@@ -1,0 +1,260 @@
+{
+  "generatedAt": "2026-06-20T03:26:30.759Z",
+  "source": "shared/collections.ts",
+  "collections": {
+    "perfLog": {
+      "name": "perfLog",
+      "schema": {
+        "fields": {
+          "durationMs": {
+            "type": "number",
+            "required": true
+          },
+          "operation": {
+            "type": "string",
+            "required": true
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "operation": 1
+            }
+          },
+          {
+            "fields": {
+              "userId": 1
+            }
+          }
+        ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": false,
+        "public": false,
+        "cascadeFrom": null
+      }
+    },
+    "authMagicLink": {
+      "name": "authMagicLink",
+      "schema": {
+        "fields": {
+          "consumedAt": {
+            "type": "number",
+            "required": true,
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "required": true
+          },
+          "expiresAt": {
+            "type": "number",
+            "required": true
+          },
+          "requestIp": {
+            "type": "string",
+            "required": true,
+            "nullable": true
+          },
+          "requestedAt": {
+            "type": "number",
+            "required": true
+          },
+          "tokenHash": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "email": 1
+            }
+          },
+          {
+            "fields": {
+              "expiresAt": 1
+            },
+            "ttl": 86400
+          }
+        ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": false,
+        "public": false,
+        "cascadeFrom": null
+      }
+    },
+    "authIdentity": {
+      "name": "authIdentity",
+      "schema": {
+        "fields": {
+          "createdAt": {
+            "type": "number",
+            "required": true
+          },
+          "email": {
+            "type": "string",
+            "required": true,
+            "nullable": true
+          },
+          "lastLoginAt": {
+            "type": "number",
+            "required": true
+          },
+          "name": {
+            "type": "string",
+            "required": true,
+            "nullable": true
+          },
+          "provider": {
+            "type": "enum",
+            "values": [
+              "magic-link",
+              "google",
+              "uglybot"
+            ],
+            "required": true
+          },
+          "providerKey": {
+            "type": "string",
+            "required": true
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "providerKey": 1
+            }
+          },
+          {
+            "fields": {
+              "userId": 1
+            }
+          }
+        ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": false,
+        "public": false,
+        "cascadeFrom": null
+      }
+    },
+    "todo": {
+      "name": "todo",
+      "schema": {
+        "fields": {
+          "done": {
+            "type": "boolean",
+            "required": true
+          },
+          "text": {
+            "type": "string",
+            "required": true
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        }
+      },
+      "meta": {
+        "cache": false,
+        "trackable": true,
+        "public": false,
+        "cascadeFrom": null,
+        "trackKeys": [
+          "userId"
+        ]
+      }
+    },
+    "conversation": {
+      "name": "conversation",
+      "schema": {
+        "fields": {
+          "title": {
+            "type": "string",
+            "required": true,
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "required": true,
+            "default": "ai-chat"
+          }
+        }
+      },
+      "meta": {
+        "cache": false,
+        "trackable": false,
+        "public": false,
+        "cascadeFrom": null
+      }
+    },
+    "message": {
+      "name": "message",
+      "schema": {
+        "fields": {
+          "conversationId": {
+            "type": "string",
+            "required": true
+          },
+          "text": {
+            "type": "string",
+            "required": true
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        }
+      },
+      "meta": {
+        "cache": false,
+        "trackable": false,
+        "public": false,
+        "cascadeFrom": "conversation",
+        "trackKeys": [
+          "conversationId"
+        ]
+      }
+    },
+    "collabDoc": {
+      "name": "collabDoc",
+      "schema": {
+        "fields": {
+          "lastSyncedAt": {
+            "type": "number",
+            "required": true
+          },
+          "serialized": {
+            "type": "string",
+            "required": true,
+            "nullable": true
+          },
+          "yjsState": {
+            "type": "string",
+            "required": true
+          }
+        }
+      },
+      "meta": {
+        "cache": false,
+        "trackable": false,
+        "public": false,
+        "cascadeFrom": null
+      }
+    }
+  }
+}

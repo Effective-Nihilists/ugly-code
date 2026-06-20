@@ -1,0 +1,170 @@
+import React from 'react';
+import { native, permissions, isNativeAvailable, nativePlatform } from 'ugly-app/native';
+import type { HostDirent } from 'ugly-app/native';
+
+// ── ugly-code: the IDE, as a web app ─────────────────────────────────────────
+// The first functional slice — a file browser + editor that reaches the local
+// filesystem entirely through the unified UglyNative SDK (`ugly-app/native`),
+// fulfilled by the Ugly Studio desktop browser's daemon. No app server involved:
+// fs/process are native capabilities, AI (later) is a direct fetch to ugly.bot.
+
+function joinPath(dir: string, name: string): string {
+  if (dir === '/' || dir === '') return '/' + name;
+  return dir.replace(/\/+$/, '') + '/' + name;
+}
+function parentOf(dir: string): string {
+  if (dir === '/' || dir === '') return '/';
+  const p = dir.replace(/\/+$/, '').split('/').slice(0, -1).join('/');
+  return p === '' ? '/' : p;
+}
+
+export default function CodeEditorPage(): React.ReactElement {
+  const available = isNativeAvailable();
+  const platform = nativePlatform();
+
+  const [cwd, setCwd] = React.useState('/');
+  const [entries, setEntries] = React.useState<HostDirent[]>([]);
+  const [openFile, setOpenFile] = React.useState<string | null>(null);
+  const [content, setContent] = React.useState('');
+  const [dirty, setDirty] = React.useState(false);
+  const [status, setStatus] = React.useState('');
+
+  const list = React.useCallback(async (dir: string) => {
+    setStatus(`reading ${dir}…`);
+    try {
+      const items = await native.fs.readdir(dir);
+      items.sort((a, b) =>
+        a.isDirectory === b.isDirectory ? a.name.localeCompare(b.name) : a.isDirectory ? -1 : 1,
+      );
+      setEntries(items);
+      setCwd(dir);
+      setStatus(`${items.length} items`);
+    } catch (e) {
+      setStatus(`error: ${(e as Error).message}`);
+    }
+  }, []);
+
+  // On mount: request fs, then list the home directory.
+  React.useEffect(() => {
+    if (!available) return;
+    (async () => {
+      try {
+        await permissions.request({ fs: 'full' });
+        await list('/');
+      } catch (e) {
+        setStatus(`permission error: ${(e as Error).message}`);
+      }
+    })();
+  }, [available, list]);
+
+  async function openEntry(entry: HostDirent) {
+    const path = joinPath(cwd, entry.name);
+    if (entry.isDirectory) {
+      await list(path);
+      return;
+    }
+    setStatus(`opening ${path}…`);
+    try {
+      const text = await native.fs.readFile(path);
+      setOpenFile(path);
+      setContent(text);
+      setDirty(false);
+      setStatus(`opened ${path}`);
+    } catch (e) {
+      setStatus(`error: ${(e as Error).message}`);
+    }
+  }
+
+  async function save() {
+    if (!openFile) return;
+    setStatus(`saving ${openFile}…`);
+    try {
+      await native.fs.writeFile(openFile, content);
+      setDirty(false);
+      setStatus(`saved ${openFile}`);
+    } catch (e) {
+      setStatus(`error: ${(e as Error).message}`);
+    }
+  }
+
+  if (!available) {
+    return (
+      <div data-id="no-native" style={S.fallback}>
+        <div style={{ fontWeight: 800, fontSize: 22 }}>Ugly Code</div>
+        <p style={{ color: '#988e80', maxWidth: 420, textAlign: 'center' }}>
+          This is the IDE — it needs the <b>Ugly Studio</b> browser to reach your filesystem.
+          Open <code>code.ugly.bot</code> inside Ugly Studio to start editing.
+        </p>
+        <div data-id="platform" style={S.tag}>platform: {platform}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={S.root}>
+      <header style={S.header}>
+        <span style={{ fontFamily: 'monospace', fontWeight: 800 }}>UGLY·CODE</span>
+        <span data-id="cwd" style={S.cwd}>{cwd}</span>
+        <span data-id="platform" style={S.tag}>{platform}</span>
+        <span style={{ flex: 1 }} />
+        <button data-id="save-btn" onClick={save} disabled={!openFile || !dirty} style={S.save}>
+          {dirty ? 'Save ●' : 'Saved'}
+        </button>
+      </header>
+      <div style={S.body}>
+        <nav data-id="file-tree" style={S.tree}>
+          {cwd !== '/' && (
+            <div data-id="up-dir" style={S.entry} onClick={() => list(parentOf(cwd))}>
+              ⬆ ..
+            </div>
+          )}
+          {entries.map((e) => (
+            <div
+              key={e.name}
+              data-id="fs-entry"
+              data-name={e.name}
+              data-dir={e.isDirectory ? '1' : '0'}
+              style={S.entry}
+              onClick={() => openEntry(e)}
+            >
+              {e.isDirectory ? '📁' : '📄'} {e.name}
+            </div>
+          ))}
+        </nav>
+        <main style={S.main}>
+          {openFile ? (
+            <textarea
+              data-id="editor-textarea"
+              value={content}
+              onChange={(ev) => {
+                setContent(ev.target.value);
+                setDirty(true);
+              }}
+              spellCheck={false}
+              style={S.editor}
+            />
+          ) : (
+            <div style={S.empty}>Select a file to edit.</div>
+          )}
+        </main>
+      </div>
+      <footer data-id="status" style={S.status}>{status}</footer>
+    </div>
+  );
+}
+
+const S: Record<string, React.CSSProperties> = {
+  root: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#0c0b0a', color: '#efe9e1' },
+  header: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderBottom: '1px solid #2c2620' },
+  cwd: { fontFamily: 'monospace', fontSize: 12, color: '#988e80' },
+  tag: { fontFamily: 'monospace', fontSize: 11, color: '#ff6a1f', border: '1px solid #d44e0a', borderRadius: 6, padding: '2px 7px' },
+  save: { fontFamily: 'monospace', fontSize: 12, background: '#ff6a1f', color: '#1a0e06', border: 'none', borderRadius: 7, padding: '6px 12px', cursor: 'pointer' },
+  body: { flex: 1, display: 'flex', minHeight: 0 },
+  tree: { width: 240, flex: 'none', borderRight: '1px solid #2c2620', overflow: 'auto', padding: 6 },
+  entry: { fontFamily: 'monospace', fontSize: 13, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  main: { flex: 1, minWidth: 0, display: 'flex' },
+  editor: { flex: 1, background: '#0b0907', color: '#efe9e1', border: 'none', outline: 'none', fontFamily: 'monospace', fontSize: 13, padding: 16, resize: 'none' },
+  empty: { margin: 'auto', color: '#5f574c', fontFamily: 'monospace' },
+  status: { fontFamily: 'monospace', fontSize: 11, color: '#988e80', padding: '6px 14px', borderTop: '1px solid #2c2620' },
+  fallback: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, height: '100vh', background: '#0c0b0a', color: '#efe9e1' },
+};
