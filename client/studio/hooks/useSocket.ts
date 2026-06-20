@@ -29,6 +29,11 @@ export function onCustomMessage(handler: CustomMessageHandler): () => void {
     customMessageHandlers.delete(handler);
   };
 }
+/** Fan a server-style push message out to subscribers — how the client-side
+ *  agent streams `codingAgent:event` frames into useCodingAgentChat. */
+function emitCustom(msg: { type: string; [k: string]: unknown }): void {
+  for (const h of customMessageHandlers) h(msg);
+}
 /** The native transport is always "connected" (no remote handshake). */
 export function isConnected(): boolean {
   return true;
@@ -69,7 +74,16 @@ const handlers: Record<string, Handler> = {
   codingAgentChatListMessages: () => Promise.resolve({ messages: [], hasMore: false }),
   getCodingAgentSnapshot: () => Promise.resolve(null),
   codingAgentChatCreate: () => Promise.resolve({ sessionId: 'sess-stub:' + Math.random().toString(36).slice(2, 9) }),
-  codingAgentChatSend: () => Promise.resolve({}),
+  codingAgentChatSend: (i) => {
+    const sessionId = String(i.sessionId ?? '');
+    const message = String(i.message ?? '');
+    // Run the agent loop client-side; it streams codingAgent:event frames back
+    // through emitCustom for useCodingAgentChat to render.
+    void import('../agent/clientAgent').then((m) =>
+      m.runClientAgentTurn(sessionId, message, emitCustom),
+    );
+    return Promise.resolve({});
+  },
   codingAgentChatStop: () => Promise.resolve({}),
   codingAgentChatClearMessages: () => Promise.resolve({}),
   codingAgentToolStop: () => Promise.resolve({}),

@@ -500,15 +500,11 @@ export interface PendingStepReview {
 }
 
 async function rawAgentApi(method: string, input: object): Promise<any> {
-  const res = await fetch(`/api/${method}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ input }),
-  });
-  const json = await res.json();
-  if (json.error) throw new Error(json.error);
-  return json.result ?? json;
+  // Phase 3b: the coding-agent RPCs route through the native transport shim
+  // (window.UglyNative) instead of a sidecar `/api/*` fetch. The shim runs the
+  // agent loop client-side for chatSend.
+  const { nativeRequest } = await import('./useSocket');
+  return nativeRequest(method, input);
 }
 
 /**
