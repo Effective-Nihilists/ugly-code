@@ -39,6 +39,93 @@ export function isConnected(): boolean {
   return true;
 }
 
+// The opened project's absolute path — set by StudioProjectPage. Used to run
+// project-scoped native tools (the DB query script, the `ugly-app` CLI).
+let activeProjectPath: string | null = null;
+export function setActiveProjectPath(p: string | null): void {
+  activeProjectPath = p;
+}
+
+// A self-contained Node ESM script (run via native.process in the project) that
+// resolves the project's Postgres connection string for both dev (local .env
+// DATABASE_URL) and prod (Neon, from the project's publish-state) and runs the
+// requested DB op through the project's own ugly-app/server. No backticks/${}
+// so it embeds cleanly; inputs arrive via env.
+const DB_SCRIPT = [
+  "import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';",
+  "const mode = process.env.UGLY_DB_MODE, proj = process.env.UGLY_DB_PROJECT, op = process.env.UGLY_DB_OP;",
+  "const input = JSON.parse(process.env.UGLY_DB_INPUT || '{}');",
+  "function connStr(){",
+  "  if (mode === 'prod') {",
+  "    const ua = JSON.parse(fs.readFileSync(path.join(proj, '.uglyapp'), 'utf8'));",
+  "    const st = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.ugly-studio', 'projects', ua.projectId, 'publish-state.json'), 'utf8'));",
+  "    const neon = st.neon || (st.deployTarget && st.deployTarget.neon) || {};",
+  "    const cs = neon.connectionString || neon.connStr || (st.deployTarget && st.deployTarget.neonConnectionString);",
+  "    if (!cs) throw new Error('No Neon connection string in publish-state for ' + ua.projectId);",
+  "    return cs;",
+  "  }",
+  "  const env = fs.readFileSync(path.join(proj, '.env'), 'utf8');",
+  "  const m = /^(?:DATABASE_URL|POSTGRES_URL)=(.+)$/m.exec(env);",
+  "  if (!m) throw new Error('No DATABASE_URL/POSTGRES_URL in ' + proj + '/.env');",
+  "  return m[1].trim().replace(/^[\"\\']|[\"\\']$/g, '');",
+  "}",
+  "process.env.DATABASE_URL = connStr();",
+  "const mod = await import('ugly-app/server');",
+  "mod.createAdapter();",
+  "const q = mod.query || mod.pgQuery;",
+  "let out = {};",
+  "if (op === 'collections') {",
+  "  const sql = \"SELECT c.relname AS name, c.reltuples::bigint AS n FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace WHERE ns.nspname = 'public' AND c.relkind = 'r' AND c.relname NOT LIKE 'pg_%' ORDER BY c.relname\";",
+  "  const r = await q(sql);",
+  "  out = { collections: r.rows.map((x) => ({ name: x.name, estimatedCount: Math.max(0, Number(x.n) || 0) })) };",
+  "} else if (op === 'getDoc') {",
+  "  const r = await q('SELECT data FROM \"' + input.collection + '\" WHERE _id = $1', [input.id]);",
+  "  out = { doc: (r.rows[0] && r.rows[0].data) || null };",
+  "} else if (op === 'getQuery') {",
+  "  const t0 = Date.now();",
+  "  const rows = await mod.getQueryRaw(input.collection, input.pipeline || [], { limit: input.limit || 50, skip: input.skip || 0 });",
+  "  const columns = rows.length ? Object.keys(rows[0]) : [];",
+  "  out = { columns, rows, rowCount: rows.length, durationMs: Date.now() - t0 };",
+  "}",
+  "process.stdout.write(JSON.stringify(out));",
+].join('\n');
+
+function runDbScript(op: string, mode: string, input: unknown): Promise<unknown> {
+  const proj = activeProjectPath;
+  if (!proj) return Promise.reject(new Error('No active project'));
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    try {
+      const proc = native.process.spawn('node', ['--input-type=module', '-e', DB_SCRIPT], {
+        cwd: proj,
+        env: {
+          UGLY_DB_MODE: mode,
+          UGLY_DB_PROJECT: proj,
+          UGLY_DB_OP: op,
+          UGLY_DB_INPUT: JSON.stringify(input ?? {}),
+        },
+      });
+      proc.onStdout((c) => (stdout += c));
+      proc.onStderr((c) => (stderr += c));
+      proc.onError((e) => reject(new Error(e)));
+      proc.onExit((code) => {
+        if (code === 0) {
+          try {
+            resolve(JSON.parse(stdout || '{}'));
+          } catch {
+            reject(new Error('DB query: unparseable output: ' + stdout.slice(0, 200)));
+          }
+        } else {
+          reject(new Error(stderr.trim() || 'node exited ' + code));
+        }
+      });
+    } catch (e) {
+      reject(e as Error);
+    }
+  });
+}
+
 // Studio user settings persist locally in the browser for now (later: a native
 // settings file under the app's scoped dir).
 const SETTINGS_KEY = 'ugly-studio:settings';
@@ -66,6 +153,18 @@ const handlers: Record<string, Handler> = {
     return Promise.resolve({});
   },
   listRecentProjects: () => Promise.resolve({ projects: [] }),
+  // ── Database panel: run queries against the project's PG (dev) or Neon (prod)
+  // via a node+pg script over native.process. ──
+  dbCollections: (i) => runDbScript('collections', String(i.mode ?? 'dev'), {}),
+  dbGetDoc: (i) =>
+    runDbScript('getDoc', String(i.mode ?? 'dev'), { collection: i.collection, id: i.id }),
+  dbGetQuery: (i) =>
+    runDbScript('getQuery', String(i.mode ?? 'dev'), {
+      collection: i.collection,
+      pipeline: i.pipeline,
+      limit: i.limit,
+      skip: i.skip,
+    }),
   // ── project-page (session sidebar) reads ──
   codingAgentListSessions: () => Promise.resolve({ sessions: [] }),
   gitStatus: () => Promise.resolve({ branch: 'main', remote: null, files: [] }),

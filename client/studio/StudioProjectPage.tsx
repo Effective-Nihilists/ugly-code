@@ -3,10 +3,13 @@ import {
   SessionListSidebar,
   type SessionListSidebarSession,
 } from './panels/SessionListSidebar';
-import { nativeRequest } from './hooks/useSocket';
+import { nativeRequest, setActiveProjectPath } from './hooks/useSocket';
 import { timeAgoShort } from './utils/timeAgo';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { CodingAgentChat } from './panels/CodingAgentChat';
+import { DatabasePanel } from './panels/DatabasePanel';
+
+type WorkspaceTab = 'chat' | 'database';
 
 // Phase 2: the project page — the REAL Studio session sidebar (session list +
 // Prod/Git/Terminal footer buttons + New session) rendering against the native
@@ -34,6 +37,14 @@ export default function StudioProjectPage({
   onBack: () => void;
 }): React.ReactElement {
   const [sessions, setSessions] = React.useState<SessionRow[]>([]);
+  const [tab, setTab] = React.useState<WorkspaceTab>('chat');
+
+  // Tell the native transport which project the panels (DB query, ugly-app CLI)
+  // should target.
+  React.useEffect(() => {
+    setActiveProjectPath(projectPath ?? null);
+    return () => setActiveProjectPath(null);
+  }, [projectPath]);
 
   React.useEffect(() => {
     nativeRequest('codingAgentListSessions', { projectPath, includeArchived: true })
@@ -84,9 +95,26 @@ export default function StudioProjectPage({
           </button>
           <span style={S.name}>{projectName}</span>
           {projectPath && <span style={S.path}>{projectPath}</span>}
+          <span style={{ flex: 1 }} />
+          {(['chat', 'database'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}
+            >
+              {t === 'chat' ? 'Agent' : 'Database'}
+            </button>
+          ))}
         </header>
-        <div style={S.chat}>
-          <CodingAgentChat />
+        <div style={S.content}>
+          <div style={{ ...S.pane, display: tab === 'chat' ? 'flex' : 'none' }}>
+            <CodingAgentChat />
+          </div>
+          {tab === 'database' && (
+            <div style={S.paneScroll}>
+              <DatabasePanel />
+            </div>
+          )}
         </div>
       </main>
     </div>
@@ -102,5 +130,9 @@ const S: Record<string, React.CSSProperties> = {
   back: { fontFamily: 'monospace', fontSize: 12, background: 'transparent', color: '#988e80', border: '1px solid #2c2620', borderRadius: 7, padding: '5px 11px', cursor: 'pointer' },
   name: { fontFamily: 'monospace', fontWeight: 700 },
   path: { fontFamily: 'monospace', fontSize: 12, color: '#5f574c' },
-  chat: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' },
+  tab: { fontFamily: 'monospace', fontSize: 12, background: 'transparent', color: '#988e80', border: '1px solid #2c2620', borderRadius: 7, padding: '5px 12px', cursor: 'pointer' },
+  tabActive: { background: '#1a1512', color: '#ff6a1f', borderColor: '#d44e0a' },
+  content: { flex: 1, minHeight: 0, display: 'flex', position: 'relative' },
+  pane: { flex: 1, minHeight: 0, flexDirection: 'column' },
+  paneScroll: { flex: 1, minHeight: 0, overflow: 'auto' },
 };
