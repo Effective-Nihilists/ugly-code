@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.DS_Store
+local/
+logs/
+coverage/
+
+# ugly-studio state (do not commit)
+.ugly-studio/codebase-index.db*
+.ugly-studio/session-index.db*
+.ugly-studio/layout.json
+.ugly-studio/sandbox-state.json
+.ugly-studio/tmp/
+.ugly-studio/users/
+.ugly-studio/home/
