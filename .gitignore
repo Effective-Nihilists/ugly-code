@@ -4,6 +4,13 @@ dist/
 local/
 logs/
 coverage/
+test-results/
+playwright-report/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
 
 # ugly-studio state (do not commit)
 .ugly-studio/codebase-index.db*
