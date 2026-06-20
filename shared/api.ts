@@ -1,6 +1,20 @@
 import { authReq, defineMessages, defineRequests, frameworkMessages, frameworkRequests, z } from 'ugly-app/shared';
+import { agentMessageSchema } from './agent';
 
 export const requests = defineRequests({
+  // Coding agent — one turn of the agentic loop. The client sends the full
+  // message history; the server adds the system prompt + tool specs and returns
+  // the model's next assistant message (which may contain tool_use blocks the
+  // client then executes against the native fs/process API).
+  agentStep: authReq({
+    input: z.object({
+      messages: z.array(agentMessageSchema),
+      model: z.string().optional(),
+    }),
+    output: z.object({ message: agentMessageSchema }),
+    rateLimit: { max: 60, window: 60 },
+  }),
+
   // Todo demo — CRUD requests
   createTodo: authReq({
     input: z.object({ text: z.string().min(1).max(500) }),

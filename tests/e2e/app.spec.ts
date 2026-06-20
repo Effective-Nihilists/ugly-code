@@ -1,14 +1,17 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('App startup', () => {
-  test('home page loads and shows welcome text', async ({ page }) => {
+  test('home page is the IDE (Ugly Code)', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText('Welcome')).toBeVisible();
+    // The home route is the IDE (CodeEditorPage). In a plain browser without
+    // the Ugly Studio native bridge it renders the "open in Studio" fallback.
+    await expect(page.getByText('Ugly Code')).toBeVisible();
   });
 
-  test('home page shows login button when unauthenticated', async ({ page }) => {
+  test('home page tells unbridged browsers to open in Ugly Studio', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText('Login')).toBeVisible();
+    await expect(page.locator('[data-id="no-native"]')).toBeVisible();
+    await expect(page.locator('[data-id="no-native"]')).toContainText('Ugly Studio');
   });
 
   test('navigating to a non-existent route returns 404', async ({ page }) => {

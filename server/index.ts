@@ -14,9 +14,10 @@ import {
 import { nanoid } from 'nanoid';
 import { enableConversations } from 'ugly-app/conversation/server';
 import { enableCollab } from 'ugly-app/collab/server';
-import type { WorkerHandlers } from 'ugly-app/shared';
+import type { WorkerHandlers, TextGenModel } from 'ugly-app/shared';
 import { dbDefaults } from 'ugly-app/shared';
 import { messages, requests } from '../shared/api';
+import { AGENT_DEFAULT_MODEL, AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
 import type { Todo } from '../shared/collections';
 import { collections } from '../shared/collections';
 import { cronTasks } from '../shared/cron';
@@ -40,6 +41,23 @@ const cronHandlers: WorkerHandlers<typeof cronTasks> = {
 const app = createApp(
   { requests, messages },
   {
+    // Coding agent — forward one turn to ugly.bot's textGen with the system
+    // prompt + tool specs, and return the raw assistant message (tool_use
+    // blocks included) for the client loop to dispatch.
+    agentStep: async (_userId, { messages: history, model }) => {
+      const data = await uglyBotRequest('textGen', {
+        model: (model as TextGenModel) ?? AGENT_DEFAULT_MODEL,
+        messages: [
+          { role: 'system', content: AGENT_SYSTEM_PROMPT },
+          ...history,
+        ],
+        tools: AGENT_TOOLS,
+        options: { maxTokens: 8192 },
+      });
+      if (!data?.message) throw new Error('Agent step failed: no response from model');
+      return { message: data.message as AgentMessage };
+    },
+
     createTodo: async (userId, { text }) => {
       const _id = nanoid();
       const todo: Todo = { _id, userId, text, done: false, ...dbDefaults() };

@@ -1,6 +1,7 @@
 import React from 'react';
 import { native, permissions, isNativeAvailable, nativePlatform } from 'ugly-app/native';
 import type { HostDirent } from 'ugly-app/native';
+import AgentPanel from '../agent/AgentPanel';
 
 // ── ugly-code: the IDE, as a web app ─────────────────────────────────────────
 // The first functional slice — a file browser + editor that reaches the local
@@ -173,6 +174,7 @@ export default function CodeEditorPage(): React.ReactElement {
             <div style={S.empty}>Select a file to edit.</div>
           )}
         </main>
+        <AgentPanel />
       </div>
       <section data-id="terminal" style={S.terminal}>
         <div style={S.termBar}>

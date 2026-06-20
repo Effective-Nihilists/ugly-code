@@ -15,9 +15,7 @@ describe('Page definitions', () => {
   });
 
   it('authenticated pages require auth', () => {
-    const authPages = ['test/todo', 'test/ai', 'test/upload'] as const;
-    for (const key of authPages) {
-      expect(pages[key].auth, `${key} should require auth`).toBe(true);
-    }
+    // user/:userId is the authed route (definePage defaults to auth: true).
+    expect(pages['user/:userId'].auth, 'user/:userId should require auth').not.toBe(false);
   });
 });
