@@ -5,6 +5,8 @@ import {
 } from './panels/SessionListSidebar';
 import { nativeRequest } from './hooks/useSocket';
 import { timeAgoShort } from './utils/timeAgo';
+import { ThemeProvider } from './theme/ThemeProvider';
+import { CodingAgentChat } from './panels/CodingAgentChat';
 
 // Phase 2: the project page — the REAL Studio session sidebar (session list +
 // Prod/Git/Terminal footer buttons + New session) rendering against the native
@@ -53,6 +55,7 @@ export default function StudioProjectPage({
     }));
 
   return (
+    <ThemeProvider>
     <div style={S.root}>
       <div style={S.sidebar}>
       <SessionListSidebar
@@ -82,18 +85,12 @@ export default function StudioProjectPage({
           <span style={S.name}>{projectName}</span>
           {projectPath && <span style={S.path}>{projectPath}</span>}
         </header>
-        <div style={S.placeholder}>
-          <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 8 }}>
-            Session workspace
-          </div>
-          <div style={{ maxWidth: 420, textAlign: 'center', lineHeight: 1.6 }}>
-            The coding-agent chat + the spec / files / preview / database / errors /
-            events / workers / git / tests panels land in the next phase, wired over
-            the same <code>window.UglyNative</code> transport.
-          </div>
+        <div style={S.chat}>
+          <CodingAgentChat />
         </div>
       </main>
     </div>
+    </ThemeProvider>
   );
 }
 
@@ -105,5 +102,5 @@ const S: Record<string, React.CSSProperties> = {
   back: { fontFamily: 'monospace', fontSize: 12, background: 'transparent', color: '#988e80', border: '1px solid #2c2620', borderRadius: 7, padding: '5px 11px', cursor: 'pointer' },
   name: { fontFamily: 'monospace', fontWeight: 700 },
   path: { fontFamily: 'monospace', fontSize: 12, color: '#5f574c' },
-  placeholder: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#988e80' },
+  chat: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' },
 };

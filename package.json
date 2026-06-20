@@ -30,6 +30,14 @@
     "upgrade": "node -e \"const e=require('child_process').execSync,x=require('fs').existsSync,g=require('fs').readdirSync;g('node_modules').filter(f=>f.startsWith('.ugly-app-')).forEach(f=>require('fs').rmSync('node_modules/'+f,{recursive:true,force:true}));e(x('yarn.lock')?'yarn add ugly-app@latest':x('pnpm-lock.yaml')?'pnpm add ugly-app@latest':'npm install ugly-app@latest',{stdio:'inherit'});e('node node_modules/ugly-app/dist/cli/index.js upgrade',{stdio:'inherit'})\""
   },
   "dependencies": {
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@floating-ui/react": "^0.27.19",
+    "@tanstack/virtual-core": "^3.17.0",
+    "anser": "^2.3.5",
+    "codemirror": "^6.0.2",
+    "lucide-react": "^1.8.0",
     "nanoid": "^5.1.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
