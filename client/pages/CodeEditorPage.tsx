@@ -29,6 +29,32 @@ export default function CodeEditorPage(): React.ReactElement {
   const [dirty, setDirty] = React.useState(false);
   const [status, setStatus] = React.useState('');
 
+  // Terminal: run commands via native.process (desktop-only).
+  const [cmd, setCmd] = React.useState('echo hello from ugly-code');
+  const [output, setOutput] = React.useState('');
+  const [running, setRunning] = React.useState(false);
+
+  function runCommand() {
+    const parts = cmd.trim().split(/\s+/);
+    if (parts.length === 0 || !parts[0]) return;
+    const [bin, ...args] = parts;
+    setOutput((o) => o + `$ ${cmd}\n`);
+    setRunning(true);
+    try {
+      const proc = native.process.spawn(bin, args, { cwd });
+      proc.onStdout((chunk) => setOutput((o) => o + chunk));
+      proc.onStderr((chunk) => setOutput((o) => o + chunk));
+      proc.onError((err) => setOutput((o) => o + `error: ${err}\n`));
+      proc.onExit((code) => {
+        setOutput((o) => o + `\n[exit ${code}]\n`);
+        setRunning(false);
+      });
+    } catch (e) {
+      setOutput((o) => o + `error: ${(e as Error).message}\n`);
+      setRunning(false);
+    }
+  }
+
   const list = React.useCallback(async (dir: string) => {
     setStatus(`reading ${dir}…`);
     try {
@@ -148,6 +174,23 @@ export default function CodeEditorPage(): React.ReactElement {
           )}
         </main>
       </div>
+      <section data-id="terminal" style={S.terminal}>
+        <div style={S.termBar}>
+          <span style={{ color: '#ff6a1f' }}>❯</span>
+          <input
+            data-id="cmd-input"
+            value={cmd}
+            onChange={(e) => setCmd(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !running && runCommand()}
+            spellCheck={false}
+            style={S.cmdInput}
+          />
+          <button data-id="run-btn" onClick={runCommand} disabled={running} style={S.run}>
+            {running ? 'Running…' : 'Run'}
+          </button>
+        </div>
+        {output && <pre data-id="terminal-output" style={S.termOut}>{output}</pre>}
+      </section>
       <footer data-id="status" style={S.status}>{status}</footer>
     </div>
   );
@@ -165,6 +208,11 @@ const S: Record<string, React.CSSProperties> = {
   main: { flex: 1, minWidth: 0, display: 'flex' },
   editor: { flex: 1, background: '#0b0907', color: '#efe9e1', border: 'none', outline: 'none', fontFamily: 'monospace', fontSize: 13, padding: 16, resize: 'none' },
   empty: { margin: 'auto', color: '#5f574c', fontFamily: 'monospace' },
+  terminal: { borderTop: '1px solid #2c2620', background: '#0b0907', maxHeight: 220, display: 'flex', flexDirection: 'column' },
+  termBar: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px' },
+  cmdInput: { flex: 1, background: '#141210', color: '#efe9e1', border: '1px solid #2c2620', borderRadius: 6, fontFamily: 'monospace', fontSize: 13, padding: '6px 10px', outline: 'none' },
+  run: { fontFamily: 'monospace', fontSize: 12, background: '#ff6a1f', color: '#1a0e06', border: 'none', borderRadius: 7, padding: '6px 14px', cursor: 'pointer' },
+  termOut: { margin: 0, padding: '0 12px 10px', overflow: 'auto', fontFamily: 'monospace', fontSize: 12, color: '#cabfaa', whiteSpace: 'pre-wrap' },
   status: { fontFamily: 'monospace', fontSize: 11, color: '#988e80', padding: '6px 14px', borderTop: '1px solid #2c2620' },
   fallback: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, height: '100vh', background: '#0c0b0a', color: '#efe9e1' },
 };
