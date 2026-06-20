@@ -61,9 +61,18 @@ const handlers: Record<string, Handler> = {
     return Promise.resolve({});
   },
   listRecentProjects: () => Promise.resolve({ projects: [] }),
+  // ── project-page (session sidebar) reads ──
+  codingAgentListSessions: () => Promise.resolve({ sessions: [] }),
+  gitStatus: () => Promise.resolve({ branch: 'main', remote: null, files: [] }),
+  deleteCodingAgentSession: () => Promise.resolve({}),
   evalListTasks: () => Promise.resolve({ tasks: [] }),
   evalListHistory: () => Promise.resolve({ runs: [] }),
   evalDeleteRun: () => Promise.resolve({}),
+  openProject: (i) => {
+    const path = String(i.path ?? '').replace(/\/+$/, '');
+    const name = path.split('/').pop() || path || 'project';
+    return Promise.resolve({ name, path });
+  },
   closeProject: () => Promise.resolve({}),
   setActiveProject: () => Promise.resolve({}),
   cancelTask: () => Promise.resolve({}),
