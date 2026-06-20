@@ -25,11 +25,14 @@ import type { WorkerHandlers } from 'ugly-app/shared';
 import { messages, requests } from '../shared/api';
 import { collections } from '../shared/collections';
 import { cronTasks } from '../shared/cron';
+import { agentTurnHandler } from 'ugly-app/agent/server';
+import { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } from '../shared/agent';
 
-// Request handlers run inside the Worker for `fetch` requests. Most
-// projects keep these in sync with `server/index.ts`; the framework's
-// `app.db` works the same way in both runtimes.
-const requestHandlers: Partial<RequestHandlers<typeof requests>> = {};
+// Request handlers run inside the Worker for `fetch` requests. The studio
+// coding chat (client-driven loop) calls `agentTurn` on the deployed worker.
+const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
+  agentTurn: agentTurnHandler({ tools: AGENT_TOOLS, systemPrompt: AGENT_SYSTEM_PROMPT }),
+};
 
 // Cron handlers run on Cloudflare Cron Triggers (matches the schedule
 // declared in `shared/cron.ts`).

@@ -45,6 +45,10 @@ let activeProjectPath: string | null = null;
 export function setActiveProjectPath(p: string | null): void {
   activeProjectPath = p;
 }
+/** The opened project's absolute path (for the per-session FS log). */
+export function getActiveProjectPath(): string | null {
+  return activeProjectPath;
+}
 
 // A self-contained Node ESM script (run via native.process in the project) that
 // resolves the project's Postgres connection string for both dev (local .env
@@ -330,7 +334,12 @@ const handlers: Record<string, Handler> = {
     );
     return Promise.resolve({});
   },
-  codingAgentChatStop: () => Promise.resolve({}),
+  codingAgentChatStop: (i) => {
+    void import('../agent/clientAgent').then((m) =>
+      m.abortClientAgent(String(i.sessionId ?? '')),
+    );
+    return Promise.resolve({});
+  },
   codingAgentChatClearMessages: () => Promise.resolve({}),
   codingAgentToolStop: () => Promise.resolve({}),
   codingAgentChatSetModel: () => Promise.resolve({}),

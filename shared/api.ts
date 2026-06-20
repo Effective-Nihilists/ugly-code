@@ -1,8 +1,20 @@
 import { authReq, defineMessages, defineRequests, frameworkMessages, frameworkRequests, z } from 'ugly-app/shared';
 import { agentMessageSchema } from './agent';
+import { agentTurnRequestSchema, agentTurnResponseSchema } from 'ugly-app/agent/shared';
 
 export const requests = defineRequests({
-  // Coding agent — one turn of the agentic loop. The client sends the full
+  // Standardized client-driven agent turn (ugly-app/agent). The studio coding
+  // chat drives the loop; the server streams one model turn (text + tool_use)
+  // and returns the authoritative result + per-turn telemetry. Replaces the
+  // bespoke agentStep loop for the studio path.
+  agentTurn: authReq({
+    input: agentTurnRequestSchema,
+    output: agentTurnResponseSchema,
+    rateLimit: { max: 120, window: 60 },
+  }),
+
+  // Coding agent — one turn of the agentic loop (legacy single-shot; still used
+  // by the standalone AgentPanel / CodeEditorPage). The client sends the full
   // message history; the server adds the system prompt + tool specs and returns
   // the model's next assistant message (which may contain tool_use blocks the
   // client then executes against the native fs/process API).

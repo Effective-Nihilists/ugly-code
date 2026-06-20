@@ -18,6 +18,7 @@ import type { WorkerHandlers, TextGenModel } from 'ugly-app/shared';
 import { dbDefaults } from 'ugly-app/shared';
 import { messages, requests } from '../shared/api';
 import { AGENT_DEFAULT_MODEL, AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
+import { agentTurnHandler } from 'ugly-app/agent/server';
 import type { Todo } from '../shared/collections';
 import { collections } from '../shared/collections';
 import { cronTasks } from '../shared/cron';
@@ -41,6 +42,9 @@ const cronHandlers: WorkerHandlers<typeof cronTasks> = {
 const app = createApp(
   { requests, messages },
   {
+    // Standardized client-driven agent turn (ugly-app/agent) — the studio path.
+    agentTurn: agentTurnHandler({ tools: AGENT_TOOLS, systemPrompt: AGENT_SYSTEM_PROMPT }),
+
     // Coding agent — forward one turn to ugly.bot's textGen with the system
     // prompt + tool specs, and return the raw assistant message (tool_use
     // blocks included) for the client loop to dispatch.
