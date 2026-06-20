@@ -90,6 +90,46 @@ const DB_SCRIPT = [
   "process.stdout.write(JSON.stringify(out));",
 ].join('\n');
 
+/** Spawn the opened project's `ugly-app <cmd> --json` CLI (reads its prod D1
+ *  telemetry) and parse the NDJSON output into docs. Resolves [] on any failure
+ *  (project not deployed, no CF token, command missing) so panels degrade. */
+function runCli(cmd: string): Promise<{ _id: string; created: number; data: Record<string, unknown> }[]> {
+  const proj = activeProjectPath;
+  if (!proj) return Promise.resolve([]);
+  return new Promise((resolve) => {
+    let stdout = '';
+    try {
+      const proc = native.process.spawn(
+        'node',
+        ['./node_modules/ugly-app/dist/cli/index.js', cmd, '--json'],
+        { cwd: proj },
+      );
+      proc.onStdout((c) => (stdout += c));
+      proc.onError(() => resolve([]));
+      proc.onExit(() => {
+        const docs = stdout
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .map((l) => {
+            try {
+              return JSON.parse(l) as { _id: string; created: number; data: Record<string, unknown> };
+            } catch {
+              return null;
+            }
+          })
+          .filter((d): d is { _id: string; created: number; data: Record<string, unknown> } => !!d && !!d.data);
+        resolve(docs);
+      });
+    } catch {
+      resolve([]);
+    }
+  });
+}
+
+const mapWorkerStatus = (s: unknown): 'completed' | 'failed' =>
+  s === 'error' ? 'failed' : 'completed';
+
 function runDbScript(op: string, mode: string, input: unknown): Promise<unknown> {
   const proj = activeProjectPath;
   if (!proj) return Promise.reject(new Error('No active project'));
@@ -165,6 +205,113 @@ const handlers: Record<string, Handler> = {
       limit: i.limit,
       skip: i.skip,
     }),
+  // ── telemetry panels: read the project's prod D1 via `ugly-app <cmd> --json` ──
+  errorLogGetList: async () => {
+    const docs = await runCli('errors');
+    return {
+      errors: docs.map((d) => ({
+        id: d._id,
+        created: d.created,
+        source: String(d.data.source ?? ''),
+        type: String(d.data.type ?? ''),
+        level: String(d.data.level ?? 'error'),
+        message: String(d.data.message ?? ''),
+        stack: d.data.stack as string | undefined,
+        userId: (d.data.userId ?? null) as string | null,
+        hash: '',
+        isExpected: false,
+      })),
+    };
+  },
+  errorLogGetSummary: async () => {
+    const docs = await runCli('errors');
+    const map = new Map<string, { message: string; count: number; lastSeen: number; latestErrorId: string }>();
+    for (const d of docs) {
+      const msg = String(d.data.message ?? '');
+      const e = map.get(msg);
+      if (e) {
+        e.count++;
+        if (d.created > e.lastSeen) {
+          e.lastSeen = d.created;
+          e.latestErrorId = d._id;
+        }
+      } else {
+        map.set(msg, { message: msg, count: 1, lastSeen: d.created, latestErrorId: d._id });
+      }
+    }
+    return { aggregations: [...map.values()].sort((a, b) => b.count - a.count) };
+  },
+  eventList: async () => {
+    const docs = await runCli('events');
+    return {
+      events: docs.map((d) => ({
+        id: d._id,
+        created: d.created,
+        eventName: String(d.data.eventName ?? ''),
+        userId: (d.data.userId ?? null) as string | null,
+        sessionId: String(d.data.sessionId ?? ''),
+        properties: (d.data.properties ?? {}) as Record<string, unknown>,
+      })),
+    };
+  },
+  eventTopEvents: async () => {
+    const docs = await runCli('events');
+    const counts = new Map<string, number>();
+    for (const d of docs) {
+      const n = String(d.data.eventName ?? '');
+      counts.set(n, (counts.get(n) ?? 0) + 1);
+    }
+    return {
+      events: [...counts.entries()]
+        .map(([eventName, count]) => ({ eventName, count }))
+        .sort((a, b) => b.count - a.count),
+    };
+  },
+  workersGetManifest: async () => {
+    const docs = await runCli('workers');
+    const names = new Map<string, { name: string; schedule?: string }>();
+    for (const d of docs) {
+      const n = String(d.data.name ?? '');
+      if (n && !names.has(n)) names.set(n, { name: n, schedule: d.data.schedule as string | undefined });
+    }
+    return { available: true, workers: [...names.values()] };
+  },
+  workersListRuns: async (i) => {
+    const docs = await runCli('workers');
+    const filtered = i.name ? docs.filter((d) => d.data.name === i.name) : docs;
+    return {
+      runs: filtered.map((d) => ({
+        runId: d._id,
+        name: String(d.data.name ?? ''),
+        startedAt: d.created,
+        status: mapWorkerStatus(d.data.status),
+        durationMs: (d.data.durationMs ?? null) as number | null,
+        source: String(d.data.source ?? ''),
+        error: d.data.error as string | undefined,
+      })),
+    };
+  },
+  workersGetRun: async (i) => {
+    const docs = await runCli('workers');
+    const d = docs.find((x) => x._id === i.runId);
+    return {
+      run: d
+        ? {
+            runId: d._id,
+            name: String(d.data.name ?? ''),
+            startedAt: d.created,
+            status: mapWorkerStatus(d.data.status),
+            durationMs: (d.data.durationMs ?? null) as number | null,
+            source: String(d.data.source ?? ''),
+            error: d.data.error as string | undefined,
+            logs: [],
+          }
+        : null,
+    };
+  },
+  workersRun: () =>
+    Promise.resolve({ runId: 'manual-' + Math.random().toString(36).slice(2, 9) }),
+
   // ── project-page (session sidebar) reads ──
   codingAgentListSessions: () => Promise.resolve({ sessions: [] }),
   gitStatus: () => Promise.resolve({ branch: 'main', remote: null, files: [] }),

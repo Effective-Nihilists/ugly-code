@@ -8,8 +8,18 @@ import { timeAgoShort } from './utils/timeAgo';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { CodingAgentChat } from './panels/CodingAgentChat';
 import { DatabasePanel } from './panels/DatabasePanel';
+import { ErrorsPanel } from './panels/ErrorsPanel';
+import { EventsPanel } from './panels/EventsPanel';
+import { WorkersPanel } from './panels/WorkersPanel';
 
-type WorkspaceTab = 'chat' | 'database';
+type WorkspaceTab = 'chat' | 'database' | 'errors' | 'events' | 'workers';
+const TABS: { id: WorkspaceTab; label: string }[] = [
+  { id: 'chat', label: 'Agent' },
+  { id: 'database', label: 'Database' },
+  { id: 'errors', label: 'Errors' },
+  { id: 'events', label: 'Events' },
+  { id: 'workers', label: 'Workers' },
+];
 
 // Phase 2: the project page — the REAL Studio session sidebar (session list +
 // Prod/Git/Terminal footer buttons + New session) rendering against the native
@@ -96,25 +106,25 @@ export default function StudioProjectPage({
           <span style={S.name}>{projectName}</span>
           {projectPath && <span style={S.path}>{projectPath}</span>}
           <span style={{ flex: 1 }} />
-          {(['chat', 'database'] as const).map((t) => (
+          {TABS.map((t) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{ ...S.tab, ...(tab === t.id ? S.tabActive : {}) }}
             >
-              {t === 'chat' ? 'Agent' : 'Database'}
+              {t.label}
             </button>
           ))}
         </header>
         <div style={S.content}>
+          {/* Chat stays mounted (preserves the agent session); others mount on demand. */}
           <div style={{ ...S.pane, display: tab === 'chat' ? 'flex' : 'none' }}>
             <CodingAgentChat />
           </div>
-          {tab === 'database' && (
-            <div style={S.paneScroll}>
-              <DatabasePanel />
-            </div>
-          )}
+          {tab === 'database' && <div style={S.paneScroll}><DatabasePanel /></div>}
+          {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel /></div>}
+          {tab === 'events' && <div style={S.paneScroll}><EventsPanel /></div>}
+          {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel /></div>}
         </div>
       </main>
     </div>
