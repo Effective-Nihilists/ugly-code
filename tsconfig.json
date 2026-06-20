@@ -7,8 +7,12 @@
     "types": ["vite/client", "node"],
     "jsx": "react-jsx",
     "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    // Relaxed to match ugly-studio (where the vendored Studio IDE under
+    // client/studio/ was authored). Both flags only tighten; turning them off
+    // never breaks ugly-code's own code, and the 55k-LOC vendored IDE wasn't
+    // written against them.
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
