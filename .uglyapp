@@ -4,10 +4,22 @@
   "description": "The Ugly Studio coding agent + IDE, as a web app — runs on the Ugly Studio desktop browser via window.ugly (fs/process), AI via ugly.bot.",
   "deployTarget": {
     "provider": "cloudflare-workers",
+    "workerName": "ugly-code",
+    "workerUrl": "https://ugly-code.justin-mann.workers.dev",
+    "cloudflareSubdomain": "justin-mann",
+    "neonProjectId": "lucky-king-13845230",
+    "cloudflareAccountId": "9edc7fbe4a55b0b6489df8e7a120526c",
+    "r2BucketName": "ugly-code",
     "appDomain": "code.ugly.bot",
+    "appDomainZoneId": "49fdcfd05f20b82fb8cf9d11bcb8a3de",
     "customDomainUrl": "https://code.ugly.bot",
     "sendingDomain": "code.ugly.bot",
-    "cloudflareAccountId": "9edc7fbe4a55b0b6489df8e7a120526c",
-    "appDomainZoneId": "49fdcfd05f20b82fb8cf9d11bcb8a3de"
+    "proxyTokenIds": {
+      "ai": "",
+      "email": "",
+      "push": "",
+      "search": ""
+    },
+    "lastDeployedAt": "2026-06-20T06:08:31.620Z"
   }
 }
