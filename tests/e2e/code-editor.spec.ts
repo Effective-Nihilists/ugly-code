@@ -86,4 +86,8 @@ test('shows the Open-in-Studio fallback when native is unavailable (web)', async
   await page.goto('/');
   await expect(page.locator('[data-id="no-native"]')).toBeVisible();
   await expect(page.locator('[data-id="no-native"]')).toContainText('Ugly Studio');
+  // It offers a download link to the Ugly Studio landing page.
+  const cta = page.locator('[data-id="download-studio"]');
+  await expect(cta).toBeVisible();
+  await expect(cta).toHaveAttribute('href', 'https://studio.ugly.bot');
 });

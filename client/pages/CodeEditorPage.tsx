@@ -119,9 +119,13 @@ export default function CodeEditorPage(): React.ReactElement {
       <div data-id="no-native" style={S.fallback}>
         <div style={{ fontWeight: 800, fontSize: 22 }}>Ugly Code</div>
         <p style={{ color: '#988e80', maxWidth: 420, textAlign: 'center' }}>
-          This is the IDE — it needs the <b>Ugly Studio</b> browser to reach your filesystem.
-          Open <code>code.ugly.bot</code> inside Ugly Studio to start editing.
+          This is the IDE — it runs inside the <b>Ugly Studio</b> browser, which gives it
+          access to your filesystem and tools. Get Ugly Studio, then open{' '}
+          <code>code.ugly.bot</code> inside it.
         </p>
+        <a data-id="download-studio" href="https://studio.ugly.bot" style={S.cta}>
+          Download Ugly Studio
+        </a>
         <div data-id="platform" style={S.tag}>platform: {platform}</div>
       </div>
     );
@@ -217,4 +221,5 @@ const S: Record<string, React.CSSProperties> = {
   termOut: { margin: 0, padding: '0 12px 10px', overflow: 'auto', fontFamily: 'monospace', fontSize: 12, color: '#cabfaa', whiteSpace: 'pre-wrap' },
   status: { fontFamily: 'monospace', fontSize: 11, color: '#988e80', padding: '6px 14px', borderTop: '1px solid #2c2620' },
   fallback: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, height: '100vh', background: '#0c0b0a', color: '#efe9e1' },
+  cta: { fontFamily: 'monospace', fontSize: 14, fontWeight: 700, background: '#ff6a1f', color: '#1a0e06', textDecoration: 'none', borderRadius: 8, padding: '10px 18px' },
 };
