@@ -47,48 +47,37 @@ test('lists, opens, edits and saves files over uglyNative', async ({ page }) => 
   await expect(page.locator('[data-id="status"]')).toContainText('saved /README.md');
 });
 
-test('runs a command via native.process and streams output', async ({ page }) => {
-  await installUglyNativeMock(page, {
+test('runs a command via native.process over the unified protocol', async ({ page }) => {
+  // process is no longer a UglyDesktop bridge — it rides the same window.UglyNative
+  // invoke/subscribe the mock provides. spawn → invoke('process.spawn') → {id};
+  // output streams as id-keyed events.
+  const mock = await installUglyNativeMock(page, {
     platform: 'desktop',
     results: {
       'permissions.request': { granted: { fs: 'full', process: 'full' } },
       'permissions.query': { granted: { fs: 'full', process: 'full' } },
       'fs.readdir': { entries: [] },
+      'process.spawn': { id: 'P1', pid: 7 },
     },
-  });
-  // `native.process` is a facade on window.UglyDesktop (not window.UglyNative),
-  // so inject a desktop process bridge that echoes the command and exits 0.
-  await page.addInitScript(() => {
-    const w = window as unknown as { UglyDesktop?: Record<string, unknown> };
-    w.UglyDesktop = w.UglyDesktop || {};
-    (w.UglyDesktop as { process?: unknown }).process = {
-      spawn: (bin: string, args: string[]) => {
-        const h: Record<string, ((x: unknown) => void)[]> = { stdout: [], exit: [], stderr: [], error: [] };
-        setTimeout(() => {
-          h.stdout.forEach((cb) => cb(`${bin} ${args.join(' ')}\n`));
-          h.exit.forEach((cb) => cb(0));
-        }, 5);
-        return {
-          onStdout: (cb: (x: unknown) => void) => h.stdout.push(cb),
-          onStderr: (cb: (x: unknown) => void) => h.stderr.push(cb),
-          onExit: (cb: (x: unknown) => void) => h.exit.push(cb),
-          onError: (cb: (x: unknown) => void) => h.error.push(cb),
-          write: () => {},
-          closeStdin: () => {},
-          kill: () => {},
-        };
-      },
-    };
   });
 
   await page.goto('/');
   await expect(page.locator('[data-id="terminal"]')).toBeVisible();
   await page.locator('[data-id="cmd-input"]').fill('echo functional');
-  await page.locator('[data-id="cmd-input"]').press('Enter'); // runs (avoids the fixed feedback-button overlay)
+  await page.locator('[data-id="cmd-input"]').press('Enter');
+
+  await mock.expectInvoked('process.spawn', { cmd: 'echo' });
+  // wait until the facade has wired its id-keyed subscriptions, then stream.
+  await page.waitForFunction(
+    () => !!(window as unknown as { __uglyNativeListeners?: Record<string, unknown> })
+      .__uglyNativeListeners?.['process.stdout:P1'],
+  );
+  await mock.emit('process.stdout:P1' as never, { chunk: 'functional output\n' } as never);
+  await mock.emit('process.exit:P1' as never, { code: 0 } as never);
 
   const out = page.locator('[data-id="terminal-output"]');
   await expect(out).toContainText('$ echo functional');
-  await expect(out).toContainText('echo functional'); // stdout streamed from the process bridge
+  await expect(out).toContainText('functional output'); // stdout streamed over invoke/subscribe
   await expect(out).toContainText('[exit 0]');
 });
 
