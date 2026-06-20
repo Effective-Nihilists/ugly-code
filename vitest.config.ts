@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Installs the node-side UglyNative mock before any test imports ugly-app/native.
+    setupFiles: ['./tests/helpers/uglyNativeSetup.ts'],
     include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx'],
     coverage: {
       provider: 'v8',

@@ -68,3 +68,61 @@ test('drives a tool round-trip: tool_use → native fs → tool_result → final
   // The read_file tool bottomed out at the real native fs.readFile invoke.
   await mock.expectInvoked('fs.readFile', { path: 'package.json' });
 });
+
+test('runs a command: tool_use run_command → process.spawn + streamed exit → answer', async ({
+  page,
+}) => {
+  // process rides the same window.UglyNative invoke/subscribe: spawn →
+  // invoke('process.spawn')→{id}; output streams as id-keyed events the mock emits.
+  const mock = await installUglyNativeMock(page, {
+    platform: 'desktop',
+    results: {
+      'permissions.request': { granted: { fs: 'full', process: 'full' } },
+      'permissions.query': { granted: { fs: 'full', process: 'full' } },
+      'fs.readdir': { entries: [] },
+      'process.spawn': { id: 'P1', pid: 7 },
+    },
+  });
+
+  await page.addInitScript(() => {
+    let n = 0;
+    (window as unknown as { __uglyCodeAgentStep: unknown }).__uglyCodeAgentStep = () => {
+      n += 1;
+      if (n === 1) {
+        return Promise.resolve({
+          message: {
+            role: 'assistant',
+            content: [
+              { type: 'tool_use', id: 'r1', name: 'run_command', input: { cmd: 'git', args: ['status'] } },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ message: { role: 'assistant', content: 'The working tree is clean.' } });
+    };
+  });
+
+  await page.goto('/');
+  await expect(page.locator('[data-id="agent-panel"]')).toBeVisible();
+  await page.locator('[data-id="agent-input"]').fill('run git status');
+  await page.locator('[data-id="agent-send"]').click();
+
+  // The spawn went through the unified protocol with cmd+args.
+  await mock.expectInvoked('process.spawn', { cmd: 'git' });
+
+  // Wait until the process facade wired its id-keyed subscriptions, then stream
+  // stdout + exit so the run_command tool resolves and the loop continues.
+  await page.waitForFunction(
+    () =>
+      !!(window as unknown as { __uglyNativeListeners?: Record<string, unknown> })
+        .__uglyNativeListeners?.['process.exit:P1'],
+  );
+  await mock.emit('process.stdout:P1' as never, { chunk: 'nothing to commit\n' } as never);
+  await mock.emit('process.exit:P1' as never, { code: 0 } as never);
+
+  // The tool result fed back and the model produced its final answer.
+  await expect(page.locator('[data-id="agent-tool"][data-tool="run_command"]')).toHaveCount(2);
+  await expect(page.locator('[data-id="agent-assistant"]').last()).toContainText(
+    'working tree is clean',
+  );
+});
