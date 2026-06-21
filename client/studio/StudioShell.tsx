@@ -19,11 +19,58 @@ import { PopoverHost } from './system/popover/PopoverHost';
 // "useModalStack must be used inside <AppProvider>" and white-screens the IDE.
 // Restore the minimal AppProvider equivalent here: the stack context + the two
 // portal targets (modal-root before popover-root so popovers paint above).
+interface OpenProject {
+  name: string;
+  path?: string;
+}
+
+// The open project is reflected in the URL as `?path=<local path>` so the
+// workspace is deep-linkable, survives a reload, and Back returns to the picker.
+const PATH_PARAM = 'path';
+
+function projectFromUrl(): OpenProject | null {
+  const path = new URLSearchParams(window.location.search).get(PATH_PARAM);
+  if (!path) return null;
+  // Name isn't in the URL (path is the source of truth) — derive it from the
+  // last path segment, e.g. /Users/me/test1 → "test1".
+  const name = path.split('/').filter(Boolean).pop() ?? path;
+  return { name, path };
+}
+
+function pushProjectUrl(project: OpenProject | null): void {
+  let url = window.location.pathname;
+  if (project?.path) {
+    // Keep slashes readable (the user's `?path=/test1` shape) while still
+    // escaping spaces/specials; URLSearchParams.get decodes both forms.
+    url += `?${PATH_PARAM}=${encodeURIComponent(project.path).replace(/%2F/g, '/')}`;
+  }
+  window.history.pushState({}, '', url);
+}
+
 export default function StudioShell(): React.ReactElement {
-  const [open, setOpen] = React.useState<{ name: string; path?: string } | null>(null);
+  // Restore an open project from the URL on first paint (deep link / reload).
+  const [open, setOpen] = React.useState<OpenProject | null>(() => projectFromUrl());
   // When set, the picker has handed off to the live "Create Project" progress
   // view (streams `npx ugly-app init` + `pnpm install`); on success it opens.
   const [creating, setCreating] = React.useState<{ name: string; parentDir: string } | null>(null);
+
+  const openProject = React.useCallback((name: string, path?: string) => {
+    const next: OpenProject = { name, ...(path ? { path } : {}) };
+    setCreating(null);
+    setOpen(next);
+    pushProjectUrl(next);
+  }, []);
+  const closeProject = React.useCallback(() => {
+    setOpen(null);
+    pushProjectUrl(null);
+  }, []);
+
+  // Browser Back/Forward → re-derive the open project from the URL.
+  React.useEffect(() => {
+    const onPop = (): void => setOpen(projectFromUrl());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   let body: React.ReactNode;
   if (creating) {
@@ -31,10 +78,7 @@ export default function StudioShell(): React.ReactElement {
       <ProjectCreationProgress
         name={creating.name}
         parentDir={creating.parentDir}
-        onDone={(name, path) => {
-          setCreating(null);
-          setOpen({ name, path });
-        }}
+        onDone={(name, path) => openProject(name, path)}
         onCancel={() => setCreating(null)}
       />
     );
@@ -43,14 +87,14 @@ export default function StudioShell(): React.ReactElement {
       <StudioProjectPage
         projectName={open.name}
         {...(open.path ? { projectPath: open.path } : {})}
-        onBack={() => setOpen(null)}
+        onBack={closeProject}
       />
     );
   } else {
     body = (
       <ProjectsProvider>
         <ProjectOnboarding
-          onProjectOpen={(name, path) => setOpen({ name, ...(path ? { path } : {}) })}
+          onProjectOpen={(name, path) => openProject(name, path)}
           onBeginCreate={(name, parentDir) => setCreating({ name, parentDir })}
           platform={null}
           onOpenSettings={() => undefined}
