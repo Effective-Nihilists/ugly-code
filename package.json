@@ -11,7 +11,7 @@
     "db:migrate": "ugly-app db:migrate",
     "db:schema-gen": "ugly-app db:schema-gen",
     "db:schema-status": "ugly-app db:schema-status",
-    "deploy": "ugly-app deploy",
+    "deploy": "ugly-app publish",
     "prod": "ugly-app prod",
     "versions": "ugly-app versions",
     "versions:prune": "ugly-app versions:prune",
