@@ -3,12 +3,12 @@
 // live in tasks.json; this module derives the picker's listing (difficulty +
 // "why interesting") exactly as the monolith's listEvalTasks did.
 //
-// NOTE: the task FIXTURES (the buggy/seed code each task runs against) are
-// generated/prewarmed in the monolith and not committed, so they are NOT bundled
-// here yet. evalCreateProject seeds an empty project + the first-turn prompt;
-// fixture-less / write-from-scratch tasks (feature/boss/planning/vague) run
-// fully, fixture-based ones need the fixture pipeline (a follow-up). Automated
-// grading (graders/judge gates) is likewise deferred.
+// Each task's FIXTURE (the buggy/seed code) is published as a public repo —
+// github.com/Effective-Nihilists/ugly-evals-<task> — recorded as `repoUrl` on
+// 57/59 tasks. evalCreateProject git-clones it (see useSocket), so the agent
+// works against the real code; the few fixture-less tasks get an empty project.
+// Automated grading (the cloned repo's eval/ graders + judge gates) is a
+// follow-up — runs aren't scored yet.
 
 import rawTasksJson from './tasks.json';
 

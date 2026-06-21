@@ -384,26 +384,30 @@ const handlers: Record<string, Handler> = {
   evalListTasks: () => Promise.resolve(listEvalTasks()),
   evalListHistory: () => Promise.resolve({ runs: [] }),
   evalDeleteRun: () => Promise.resolve({}),
-  // Scaffold an eval run: a fresh git project under ~/.ugly-studio/eval-projects,
-  // then open it + seed the task's first-turn prompt. NOTE: task fixtures are
-  // generated/prewarmed in the monolith and not yet bundled here, so the project
-  // starts empty — write-from-scratch tasks (feature/boss/planning/vague) run
-  // fully; fixture-based tasks need the fixture pipeline (a follow-up).
+  // Scaffold an eval run under ~/.ugly-studio/eval-projects, open it, and seed
+  // the task's first-turn prompt. When the task has a `repoUrl` (57/59 tasks —
+  // each fixture is published as a public github.com/Effective-Nihilists/
+  // ugly-evals-<task> repo), git-clone it so the agent works against the REAL
+  // buggy code + tests; then re-init git for a clean baseline diff. The few
+  // fixture-less tasks (write-from-scratch) get an empty seeded project.
   evalCreateProject: async (i) => {
     const taskName = String(i.taskName ?? '');
     const task = getEvalTask(taskName);
     if (!task) throw new Error(`Unknown eval task: ${taskName}`);
     const safe = taskName.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const stamp = String(i.taskId ?? Date.now()).replace(/[^a-zA-Z0-9_.-]/g, '_');
-    // `$HOME` (not `~`) — a leading `~` is NOT expanded inside the double quotes
-    // below, which would create a literal `~` dir.
+    // `$HOME` (not `~`) — a leading `~` is NOT expanded inside the double quotes.
     const base = `$HOME/.ugly-studio/eval-projects/${safe}-${stamp}`;
-    const cmd =
-      `mkdir -p "${base}" && cd "${base}" && ` +
-      `printf '{"name":"%s","version":"0.0.0","private":true}\\n' "${safe}" > package.json && ` +
-      `git init -b main -q 2>/dev/null; git add -A 2>/dev/null; ` +
-      `git -c user.email=eval@ugly.bot -c user.name=eval commit -q --allow-empty -m "eval: seed ${safe}" 2>/dev/null; ` +
-      `pwd`;
+    const seedGit =
+      `rm -rf .git && git init -b main -q && git add -A && ` +
+      `git -c user.email=eval@ugly.bot -c user.name=eval commit -q -m "eval: seed ${safe}"`;
+    const cmd = task.repoUrl
+      ? `mkdir -p "$HOME/.ugly-studio/eval-projects" && ` +
+        `git clone --depth 1 "${task.repoUrl.replace(/"/g, '\\"')}" "${base}" && cd "${base}" && ` +
+        `${seedGit} && pwd`
+      : `mkdir -p "${base}" && cd "${base}" && ` +
+        `printf '{"name":"%s","version":"0.0.0","private":true}\\n' "${safe}" > package.json && ` +
+        `${seedGit} && pwd`;
     const projectPath = await spawnForPath(cmd);
     const projectName = projectPath.split('/').pop() || safe;
     return { projectPath, projectName, firstTurnPrompt: firstTurnPrompt(task) };
