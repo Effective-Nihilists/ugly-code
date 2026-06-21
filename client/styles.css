@@ -1,3 +1,1349 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=optional');
+
+:root {
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-heading: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  /* Small uppercase metadata labels (tabs, pill chips, button captions).
+     Resolves to the theme body font by default so labels read as part of
+     the same family — overridden per-theme below where a different label
+     face is desired. */
+  --font-label: var(--font-body);
+
+  --accent: #ff5500;
+  --accent-dim: rgba(255, 85, 0, 0.12);
+  --accent-hover: #e84d00;
+  --on-accent: #ffffff;
+  --success: #4caf50;
+  --error: #e3120b;
+  --warning: #ff9800;
+
+  /* ANSI palette — consumed by `<ConsoleText>` for bash/install/dev-server
+     output. Overridden per theme below so colored CLI output (npm, eslint,
+     git, etc.) keeps a comfortable contrast against the active background. */
+  --ansi-black: #000000;
+  --ansi-red: #cd3131;
+  --ansi-green: #008000;
+  --ansi-yellow: #949800;
+  --ansi-blue: #0451a5;
+  --ansi-magenta: #bc05bc;
+  --ansi-cyan: #0598bc;
+  --ansi-white: #555555;
+  --ansi-bright-black: #666666;
+  --ansi-bright-red: #cd3131;
+  --ansi-bright-green: #14ce14;
+  --ansi-bright-yellow: #b5ba00;
+  --ansi-bright-blue: #0451a5;
+  --ansi-bright-magenta: #bc05bc;
+  --ansi-bright-cyan: #0598bc;
+  --ansi-bright-white: #a5a5a5;
+
+  /* Light mode (default) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f4f4f5;
+  --bg-tertiary: #e4e4e7;
+  --bg-panel: #fafafa;
+  --bg-input: #ffffff;
+  --bg-preview: #e5e7eb;
+  --border: #d4d4d8;
+  --text-primary: #000000;
+  --text-secondary: #52525b;
+  --text-muted: #a1a1aa;
+
+  /* Aliases for legacy variable names referenced across panels.
+     Resolve at use-time so they pick up the active theme. */
+  --accent-primary: var(--accent);
+  --border-primary: var(--border);
+  --text-on-accent: var(--on-accent);
+
+  /* ugly-app markdown editor theme bridge */
+  --app-foreground: #000000;
+  --app-background: #ffffff;
+  --app-secondary: #f4f4f5;
+  --app-border: #d4d4d8;
+  --app-primary: #ff5500;
+  --app-primary-rgb: 255, 85, 0;
+  /* Inverted vs --app-foreground so the floating selection toolbar
+     (rgba(--app-main-rgb, 0.6) bg + --app-foreground text) has contrast. */
+  --app-main-rgb: 255, 255, 255;
+  --app-on-primary: #ffffff;
+  --app-primary-20: rgba(255, 85, 0, 0.32);
+  --app-black-10: rgba(0, 0, 0, 0.1);
+  --app-black-20: rgba(0, 0, 0, 0.2);
+  --app-error: #e3120b;
+  --app-font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --app-font-body-weight: 400;
+
+  /* Standard panel toolbar height */
+  --toolbar-height: 36px;
+
+  /* Motion tokens — durations */
+  --dur-instant: 80ms;
+  --dur-hover: 120ms;
+  --dur-content: 180ms;
+  --dur-layout: 240ms;
+  --dur-page: 320ms;
+
+  /* Motion tokens — easings */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.35, 0.64, 1);
+}
+
+/* Dark palette — applied when ThemeProvider sets data-theme="dark" (auto + OS dark),
+   and as a fallback via prefers-color-scheme before the provider mounts. */
+:root[data-theme='dark'] {
+  --bg-primary: #0f1115;
+  --bg-secondary: #1a1d23;
+  --bg-tertiary: #2a2d35;
+  --bg-panel: #141720;
+  --bg-input: #12141a;
+  --bg-preview: #1a1d23;
+  --border: #2a2d35;
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #52525b;
+
+  --ansi-black: #1a1d23;
+  --ansi-red: #f14c4c;
+  --ansi-green: #23d18b;
+  --ansi-yellow: #f5f543;
+  --ansi-blue: #3b8eea;
+  --ansi-magenta: #d670d6;
+  --ansi-cyan: #29b8db;
+  --ansi-white: #e5e5e5;
+  --ansi-bright-black: #888888;
+  --ansi-bright-red: #ff6e6e;
+  --ansi-bright-green: #4af09b;
+  --ansi-bright-yellow: #ffff66;
+  --ansi-bright-blue: #6ab0f3;
+  --ansi-bright-magenta: #e890e8;
+  --ansi-bright-cyan: #4dd0ee;
+  --ansi-bright-white: #ffffff;
+
+  --app-foreground: #ffffff;
+  --app-background: #0f1115;
+  --app-secondary: #1a1d23;
+  --app-border: #2a2d35;
+  --app-primary: #ff5500;
+  --app-primary-rgb: 255, 85, 0;
+  --app-main-rgb: 0, 0, 0;
+  --app-on-primary: #ffffff;
+  --app-primary-20: rgba(255, 85, 0, 0.4);
+  --app-black-10: rgba(0, 0, 0, 0.3);
+  --app-black-20: rgba(0, 0, 0, 0.5);
+  --app-error: #e3120b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg-primary: #0f1115;
+    --bg-secondary: #1a1d23;
+    --bg-tertiary: #2a2d35;
+    --bg-panel: #141720;
+    --bg-input: #12141a;
+    --bg-preview: #1a1d23;
+    --border: #2a2d35;
+    --text-primary: #ffffff;
+    --text-secondary: #a1a1aa;
+    --text-muted: #52525b;
+
+    --ansi-black: #1a1d23;
+    --ansi-red: #f14c4c;
+    --ansi-green: #23d18b;
+    --ansi-yellow: #f5f543;
+    --ansi-blue: #3b8eea;
+    --ansi-magenta: #d670d6;
+    --ansi-cyan: #29b8db;
+    --ansi-white: #e5e5e5;
+    --ansi-bright-black: #888888;
+    --ansi-bright-red: #ff6e6e;
+    --ansi-bright-green: #4af09b;
+    --ansi-bright-yellow: #ffff66;
+    --ansi-bright-blue: #6ab0f3;
+    --ansi-bright-magenta: #e890e8;
+    --ansi-bright-cyan: #4dd0ee;
+    --ansi-bright-white: #ffffff;
+
+    --app-foreground: #ffffff;
+    --app-background: #0f1115;
+    --app-secondary: #1a1d23;
+    --app-border: #2a2d35;
+    --app-primary: #ff5500;
+    --app-primary-rgb: 255, 85, 0;
+    --app-main-rgb: 0, 0, 0;
+    --app-on-primary: #ffffff;
+    --app-primary-20: rgba(255, 85, 0, 0.4);
+    --app-black-10: rgba(0, 0, 0, 0.3);
+    --app-black-20: rgba(0, 0, 0, 0.5);
+    --app-error: #e3120b;
+  }
+}
+
+/* Cosmic Latte — warm cream + serif, classy editorial feel.
+   Body uses Cormorant Garamond (calm, readable); headings use Playfair
+   Display italic for high-contrast editorial flourish. */
+:root[data-theme='cosmic-latte'] {
+  --font-body: 'Cormorant Garamond', 'EB Garamond', Georgia, 'Times New Roman',
+    serif;
+  --font-heading: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  --bg-primary: #fff8e7;
+  --bg-secondary: #f5edd6;
+  --bg-tertiary: #ebe2c2;
+  --bg-panel: #fdf6e3;
+  --bg-input: #fffdf5;
+  --bg-preview: #efe6cc;
+  --border: #e6dcc0;
+  --text-primary: #3a342a;
+  --text-secondary: #6b6354;
+  --text-muted: #9a9080;
+
+  /* Muted, sepia-leaning ANSI palette to match the warm-cream surface. */
+  --ansi-black: #3a342a;
+  --ansi-red: #a44a3a;
+  --ansi-green: #5a7a3a;
+  --ansi-yellow: #9a7a2a;
+  --ansi-blue: #4a6a8a;
+  --ansi-magenta: #8a4a6a;
+  --ansi-cyan: #4a8a8a;
+  --ansi-white: #6b6354;
+  --ansi-bright-black: #6b6354;
+  --ansi-bright-red: #c4604a;
+  --ansi-bright-green: #6f9145;
+  --ansi-bright-yellow: #b48a3a;
+  --ansi-bright-blue: #5d80a4;
+  --ansi-bright-magenta: #a55c80;
+  --ansi-bright-cyan: #5da5a5;
+  --ansi-bright-white: #3a342a;
+
+  --app-foreground: #3a342a;
+  --app-background: #fff8e7;
+  --app-secondary: #f5edd6;
+  --app-border: #e6dcc0;
+  --app-primary: #ff5500;
+  --app-primary-rgb: 255, 85, 0;
+  --app-main-rgb: 255, 248, 231;
+  --app-on-primary: #ffffff;
+  --app-primary-20: rgba(255, 85, 0, 0.32);
+  --app-black-10: rgba(58, 52, 42, 0.1);
+  --app-black-20: rgba(58, 52, 42, 0.2);
+  --app-error: #e3120b;
+  --app-font-body: 'Cormorant Garamond', 'EB Garamond', Georgia,
+    'Times New Roman', serif;
+  --app-font-body-weight: 500;
+}
+
+:root[data-theme='cosmic-latte'] body {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+:root[data-theme='cosmic-latte'] h1,
+:root[data-theme='cosmic-latte'] h2,
+:root[data-theme='cosmic-latte'] h3,
+:root[data-theme='cosmic-latte'] h4,
+:root[data-theme='cosmic-latte'] h5,
+:root[data-theme='cosmic-latte'] h6 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Vim — phosphor green on black, two mono families: JetBrains Mono for
+   body (clean, geometric), Space Mono for headings (decorative
+   terminals + tighter form). */
+:root[data-theme='vim'] {
+  --font-body: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --font-heading: 'Space Mono', 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  --accent: #15d34c;
+  --accent-dim: rgba(21, 211, 76, 0.15);
+  --accent-hover: #1ae659;
+  --on-accent: #000000;
+
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #111111;
+  --bg-panel: #050505;
+  --bg-input: #0a0a0a;
+  --bg-preview: #0a0a0a;
+  --border: #0fa83b;
+  --text-primary: #15d34c;
+  --text-secondary: #0fa83b;
+  --text-muted: #0a7a2a;
+
+  /* Phosphor-themed ANSI palette — distinct hues but pulled toward
+     green/amber so the terminal feel holds across colored CLI output. */
+  --ansi-black: #001a00;
+  --ansi-red: #ff5b5b;
+  --ansi-green: #15d34c;
+  --ansi-yellow: #d4d400;
+  --ansi-blue: #4cd1ff;
+  --ansi-magenta: #ff66cc;
+  --ansi-cyan: #00ffd1;
+  --ansi-white: #15d34c;
+  --ansi-bright-black: #0fa83b;
+  --ansi-bright-red: #ff8a8a;
+  --ansi-bright-green: #5cff8c;
+  --ansi-bright-yellow: #ffff66;
+  --ansi-bright-blue: #8de6ff;
+  --ansi-bright-magenta: #ff99dd;
+  --ansi-bright-cyan: #66ffe6;
+  --ansi-bright-white: #b6ffc8;
+
+  --app-foreground: #15d34c;
+  --app-background: #000000;
+  --app-secondary: #0a0a0a;
+  --app-border: #0fa83b;
+  --app-primary: #15d34c;
+  --app-primary-rgb: 21, 211, 76;
+  --app-main-rgb: 0, 0, 0;
+  --app-on-primary: #000000;
+  --app-primary-20: rgba(21, 211, 76, 0.32);
+  --app-black-10: rgba(0, 0, 0, 0.5);
+  --app-black-20: rgba(0, 0, 0, 0.7);
+  --app-error: #ff4444;
+  --app-font-body: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --app-font-body-weight: 400;
+}
+
+:root[data-theme='vim'] h1,
+:root[data-theme='vim'] h2,
+:root[data-theme='vim'] h3,
+:root[data-theme='vim'] h4,
+:root[data-theme='vim'] h5,
+:root[data-theme='vim'] h6 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  /* NOTE: ugly-code runs both as a web app (code.ugly.bot — the marketing
+     landing must scroll) and inside native Studio. The original monolith
+     was Electron-only and locked the body to `overflow: hidden; height:
+     100vh; width: 100vw` for the fixed desktop app-shell. Keeping that here
+     clips the scrollable web landing and `100vw` adds a horizontal
+     scrollbar. The framework's index.html already sizes
+     `html, body, #root { height: 100% }`, so we keep only the visual
+     theming and let the framework/components own layout + scroll. */
+  overscroll-behavior-y: none;
+}
+
+/* Form controls don't inherit font-family by default — force them to
+   pick up the themed body font so dropdowns / inputs / buttons swap
+   along with the rest of the UI. */
+button,
+input,
+select,
+textarea,
+optgroup,
+option {
+  font-family: inherit;
+}
+
+/* Native <select> theming. The default browser appearance leaks the OS
+ * widget (white-on-light bg even in dark themes), which is the most
+ * jarring un-themed surface in the studio. Override the trigger to
+ * use the same tokens as our custom popover dropdowns; the dropdown
+ * panel itself is rendered by the OS and inherits these via the
+ * accent / bg / color tokens that `option` picks up. accent-color
+ * tints the highlighted option on Webkit + recent Firefox.
+ *
+ * Applies globally so every <select> in Settings (theme picker, UI
+ * scale, etc.) and any future addition picks this up automatically.
+ */
+select {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Themed tooltip via a `data-us-tooltip="…"` attribute. Native
+ * `title="…"` tooltips are rendered by the OS and can't be styled,
+ * so they show up white-on-light even in the studio's dark theme.
+ * For surfaces where it matters (header buttons, dropdown triggers),
+ * use the `<Tooltip>` React helper or `data-us-tooltip` directly.
+ *
+ * Rendering is handled by `TooltipOverlay` (mounted once at the
+ * React root): it listens for hovers/focuses on `[data-us-tooltip]`
+ * triggers and portals the bubble to `document.body` with
+ * `position: fixed`, so tooltips can escape `overflow: hidden`
+ * ancestors (e.g. the chat ↔ git/files panel split). Previously this
+ * was a pure-CSS `::after` rule, which inherited the trigger's
+ * stacking context and got clipped at panel boundaries.
+ */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+}
+
+#root {
+  /* `100%` (not `100vw`) avoids a horizontal scrollbar from viewport-width
+     including the vertical scrollbar; height comes from index.html's
+     `html, body, #root { height: 100% }`. See the body{} note above. */
+  height: 100%;
+  min-height: 100%;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Tab rail tooltips — fade in on hover */
+.tab-rail-item .tab-rail-tooltip {
+  position: absolute;
+  left: 44px;
+  top: 50%;
+  transform: translate(-4px, -50%);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transition: opacity var(--dur-content) var(--ease-out),
+    transform var(--dur-content) var(--ease-out);
+}
+.tab-rail-item:hover .tab-rail-tooltip {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+/* Claude Chat blinking cursor */
+@keyframes claude-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+.claude-chat-cursor {
+  animation: claude-blink 1s step-end infinite;
+}
+
+/* Spinner used for running tool cards */
+@keyframes us-spin-kf {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.us-spin {
+  animation: us-spin-kf 0.9s linear infinite;
+}
+
+/* Thinking indicator — subtle pulsing dots next to the "Thinking" label */
+@keyframes us-thinking-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+.us-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+.us-thinking-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  display: inline-block;
+  animation: us-thinking-dot 1.1s ease-in-out infinite;
+}
+.us-thinking-dot:nth-child(2) {
+  margin-left: 2px;
+}
+.us-thinking-dot:nth-child(3) {
+  animation-delay: 0.15s;
+}
+.us-thinking-dot:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+/* Project-tab activity dot. Rendered next to the tab label in the
+   top-bar's ProjectTabBar; color picks the highest-priority state
+   across the project's live sessions (thinking-done > thinking >
+   blocked > idle). The thinking-done variant gets a slow ring pulse
+   to draw the eye since it represents user-attention work. */
+.us-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.us-tab-dot--thinking-done {
+  background: var(--accent, #ff8a1f);
+  animation: us-tab-dot-pulse 1.4s ease-in-out infinite;
+}
+.us-tab-dot--thinking {
+  background: var(--accent, #ff8a1f);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.us-tab-dot--blocked {
+  background: #f59e0b;
+}
+@keyframes us-tab-dot-pulse {
+  0% {
+    box-shadow: 0 0 0 0
+      color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 6px
+      color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0
+      color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+/* Feedback button — inline in title bar, subtle */
+.feedback-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.feedback-wrap [data-id='feedback-button'] {
+  position: static !important;
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  border-radius: 5px !important;
+  -webkit-app-region: no-drag;
+}
+.feedback-wrap [data-id='feedback-button']:hover {
+  opacity: 1;
+  background: var(--bg-primary) !important;
+  color: var(--text-secondary) !important;
+}
+/* Feedback popup — anchored below button in title bar */
+.feedback-wrap > div:last-child:not(:only-child) {
+  position: fixed !important;
+  top: 40px !important;
+  right: 12px !important;
+  bottom: auto !important;
+}
+
+/* ============================================================
+   Motion system
+   ============================================================ */
+
+/* Keyframes */
+@keyframes us-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes us-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes us-fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes us-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes us-slide-in-r {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes us-slide-in-l {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes us-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes us-letter-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes us-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(110%);
+  }
+}
+@keyframes us-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes us-loader-out {
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(1.04);
+  }
+}
+@keyframes us-word-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes us-pulse-soft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Enter animation classes (run once on mount) */
+/* fill-mode `forwards` (not `both`): the `to` keyframe latches after
+   the animation ends, but the `from` keyframe is NOT applied while
+   the animation is waiting to start. That matters for elements that
+   end up inside a `display: none` subtree before their animation
+   runs (multi-tab shells, hidden popovers) — with `both` the element
+   is stuck at opacity 0 forever because animations don't progress
+   under display:none. With `forwards` the resting style wins, so
+   when the subtree becomes visible again the content is readable
+   instead of invisible. No visual difference on the happy path:
+   the animation still drives 0→1 from the first paint. */
+.us-fade {
+  animation: us-fade-in var(--dur-content) var(--ease-out) forwards;
+}
+.us-fade-up {
+  animation: us-fade-up var(--dur-content) var(--ease-out) forwards;
+}
+/* Same keyframe as `.us-fade-up`, but slowed to `--dur-page` so
+   top-level view changes (home/session/prod/git/terminal) feel
+   weightier than tab swaps. Tabs keep using `.us-fade-up`. */
+.us-fade-page {
+  animation: us-fade-up var(--dur-page) var(--ease-out) forwards;
+}
+.us-fade-down {
+  animation: us-fade-down var(--dur-content) var(--ease-out) forwards;
+}
+.us-pop {
+  animation: us-pop-in var(--dur-content) var(--ease-out) forwards;
+}
+.us-slide-r {
+  animation: us-slide-in-r var(--dur-layout) var(--ease-out) forwards;
+}
+.us-slide-l {
+  animation: us-slide-in-l var(--dur-layout) var(--ease-out) forwards;
+}
+.us-toast {
+  animation: us-toast-in var(--dur-content) var(--ease-spring) forwards;
+}
+
+/* Word-by-word reveal — each word is a span with its own animation-delay */
+.us-word {
+  display: inline-block;
+  opacity: 0;
+  animation: us-fade-up var(--dur-content) var(--ease-out) both;
+  white-space: pre;
+}
+.us-word-pop {
+  display: inline-block;
+  opacity: 0;
+  animation: us-word-pop 520ms var(--ease-spring) both;
+}
+
+/* When the renderer boots in a subsequent window (`?skipSplash=1` —
+   tear-out, "Open in New Window", Cmd+Shift+N), the surface should
+   feel like "appears continuously from the source window", not
+   "fresh React tree replays every mount animation". `main.tsx`
+   sets `body.us-no-mount-anim` for the first 250ms of the SPA's
+   life in such windows; this rule zeros out the page-level fade /
+   word-cascade animations for that window so the user sees the
+   workspace already-present instead of fading-in. Hover/focus
+   transitions and intentional state-change animations (which fire
+   AFTER the 250ms window) are unaffected. */
+body.us-no-mount-anim .us-fade,
+body.us-no-mount-anim .us-fade-up,
+body.us-no-mount-anim .us-fade-page,
+body.us-no-mount-anim .us-fade-down,
+body.us-no-mount-anim .us-pop,
+body.us-no-mount-anim .us-slide-r,
+body.us-no-mount-anim .us-slide-l,
+body.us-no-mount-anim .us-toast,
+body.us-no-mount-anim .us-word,
+body.us-no-mount-anim .us-word-pop {
+  animation: none !important;
+  opacity: 1 !important;
+}
+
+/* Boot loader — full-window splash that bridges from React mount to
+   either the login page or the project picker. Exit animation runs when
+   the wrapper gets data-leaving="true". */
+.us-loader-exit {
+  transition: none;
+}
+.us-loader-exit[data-leaving='true'] {
+  animation: us-loader-out 420ms var(--ease-in-out) forwards;
+  pointer-events: none;
+}
+
+/* Project picker exit — runs the same fade+lift+scale used by the boot
+   loader so the picker→workspace handoff matches the rest of the
+   chrome. Stacked above the workspace via absolute positioning while
+   `data-leaving="true"`; unmounts after the animation completes. */
+.us-picker-exit[data-leaving='true'] {
+  animation: us-loader-out var(--dur-layout) var(--ease-in-out) forwards;
+  pointer-events: none;
+}
+.us-letter {
+  display: inline-block;
+  opacity: 0;
+  animation: us-letter-drop var(--dur-page) var(--ease-spring) both;
+}
+.us-sweep-track {
+  position: relative;
+  overflow: hidden;
+}
+.us-sweep-bar {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 50%,
+    transparent 100%
+  );
+  animation: us-sweep 2.4s var(--ease-in-out) infinite;
+}
+.us-pulse-soft {
+  animation: us-pulse-soft 1.6s ease-in-out infinite;
+}
+
+/* Universal interactive transition — apply to rows, menu items, etc. */
+.us-interactive {
+  transition: background-color var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    opacity var(--dur-hover) var(--ease-out),
+    transform var(--dur-hover) var(--ease-out);
+}
+
+/* Max-height collapse helper for disclosures */
+.us-collapse {
+  overflow: hidden;
+  transition: max-height var(--dur-layout) var(--ease-in-out),
+    opacity var(--dur-content) var(--ease-out);
+}
+.us-collapse[data-open='false'] {
+  max-height: 0;
+  opacity: 0;
+}
+.us-collapse[data-open='true'] {
+  /* Cap is the transition target — content over this is clipped. Sized
+     to comfortably fit the longest current consumer (Settings → Advanced
+     expando, ~25 rows ≈ 1500-1800px). Bump if a future expando holds
+     more. */
+  max-height: 4000px;
+  opacity: 1;
+}
+
+/* Slide-in panels driven by useMountTransition (data-visible toggle) */
+.us-slide-left {
+  transition: transform var(--dur-layout) var(--ease-in-out),
+    opacity var(--dur-content) var(--ease-out);
+  will-change: transform, opacity;
+}
+.us-slide-left[data-visible='false'] {
+  transform: translateX(-8px);
+  opacity: 0;
+}
+.us-slide-left[data-visible='true'] {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.us-slide-right {
+  transition: transform var(--dur-layout) var(--ease-in-out),
+    opacity var(--dur-content) var(--ease-out);
+  will-change: transform, opacity;
+}
+.us-slide-right[data-visible='false'] {
+  transform: translateX(8px);
+  opacity: 0;
+}
+.us-slide-right[data-visible='true'] {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.us-slide-up {
+  transition: transform var(--dur-layout) var(--ease-in-out),
+    opacity var(--dur-content) var(--ease-out);
+  will-change: transform, opacity;
+}
+.us-slide-up[data-visible='false'] {
+  transform: translateY(8px);
+  opacity: 0;
+}
+.us-slide-up[data-visible='true'] {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Modal enter/exit via data-visible */
+.us-modal-backdrop {
+  transition: opacity var(--dur-content) var(--ease-out);
+}
+.us-modal-backdrop[data-visible='false'] {
+  opacity: 0;
+}
+.us-modal-backdrop[data-visible='true'] {
+  opacity: 1;
+}
+
+.us-modal-dialog {
+  transition: opacity var(--dur-content) var(--ease-out),
+    transform var(--dur-content) var(--ease-out);
+  will-change: transform, opacity;
+}
+.us-modal-dialog[data-visible='false'] {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.us-modal-dialog[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Global button baseline — smooths every existing inline-styled button */
+button,
+[role='button'] {
+  transition: background-color var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    opacity var(--dur-hover) var(--ease-out),
+    box-shadow var(--dur-hover) var(--ease-out);
+}
+
+/* File tab strip — X button only appears on hover or for active tab. */
+.us-file-tab .us-file-tab-close {
+  opacity: 0;
+  transition: opacity var(--dur-hover) var(--ease-out);
+}
+.us-file-tab:hover .us-file-tab-close,
+.us-file-tab[data-active] .us-file-tab-close {
+  opacity: 1;
+}
+.us-file-tab:hover {
+  background: var(--accent-dim);
+}
+
+/* Small hover helpers for hand-migrated rows/menu items */
+.us-menu-item {
+  cursor: pointer;
+  transition: background-color var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out);
+}
+.us-menu-item:hover {
+  background: var(--accent-dim);
+}
+.us-menu-item--danger:hover {
+  background: rgba(227, 18, 11, 0.08);
+}
+
+.us-tree-row {
+  transition: background-color var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out);
+}
+.us-tree-row:hover {
+  background: var(--bg-secondary);
+}
+
+.us-suggestion:hover {
+  border-color: var(--accent) !important;
+}
+
+/* Chevron rotation helper for disclosure triangles */
+.us-chevron {
+  transition: transform var(--dur-hover) var(--ease-out);
+}
+.us-chevron[data-open='true'] {
+  transform: rotate(90deg);
+}
+.us-chevron[data-open='false'] {
+  transform: rotate(0deg);
+}
+
+/* Markdown editor floating toolbar: upstream IconNormal sets
+   stroke="var(--app-foreground)" as an SVG attribute, which browsers do not
+   resolve (CSS vars only work in style/CSS context). Force currentColor so
+   icons inherit the body text color. */
+svg[stroke^='var('] {
+  stroke: currentColor;
+}
+svg[fill^='var('] {
+  fill: currentColor;
+}
+
+/* Markdown editor: ensure text selection is visible. The upstream rule
+   uses an undefined --app-primary-20 var, which collapses to transparent. */
+.ProseMirror ::selection,
+.ProseMirror::selection {
+  background: rgba(255, 85, 0, 0.32);
+}
+@media (prefers-color-scheme: dark) {
+  .ProseMirror ::selection,
+  .ProseMirror::selection {
+    background: rgba(255, 85, 0, 0.45);
+  }
+}
+
+/* Chat markdown rendering (MdastViewer). The ugly-app theme only styles
+   tables under .ProseMirror, so the plain <table> emitted by MdastViewer
+   arrives with no borders, padding, or spacing. Scope everything under
+   .us-md so we don't leak into the editor. */
+.us-md {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+.us-md p {
+  margin: 0.4em 0;
+}
+.us-md p:first-child {
+  margin-top: 0;
+}
+.us-md p:last-child {
+  margin-bottom: 0;
+}
+.us-md ul,
+.us-md ol {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
+}
+.us-md li {
+  margin: 0.15em 0;
+}
+.us-md h1,
+.us-md h2,
+.us-md h3,
+.us-md h4 {
+  margin: 0.8em 0 0.3em;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  line-height: 1.25;
+}
+.us-md h1 {
+  font-size: 1.35em;
+}
+.us-md h2 {
+  font-size: 1.2em;
+}
+.us-md h3 {
+  font-size: 1.08em;
+}
+.us-md h4 {
+  font-size: 1em;
+}
+.us-md code {
+  background: var(--bg-primary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.9em;
+}
+.us-md pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+  overflow: auto;
+}
+.us-md pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+.us-md a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.us-md a:hover {
+  text-decoration: underline;
+}
+.us-md blockquote {
+  margin: 0.4em 0;
+  padding: 0 0 0 10px;
+  border-left: 3px solid var(--border);
+  color: var(--text-secondary);
+}
+.us-md hr {
+  margin: 1em 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+.us-md table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  font-size: 12px;
+  max-width: 100%;
+}
+.us-md th,
+.us-md td {
+  border: 1px solid var(--border);
+  padding: 5px 9px;
+  text-align: left;
+  vertical-align: top;
+}
+.us-md th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+.us-md tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--bg-secondary) 40%, transparent);
+}
+
+/* Standard panel toolbar — used by FileTree, GitPanel, CodingAgentChat */
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--toolbar-height);
+  flex-shrink: 0;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+  container-type: inline-size;
+  container-name: panel-toolbar;
+  min-width: 0;
+  /* `overflow: visible` so themed tooltips (`data-us-tooltip` ::after
+     bubbles) can escape the bar vertically. Children that need to
+     clip long text already do so themselves via `min-width: 0` +
+     `text-overflow: ellipsis`. Was `overflow: hidden` previously,
+     which silently swallowed every tooltip on this bar — the
+     SessionReadout, ContextMeter, and CodebaseReadinessPill bubbles
+     all rendered behind the bar's bottom edge and were invisible. */
+  overflow: visible;
+}
+
+/* Session usage readout (cost / tokens) — fixed-width cells so numbers
+   line up across renders, hidden entirely when the toolbar is too
+   narrow to fit it without crowding the model selector + buttons. */
+.session-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.session-readout .cells {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.session-readout .cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.session-readout .cell .label {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+.session-readout .cost-cell {
+  min-width: 0;
+  text-align: right;
+}
+/* Progressive collapse — keep the essentials (input tokens + cost
+   chip) visible at any practical chat-panel width. The old rule
+   hid the entire readout below 560px, so most chat panels (e.g.
+   split with a side rail) lost the cost+tokens chip even though
+   the data was being computed correctly. Drop cells in order of
+   redundancy: cache cells first (the tooltip still carries the
+   numbers), then completion (output is derivable from messages),
+   only hide the chip entirely when there's literally no room. */
+@container panel-toolbar (max-width: 560px) {
+  .session-readout .cell.cache {
+    display: none;
+  }
+}
+@container panel-toolbar (max-width: 420px) {
+  .session-readout .cell.completion {
+    display: none;
+  }
+}
+@container panel-toolbar (max-width: 340px) {
+  .session-readout {
+    display: none;
+  }
+}
+
+/* Git panel: per-file revert button only shows on row hover */
+.git-file-row .git-file-revert {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.git-file-row:hover .git-file-revert,
+.git-file-row .git-file-revert:focus-visible {
+  opacity: 1;
+}
+
+/* PatternStrip — step chips for the active pattern. Reads as a second
+   toolbar row directly beneath `.panel-toolbar` (matching height +
+   padding) whenever the classifier (or explicit user pick) has
+   resolved a pattern. */
+.pattern-strip {
+  display: flex;
+  align-items: center;
+  height: var(--toolbar-height);
+  flex-shrink: 0;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  font-size: 11px;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.pattern-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+.pattern-strip-label {
+  font-family: var(--font-label, inherit);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.pattern-strip-steps {
+  display: inline-flex;
+  align-items: center;
+  /* Wider gap so the inter-chip arrow (positioned absolutely below)
+     has room to breathe and the chips don't feel cramped against each
+     other. Pairs with the `left: -10px` arrow offset. */
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pattern-strip-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  white-space: nowrap;
+  position: relative;
+}
+.pattern-strip-step + .pattern-strip-step::before {
+  content: '→';
+  position: absolute;
+  left: -12px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-size: 10px;
+}
+.pattern-strip-step.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.pattern-strip-step.done {
+  color: var(--success, #4caf50);
+  border-color: color-mix(in srgb, var(--success, #4caf50) 40%, var(--border));
+  background: color-mix(in srgb, var(--success, #4caf50) 8%, transparent);
+}
+.pattern-strip-step-label {
+  font-weight: 600;
+}
+.pattern-strip-step-iter {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+/* Respect user motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Studio is a desktop app, not a webpage — disable arbitrary text selection
+   on chrome. Inputs/contenteditable and the coding chat opt back in below. */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable='true'],
+[contenteditable=''] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.coding-chat-selectable,
+.coding-chat-selectable * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ============================================================
+   Safe-area + web/native viewport (ugly-code additions)
+   These were the only rules in the pre-port stub; kept because
+   ugly-code targets web + mobile-wrapped surfaces, not just the
+   Electron desktop shell the monolith stylesheet assumed.
+   ============================================================ */
 :root {
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-right: env(safe-area-inset-right, 0px);
@@ -8,10 +1354,6 @@
 html {
   height: 100%;
   height: 100dvh;
-}
-
-body {
-  overscroll-behavior-y: none;
 }
 
 /* Apply to a custom full-height / full-bleed scroll container so its content
