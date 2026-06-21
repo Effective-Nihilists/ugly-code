@@ -2,6 +2,7 @@
   "projectId": "nelbipxwfm",
   "title": "Ugly Code",
   "description": "The Ugly Studio coding agent + IDE, as a web app — runs on the Ugly Studio desktop browser via window.ugly (fs/process), AI via ugly.bot.",
+  "icon": "icon.png",
   "deployTarget": {
     "provider": "cloudflare-workers",
     "workerName": "ugly-code",
