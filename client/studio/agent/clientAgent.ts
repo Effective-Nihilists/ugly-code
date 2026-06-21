@@ -105,8 +105,16 @@ const fetchSocket: RunAgentSocket = {
   trackDocs: () => () => {},
 };
 
-const TOOL_HANDLERS: Record<string, (input: unknown) => Promise<string>> =
-  Object.fromEntries(AGENT_TOOL_NAMES.map((n) => [n, (input: unknown) => dispatchTool(n, input)]));
+// Pass the active project + edit mode so the daemon OS-user-sandboxes tool
+// subprocesses (run_command) for the open project. getActiveProjectPath() is
+// read per-call so it tracks the currently-open project; this client agent
+// runs in edit mode.
+const TOOL_HANDLERS: Record<string, (input: unknown) => Promise<string>> = Object.fromEntries(
+  AGENT_TOOL_NAMES.map((n) => [
+    n,
+    (input: unknown) => dispatchTool(n, input, { projectDir: getActiveProjectPath(), mode: 'edit' }),
+  ]),
+);
 
 interface PerModelAcc {
   model: string;

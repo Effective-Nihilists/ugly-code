@@ -83,7 +83,8 @@ import {
 import { useGitStatus } from '../hooks/useGitStatus';
 import { useInputHistory } from '../hooks/useInputHistory';
 import { useSlashCommands } from '../hooks/useSlashCommands';
-import { useSocket } from '../hooks/useSocket';
+import { useSocket, getActiveProjectPath } from '../hooks/useSocket';
+import { native } from 'ugly-app/native';
 import { useTheme } from '../theme/ThemeProvider';
 import { shortcut } from '../utils/platform';
 import { EvalScorecard } from './EvalScorecard';
@@ -8630,32 +8631,17 @@ export function CodingAgentChat(props: CodingAgentChatProps = {}) {
   );
 }
 
-interface SandboxStatus {
-  supported: boolean;
-  initialized: boolean;
-  platform: 'macos' | 'linux' | 'windows' | 'unsupported';
-  username: string | null;
-}
+type SandboxStatus = Awaited<ReturnType<typeof native.sandbox.status>>;
 
-async function sandboxApiCall<T>(
-  endpoint: string,
-  input: unknown,
-): Promise<T | null> {
+/** Resolve the open project's id (from `.uglyapp`) + dir for sandbox calls. */
+async function resolveProjectInfo(): Promise<{ projectId: string | null; projectDir: string | null }> {
+  const projectDir = getActiveProjectPath();
+  if (!projectDir) return { projectId: null, projectDir: null };
   try {
-    const res = await fetch(`/api/${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ input }),
-    });
-    if (!res.ok) {
-      console.warn(`[sandbox] ${endpoint} HTTP ${res.status}`);
-    }
-    const json = (await res.json()) as { result?: T };
-    return json.result ?? (json as T);
-  } catch (err) {
-    console.warn(`[sandbox] ${endpoint} fetch threw:`, err);
-    return null;
+    const ua = JSON.parse(await native.fs.readFile(projectDir + '/.uglyapp')) as { projectId?: string };
+    return { projectId: ua.projectId ?? null, projectDir };
+  } catch {
+    return { projectId: null, projectDir };
   }
 }
 
@@ -8671,22 +8657,19 @@ function SandboxStatusPill({
 
   useEffect(() => {
     void (async () => {
-      const info = await sandboxApiCall<{
-        projectId: string | null;
-        path: string | null;
-      }>('getProjectInfo', {});
-      if (!info) return;
-      setProjectId(info.projectId ?? null);
-      setProjectDir(info.path ?? null);
+      const info = await resolveProjectInfo();
+      setProjectId(info.projectId);
+      setProjectDir(info.projectDir);
     })();
   }, []);
 
   const refresh = useCallback(async () => {
     if (!projectId) return;
-    const s = await sandboxApiCall<SandboxStatus>('getSandboxStatus', {
-      projectId,
-    });
-    if (s) setStatus(s);
+    try {
+      setStatus(await native.sandbox.status(projectId));
+    } catch (err) {
+      console.warn('[sandbox] status failed:', err);
+    }
   }, [projectId]);
 
   useEffect(() => {
@@ -8705,21 +8688,18 @@ function SandboxStatusPill({
   if (status.initialized) return null;
 
   const onInit = async () => {
-    console.log('[sandbox] init clicked', { projectId, projectDir, working });
-    if (!projectDir || working) return;
+    if (!projectId || !projectDir || working) return;
     setWorking(true);
-    const r = await sandboxApiCall<{ ok: boolean; error?: string }>(
-      'initializeSandbox',
-      { projectId, projectDir },
-    );
-    console.log('[sandbox] init result', r);
-    setWorking(false);
-    if (r?.ok) {
-      await refresh();
-    } else if (r?.error) {
-      console.warn('[sandbox] init failed:', r.error);
-    } else {
-      console.warn('[sandbox] init returned null/unexpected response', r);
+    try {
+      // Triggers the OS admin-elevation prompt (Touch ID / password) in the
+      // daemon, then creates the per-project sandbox user + ACLs.
+      const r = await native.sandbox.initialize(projectId, projectDir);
+      if (r.ok) await refresh();
+      else console.warn('[sandbox] init failed:', r.error);
+    } catch (err) {
+      console.warn('[sandbox] init threw:', err);
+    } finally {
+      setWorking(false);
     }
   };
 
