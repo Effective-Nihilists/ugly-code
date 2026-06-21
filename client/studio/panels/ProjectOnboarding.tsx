@@ -81,6 +81,9 @@ interface ProjectOnboardingProps {
    * callers that omit `path` keep the previous single-project flow.
    */
   onProjectOpen: (name: string, path?: string) => void;
+  /** Hand off "Create Project" to the shell's live progress view (which streams
+   *  `npx ugly-app init` + `pnpm install` and opens the project on success). */
+  onBeginCreate?: (name: string, parentDir: string) => void;
   /** Platform from electronAPI.getPlatform() — threads into StudioTopBar. */
   platform?: NodeJS.Platform | null;
   /** Open the global settings modal — wired up by the Editor shell. */
@@ -108,6 +111,7 @@ async function apiRequest(method: string, input: object): Promise<any> {
 
 export function ProjectOnboarding({
   onProjectOpen,
+  onBeginCreate,
   // platform was threaded into the inline StudioTopBar; the bar is
   // now persistent at the Editor root and reads platform from
   // ChromeContext directly, so this prop is no longer needed here.
@@ -271,27 +275,14 @@ export function ProjectOnboarding({
     [onProjectOpen],
   );
 
-  const handleNewProject = useCallback(async () => {
+  const handleNewProject = useCallback(() => {
     if (!newName.trim() || loading) return;
-    // The monolith promoted the picker tab to a "creating" tab and let an
-    // EditorInner swap in <ProjectCreationProgress>. That multi-tab machinery
-    // wasn't ported (StudioShell renders ProjectOnboarding directly), so create
-    // the project inline: scaffold via `initProject`, then open it. `loading`
-    // drives the button's "Creating…" state.
+    // Hand off to StudioShell's <ProjectCreationProgress>, which spawns the
+    // scaffold and streams its live CLI output (npx ugly-app init + pnpm
+    // install) instead of blocking silently on the button.
     setError(null);
-    setLoading(true);
-    try {
-      const result = await apiRequest('initProject', {
-        name: newName.trim(),
-        parentDir: newParentDir.trim(),
-      });
-      onProjectOpen(result.name as string, result.path as string);
-    } catch (err) {
-      setError(`Failed to create project: ${(err as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [newName, newParentDir, loading, onProjectOpen]);
+    onBeginCreate?.(newName.trim(), newParentDir.trim());
+  }, [newName, newParentDir, loading, onBeginCreate]);
 
   const handleOpenFolder = useCallback(async () => {
     if (!openPath.trim() || loading) return;

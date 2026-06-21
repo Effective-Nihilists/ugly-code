@@ -36,8 +36,8 @@ test.describe('Studio shell — real app', () => {
     expect(bodyFont.toLowerCase()).toContain('inter');
   });
 
-  test('Create Project scaffolds via initProject and opens the project', async ({ page }) => {
-    // Mock the OS process the scaffold spawns; we drive it to success below.
+  test('Create Project shows live progress, streams init output, then opens', async ({ page }) => {
+    // Mock the OS process the scaffold spawns; we drive its output below.
     const mock = await enterStudioShell(page, auth!, {
       'process.spawn': { id: 'init1', pid: 4242 },
     });
@@ -46,17 +46,21 @@ test.describe('Studio shell — real app', () => {
     await page.getByPlaceholder('my-side-project').fill('e2e-demo-project');
     await page.getByRole('button', { name: /Create Project/ }).click();
 
-    // No longer dead: the button enters the creating state and the real
-    // initProject handler spawns the scaffold (bash -lc "npx … ugly-app init").
-    await expect(page.getByRole('button', { name: /Creating/ })).toBeVisible();
+    // Hands off to the live progress view, which spawns the scaffold.
+    await expect(page.locator('[data-id=project-creation-progress]')).toBeVisible();
     await mock.expectInvoked('process.spawn');
 
-    // Drive the mocked scaffold to success: print the resolved abs path, exit 0.
+    // CLI output streams into the console as it arrives.
     await page.waitForTimeout(400); // let the process facade subscribe to id-channels
+    await mock.emit('process.stdout:init1', {
+      chunk: '[ugly-app] Creating project: e2e-demo-project\nInstalling dependencies...\n',
+    });
+    await expect(page.locator('[data-id=creation-output]')).toContainText('Installing dependencies');
+
+    // The last stdout line is the resolved path; exit 0 → open the project.
     await mock.emit('process.stdout:init1', { chunk: '/tmp/e2e-demo-project\n' });
     await mock.emit('process.exit:init1', { code: 0 });
 
-    // initProject resolves → onProjectOpen → StudioProjectPage mounts.
     await expect(page.getByRole('button', { name: /‹ Projects|Projects/ })).toBeVisible({
       timeout: 8_000,
     });
