@@ -14,7 +14,7 @@
 
 import { useContext, useMemo } from 'react';
 import type { AppSocket } from 'ugly-app/client';
-import { native } from 'ugly-app/native';
+import { native, permissions } from 'ugly-app/native';
 import type { AppRegistry } from '../shared/api';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
@@ -22,8 +22,16 @@ import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 /** Run a shell command through `bash -lc` (so `~` expands + login PATH applies)
  *  and resolve with the LAST stdout line — a trailing `pwd`/`echo` of a path.
  *  Rejects on non-zero exit. Used by initProject + evalCreateProject. */
-function spawnForPath(cmd: string): Promise<string> {
-  return new Promise((resolve, reject) => {
+async function spawnForPath(cmd: string): Promise<string> {
+  // Grant fs + process (bash/git/npx/pnpm) before spawning, or the daemon denies
+  // it ("requires the process permission" / "not a bundled tool"). Auto-granted
+  // for the first-party IDE origin. The facade types `process` as boolean, but
+  // the daemon accepts a per-binary allowlist array.
+  type GrantReq = Parameters<typeof permissions.request>[0];
+  await permissions
+    .request({ fs: 'full', process: ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'] } as unknown as GrantReq)
+    .catch(() => undefined);
+  return new Promise<string>((resolve, reject) => {
     let out = '';
     let err = '';
     try {

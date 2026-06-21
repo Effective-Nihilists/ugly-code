@@ -1,6 +1,12 @@
 import React from 'react';
-import { native } from 'ugly-app/native';
+import { native, permissions } from 'ugly-app/native';
 import { ConsoleText } from '../components/ConsoleText';
+
+/** Bundled tools the scaffold needs. The desktop daemon gates uglyNative.process
+ *  on (a) the binary being bundled and (b) a granted `process` capability; we
+ *  spawn `bash` and it shells out to npx/pnpm. Requesting up-front is required —
+ *  for the first-party IDE origin it's auto-granted (no prompt). */
+const SCAFFOLD_TOOLS = ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'];
 
 type UglyProcess = ReturnType<typeof native.process.spawn>;
 
@@ -48,6 +54,16 @@ export function ProjectCreationProgress({
     setOutput('');
     setStatus('running');
     setError(null);
+
+    void (async () => {
+    // Grant the process/fs capability before spawning, or the daemon denies the
+    // spawn ("requires the process permission"). The facade types `process` as
+    // boolean|GrantState, but the daemon accepts a per-binary allowlist array.
+    type GrantReq = Parameters<typeof permissions.request>[0];
+    await permissions
+      .request({ fs: 'full', process: [...SCAFFOLD_TOOLS] } as unknown as GrantReq)
+      .catch(() => undefined);
+    if (settled) return;
     try {
       const proc = native.process.spawn('bash', ['-lc', cmd], {});
       procRef.current = proc;
@@ -74,6 +90,8 @@ export function ProjectCreationProgress({
       setStatus('error');
       setError((e as Error).message);
     }
+    })();
+
     return () => {
       settled = true;
       try {
