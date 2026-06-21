@@ -31,3 +31,12 @@ export async function enterStudioShell(
   await page.goto('/');
   return mock;
 }
+
+/** From the project picker, open a folder (openProject echoes name+path) so the
+ *  StudioProjectPage + coding-agent chat (NewSessionHero) mount. */
+export async function openProject(page: Page, path = '/tmp/demo-project'): Promise<void> {
+  await page.getByRole('button', { name: /Open Folder/ }).first().click();
+  await page.getByPlaceholder('/path/to/project').fill(path);
+  await page.getByRole('button', { name: /Open Folder →/ }).click();
+  await page.locator('[data-id=home-prompt-input]').waitFor();
+}

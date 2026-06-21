@@ -170,6 +170,11 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
     worktree: null,
     worktreeBlocked: false,
     worktreeStatus: null,
+    // The chat hook's applySnapshot reads finishPipeline.{running,done,ok} and
+    // .stages.map() WITHOUT guards — omit it and `session_state` crashes the
+    // whole CodingAgentChat (white screen) right after the reply renders. The
+    // client-side agent has no finish pipeline, so send the empty shape.
+    finishPipeline: { running: false, done: false, ok: false, stages: [] },
     cost: s.cost,
     promptTokens: s.promptTokens,
     completionTokens: s.completionTokens,

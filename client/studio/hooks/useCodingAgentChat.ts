@@ -1317,6 +1317,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // events have already accumulated by name-matching the
       // existing client stage entries.
       setFinishPipeline((prev) => {
+        // A snapshot without a finishPipeline (e.g. the client-side agent, or a
+        // legacy projection) must not crash the panel — keep the prior state.
+        if (!snap.finishPipeline) return prev;
         const prevByName = new Map(prev.stages.map((s) => [s.name, s]));
         return {
           running: snap.finishPipeline.running,

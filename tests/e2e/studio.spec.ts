@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { loadDevAuth } from './helpers/auth';
-import { enterStudioShell } from './helpers/studio';
+import { enterStudioShell, openProject } from './helpers/studio';
 
 // REAL-APP e2e for the Studio shell — drives HomeGate → StudioShell →
 // ProjectOnboarding / StudioProjectPage exactly as the user does (no synthetic
@@ -76,40 +76,57 @@ test.describe('Studio shell — real app', () => {
   });
 
   // Full real loop: NewSessionHero → codingAgentChatSend → runClientAgentTurn →
-  // POST /api/agentTurn → ugly.bot /v1/ai → assistant reply. Needs a real session
-  // + a DB-backed dev server (DATABASE_URL). The assertion uses a computed answer
-  // NOT present in the prompt, so it can't pass on the user-message echo.
-  test('agent chat returns a real model reply in an opened project', async ({ page }) => {
+  // POST /api/agentTurn → ugly.bot /v1/ai → assistant reply, RENDERED into the
+  // transcript. Computed answers (NOT in the prompt) rule out matching the user
+  // echo. Needs a real session + a DB-backed dev server (DATABASE_URL).
+  //
+  // Regression guard: a `session_state` event missing `finishPipeline` used to
+  // crash CodingAgentChat (white screen) right after the reply, so the message
+  // never rendered. We fail on ANY page error and assert the reply is actually
+  // in `chat-messages-list` (not just that /api/agentTurn returned it).
+  test('chat renders the user message + assistant reply (no crash)', async ({ page }) => {
     test.skip(!REAL_AI, 'Set RUN_REAL_SMOKE=1 (+ DATABASE_URL on the dev server) to hit live ugly.bot AI');
-
-    // Capture the real /api/agentTurn reply — the model's answer is the source
-    // of truth (robust to streaming-render timing in the DOM). A computed answer
-    // (17×3=51) NOT present in the prompt rules out matching the user echo.
-    let reply = '';
-    page.on('response', (res) => {
-      if (!res.url().includes('/api/agentTurn')) return;
-      void res
-        .json()
-        .then((j: { result?: { content?: Array<{ type?: string; text?: string }> } }) => {
-          for (const p of j.result?.content ?? []) if (p.type === 'text') reply += p.text ?? '';
-        })
-        .catch(() => undefined);
-    });
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
 
     await enterStudioShell(page, auth!);
-    await page.getByRole('button', { name: /Open Folder/ }).first().click();
-    await page.getByPlaceholder('/path/to/project').fill('/tmp/demo-project');
-    await page.getByRole('button', { name: /Open Folder →/ }).click();
+    await openProject(page);
 
-    const prompt = page.locator('[data-id=home-prompt-input]');
-    await expect(prompt).toBeVisible();
-    await prompt.fill('Respond with only the result of 17 times 3 as digits.');
+    await page.locator('[data-id=home-prompt-input]').fill('Respond with only the result of 17 times 3 as digits.');
     await page.locator('[data-id=home-start-session]').click();
 
-    // The real model, reached through the real UI send (NewSessionHero →
-    // codingAgentChatSend → /api/agentTurn → ugly.bot /v1/ai), returns the
-    // computed answer. This is the definitive end-to-end proof the agent works.
-    await expect.poll(() => reply, { timeout: 60_000, message: 'agentTurn reply' }).toContain('51');
+    const list = page.locator('[data-id=chat-messages-list]');
+    await expect(list).toContainText('51', { timeout: 60_000 }); // assistant reply rendered
+    await expect(list).toContainText('17 times 3'); // user message is part of history
+    expect(errors, `page crashed: ${errors.join('; ')}`).toEqual([]);
+  });
+
+  // Chat history must accumulate: a second turn keeps the first turn's prompt +
+  // reply in the transcript (the bug above wiped the whole conversation).
+  test('chat history accumulates across turns', async ({ page }) => {
+    test.skip(!REAL_AI, 'Set RUN_REAL_SMOKE=1 (+ DATABASE_URL on the dev server) to hit live ugly.bot AI');
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+
+    await enterStudioShell(page, auth!);
+    await openProject(page);
+    const list = page.locator('[data-id=chat-messages-list]');
+
+    // Turn 1 via the NewSessionHero.
+    await page.locator('[data-id=home-prompt-input]').fill('What is 17 times 3? Reply with digits only.');
+    await page.locator('[data-id=home-start-session]').click();
+    await expect(list).toContainText('51', { timeout: 60_000 });
+
+    // Turn 2 via the in-session composer (sends on Cmd/Ctrl+Enter).
+    await page.locator('[data-id=chat-input]').fill('What is 8 times 9? Reply with digits only.');
+    await page.locator('[data-id=chat-input]').press('ControlOrMeta+Enter');
+    await expect(list).toContainText('72', { timeout: 60_000 });
+
+    // Both turns persist in the rendered history.
+    await expect(list).toContainText('51');
+    await expect(list).toContainText('17 times 3');
+    await expect(list).toContainText('8 times 9');
+    expect(errors, `page crashed: ${errors.join('; ')}`).toEqual([]);
   });
 
   // STILL BROKEN (out of scope — user chose create+open+chat, not eval): "Run
