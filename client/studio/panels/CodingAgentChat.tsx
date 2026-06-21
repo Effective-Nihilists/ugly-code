@@ -6681,7 +6681,7 @@ CodingAgentChatProps = {}) {
     try {
       const result = await socket.request(
         'evalGradeSession',
-        { sessionId },
+        { sessionId, ...(evalTaskName ? { taskName: evalTaskName } : {}) },
         { timeoutMs: 180_000 },
       );
       setEvalLocalGrade(result);
@@ -6690,7 +6690,7 @@ CodingAgentChatProps = {}) {
     } finally {
       setEvalGrading(false);
     }
-  }, [sessionId, evalGrading, socket]);
+  }, [sessionId, evalGrading, socket, evalTaskName]);
   const evalAllTurnsDone =
     !!evalState &&
     !!evalTaskTurns &&

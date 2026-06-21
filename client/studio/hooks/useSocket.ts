@@ -18,6 +18,7 @@ import { native, permissions } from 'ugly-app/native';
 import type { AppRegistry } from '../shared/api';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
+import { gradeProject, type GradeDeps } from '../evals/grader';
 
 /** Run a shell command through `bash -lc` (so `~` expands + login PATH applies)
  *  and resolve with the LAST stdout line — a trailing `pwd`/`echo` of a path.
@@ -84,6 +85,34 @@ export function setActiveProjectPath(p: string | null): void {
 export function getActiveProjectPath(): string | null {
   return activeProjectPath;
 }
+
+// Grader IO over the native bridge: run tools (tsc/vitest) in the project and
+// read its files. Mirrors spawnForPath's spawn shape but with a custom cwd/argv.
+const gradeDeps: GradeDeps = {
+  run: (cmd, args, cwd) =>
+    new Promise((resolve) => {
+      let out = '';
+      try {
+        const proc = native.process.spawn(cmd, args, { cwd });
+        proc.onStdout((c) => (out += c));
+        proc.onStderr((c) => (out += c));
+        proc.onError((e) => resolve({ out: `${out}\n${e}`, code: 1 }));
+        proc.onExit((code) => resolve({ out, code }));
+      } catch (e) {
+        resolve({ out: String((e as Error).message), code: 1 });
+      }
+    }),
+  readFile: (p) => native.fs.readFile(p),
+  exists: (p) => native.fs.exists(p),
+};
+// Run totals (cost/tokens/duration) live on the session snapshot, not here;
+// the grader fills the score + gates and the scorecard overlays totals.
+const ZERO_RUN_TOTALS = {
+  durationMs: 0,
+  turns: 0,
+  cost: { total: 0, input: 0, output: 0, cacheRead: 0 },
+  tokens: { input: 0, output: 0, cacheRead: 0, cacheCreate: 0 },
+};
 
 // A self-contained Node ESM script (run via native.process in the project) that
 // resolves the project's Postgres connection string for both dev (local .env
@@ -419,6 +448,25 @@ const handlers: Record<string, Handler> = {
     const projectPath = await spawnForPath(cmd);
     const projectName = projectPath.split('/').pop() || safe;
     return { projectPath, projectName, firstTurnPrompt: firstTurnPrompt(task) };
+  },
+  // Grade the eval run against the project on disk: runs the task's gates
+  // (tsc/vitest/fileExists/fileMatches deterministically; judge/custom surfaced
+  // for manual review) and returns the scorecard. taskName comes from the
+  // session (the client passes it); the project is the open one.
+  evalGradeSession: async (i) => {
+    const projectPath = getActiveProjectPath();
+    if (!projectPath) throw new Error('No project open to grade');
+    const taskName = String((i as { taskName?: string }).taskName ?? '');
+    const task = taskName ? getEvalTask(taskName) : null;
+    return gradeProject(
+      {
+        taskName: taskName || 'unknown',
+        projectPath,
+        ...(task?.gates ? { gates: task.gates } : {}),
+        runTotals: ZERO_RUN_TOTALS,
+      },
+      gradeDeps,
+    );
   },
   // Scaffold a new ugly-app project on disk, then resolve its absolute path so
   // the caller can open it. Mirrors the monolith's `npx -y ugly-app@latest init`

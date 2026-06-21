@@ -3996,7 +3996,7 @@ export const requests = defineRequests({
    * `evalGradeResult` so the chat can render it on mount.
    */
   evalGradeSession: req({
-    input: z.object({ sessionId: z.string() }),
+    input: z.object({ sessionId: z.string(), taskName: z.string().optional() }),
     output: EvalGradeResultSchema,
   }),
 
