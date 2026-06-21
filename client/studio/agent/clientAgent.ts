@@ -49,8 +49,59 @@ const fetchSocket: RunAgentSocket = {
     if (json.error) throw new Error(json.error);
     return json.result;
   },
-  // No live-frame channel over the native shim — the authoritative turn result
-  // comes from the request response (onTurn).
+  // No hub/trackDocs over the native bridge — instead we stream the agent's
+  // frames over the agentTurn HTTP response (the framework's SSE mode). Each
+  // `data:` line is an agent frame; a terminal `__result__`/`__error__` frame
+  // carries the authoritative turn. runAgent prefers this when present.
+  async requestStream(name, input, onFrame, opts) {
+    const res = await fetch('/api/' + name, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      credentials: 'include',
+      body: JSON.stringify({ input }),
+      ...(opts?.signal ? { signal: opts.signal } : {}),
+    });
+    if (!res.ok || !res.body) {
+      // Fall back to the buffered turn if streaming isn't available.
+      const json = (await res.json().catch(() => ({}))) as { result?: unknown; error?: string };
+      if (json.error) throw new Error(json.error);
+      return json.result;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let result: unknown;
+    let done = false;
+    while (!done) {
+      const { value, done: rdone } = await reader.read();
+      if (rdone) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl).replace(/\r$/, '');
+        buffer = buffer.slice(nl + 1);
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trimStart();
+        if (!data) continue;
+        let frame: { type?: string; result?: unknown; error?: string };
+        try {
+          frame = JSON.parse(data) as typeof frame;
+        } catch {
+          continue;
+        }
+        if (frame.type === '__result__') {
+          result = frame.result;
+          done = true;
+          break;
+        }
+        if (frame.type === '__error__') {
+          throw new Error(frame.error ?? 'agent turn failed');
+        }
+        onFrame(frame);
+      }
+    }
+    return result;
+  },
   trackDocs: () => () => {},
 };
 
@@ -78,6 +129,11 @@ interface SessionAgentState {
   messageCount: number;
   perModel: Map<string, PerModelAcc>;
   createdAt: number;
+  // Live-streaming state for the in-flight assistant turn: the stable bubble id
+  // (null until the first token) + accumulated text, so onText updates one
+  // message in place and onTurn finalizes it.
+  streamMsgId: string | null;
+  streamText: string;
 }
 
 const sessions = new Map<string, SessionAgentState>();
@@ -90,11 +146,23 @@ function safeEmit(emit: Emit, msg: { type: string; [k: string]: unknown }): void
   }
 }
 
-function emitMessage(emit: Emit, sessionId: string, role: string, parts: Part[]): void {
+function emitMessage(
+  emit: Emit,
+  sessionId: string,
+  role: string,
+  parts: Part[],
+  opts: { id?: string; action?: 'created' | 'updated' } = {},
+): void {
   safeEmit(emit, {
     type: 'codingAgent:event',
     sessionId,
-    event: { type: 'message', payload: { type: 'created', payload: { id: rid(), role, parts, created_at: Date.now() } } },
+    event: {
+      type: 'message',
+      payload: {
+        type: opts.action ?? 'created',
+        payload: { id: opts.id ?? rid(), role, parts, created_at: Date.now() },
+      },
+    },
   });
 }
 
@@ -207,6 +275,8 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
     messageCount: 0,
     perModel: new Map(),
     createdAt: Date.now(),
+    streamMsgId: null,
+    streamText: '',
   };
   state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: AGENT_DEFAULT_MODEL });
 
@@ -219,11 +289,34 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
     toolHandlers: TOOL_HANDLERS,
     budget: { maxTurns: 12 },
     compaction: { maxContextTokens: 120_000, keepRecentTurns: 8 },
+    // Live token streaming: create the assistant bubble on the first token, then
+    // update it in place as text arrives (onTurn finalizes it authoritatively).
+    onText: (_msgId, delta) => {
+      state.streamText += delta;
+      const parts: Part[] = [{ type: 'text', data: { text: state.streamText } }];
+      if (!state.streamMsgId) {
+        state.streamMsgId = rid();
+        emitMessage(emitRef.current, sessionId, 'assistant', parts, { id: state.streamMsgId, action: 'created' });
+      } else {
+        emitMessage(emitRef.current, sessionId, 'assistant', parts, { id: state.streamMsgId, action: 'updated' });
+      }
+    },
     onTurn: (turn, telemetry) => {
       const content = Array.isArray(turn.content)
         ? turn.content
         : [{ type: 'text' as const, text: String(turn.content) }];
-      emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content));
+      // Finalize the streamed bubble in place (same id) when we streamed text;
+      // otherwise (tool-only turn) emit a fresh bubble.
+      if (state.streamMsgId) {
+        emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content), {
+          id: state.streamMsgId,
+          action: 'updated',
+        });
+      } else {
+        emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content));
+      }
+      state.streamMsgId = null;
+      state.streamText = '';
       state.messageCount += 1;
       state.log.append({ ts: Date.now(), type: 'assistant', content, ...(telemetry ? { telemetry } : {}) });
       if (telemetry) {
