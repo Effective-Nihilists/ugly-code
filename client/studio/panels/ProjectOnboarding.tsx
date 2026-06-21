@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useProjects } from '../state/ProjectsContext';
 import { shortcut } from '../utils/platform';
 import { generateTaskId } from '../utils/taskId';
 import { timeAgoShort } from '../utils/timeAgo';
@@ -122,7 +121,6 @@ export function ProjectOnboarding({
   // mount/exit transitions and clashed with the project tab strip
   // that lives in the same bar.
 
-  const projects = useProjects();
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [activeAction, setActiveAction] = useState<ActionTab>('new');
   const [newName, setNewName] = useState('');
@@ -273,17 +271,27 @@ export function ProjectOnboarding({
     [onProjectOpen],
   );
 
-  const handleNewProject = useCallback(() => {
+  const handleNewProject = useCallback(async () => {
     if (!newName.trim() || loading) return;
-    // Promote the active picker tab into a "creating" tab. The
-    // EditorInner body branch immediately swaps from
-    // <ProjectOnboarding> to <ProjectCreationProgress>, which owns
-    // the in-flight initProject promise + sandbox-status check. The
-    // user can switch to other tabs while the sidecar runs.
+    // The monolith promoted the picker tab to a "creating" tab and let an
+    // EditorInner swap in <ProjectCreationProgress>. That multi-tab machinery
+    // wasn't ported (StudioShell renders ProjectOnboarding directly), so create
+    // the project inline: scaffold via `initProject`, then open it. `loading`
+    // drives the button's "Creating…" state.
     setError(null);
-    const taskId = generateTaskId();
-    projects.beginProjectCreation(newName.trim(), newParentDir.trim(), taskId);
-  }, [newName, newParentDir, loading, projects]);
+    setLoading(true);
+    try {
+      const result = await apiRequest('initProject', {
+        name: newName.trim(),
+        parentDir: newParentDir.trim(),
+      });
+      onProjectOpen(result.name as string, result.path as string);
+    } catch (err) {
+      setError(`Failed to create project: ${(err as Error).message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [newName, newParentDir, loading, onProjectOpen]);
 
   const handleOpenFolder = useCallback(async () => {
     if (!openPath.trim() || loading) return;

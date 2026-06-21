@@ -355,6 +355,41 @@ const handlers: Record<string, Handler> = {
   evalListTasks: () => Promise.resolve({ tasks: [] }),
   evalListHistory: () => Promise.resolve({ runs: [] }),
   evalDeleteRun: () => Promise.resolve({}),
+  // Scaffold a new ugly-app project on disk, then resolve its absolute path so
+  // the caller can open it. Mirrors the monolith's `npx -y ugly-app@latest init`
+  // but over native.process. Runs through `bash -lc` so `~` expands and `npx`
+  // resolves on the login PATH (the desktop daemon bundles bash). The trailing
+  // `pwd` prints the created project's absolute path as the last stdout line.
+  initProject: (i) => {
+    const name = String(i.name ?? '').trim();
+    const parentDir = String(i.parentDir ?? '').trim() || '~';
+    if (!name) return Promise.reject(new Error('Project name is required'));
+    const q = (s: string): string => s.replace(/"/g, '\\"');
+    const cmd =
+      `mkdir -p "${q(parentDir)}" && cd "${q(parentDir)}" && ` +
+      `npx -y ugly-app@latest init "${q(name)}" && cd "${q(name)}" && pwd`;
+    return new Promise<{ name: string; path: string }>((resolve, reject) => {
+      let out = '';
+      let err = '';
+      try {
+        const proc = native.process.spawn('bash', ['-lc', cmd], {});
+        proc.onStdout((c) => (out += c));
+        proc.onStderr((c) => (err += c));
+        proc.onError((e) => reject(new Error(e)));
+        proc.onExit((code) => {
+          if (code !== 0) {
+            reject(new Error(`Project creation failed (exit ${code ?? 'null'})\n${(err || out).trim()}`));
+            return;
+          }
+          const lines = out.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+          const path = lines[lines.length - 1] ?? `${parentDir}/${name}`;
+          resolve({ name, path });
+        });
+      } catch (e) {
+        reject(e as Error);
+      }
+    });
+  },
   openProject: (i) => {
     const path = String(i.path ?? '').replace(/\/+$/, '');
     const name = path.split('/').pop() || path || 'project';
