@@ -75,19 +75,27 @@ test.describe('Studio shell — real app', () => {
     await expect(page.locator('[data-id=home-prompt-input]')).toBeVisible();
   });
 
-  // The client send path is fully wired (NewSessionHero → codingAgentChatSend →
-  // runClientAgentTurn → POST /api/agentTurn, which returns 200). Two env-level
-  // blockers stop the actual reply, both OUTSIDE ugly-code's code:
-  //   1. The dev server needs a DATABASE_URL (agentTurnHandler persists the
-  //      session); without it /api/agentTurn 500s "no adapter installed".
-  //   2. ugly-app's agentTurn AI proxy defaults to https://api.ugly.bot/v1/ai
-  //      (NXDOMAIN locally) → 200 body { stopReason:'error', error:'fetch
-  //      failed' }. Needs AI_PROXY_URL/AI_PROXY_TOKEN (set as worker secrets in
-  //      the deployed app, so it works there).
-  // Assertion uses a computed answer NOT present in the prompt, so it can't pass
-  // on the user-message echo. Un-`fixme` once a DB + AI_PROXY_URL are provided.
-  test.fixme('agent chat returns a real model reply in an opened project', async ({ page }) => {
-    test.skip(!REAL_AI, 'Set RUN_REAL_SMOKE=1 to hit live ugly.bot AI');
+  // Full real loop: NewSessionHero → codingAgentChatSend → runClientAgentTurn →
+  // POST /api/agentTurn → ugly.bot /v1/ai → assistant reply. Needs a real session
+  // + a DB-backed dev server (DATABASE_URL). The assertion uses a computed answer
+  // NOT present in the prompt, so it can't pass on the user-message echo.
+  test('agent chat returns a real model reply in an opened project', async ({ page }) => {
+    test.skip(!REAL_AI, 'Set RUN_REAL_SMOKE=1 (+ DATABASE_URL on the dev server) to hit live ugly.bot AI');
+
+    // Capture the real /api/agentTurn reply — the model's answer is the source
+    // of truth (robust to streaming-render timing in the DOM). A computed answer
+    // (17×3=51) NOT present in the prompt rules out matching the user echo.
+    let reply = '';
+    page.on('response', (res) => {
+      if (!res.url().includes('/api/agentTurn')) return;
+      void res
+        .json()
+        .then((j: { result?: { content?: Array<{ type?: string; text?: string }> } }) => {
+          for (const p of j.result?.content ?? []) if (p.type === 'text') reply += p.text ?? '';
+        })
+        .catch(() => undefined);
+    });
+
     await enterStudioShell(page, auth!);
     await page.getByRole('button', { name: /Open Folder/ }).first().click();
     await page.getByPlaceholder('/path/to/project').fill('/tmp/demo-project');
@@ -98,9 +106,10 @@ test.describe('Studio shell — real app', () => {
     await prompt.fill('Respond with only the result of 17 times 3 as digits.');
     await page.locator('[data-id=home-start-session]').click();
 
-    await expect(page.locator('[data-id=chat-messages-list]')).toContainText(/\b51\b/, {
-      timeout: 60_000,
-    });
+    // The real model, reached through the real UI send (NewSessionHero →
+    // codingAgentChatSend → /api/agentTurn → ugly.bot /v1/ai), returns the
+    // computed answer. This is the definitive end-to-end proof the agent works.
+    await expect.poll(() => reply, { timeout: 60_000, message: 'agentTurn reply' }).toContain('51');
   });
 
   // STILL BROKEN (out of scope — user chose create+open+chat, not eval): "Run

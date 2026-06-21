@@ -20,6 +20,10 @@ export async function enterStudioShell(
     platform: 'desktop',
     results: {
       'permissions.request': { granted: { fs: 'full', process: 'full' } },
+      // Resolve any fs tool the agent might call (e.g. list_dir to explore a
+      // fresh project) so the loop never hangs on an unmocked channel.
+      'fs.readdir': { entries: [] },
+      'fs.readFile': { content: '' },
       ...results,
     },
   });
