@@ -9,14 +9,16 @@ export type InstallOs =
   | 'mac-arm64'
   | 'mac-x64'
   | 'mac-dmg'
+  | 'mac-pkg'
   | 'linux-appimage'
   | 'linux-deb';
 
-// Only these targets can recover the code from the filename (Plan 1: AppImage
-// works end-to-end now; win works once Plan 2's NSIS hook lands).
+// Only these targets can recover the code from the filename: AppImage via
+// $APPIMAGE, win via the NSIS hook, mac-pkg via the postinstall script (Plan 2).
 const CODE_BEARING: Partial<Record<InstallOs, string>> = {
   win: 'exe',
   'linux-appimage': 'AppImage',
+  'mac-pkg': 'pkg',
 };
 
 export function buildInstallDownloadUrl(os: InstallOs, code: string): string | null {

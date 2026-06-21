@@ -47,6 +47,9 @@ interface PlatformInfo {
   // the page serve the Intel build to Intel Macs.
   arm64?: ArchAsset;
   x64?: ArchAsset;
+  // Present once a code-bearing .pkg is published — switches the mac CTA to the
+  // auto-open install path (Plan 2).
+  pkg?: ArchAsset;
 }
 
 interface ReleaseInfo {
@@ -386,15 +389,16 @@ function HeroInstall({
       : release?.platforms[userOS];
   const [winPromptUrl, setWinPromptUrl] = useState<string | null>(null);
 
-  // Map the detected OS (+ mac arch) to a download target for the handoff.
+  // Map the detected OS (+ mac arch) to a download target for the handoff. On
+  // mac, prefer the code-bearing .pkg once one is published (auto-open); until
+  // then fall back to the per-arch dmg (no auto-open, unchanged behavior).
+  const macTarget: InstallOs = release?.platforms.mac?.pkg
+    ? 'mac-pkg'
+    : macArch === 'x64'
+      ? 'mac-x64'
+      : 'mac-arm64';
   const installOs: InstallOs =
-    userOS === 'win'
-      ? 'win'
-      : userOS === 'linux'
-        ? 'linux-appimage'
-        : macArch === 'x64'
-          ? 'mac-x64'
-          : 'mac-arm64';
+    userOS === 'win' ? 'win' : userOS === 'linux' ? 'linux-appimage' : macTarget;
 
   // On click: create an install intent so Studio opens code.ugly.bot after
   // install, then download via the code-bearing /dl URL when the target can

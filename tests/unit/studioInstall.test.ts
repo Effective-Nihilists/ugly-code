@@ -10,6 +10,11 @@ describe('buildInstallDownloadUrl', () => {
       'https://studio.ugly.bot/dl/linux-appimage/Ugly%20Studio-abc1234567.AppImage',
     );
   });
+  it('builds a /dl URL for mac-pkg', () => {
+    expect(buildInstallDownloadUrl('mac-pkg', 'abcdefghij')).toBe(
+      'https://studio.ugly.bot/dl/mac-pkg/Ugly%20Studio-abcdefghij.pkg',
+    );
+  });
   it('returns null for targets that cannot recover the code', () => {
     expect(buildInstallDownloadUrl('mac-dmg', 'abc1234567')).toBeNull();
     expect(buildInstallDownloadUrl('linux-deb', 'abc1234567')).toBeNull();
