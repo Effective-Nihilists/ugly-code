@@ -23,10 +23,6 @@ export const pages = definePages({
     simulate?: 'cls' | 'overlap' | 'safearea' | 'keyboard' | 'jank' | 'popup';
   }>({ auth: false }),
   'test/inspect-fixture-other': definePage<{}>({ auth: false }),
-  // Mounts the real <AgentPanel/> so e2e can drive the coding-agent loop
-  // (deterministic via a scripted step override + UglyNative mock, or real via
-  // an injected auth cookie). See tests/e2e/agent.spec.ts.
-  'test/agent': definePage<{}>({ auth: false }),
 });
 
 export type AppPages = typeof pages;
