@@ -35,6 +35,8 @@ export interface GatedNativeOpts {
   root: string;
   /** The bundled-tool allowlist (defaults to the daemon's list). */
   bundledBinaries?: readonly string[];
+  /** Whether the in-memory sandbox backend reports supported (default true). */
+  sandboxSupported?: boolean;
 }
 
 /**
@@ -109,12 +111,17 @@ export async function installGatedNative(page: Page, opts: GatedNativeOpts): Pro
       }),
   );
 
-  await page.addInitScript(() => {
+  await page.addInitScript((sandboxSupported: boolean) => {
     const listeners: Record<string, Array<(d: unknown) => void>> = {};
     let seq = 0;
     const emit = (e: string, d: unknown): void => (listeners[e] ?? []).forEach((cb) => cb(d));
+    // In-memory sandbox state (the real OS-user backend lives in the daemon —
+    // here we mirror the contract so the client's pill + tool wiring is testable).
+    const sbInit = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any;
+    // Spawns that carried a sandbox context, for assertions.
+    w.__sandboxSpawns = [];
 
     w.UglyNative = {
       platform: 'desktop',
@@ -134,11 +141,33 @@ export async function installGatedNative(page: Page, opts: GatedNativeOpts): Pro
         if (ch === 'fs.mkdir') return w.__gnFs('mkdir', String(p.path), '');
         if (ch === 'fs.exists') return w.__gnFs('exists', String(p.path), '');
         if (ch === 'fs.realpath') return { path: String(p.path) };
+        // ── sandbox (per-project OS-user isolation) ──
+        if (ch === 'sandbox.status') {
+          const id = String(p.projectId);
+          return {
+            supported: sandboxSupported,
+            initialized: sbInit.has(id),
+            platform: sandboxSupported ? 'macos' : 'unsupported',
+            username: sandboxSupported ? 'ugs-' + id : null,
+          };
+        }
+        if (ch === 'sandbox.initialize') {
+          if (!sandboxSupported) return { ok: false, error: 'sandbox not supported on unsupported' };
+          sbInit.add(String(p.projectId));
+          return { ok: true };
+        }
+        if (ch === 'sandbox.teardown') {
+          sbInit.delete(String(p.projectId));
+          return { ok: true };
+        }
         if (ch === 'process.spawn') {
+          // The facade sends { cmd, args, opts }; cwd + sandbox live on opts.
+          const opts = p.opts ?? p;
+          if (opts?.sandbox) w.__sandboxSpawns.push({ cmd: String(p.cmd), sandbox: opts.sandbox });
           const id = 'p' + seq++;
           // __gnSpawn rejects (gate denial) → this await throws → invoke rejects.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const r: any = await w.__gnSpawn(String(p.cmd), (p.args ?? []).map(String), p.cwd ? String(p.cwd) : undefined);
+          const r: any = await w.__gnSpawn(String(p.cmd), (p.args ?? []).map(String), opts?.cwd ? String(opts.cwd) : undefined);
           setTimeout(() => {
             if (r.stdout) emit('process.stdout:' + id, { chunk: r.stdout });
             if (r.stderr) emit('process.stderr:' + id, { chunk: r.stderr });
@@ -150,7 +179,7 @@ export async function installGatedNative(page: Page, opts: GatedNativeOpts): Pro
         return {};
       },
     };
-  });
+  }, opts.sandboxSupported ?? true);
 
   return { scopeRoot };
 }
