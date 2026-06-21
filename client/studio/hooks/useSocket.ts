@@ -17,6 +17,33 @@ import type { AppSocket } from 'ugly-app/client';
 import { native } from 'ugly-app/native';
 import type { AppRegistry } from '../shared/api';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
+import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
+
+/** Run a shell command through `bash -lc` (so `~` expands + login PATH applies)
+ *  and resolve with the LAST stdout line — a trailing `pwd`/`echo` of a path.
+ *  Rejects on non-zero exit. Used by initProject + evalCreateProject. */
+function spawnForPath(cmd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let out = '';
+    let err = '';
+    try {
+      const proc = native.process.spawn('bash', ['-lc', cmd], {});
+      proc.onStdout((c) => (out += c));
+      proc.onStderr((c) => (err += c));
+      proc.onError((e) => reject(new Error(e)));
+      proc.onExit((code) => {
+        if (code !== 0) {
+          reject(new Error(`command failed (exit ${code ?? 'null'})\n${(err || out).trim()}`));
+          return;
+        }
+        const lines = out.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+        resolve(lines[lines.length - 1] ?? '');
+      });
+    } catch (e) {
+      reject(e as Error);
+    }
+  });
+}
 
 type Input = Record<string, unknown>;
 type Handler = (input: Input) => Promise<unknown>;
@@ -352,43 +379,52 @@ const handlers: Record<string, Handler> = {
   markSessionViewed: () => Promise.resolve({}),
   getCodingAgentWorktreeBehind: () => Promise.resolve({ behind: 0 }),
   getCodingAgentWorktreeAhead: () => Promise.resolve({ ahead: 0 }),
-  evalListTasks: () => Promise.resolve({ tasks: [] }),
+  // The eval picker: all 59 task defs (ported from app/studio/evals/tasks) with
+  // derived difficulty + "why interesting". See client/studio/evals/registry.ts.
+  evalListTasks: () => Promise.resolve(listEvalTasks()),
   evalListHistory: () => Promise.resolve({ runs: [] }),
   evalDeleteRun: () => Promise.resolve({}),
+  // Scaffold an eval run: a fresh git project under ~/.ugly-studio/eval-projects,
+  // then open it + seed the task's first-turn prompt. NOTE: task fixtures are
+  // generated/prewarmed in the monolith and not yet bundled here, so the project
+  // starts empty — write-from-scratch tasks (feature/boss/planning/vague) run
+  // fully; fixture-based tasks need the fixture pipeline (a follow-up).
+  evalCreateProject: async (i) => {
+    const taskName = String(i.taskName ?? '');
+    const task = getEvalTask(taskName);
+    if (!task) throw new Error(`Unknown eval task: ${taskName}`);
+    const safe = taskName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const stamp = String(i.taskId ?? Date.now()).replace(/[^a-zA-Z0-9_.-]/g, '_');
+    // `$HOME` (not `~`) — a leading `~` is NOT expanded inside the double quotes
+    // below, which would create a literal `~` dir.
+    const base = `$HOME/.ugly-studio/eval-projects/${safe}-${stamp}`;
+    const cmd =
+      `mkdir -p "${base}" && cd "${base}" && ` +
+      `printf '{"name":"%s","version":"0.0.0","private":true}\\n' "${safe}" > package.json && ` +
+      `git init -b main -q 2>/dev/null; git add -A 2>/dev/null; ` +
+      `git -c user.email=eval@ugly.bot -c user.name=eval commit -q --allow-empty -m "eval: seed ${safe}" 2>/dev/null; ` +
+      `pwd`;
+    const projectPath = await spawnForPath(cmd);
+    const projectName = projectPath.split('/').pop() || safe;
+    return { projectPath, projectName, firstTurnPrompt: firstTurnPrompt(task) };
+  },
   // Scaffold a new ugly-app project on disk, then resolve its absolute path so
   // the caller can open it. Mirrors the monolith's `npx -y ugly-app@latest init`
   // but over native.process. Runs through `bash -lc` so `~` expands and `npx`
   // resolves on the login PATH (the desktop daemon bundles bash). The trailing
   // `pwd` prints the created project's absolute path as the last stdout line.
-  initProject: (i) => {
+  initProject: async (i) => {
     const name = String(i.name ?? '').trim();
-    const parentDir = String(i.parentDir ?? '').trim() || '~';
-    if (!name) return Promise.reject(new Error('Project name is required'));
+    // A leading `~` is NOT expanded inside the double quotes below — map it to
+    // `$HOME`, which is.
+    const parentDir = (String(i.parentDir ?? '').trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
+    if (!name) throw new Error('Project name is required');
     const q = (s: string): string => s.replace(/"/g, '\\"');
     const cmd =
       `mkdir -p "${q(parentDir)}" && cd "${q(parentDir)}" && ` +
       `npx -y ugly-app@latest init "${q(name)}" && cd "${q(name)}" && pwd`;
-    return new Promise<{ name: string; path: string }>((resolve, reject) => {
-      let out = '';
-      let err = '';
-      try {
-        const proc = native.process.spawn('bash', ['-lc', cmd], {});
-        proc.onStdout((c) => (out += c));
-        proc.onStderr((c) => (err += c));
-        proc.onError((e) => reject(new Error(e)));
-        proc.onExit((code) => {
-          if (code !== 0) {
-            reject(new Error(`Project creation failed (exit ${code ?? 'null'})\n${(err || out).trim()}`));
-            return;
-          }
-          const lines = out.trim().split('\n').map((l) => l.trim()).filter(Boolean);
-          const path = lines[lines.length - 1] ?? `${parentDir}/${name}`;
-          resolve({ name, path });
-        });
-      } catch (e) {
-        reject(e as Error);
-      }
-    });
+    const path = await spawnForPath(cmd);
+    return { name, path: path || `${parentDir}/${name}` };
   },
   openProject: (i) => {
     const path = String(i.path ?? '').replace(/\/+$/, '');

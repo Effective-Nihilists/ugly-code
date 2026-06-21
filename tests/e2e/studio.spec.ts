@@ -129,15 +129,14 @@ test.describe('Studio shell — real app', () => {
     expect(errors, `page crashed: ${errors.join('; ')}`).toEqual([]);
   });
 
-  // STILL BROKEN (out of scope — user chose create+open+chat, not eval): "Run
-  // eval" opens EvalPickerModal which loads evalListTasks, stubbed to
-  // `{tasks:[]}` with no eval task data in the repo → blank picker. Asserts the
-  // correct behavior; un-`fixme` once eval tasks are wired.
-  test.fixme('Run eval lists at least one eval task', async ({ page }) => {
+  // "Run eval" loads the 59 ported task defs (client/studio/evals/registry.ts)
+  // into the picker, sorted easy → hard. Pure client-side (no AI/native), so it
+  // runs in the deterministic suite.
+  test('Run eval lists the ported eval tasks', async ({ page }) => {
     await enterStudioShell(page, auth!);
     await page.getByText('Run eval').click();
-    await expect(page.getByText(/difficulty|bug-fix|feature|planning/i).first()).toBeVisible({
-      timeout: 8_000,
-    });
+    // Top-of-list (low difficulty) and a boss task both render.
+    await expect(page.getByText('smoke-trivial-fix', { exact: true })).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('boss-chatgpt-clone', { exact: true })).toBeVisible();
   });
 });
