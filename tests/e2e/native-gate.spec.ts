@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import * as fs from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,15 +6,15 @@ import { installGatedNative } from './helpers/gatedNative';
 
 /**
  * Proves the UglyNative TEST harness enforces the SAME restricted-space +
- * permission model as the real Ugly Studio daemon — so a test can no longer go
- * green against an unrestricted host (which is exactly how the `bash`-not-bundled
- * Create Project bug shipped: the old harness ran real bash with no gate).
+ * permission model as the real Ugly Studio daemon — it now drives the ACTUAL
+ * `CapabilityGate` from `ugly-app/native/server` (the exact class the daemon
+ * constructs), so a test can no longer go green against an unrestricted host
+ * (which is exactly how the `bash`-not-bundled Create Project bug shipped: the
+ * old harness ran real bash with no gate).
  *
  * Each test drives `window.UglyNative` directly so it asserts the gate, not the
- * app. The backing fs/process are REAL but sandboxed to a temp dir.
+ * app. The backing fs/process are REAL but authorized + confined by the gate.
  */
-const native = (): string => `(window).UglyNative`;
-
 async function invoke(page: import('@playwright/test').Page, ch: string, payload: unknown): Promise<unknown> {
   return page.evaluate(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,9 +67,9 @@ test('spawning a bundled tool WITHOUT requesting the process permission is denie
   await installGatedNative(page, { root });
   await page.goto('/');
 
-  // No permissions.request → exactly the daemon's "not granted" path.
+  // No permissions.request → the real gate's CapabilityGate.checkProcess path.
   await expect(invoke(page, 'process.spawn', { cmd: 'bash', args: ['-lc', 'echo hi'] })).rejects.toThrow(
-    /requires the process permission/i,
+    /tool not granted/i,
   );
 });
 
@@ -82,25 +81,29 @@ test('a NON-bundled tool is denied even after it is requested ("not a bundled to
   await expect(invoke(page, 'process.spawn', { cmd: 'rm', args: ['-rf', '/'] })).rejects.toThrow(/not a bundled tool/i);
 });
 
-test('fs is denied until the fs capability is granted, then confined to the sandbox', async ({ page }) => {
+test('fs is denied until the fs capability is granted, then confined to the scoped folder', async ({ page }) => {
   await installGatedNative(page, { root });
   await page.goto('/');
 
-  await expect(invoke(page, 'fs.writeFile', { path: 'a.txt', content: 'x' })).rejects.toThrow(/fs permission not granted/i);
+  // No fs grant → the real gate's resolveFsPath denies ('no filesystem permission').
+  await expect(invoke(page, 'fs.writeFile', { path: 'a.txt', content: 'x' })).rejects.toThrow(/no filesystem permission/i);
 
-  await invoke(page, 'permissions.request', { fs: 'full', process: [] });
+  // Granted scoped → reads/writes succeed THROUGH the gate (confined to the
+  // origin's scope folder; we read back through the gate, not the raw fs).
+  await invoke(page, 'permissions.request', { fs: 'scoped', process: [] });
   await invoke(page, 'fs.writeFile', { path: 'a.txt', content: 'hello' });
-  expect(fs.readFileSync(join(root, 'a.txt'), 'utf8')).toBe('hello');
+  const back = (await invoke(page, 'fs.readFile', { path: 'a.txt' })) as { content: string };
+  expect(back.content).toBe('hello');
 
-  // Escaping the sandbox is rejected by the node-side path confinement.
-  await expect(invoke(page, 'fs.readFile', { path: '../../etc/hosts' })).rejects.toThrow(/escapes sandbox/i);
+  // Escaping the scope is rejected by the real ScopeViolation confinement.
+  await expect(invoke(page, 'fs.readFile', { path: '../../etc/hosts' })).rejects.toThrow(/escapes scoped folder/i);
 });
 
-test('once bundled AND granted, a real process runs (sandboxed)', async ({ page }) => {
+test('once bundled AND granted, a real process runs (confined)', async ({ page }) => {
   await installGatedNative(page, { root });
   await page.goto('/');
 
-  await invoke(page, 'permissions.request', { fs: 'full', process: ['bash'] });
+  await invoke(page, 'permissions.request', { fs: 'scoped', process: ['bash'] });
   const res = await spawnAndWait(page, 'bash', ['-lc', 'echo gated-ok']);
   expect(res.code).toBe(0);
   expect(res.out).toContain('gated-ok');
@@ -119,5 +122,3 @@ test("REGRESSION: with the daemon's OLD allowlist (no bash), Create Project's sp
   );
 });
 
-// Silence the unused helper warning while keeping it documented for spec authors.
-void native;
