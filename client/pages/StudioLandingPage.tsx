@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollAnimatedView, ScrollView, View } from 'ugly-app/client';
 import {
+  buildInstallDownloadUrl,
+  requestStudioInstall,
+  type InstallOs,
+} from '../lib/studioInstall';
+import {
   BG,
   BG_ELEV,
   BORDER,
@@ -381,11 +386,31 @@ function HeroInstall({
       : release?.platforms[userOS];
   const [winPromptUrl, setWinPromptUrl] = useState<string | null>(null);
 
+  // Map the detected OS (+ mac arch) to a download target for the handoff.
+  const installOs: InstallOs =
+    userOS === 'win'
+      ? 'win'
+      : userOS === 'linux'
+        ? 'linux-appimage'
+        : macArch === 'x64'
+          ? 'mac-x64'
+          : 'mac-arm64';
+
+  // On click: create an install intent so Studio opens code.ugly.bot after
+  // install, then download via the code-bearing /dl URL when the target can
+  // recover the code (win, AppImage); otherwise fall back to the direct asset.
+  // The Windows flow keeps showing its SmartScreen prompt modal (with the /dl
+  // URL); other OSes navigate straight to the download.
   const onPrimaryClick = (e: { preventDefault(): void }) => {
-    if (userOS === 'win' && primary?.url) {
-      setWinPromptUrl(primary.url);
-      e.preventDefault();
-    }
+    e.preventDefault();
+    void (async () => {
+      const code = await requestStudioInstall('https://code.ugly.bot');
+      const dl = code ? buildInstallDownloadUrl(installOs, code) : null;
+      const url = dl ?? primary?.url ?? null;
+      if (!url) return;
+      if (userOS === 'win') setWinPromptUrl(url);
+      else window.location.href = url;
+    })();
   };
 
   return (
