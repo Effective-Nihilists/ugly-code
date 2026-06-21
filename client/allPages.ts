@@ -23,4 +23,5 @@ export const allPages = {
   ['test/inspect-fixture-other']: lazyPage(
     () => import('./pages/InspectFixtureOtherPage'),
   ),
+  ['test/agent']: lazyPage(() => import('./pages/AgentFixturePage')),
 } satisfies PageMap<AppPages>;

@@ -25,19 +25,22 @@ test.describe('Auth flow', () => {
   test('auth-demo page shows login prompt when unauthenticated', async ({ page }) => {
     await page.goto('/auth-demo');
     await expect(page.getByText('You are not logged in.')).toBeVisible();
-    await expect(page.getByText('Login with ugly.bot')).toBeVisible();
+    // The login CTA label is experiment-driven (cta-test → "Get started" |
+    // "Try it free"); assert the button exists rather than a fixed string.
+    await expect(
+      page.getByRole('button', { name: /Get started|Try it free/ }),
+    ).toBeVisible();
   });
 
   test('login button opens OAuth popup', async ({ page, context }) => {
     await page.goto('/auth-demo');
 
-    // Listen for a new page (popup) when clicking login
+    // Listen for a new page (popup) when clicking the CTA — openLogin() does
+    // window.open('https://ugly.bot/oauth?origin=…').
     const popupPromise = context.waitForEvent('page');
-    await page.getByText('Login with ugly.bot').click();
+    await page.getByRole('button', { name: /Get started|Try it free/ }).click();
     const popup = await popupPromise;
 
-    // The popup should navigate to the ugly.bot login page. AuthDemoPage opens
-    // /oauth which redirects to /loginOAuth on ugly.bot.
     expect(popup.url()).toContain('ugly.bot/');
     expect(popup.url().toLowerCase()).toContain('oauth');
     await popup.close();
