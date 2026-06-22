@@ -89,6 +89,22 @@ export function getActiveProjectPath(): string | null {
   return activeProjectPath;
 }
 
+// Per-session selected model id, so codingAgentChatSend routes to the right
+// runner: the local Claude CLI (claude-code* / claude-cli) vs the in-process
+// ugly.bot agent (everything else).
+const sessionModels = new Map<string, string>();
+export function setSessionModel(sessionId: string, model: string): void {
+  if (sessionId && model) sessionModels.set(sessionId, model);
+}
+export function getSessionModel(sessionId: string): string | null {
+  return sessionModels.get(sessionId) ?? null;
+}
+/** A local Claude Code CLI model id (defined here to avoid a static import cycle
+ *  with claudeCliAgent, which imports from this module). */
+function isClaudeCliModel(model: string | null | undefined): boolean {
+  return !!model && (model === 'claude-cli' || model === 'claude-code' || model.startsWith('claude-code:'));
+}
+
 // Grader IO over the native bridge: run tools (tsc/vitest) in the project and
 // read its files. Mirrors spawnForPath's spawn shape but with a custom cwd/argv.
 const gradeDeps: GradeDeps = {
@@ -451,45 +467,54 @@ const handlers: Record<string, Handler> = {
   // Honor resumeSessionId (return it unchanged → no "resume mismatch"); mint a
   // fresh compositeId for a new session. Persistence is deferred to the first
   // turn (clientAgent upserts), so we don't create empty session rows.
-  codingAgentChatCreate: (i) =>
-    Promise.resolve({
-      sessionId: i.resumeSessionId
-        ? String(i.resumeSessionId)
-        : 'cs:' + Math.random().toString(36).slice(2, 11),
-    }),
+  codingAgentChatCreate: (i) => {
+    const sessionId = i.resumeSessionId
+      ? String(i.resumeSessionId)
+      : 'cs:' + Math.random().toString(36).slice(2, 11);
+    if (i.model) setSessionModel(sessionId, String(i.model));
+    return Promise.resolve({ sessionId });
+  },
   codingAgentChatSend: (i) => {
     const sessionId = String(i.sessionId ?? '');
     const message = String(i.message ?? '');
-    // Run the agent loop client-side; it streams codingAgent:event frames back
-    // through emitCustom for useCodingAgentChat to render. Surface a pre-loop
-    // failure (e.g. resume/setup throwing) as an error frame instead of letting
-    // the floating promise swallow it — otherwise the turn silently does nothing.
-    void import('../agent/clientAgent')
-      .then((m) => m.runClientAgentTurn(sessionId, message, emitCustom))
-      .catch((e: unknown) => {
-        console.error('[codingAgentChatSend] turn failed', e);
-        emitCustom({
-          type: 'codingAgent:event',
-          sessionId,
-          event: { type: 'message', payload: { type: 'created', payload: {
-            id: 'err_' + Math.random().toString(36).slice(2, 9),
-            role: 'assistant',
-            parts: [{ type: 'text', data: { text: '⚠ ' + (e instanceof Error ? e.message : String(e)) } }, { type: 'finish' }],
-            created_at: Date.now(),
-          } } },
-        });
+    const model = getSessionModel(sessionId);
+    // Route to the local Claude CLI runner when that's the selected model;
+    // otherwise the in-process ugly.bot agent. Both stream codingAgent:event
+    // frames back through emitCustom. Surface a pre-loop failure as an error
+    // frame instead of letting the floating promise swallow it.
+    const run = isClaudeCliModel(model)
+      ? import('../agent/claudeCliAgent').then((m) => m.runClaudeCliTurn(sessionId, message, model!, emitCustom))
+      : import('../agent/clientAgent').then((m) => m.runClientAgentTurn(sessionId, message, emitCustom));
+    void run.catch((e: unknown) => {
+      console.error('[codingAgentChatSend] turn failed', e);
+      emitCustom({
+        type: 'codingAgent:event',
+        sessionId,
+        event: { type: 'message', payload: { type: 'created', payload: {
+          id: 'err_' + Math.random().toString(36).slice(2, 9),
+          role: 'assistant',
+          parts: [{ type: 'text', data: { text: '⚠ ' + (e instanceof Error ? e.message : String(e)) } }, { type: 'finish' }],
+          created_at: Date.now(),
+        } } },
       });
+    });
     return Promise.resolve({});
   },
   codingAgentChatStop: (i) => {
-    void import('../agent/clientAgent').then((m) =>
-      m.abortClientAgent(String(i.sessionId ?? '')),
-    );
+    const sessionId = String(i.sessionId ?? '');
+    if (isClaudeCliModel(getSessionModel(sessionId))) {
+      void import('../agent/claudeCliAgent').then((m) => m.abortClaudeCli(sessionId));
+    } else {
+      void import('../agent/clientAgent').then((m) => m.abortClientAgent(sessionId));
+    }
     return Promise.resolve({});
   },
   codingAgentChatClearMessages: () => Promise.resolve({}),
   codingAgentToolStop: () => Promise.resolve({}),
-  codingAgentChatSetModel: () => Promise.resolve({}),
+  codingAgentChatSetModel: (i) => {
+    setSessionModel(String(i.sessionId ?? ''), String(i.model ?? ''));
+    return Promise.resolve({});
+  },
   codingAgentSetReasoningEffort: () => Promise.resolve({}),
   codingAgentGrantPermission: () => Promise.resolve({}),
   codingAgentSkipPermissions: () => Promise.resolve({}),

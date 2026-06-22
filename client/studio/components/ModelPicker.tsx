@@ -97,6 +97,15 @@ const BASE_MODELS = getCodingAgentModels()
     return a.costPerM - b.costPerM;
   });
 
+/** Local Claude Code CLI rows — shown only when the `claude` binary is detected
+ *  on the user's machine (provider 'claude-cli' so the family filter groups them
+ *  under the Claude CLI tab). Selecting one routes turns to the local CLI runner. */
+const CLAUDE_CLI_MODELS = [
+  { id: 'claude-code', name: 'Claude CLI', provider: 'claude-cli', contextWindow: 200000, speed: 'medium', vision: true, reasoning: 'strong', supportsReasoning: true, smartness: 5, sweBenchVerified: 72, costPerM: 0 },
+  { id: 'claude-code:opus', name: 'Claude CLI · Opus', provider: 'claude-cli', contextWindow: 200000, speed: 'slow', vision: true, reasoning: 'strong', supportsReasoning: true, smartness: 5, sweBenchVerified: 74, costPerM: 0 },
+  { id: 'claude-code:sonnet', name: 'Claude CLI · Sonnet', provider: 'claude-cli', contextWindow: 200000, speed: 'medium', vision: true, reasoning: 'strong', supportsReasoning: true, smartness: 5, sweBenchVerified: 72, costPerM: 0 },
+] as unknown as CodingAgentModel[];
+
 /** Old export kept for back-compat with reasoning-detection helpers. */
 export function isWeakModel(modelId: string): boolean {
   return BASE_MODELS.find((m) => m.id === modelId)?.reasoning === 'weak';
@@ -269,6 +278,19 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
   const [subscriptionModels, setSubscriptionModels] = useState<
     CodingAgentModel[]
   >([]);
+  // Detect the local Claude CLI; when present, surface the claude-cli rows.
+  const [claudeCliAvailable, setClaudeCliAvailable] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void import('../agent/claudeCliDetect').then(({ detectClaudeCli }) =>
+      import('../hooks/useSocket').then(({ getActiveProjectPath }) =>
+        detectClaudeCli(getActiveProjectPath()).then((p) => {
+          if (!cancelled) setClaudeCliAvailable(!!p);
+        }),
+      ),
+    );
+    return () => { cancelled = true; };
+  }, []);
   // Collapsed ugly.bot section shows only the auto-pool (pinned) models +
   // Step 3.5 Flash + any currently-selected catalog row. Expanding reveals
   // the full ugly.bot framework catalog.
@@ -304,7 +326,11 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
 
   // ── Group all available models by subscription, applying family filter
   const groups = useMemo(() => {
-    const all: CodingAgentModel[] = [...BASE_MODELS, ...subscriptionModels];
+    const all: CodingAgentModel[] = [
+      ...BASE_MODELS,
+      ...subscriptionModels,
+      ...(claudeCliAvailable ? CLAUDE_CLI_MODELS : []),
+    ];
     const bySub = new Map<SubscriptionKey, CodingAgentModel[]>();
     for (const model of all) {
       const sub = subscriptionOf(model);
@@ -316,7 +342,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
     // Sort within each group by SWE-bench desc, then weighted price asc.
     for (const arr of bySub.values()) arr.sort(sortBySweAndCost);
     return bySub;
-  }, [family, subscriptionModels]);
+  }, [family, subscriptionModels, claudeCliAvailable]);
 
   // ── Trigger label resolution
   const triggerText = useMemo(() => {
