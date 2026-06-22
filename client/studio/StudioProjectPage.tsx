@@ -205,21 +205,32 @@ export default function StudioProjectPage({
       </div>
       <main style={S.main}>
         <header style={S.header}>
+          <TabPickerStyles />
           <button onClick={onBack} style={S.back}>
             ‹ Projects
           </button>
           <span style={S.name}>{projectName}</span>
           {projectPath && <span style={S.path}>{projectPath}</span>}
           <span style={{ flex: 1 }} />
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => { setTab(t.id); }}
-              style={{ ...S.tab, ...(tab === t.id ? S.tabActive : {}) }}
-            >
-              {t.label}
-            </button>
-          ))}
+          {/* Segmented control — matches the sidebar header height (36) and reads
+              as one clean control instead of five separate bordered buttons. */}
+          <div style={S.tabBar}>
+            {TABS.map((t) => {
+              const active = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  aria-pressed={active}
+                  data-active={active}
+                  className="us-chat-tab"
+                  onClick={() => { setTab(t.id); }}
+                  style={{ ...S.tabSeg, ...(active ? S.tabSegActive : {}) }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
         </header>
         <div style={S.content}>
           {/* Chat stays mounted (preserves the agent session); others mount on demand.
@@ -246,18 +257,34 @@ export default function StudioProjectPage({
   );
 }
 
+// Hover affordance for the segmented tab control (inactive chips brighten on
+// hover; the active chip is already raised so it's excluded).
+function TabPickerStyles(): React.ReactElement {
+  return (
+    <style>{`
+      .us-chat-tab:hover:not([data-active="true"]) { color: var(--text-primary); }
+      .us-chat-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    `}</style>
+  );
+}
+
 // Themed via the studio CSS variables (light + dark) so the workspace matches
 // the rest of the app instead of a hardcoded dark palette.
 const S: Record<string, React.CSSProperties> = {
   root: { display: 'flex', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' },
   sidebar: { width: 264, flex: 'none', display: 'flex', minHeight: 0, borderRight: '1px solid var(--border)' },
   main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
-  header: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 },
-  back: { fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 11px', cursor: 'pointer' },
-  name: { fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-primary)' },
-  path: { fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 360 },
-  tab: { fontFamily: 'var(--font-mono)', fontSize: 12, background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer' },
-  tabActive: { background: 'var(--accent-dim)', color: 'var(--accent)', borderColor: 'var(--accent)' },
+  // Fixed 36px height to line up exactly with the session-list sidebar header.
+  // Right padding reserves space for the fixed top-right feedback icon so the
+  // tab control never slides under it (see [data-id='feedback-button'] in styles.css).
+  header: { display: 'flex', alignItems: 'center', gap: 10, height: 36, padding: '0 42px 0 12px', boxSizing: 'border-box', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 },
+  back: { fontFamily: 'var(--font-mono)', fontSize: 11.5, lineHeight: 1, height: 24, display: 'inline-flex', alignItems: 'center', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '0 9px', cursor: 'pointer', flexShrink: 0 },
+  name: { fontFamily: 'var(--font-mono)', fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 },
+  path: { fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 320 },
+  // Segmented control: one rounded track holding the tab chips.
+  tabBar: { display: 'inline-flex', alignItems: 'center', gap: 2, height: 26, padding: 3, boxSizing: 'border-box', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, flexShrink: 0 },
+  tabSeg: { height: '100%', display: 'inline-flex', alignItems: 'center', padding: '0 11px', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.01em', color: 'var(--text-muted)', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', transition: 'color 120ms ease, background 120ms ease, box-shadow 120ms ease' },
+  tabSegActive: { background: 'var(--bg-primary)', color: 'var(--accent)', boxShadow: '0 1px 2px rgba(0,0,0,0.16)' },
   content: { flex: 1, minHeight: 0, display: 'flex', position: 'relative', background: 'var(--bg-primary)' },
   pane: { flex: 1, minHeight: 0, flexDirection: 'column', display: 'flex' },
   paneScroll: { flex: 1, minHeight: 0, overflow: 'auto' },
