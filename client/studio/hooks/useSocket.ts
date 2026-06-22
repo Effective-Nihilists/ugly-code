@@ -93,11 +93,21 @@ export function getActiveProjectPath(): string | null {
 // runner: the local Claude CLI (claude-code* / claude-cli) vs the in-process
 // ugly.bot agent (everything else).
 const sessionModels = new Map<string, string>();
+const modelKey = (sid: string): string => `ugly-studio:model:${sid}`;
 export function setSessionModel(sessionId: string, model: string): void {
-  if (sessionId && model) sessionModels.set(sessionId, model);
+  if (!sessionId || !model) return;
+  sessionModels.set(sessionId, model);
+  try { localStorage.setItem(modelKey(sessionId), model); } catch { /* ignore */ }
 }
 export function getSessionModel(sessionId: string): string | null {
-  return sessionModels.get(sessionId) ?? null;
+  const inMem = sessionModels.get(sessionId);
+  if (inMem) return inMem;
+  // Survive reload: routing (claude-cli vs ugly.bot) must persist per session.
+  try {
+    const saved = localStorage.getItem(modelKey(sessionId));
+    if (saved) { sessionModels.set(sessionId, saved); return saved; }
+  } catch { /* ignore */ }
+  return null;
 }
 /** A local Claude Code CLI model id (defined here to avoid a static import cycle
  *  with claudeCliAgent, which imports from this module). */

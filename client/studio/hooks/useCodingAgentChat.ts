@@ -1060,6 +1060,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const [model, setModel] = useState<string>(
     () => initialModel ?? DEFAULT_MODEL,
   );
+  // A ref mirror of `model` so synchronous callers (handleHeroSubmit → setModelMode
+  // → sendMessage → startNewChat, all in one tick before re-render) read the
+  // just-picked model instead of the stale closure value.
+  const modelRef = useRef(model);
+  useEffect(() => { modelRef.current = model; }, [model]);
   // Default to max thinking for fresh sessions — matches the server
   // env default in `readReasoningEffortEnv()` and ensures the studio
   // requests the heaviest reasoning the provider exposes. Users opt
@@ -2485,11 +2490,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // value is never sent — the spec-build-verify pattern handles
       // read-only spec turns via system-prompt tail, not OS ACL.
       const serverMode = permissionMode === 'yolo' ? 'yolo' : 'edit';
+      // Read the ref (not the closed-over `model`) so a just-picked model from
+      // the new-session hero is honored on this same-tick create.
+      const createModel = modelRef.current;
       console.log(
-        `[session-origin] useCodingAgentChat.startNewChat chatCreate model=${model} mode=${serverMode}`,
+        `[session-origin] useCodingAgentChat.startNewChat chatCreate model=${createModel} mode=${serverMode}`,
       );
       const { sessionId: newId } = await agentApi(backend.chatCreate, {
-        model,
+        model: createModel,
         mode: serverMode,
       });
       console.debug('[CodingAgentChat] Session created: %s', newId);
@@ -2886,6 +2894,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       //   • needsFamilySwitchConfirm → confirm + retry via chatSetModel(reset)
       //   • ok (+ maybe a silent empty-session convert) → mirror locally
       setModelModeState(next);
+      // Keep the `model` string in sync with a single pick — it drives both the
+      // displayed model and what startNewChat sends to chatCreate. (Without this
+      // a new-session claude-cli pick was lost: the string stayed at the default
+      // 'auto', so the session showed auto and routed to the ugly.bot agent.)
+      if (next.kind === 'single') {
+        modelRef.current = next.model; // synchronous — startNewChat reads this
+        setModel(next.model);
+        onModelChangedRef.current?.(next.model);
+      }
       if (!sessionId) return;
       try {
         const res = await agentApi(backend.setModelMode, {
