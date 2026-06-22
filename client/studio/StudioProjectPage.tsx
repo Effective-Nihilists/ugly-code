@@ -25,6 +25,23 @@ const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: 'events', label: 'Events' },
   { id: 'workers', label: 'Workers' },
 ];
+const ALL_TABS: WorkspaceTab[] = ['chat', 'database', 'errors', 'events', 'workers', 'git', 'terminal', 'prod'];
+
+// The open tab + active session live in the URL (alongside ?path=) so a reload
+// restores exactly where you were.
+function readWorkspaceUrl(): { tab: WorkspaceTab | null; session: string | null } {
+  const p = new URLSearchParams(window.location.search);
+  const t = p.get('tab') as WorkspaceTab | null;
+  return { tab: t && ALL_TABS.includes(t) ? t : null, session: p.get('session') };
+}
+function writeWorkspaceUrl(tab: WorkspaceTab, session: string | null): void {
+  const url = new URL(window.location.href);
+  if (tab === 'chat') url.searchParams.delete('tab');
+  else url.searchParams.set('tab', tab);
+  if (session) url.searchParams.set('session', session);
+  else url.searchParams.delete('session');
+  window.history.replaceState({}, '', url.pathname + url.search);
+}
 
 // The project page: session sidebar (list + main + New session) + the workspace
 // (coding-agent chat + the tab rail). Sessions persist per project; the main
@@ -40,12 +57,13 @@ export default function StudioProjectPage({
   projectPath?: string;
   onBack: () => void;
 }): React.ReactElement {
-  const [tab, setTab] = React.useState<WorkspaceTab>('chat');
+  const urlInit = React.useMemo(() => readWorkspaceUrl(), []);
+  const [tab, setTab] = React.useState<WorkspaceTab>(urlInit.tab ?? 'chat');
   // Sessions are persisted per project; CodingAgentChat assigns the real
   // compositeId on first turn (onSessionCreated), which we record here.
   const [stored, setStored] = React.useState<StoredSession[]>(() => loadSessions(projectPath));
   const [activeSessionId, setActiveSessionId] = React.useState<string | null>(
-    () => loadSessions(projectPath).find((s) => s.kind === 'main')?.compositeId ?? null,
+    () => urlInit.session ?? loadSessions(projectPath).find((s) => s.kind === 'main')?.compositeId ?? null,
   );
   // Bumped to remount CodingAgentChat when switching sessions / starting fresh.
   const [chatKey, setChatKey] = React.useState(0);
@@ -56,16 +74,27 @@ export default function StudioProjectPage({
     return () => { setActiveProjectPath(null); };
   }, [projectPath]);
 
-  // Reload the session list when the project changes.
+  // Reload the session list when the project actually changes (not on first
+  // mount — initial state already came from the URL + store).
+  const prevPathRef = React.useRef(projectPath);
   React.useEffect(() => {
+    if (prevPathRef.current === projectPath) return;
+    prevPathRef.current = projectPath;
+    const u = readWorkspaceUrl();
     const s = loadSessions(projectPath);
     setStored(s);
-    setActiveSessionId(s.find((x) => x.kind === 'main')?.compositeId ?? null);
+    setActiveSessionId(u.session ?? s.find((x) => x.kind === 'main')?.compositeId ?? null);
+    setTab(u.tab ?? 'chat');
   }, [projectPath]);
 
   React.useEffect(() => {
     saveSessions(projectPath, stored);
   }, [projectPath, stored]);
+
+  // Keep ?tab= / ?session= in sync so a reload restores the workspace.
+  React.useEffect(() => {
+    writeWorkspaceUrl(tab, activeSessionId);
+  }, [tab, activeSessionId]);
 
   const hasRealMain = stored.some((s) => s.kind === 'main');
 

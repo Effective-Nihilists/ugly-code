@@ -36,3 +36,20 @@ test.describe('project URL (?path=)', () => {
     expect(new URL(page.url()).searchParams.get('path')).toBeNull();
   });
 });
+
+test.describe('workspace URL (?tab= / ?session=)', () => {
+  test('the workspace tab is restored from the URL (survives reload)', async ({ page }) => {
+    await enterStudioShell(page, auth);
+    // Deep-link straight to the Git view of a project.
+    await page.goto(`/?path=${PROJECT}&tab=git`);
+    await page.locator('[data-id=git-panel]').waitFor({ timeout: 10_000 });
+    expect(new URL(page.url()).searchParams.get('tab')).toBe('git');
+  });
+
+  test('selecting a tab writes ?tab= to the URL', async ({ page }) => {
+    await enterStudioShell(page, auth);
+    await openProject(page, PROJECT);
+    await page.getByRole('button', { name: 'Database', exact: true }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('database');
+  });
+});
