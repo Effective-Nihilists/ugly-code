@@ -1,6 +1,32 @@
 import React from 'react';
+import hljs from 'highlight.js/lib/common';
+import 'highlight.js/styles/github.css';
 import { native } from 'ugly-app/native';
 import { getActiveProjectPath } from '../hooks/useSocket';
+
+// Map a file extension → a highlight.js language id (best-effort; falls back to
+// auto-detection). Keeps highlighting fast + accurate for the common cases.
+const EXT_LANG: Record<string, string> = {
+  ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
+  json: 'json', css: 'css', scss: 'scss', html: 'xml', xml: 'xml', md: 'markdown', markdown: 'markdown',
+  py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', c: 'c', h: 'c', cpp: 'cpp', cc: 'cpp',
+  sh: 'bash', bash: 'bash', zsh: 'bash', yml: 'yaml', yaml: 'yaml', toml: 'ini', sql: 'sql', php: 'php', swift: 'swift',
+};
+const MAX_HIGHLIGHT_BYTES = 400_000; // skip highlighting very large files (perf)
+
+function highlightFile(path: string, text: string): string {
+  const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  if (text.length > MAX_HIGHLIGHT_BYTES) return esc(text);
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  const lang = EXT_LANG[ext];
+  try {
+    return lang && hljs.getLanguage(lang)
+      ? hljs.highlight(text, { language: lang }).value
+      : hljs.highlightAuto(text).value;
+  } catch {
+    return esc(text);
+  }
+}
 
 // A read-only file browser for the open project, over the native fs bridge:
 // a collapsible directory tree on the left, the selected file's contents on the
@@ -20,7 +46,7 @@ export function FilePanel(): React.ReactElement {
   const [open, setOpen] = React.useState<Record<string, Entry[] | undefined>>({});
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [selected, setSelected] = React.useState<string | null>(null);
-  const [content, setContent] = React.useState<string>('');
+  const [contentHtml, setContentHtml] = React.useState<string>('');
   const [loadingFile, setLoadingFile] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -38,7 +64,7 @@ export function FilePanel(): React.ReactElement {
     let cancelled = false;
     setExpanded(new Set());
     setSelected(null);
-    setContent('');
+    setContentHtml('');
     void list(root)
       .then((ents) => { if (!cancelled) setOpen({ [root]: ents }); })
       .catch((e: unknown) => { if (!cancelled) setError(String(e)); });
@@ -68,9 +94,9 @@ export function FilePanel(): React.ReactElement {
     setError(null);
     try {
       const text = await native.fs.readFile(path);
-      setContent(text);
+      setContentHtml(highlightFile(path, text));
     } catch (e) {
-      setContent('');
+      setContentHtml('');
       setError(`Could not read ${path}: ${String(e)}`);
     } finally {
       setLoadingFile(false);
@@ -118,7 +144,13 @@ export function FilePanel(): React.ReactElement {
         {selected ? (
           <>
             <div style={S.viewerHeader}>{selected.startsWith(root) ? selected.slice(root.length + 1) : selected}</div>
-            <pre style={S.code}>{loadingFile ? 'Loading…' : content || '(empty file)'}</pre>
+            {loadingFile ? (
+              <pre style={S.code}>Loading…</pre>
+            ) : (
+              <pre style={S.code}>
+                <code className="hljs" style={{ background: 'transparent', padding: 0 }} dangerouslySetInnerHTML={{ __html: contentHtml || '(empty file)' }} />
+              </pre>
+            )}
           </>
         ) : (
           <div style={S.empty}>Select a file to view its contents.</div>

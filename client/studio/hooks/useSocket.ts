@@ -186,7 +186,8 @@ const DB_SCRIPT = [
   "    if (!cs) throw new Error('No Neon connection string in publish-state for ' + ua.projectId);",
   "    return cs;",
   "  }",
-  "  const env = fs.readFileSync(path.join(proj, '.env'), 'utf8');",
+  "  let env = '';",
+  "  try { env = fs.readFileSync(path.join(proj, '.env'), 'utf8'); } catch { throw new Error('No dev database for this project — add a .env with DATABASE_URL (or use the prod Database in the sidebar).'); }",
   "  const m = /^(?:DATABASE_URL|POSTGRES_URL)=(.+)$/m.exec(env);",
   "  if (!m) throw new Error('No DATABASE_URL/POSTGRES_URL in ' + proj + '/.env');",
   "  return m[1].trim().replace(/^[\"\\']|[\"\\']$/g, '');",
@@ -205,8 +206,11 @@ const DB_SCRIPT = [
   "  out = { doc: (r.rows[0] && r.rows[0].data) || null };",
   "} else if (op === 'getQuery') {",
   "  const t0 = Date.now();",
-  "  const rows = await mod.getQueryRaw(input.collection, input.pipeline || [], { limit: input.limit || 50, skip: input.skip || 0 });",
-  "  const columns = rows.length ? Object.keys(rows[0]) : [];",
+  "  const lim = Math.min(Number(input.limit) || 50, 500), skip = Number(input.skip) || 0;",
+  // getQueryRaw isn't exported in this ugly-app — read the JSONB rows directly.
+  "  const r = await q('SELECT _id, data, created, updated FROM \"' + String(input.collection).replace(/[^A-Za-z0-9_]/g, '') + '\" ORDER BY created DESC LIMIT $1 OFFSET $2', [lim, skip]);",
+  "  const rows = r.rows.map((row) => Object.assign({ _id: row._id }, (row.data && typeof row.data === 'object') ? row.data : {}, { _created: row.created, _updated: row.updated }));",
+  "  const columns = rows.length ? Object.keys(rows[0]) : ['_id'];",
   "  out = { columns, rows, rowCount: rows.length, durationMs: Date.now() - t0 };",
   "}",
   "process.stdout.write(JSON.stringify(out));",
@@ -389,14 +393,32 @@ const handlers: Record<string, Handler> = {
         .sort((a, b) => b.count - a.count),
     };
   },
+  // List the project's cron tasks (the workers that run on Cloudflare) by
+  // parsing shared/cron.ts — `defineWorkers({ name: defineWorker({ schedule,
+  // description }) })`. The runs list (below) still comes from prod telemetry.
   workersGetManifest: async () => {
-    const docs = await runCli('workers');
-    const names = new Map<string, { name: string; schedule?: string }>();
-    for (const d of docs) {
-      const n = String(d.data.name ?? '');
-      if (n && !names.has(n)) names.set(n, { name: n, schedule: d.data.schedule as string | undefined });
+    const proj = activeProjectPath;
+    if (!proj) return { available: false, reason: 'No project open.', workers: [] };
+    let src = '';
+    for (const rel of ['/shared/cron.ts', '/src/shared/cron.ts']) {
+      try { src = await native.fs.readFile(proj + rel); break; } catch { /* try next */ }
     }
-    return { available: true, workers: [...names.values()] };
+    if (!src) return { available: false, reason: 'No shared/cron.ts in this project.', workers: [] };
+    const workers: { name: string; schedule?: string; description?: string; defaultInput: unknown }[] = [];
+    const re = /(\w+)\s*:\s*defineWorker\(\s*\{([\s\S]*?)\}\s*\)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null) {
+      const name = m[1];
+      const body = m[2] ?? '';
+      const schedule = /schedule\s*:\s*['"]([^'"]*)['"]/.exec(body)?.[1];
+      const description = /description\s*:\s*['"]([^'"]*)['"]/.exec(body)?.[1];
+      workers.push({ name, ...(schedule ? { schedule } : {}), ...(description ? { description } : {}), defaultInput: {} });
+    }
+    return {
+      available: workers.length > 0,
+      ...(workers.length === 0 ? { reason: 'No cron tasks defined in shared/cron.ts.' } : {}),
+      workers,
+    };
   },
   workersListRuns: async (i) => {
     const docs = await runCli('workers');
