@@ -26,6 +26,14 @@ export interface SessionWorkspace {
   port: number;
   isWorktree: boolean;
   branch?: string;
+  /** Local dev DATABASE_URL (bundled postgres), injected into run_command so the
+   *  project's `pnpm dev` boots against it (auto-creating its collections). */
+  databaseUrl?: string;
+}
+
+function homeFromProject(projectPath: string): string | null {
+  const m = /^(\/Users\/[^/]+|\/home\/[^/]+|\/root)/.exec(projectPath);
+  return m ? m[1] : null;
 }
 
 export type ProgressFn = (stage: 'creating' | 'installing' | 'ready' | 'error', text: string) => void;
@@ -43,12 +51,16 @@ function portFor(sessionId: string): number {
 }
 
 interface ProcResult { code: number; out: string }
-function runProc(cmd: string, args: string[], cwd?: string, onChunk?: (c: string) => void): Promise<ProcResult> {
+interface RunOpts { cwd?: string; env?: Record<string, string>; onChunk?: (c: string) => void }
+function runProc(cmd: string, args: string[], opts: RunOpts = {}): Promise<ProcResult> {
   return new Promise((resolve) => {
     let out = '';
     try {
-      const proc = native.process.spawn(cmd, args, cwd ? { cwd } : {});
-      const take = (c: string): void => { out += c; onChunk?.(c); };
+      const proc = native.process.spawn(cmd, args, {
+        ...(opts.cwd ? { cwd: opts.cwd } : {}),
+        ...(opts.env ? { env: opts.env } : {}),
+      });
+      const take = (c: string): void => { out += c; opts.onChunk?.(c); };
       proc.onStdout(take);
       proc.onStderr(take);
       proc.onError((e) => { resolve({ code: -1, out: out + '\n' + e }); });
@@ -57,6 +69,44 @@ function runProc(cmd: string, args: string[], cwd?: string, onChunk?: (c: string
       resolve({ code: -1, out: String(e) });
     }
   });
+}
+
+/**
+ * Ensure the bundled local postgres is up + a per-project database exists, and
+ * return its connection string. Mirrors the dev-DB panel's ensureLocalPg (same
+ * port/db) so the Database panel and the running app see the SAME local DB.
+ * Best-effort: returns null if the binaries aren't present / anything fails.
+ */
+async function ensureLocalPostgres(projectPath: string): Promise<string | null> {
+  try {
+    const home = homeFromProject(projectPath);
+    if (!home) return null;
+    const pgRoot = `${home}/.ugly-studio/binaries/postgres`;
+    const vers = (await native.fs.readdir(pgRoot)).filter((e) => e.isDirectory && /^[0-9]/.test(e.name)).map((e) => e.name).sort();
+    const ver = vers[vers.length - 1];
+    if (!ver) return null;
+    const plat = (await native.fs.readdir(`${pgRoot}/${ver}`)).find((e) => e.isDirectory)?.name;
+    if (!plat) return null;
+    const bin = `${pgRoot}/${ver}/${plat}/bin`;
+    const lib = `${pgRoot}/${ver}/${plat}/lib`;
+    const pgdata = `${home}/.ugly-studio/pgdata`;
+    const port = 55432;
+    const env = { DYLD_LIBRARY_PATH: lib, LD_LIBRARY_PATH: lib };
+    if (!(await exists(`${pgdata}/PG_VERSION`))) {
+      await runProc(`${bin}/initdb`, ['-D', pgdata, '-U', 'postgres', '--auth=trust', '-E', 'UTF8'], { env });
+    }
+    const ready = await runProc(`${bin}/pg_isready`, ['-h', '127.0.0.1', '-p', String(port)], { env });
+    if (ready.code !== 0) {
+      await runProc(`${bin}/pg_ctl`, ['-D', pgdata, '-o', `-p ${port} -k /tmp -c listen_addresses=127.0.0.1`, '-l', `${home}/.ugly-studio/pg.log`, '-w', 'start'], { env });
+    }
+    let projectId = 'dev';
+    try { projectId = (JSON.parse(await native.fs.readFile(`${projectPath}/.uglyapp`)) as { projectId?: string }).projectId ?? 'dev'; } catch { /* default */ }
+    const dbName = `p_${projectId}`.replace(/[^a-zA-Z0-9_]/g, '_');
+    await runProc(`${bin}/createdb`, ['-h', '127.0.0.1', '-p', String(port), '-U', 'postgres', dbName], { env }); // ignore "exists"
+    return `postgresql://postgres@127.0.0.1:${port}/${dbName}`;
+  } catch {
+    return null;
+  }
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -85,18 +135,28 @@ export async function ensureSessionWorkspace(sessionId: string, projectPath: str
 
 async function provision(sessionId: string, projectPath: string | null, onProgress?: ProgressFn): Promise<SessionWorkspace> {
   const port = portFor(sessionId);
+  if (!projectPath) {
+    const ws: SessionWorkspace = { dir: '', port, isWorktree: false };
+    cache.set(sessionId, ws);
+    return ws;
+  }
+
+  // Bring up the bundled local dev DB so the project's dev server (run_command)
+  // boots against it (auto-creating its collections). Deterministic per-project —
+  // the same DB the Database panel shows. Best-effort (null if unavailable).
+  const databaseUrl = (await ensureLocalPostgres(projectPath)) ?? undefined;
+  const dbField = databaseUrl ? { databaseUrl } : {};
   const fallback = (): SessionWorkspace => {
-    const ws: SessionWorkspace = { dir: projectPath ?? '', port, isWorktree: false };
+    const ws: SessionWorkspace = { dir: projectPath, port, isWorktree: false, ...dbField };
     cache.set(sessionId, ws);
     return ws;
   };
-  if (!projectPath) return fallback();
 
-  // Restore a previously-provisioned worktree across reloads.
+  // Restore a previously-provisioned worktree across reloads (refresh the db url).
   try {
     const saved = localStorage.getItem(wsKey(sessionId));
     if (saved) {
-      const ws = JSON.parse(saved) as SessionWorkspace;
+      const ws = { ...(JSON.parse(saved) as SessionWorkspace), ...dbField };
       if (ws.dir && (await exists(ws.dir))) { cache.set(sessionId, ws); return ws; }
     }
   } catch { /* ignore */ }
@@ -140,15 +200,15 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
       if (inst) {
         onProgress?.('installing', `Installing dependencies (${inst[0]} ${inst[1].join(' ')})…`);
         let tail = '';
-        const r2 = await runProc(inst[0], inst[1], dir, (c) => {
+        const r2 = await runProc(inst[0], inst[1], { cwd: dir, onChunk: (c) => {
           tail = (tail + c).split('\n').slice(-12).join('\n');
           onProgress?.('installing', tail);
-        });
+        } });
         if (r2.code !== 0) onProgress?.('error', `Install exited ${r2.code} — the agent will still run, but commands needing deps may fail.`);
       }
     }
     onProgress?.('ready', 'Workspace ready.');
-    const ws: SessionWorkspace = { dir, port, isWorktree: true, branch };
+    const ws: SessionWorkspace = { dir, port, isWorktree: true, branch, ...dbField };
     cache.set(sessionId, ws);
     try { localStorage.setItem(wsKey(sessionId), JSON.stringify(ws)); } catch { /* ignore */ }
     return ws;

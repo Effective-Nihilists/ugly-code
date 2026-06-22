@@ -136,6 +136,7 @@ function makeToolHandlers(sessionId: string): Record<string, (input: unknown) =>
           mode: 'edit',
           ...(ws?.isWorktree ? { workspaceDir: ws.dir } : {}),
           ...(ws?.port ? { port: ws.port } : {}),
+          ...(ws?.databaseUrl ? { databaseUrl: ws.databaseUrl } : {}),
         });
       },
     ]),

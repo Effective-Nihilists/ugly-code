@@ -177,7 +177,10 @@ export async function runClaudeCliTurn(sessionId: string, userText: string, mode
     try {
       proc = native.process.spawn(bin, args, {
         ...(cwd ? { cwd } : {}),
-        ...(ws.port ? { env: { PORT: String(ws.port) } } : {}),
+        ...((ws.port || ws.databaseUrl) ? { env: {
+          ...(ws.port ? { PORT: String(ws.port) } : {}),
+          ...(ws.databaseUrl ? { DATABASE_URL: ws.databaseUrl } : {}),
+        } } : {}),
       });
     } catch (e) {
       emitMessage(emit, sessionId, 'assistant', [{ type: 'text', data: { text: '⚠ Failed to spawn claude: ' + String(e) } }, { type: 'finish' }]);

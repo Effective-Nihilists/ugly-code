@@ -17,6 +17,8 @@ export interface ToolContext {
   mode?: SandboxMode;
   /** Unique dev-server port, injected as PORT into run_command spawns. */
   port?: number;
+  /** Local dev DB connection string, injected as DATABASE_URL into run_command. */
+  databaseUrl?: string;
 }
 
 /** Resolve a model-supplied (workspace-relative) path. Absolute paths pass
@@ -59,7 +61,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       return `Edited ${rawPath}`;
     }
     case 'run_command':
-      return runCommand(String(p.cmd), Array.isArray(p.args) ? p.args.map(String) : [], await sandboxOptFor(ctx), ctx?.port);
+      return runCommand(String(p.cmd), Array.isArray(p.args) ? p.args.map(String) : [], await sandboxOptFor(ctx), ctx?.port, ctx?.databaseUrl);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -101,15 +103,20 @@ function runCommand(
   args: string[],
   sandbox?: { projectId: string; mode: SandboxMode; projectDir: string },
   port?: number,
+  databaseUrl?: string,
 ): Promise<string> {
   return new Promise((resolve) => {
     let out = '';
     try {
-      // Inject PORT so the session's `pnpm dev` binds its assigned port (the
-      // Preview tab loads http://localhost:<port>).
+      // Inject PORT (so `pnpm dev` binds the session's port → Preview loads it)
+      // and DATABASE_URL (so the dev server boots against the bundled local DB).
+      const env: Record<string, string> = {
+        ...(port ? { PORT: String(port) } : {}),
+        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+      };
       const opts: Parameters<typeof native.process.spawn>[2] = {
         ...(sandbox ? { sandbox } : {}),
-        ...(port ? { env: { PORT: String(port) } } : {}),
+        ...(Object.keys(env).length ? { env } : {}),
       };
       const proc = native.process.spawn(cmd, args, opts);
       proc.onStdout((c) => (out += c));
