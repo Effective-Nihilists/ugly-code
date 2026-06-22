@@ -10,6 +10,7 @@ import {
   type AppConfigurator,
   type InboundEmail,
   type RequestHandlers,
+  type TypedDB,
 } from 'ugly-app';
 import { nanoid } from 'nanoid';
 import { enableConversations } from 'ugly-app/conversation/server';
@@ -19,8 +20,9 @@ import { dbDefaults } from 'ugly-app/shared';
 import { messages, requests } from '../shared/api';
 import { AGENT_DEFAULT_MODEL, AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
 import { agentTurnHandler } from 'ugly-app/agent/server';
-import type { Todo, CodingSession, CodingSessionMessage } from '../shared/collections';
+import type { Todo } from '../shared/collections';
 import { collections } from '../shared/collections';
+import { makeCodingSessionHandlers } from './codingSessionHandlers';
 import { cronTasks } from '../shared/cron';
 import { experiments } from '../shared/experiments';
 import en from '../shared/lang/en';
@@ -37,6 +39,14 @@ const cronHandlers: WorkerHandlers<typeof cronTasks> = {
     );
     console.log(`[Cron] dailyCleanup: deleted ${result.rowCount} old completed todos`);
   },
+};
+
+// Late-bound TypedDB (set in setOnAfterStart) so the shared coding-session
+// handler factory can read `app.db` without a circular `app`-type reference.
+let typedDbRef: TypedDB | null = null;
+const getDb = (): TypedDB => {
+  if (!typedDbRef) throw new Error('TypedDB not initialized yet');
+  return typedDbRef;
 };
 
 const app = createApp(
@@ -137,115 +147,8 @@ const app = createApp(
       return { ok: true };
     },
 
-    // ── Coding-agent session persistence ────────────────────────────────────
-    codingSessionUpsert: async (userId, input) => {
-      const existing = await app.db.getDoc(collections.codingSession, input.sessionId);
-      if (existing && existing.userId !== userId) throw new Error('Session not found');
-      // Resolve kind once (on first upsert). The first session in a project with
-      // no `main` yet becomes the main session; this needs no client plumbing.
-      let kind = input.kind ?? existing?.kind;
-      if (!kind) {
-        const mains: CodingSession[] = await app.db.getDocs(
-          collections.codingSession,
-          { userId, projectId: input.projectId, kind: 'main' },
-          { limit: 1 },
-        );
-        kind = mains.length > 0 ? 'session' : 'main';
-      }
-      const doc: CodingSession = {
-        _id: input.sessionId,
-        sessionId: input.sessionId,
-        projectId: input.projectId,
-        userId,
-        title: input.title ?? existing?.title ?? '',
-        kind,
-        model: input.model ?? existing?.model ?? '',
-        status: input.status ?? existing?.status ?? 'idle',
-        messageCount: input.messageCount ?? existing?.messageCount ?? 0,
-        costUsd: input.costUsd ?? existing?.costUsd ?? 0,
-        archived: existing?.archived ?? false,
-        ...dbDefaults(),
-        // Preserve the original creation time across updates.
-        ...(existing ? { created: existing.created } : {}),
-      };
-      await app.db.setDoc(collections.codingSession, doc);
-      return { ok: true };
-    },
-
-    codingSessionAppendMessage: async (userId, { sessionId, seq, role, content }) => {
-      const sess = await app.db.getDoc(collections.codingSession, sessionId);
-      if (sess && sess.userId !== userId) throw new Error('Session not found');
-      const doc: CodingSessionMessage = {
-        _id: `${sessionId}:${seq}`,
-        sessionId, userId, seq, role, kind: 'message', compacted: false, content,
-        ...dbDefaults(),
-      };
-      await app.db.setDoc(collections.codingSessionMessage, doc);
-      return { ok: true };
-    },
-
-    // Persist a compaction structurally: flag the dropped originals out of the
-    // normal view (kept for the full history) + insert one summary row at the
-    // dropped block's seq, so the normal query == runAgent's compacted context.
-    // Mark by _id (summary rows don't follow the sessionId:seq scheme). Then
-    // setDoc the summary AFTER marking, so re-summarizing a prior summary (same
-    // _id) leaves the row active.
-    codingSessionCompact: async (userId, { sessionId, droppedIds, summaryId, summarySeq, summaryText }) => {
-      const sess = await app.db.getDoc(collections.codingSession, sessionId);
-      if (sess && sess.userId !== userId) throw new Error('Session not found');
-      const prefix = `${sessionId}:`;
-      for (const id of droppedIds) {
-        if (!id.startsWith(prefix)) continue; // scope guard: only this session's rows
-        await app.db.setDocFieldsOrIgnore(collections.codingSessionMessage, id, { compacted: true });
-      }
-      if (!summaryId.startsWith(prefix)) throw new Error('Invalid summary id');
-      const summary: CodingSessionMessage = {
-        _id: summaryId,
-        sessionId, userId, seq: summarySeq, role: 'user', kind: 'summary', compacted: false,
-        content: JSON.stringify(summaryText),
-        ...dbDefaults(),
-      };
-      await app.db.setDoc(collections.codingSessionMessage, summary);
-      return { ok: true };
-    },
-
-    codingSessionListMessages: async (userId, { sessionId, limit, includeCompacted }) => {
-      const filter: Record<string, unknown> = { sessionId, userId };
-      if (!includeCompacted) filter.compacted = false;
-      // Annotate to break the app↔handler circular type inference.
-      const docs: CodingSessionMessage[] = await app.db.getDocs(collections.codingSessionMessage, filter, {
-        sort: { seq: 1 },
-        limit: limit ?? 2000,
-      });
-      return {
-        messages: docs.map((d) => ({
-          seq: d.seq, role: d.role, kind: d.kind, compacted: d.compacted, content: d.content,
-        })),
-      };
-    },
-
-    codingSessionList: async (userId, { projectId }) => {
-      const docs: CodingSession[] = await app.db.getDocs(
-        collections.codingSession,
-        { userId, projectId, archived: false },
-        { sort: { updated: -1 } },
-      );
-      return {
-        sessions: docs.map((d) => ({
-          sessionId: d.sessionId, title: d.title, kind: d.kind, model: d.model,
-          status: d.status, messageCount: d.messageCount, costUsd: d.costUsd,
-          created: new Date(d.created).getTime(),
-          updated: new Date(d.updated).getTime(),
-        })),
-      };
-    },
-
-    codingSessionArchive: async (userId, { sessionId }) => {
-      const sess = await app.db.getDoc(collections.codingSession, sessionId);
-      if (sess?.userId !== userId) throw new Error('Session not found');
-      await app.db.setDocFields(collections.codingSession, sessionId, { archived: true });
-      return { ok: true };
-    },
+    // ── Coding-agent session persistence (shared factory — see workers.ts) ──
+    ...makeCodingSessionHandlers(getDb),
   } satisfies RequestHandlers<typeof requests>,
   collections,
   (configurator: AppConfigurator) => {
@@ -325,6 +228,10 @@ const app = createApp(
     });
   },
 );
+
+// app.db is available synchronously after createApp; bind it for the shared
+// coding-session handler factory (see getDb above).
+typedDbRef = app.db;
 
 // eslint-disable-next-line @typescript-eslint/dot-notation
 const port = parseInt(process.env['PORT'] ?? '4321');

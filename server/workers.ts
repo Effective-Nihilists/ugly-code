@@ -18,8 +18,10 @@ import {
   CollectionDO,
   SessionDO,
   createWorkersApp,
+  getAppContext,
 } from 'ugly-app/server/adapter/workers';
 import type { RequestHandlers } from 'ugly-app';
+import type { TypedDB } from 'ugly-app/server';
 import type { WorkerHandlers } from 'ugly-app/shared';
 
 import { messages, requests } from '../shared/api';
@@ -27,11 +29,22 @@ import { collections } from '../shared/collections';
 import { cronTasks } from '../shared/cron';
 import { agentTurnHandler } from 'ugly-app/agent/server';
 import { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } from '../shared/agent';
+import { makeCodingSessionHandlers } from './codingSessionHandlers';
 
-// Request handlers run inside the Worker for `fetch` requests. The studio
-// coding chat (client-driven loop) calls `agentTurn` on the deployed worker.
+// The per-request TypedDB is set on the app context before each fetch handler
+// runs (createWorkersApp). The coding-session handlers read it lazily.
+const workersDb = (): TypedDB => {
+  const db = getAppContext().typedDb;
+  if (!db) throw new Error('TypedDB not initialized for this request');
+  return db as TypedDB;
+};
+
+// Request handlers run inside the Worker for `fetch` requests. The studio coding
+// chat (client-driven loop) calls `agentTurn`; session persistence (survive
+// reload) is the codingSession* set, shared with the Node entry (server/index.ts).
 const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
   agentTurn: agentTurnHandler({ tools: AGENT_TOOLS, systemPrompt: AGENT_SYSTEM_PROMPT }),
+  ...makeCodingSessionHandlers(workersDb),
 };
 
 // Cron handlers run on Cloudflare Cron Triggers (matches the schedule
