@@ -8,6 +8,7 @@
  */
 
 import { native } from 'ugly-app/native';
+import type { ContentPart } from 'ugly-app/agent/client';
 
 async function api<T>(name: string, input: unknown): Promise<T | null> {
   try {
@@ -50,6 +51,16 @@ export async function resolveProjectId(projectPath: string | null): Promise<stri
 // results into a single user message) — critical for the compaction seq-mapping.
 export interface ToolResultPayload { tool_use_id: string; content: string; is_error: boolean }
 export interface ToolRowPayload { results: ToolResultPayload[] }
+
+// Assistant rows store the turn content PLUS the model that produced it (so the
+// chat can show a per-message model badge after reload). Legacy rows stored a
+// bare ContentPart[] — `decodeAssistantPayload` accepts both.
+export interface AssistantContentPayload { content: ContentPart[]; model?: string }
+export function decodeAssistantPayload(raw: unknown): AssistantContentPayload {
+  if (Array.isArray(raw)) return { content: raw as ContentPart[] }; // legacy: bare content
+  const p = (raw ?? {}) as Partial<AssistantContentPayload>;
+  return { content: p.content ?? [], ...(p.model ? { model: p.model } : {}) };
+}
 
 export type StoredRole = 'user' | 'assistant' | 'tool';
 export type StoredKind = 'message' | 'summary';

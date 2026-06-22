@@ -8,7 +8,7 @@
  */
 
 import type { ContentPart } from 'ugly-app/agent/client';
-import type { StoredMessageRow, ToolRowPayload } from './serverSessionApi';
+import { decodeAssistantPayload, type StoredMessageRow, type ToolRowPayload } from './serverSessionApi';
 
 export interface Part {
   type: 'text' | 'tool_call' | 'tool_result' | 'finish';
@@ -42,6 +42,8 @@ export interface DisplayMessage {
   id: string;
   role: 'user' | 'assistant' | 'tool';
   parts: Part[];
+  /** The model that produced an assistant message (drives the model badge). */
+  model?: string;
 }
 
 /**
@@ -70,7 +72,8 @@ export function rowsToDisplayMessages(sessionId: string, rows: StoredMessageRow[
         ],
       });
     } else if (r.role === 'assistant') {
-      out.push({ id: baseId, role: 'assistant', parts: assistantParts(payload as ContentPart[]) });
+      const { content, model } = decodeAssistantPayload(payload);
+      out.push({ id: baseId, role: 'assistant', parts: assistantParts(content), ...(model ? { model } : {}) });
     } else if (r.role === 'tool') {
       const results = (payload as Partial<ToolRowPayload>).results ?? [];
       results.forEach((x, i) => {

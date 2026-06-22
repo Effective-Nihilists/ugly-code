@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planCompaction, type ActiveRow } from '../../client/studio/agent/serverSessionApi';
+import { planCompaction, decodeAssistantPayload, type ActiveRow } from '../../client/studio/agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../../client/studio/agent/sessionDisplay';
 import type { StoredMessageRow } from '../../client/studio/agent/serverSessionApi';
 
@@ -104,5 +104,35 @@ describe('rowsToDisplayMessages (history replay)', () => {
     expect(summary.id).toBe('S:summary:0');
     expect(String(summary.parts[0].data?.text)).toContain('Compacted earlier messages');
     expect(String(summary.parts[0].data?.text)).toContain('summary of earlier turns');
+  });
+
+  it('carries the per-message model from a wrapped assistant row (badge survives reload)', () => {
+    const rows: StoredMessageRow[] = [
+      row({
+        seq: 0,
+        role: 'assistant',
+        content: JSON.stringify({ content: [{ type: 'text', text: 'hi' }], model: 'glm_5_1' }),
+      }),
+      // Legacy bare-array assistant row (predates per-message model) still renders.
+      row({ seq: 1, role: 'assistant', content: JSON.stringify([{ type: 'text', text: 'legacy' }]) }),
+    ];
+    const msgs = rowsToDisplayMessages('S', rows);
+    expect(msgs[0].model).toBe('glm_5_1');
+    expect(msgs[0].parts[0]).toEqual({ type: 'text', data: { text: 'hi' } });
+    expect(msgs[1].model).toBeUndefined();
+    expect(msgs[1].parts[0]).toEqual({ type: 'text', data: { text: 'legacy' } });
+  });
+});
+
+describe('decodeAssistantPayload', () => {
+  it('accepts the wrapped {content, model} form and the legacy bare ContentPart[]', () => {
+    expect(decodeAssistantPayload({ content: [{ type: 'text', text: 'x' }], model: 'm1' })).toEqual({
+      content: [{ type: 'text', text: 'x' }],
+      model: 'm1',
+    });
+    expect(decodeAssistantPayload([{ type: 'text', text: 'y' }])).toEqual({
+      content: [{ type: 'text', text: 'y' }],
+    });
+    expect(decodeAssistantPayload(null)).toEqual({ content: [] });
   });
 });

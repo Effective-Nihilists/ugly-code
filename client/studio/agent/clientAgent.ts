@@ -35,6 +35,7 @@ import {
   sessionApi,
   resolveProjectId,
   planCompaction,
+  decodeAssistantPayload,
   type ActiveRow,
   type StoredMessageRow,
   type StoredRole,
@@ -181,7 +182,7 @@ function emitMessage(
   sessionId: string,
   role: string,
   parts: Part[],
-  opts: { id?: string; action?: 'created' | 'updated' } = {},
+  opts: { id?: string; action?: 'created' | 'updated'; model?: string } = {},
 ): void {
   safeEmit(emit, {
     type: 'codingAgent:event',
@@ -190,7 +191,14 @@ function emitMessage(
       type: 'message',
       payload: {
         type: opts.action ?? 'created',
-        payload: { id: opts.id ?? rid(), role, parts, created_at: Date.now() },
+        // `model` (when known) drives the per-message model badge in the chat.
+        payload: {
+          id: opts.id ?? rid(),
+          role,
+          parts,
+          created_at: Date.now(),
+          ...(opts.model ? { model: opts.model } : {}),
+        },
       },
     },
   });
@@ -243,7 +251,7 @@ function persistMeta(s: SessionAgentState, sessionId: string, status: 'running' 
 /** Turn a stored row back into a runAgent working-context message (for resume). */
 function rowToMessage(r: StoredMessageRow): AgentMessage {
   const payload: unknown = JSON.parse(r.content);
-  if (r.role === 'assistant') return { role: 'assistant', content: payload as ContentPart[] };
+  if (r.role === 'assistant') return { role: 'assistant', content: decodeAssistantPayload(payload).content };
   if (r.role === 'tool') {
     const results = (payload as Partial<ToolRowPayload>).results ?? [];
     return {
@@ -423,23 +431,27 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
       const content = Array.isArray(turn.content)
         ? turn.content
         : [{ type: 'text' as const, text: String(turn.content) }];
+      // The model that produced this turn — drives the per-message badge.
+      const model = telemetry?.model;
+      const modelOpt = model ? { model } : {};
       // Finalize the streamed bubble in place (same id) when we streamed text;
       // otherwise (tool-only turn) emit a fresh bubble.
       if (state.streamMsgId) {
         emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content), {
           id: state.streamMsgId,
           action: 'updated',
+          ...modelOpt,
         });
       } else {
-        emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content));
+        emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content), modelOpt);
       }
       state.streamMsgId = null;
       state.streamText = '';
       state.messageCount += 1;
       state.log.append({ ts: Date.now(), type: 'assistant', content, ...(telemetry ? { telemetry } : {}) });
       // Persist the assistant turn verbatim (one row, matches one working-context
-      // message) so it survives reload.
-      persistRow(state, sessionId, 'assistant', content);
+      // message) — content + model so the badge survives reload.
+      persistRow(state, sessionId, 'assistant', { content, ...modelOpt });
       if (telemetry) {
         accrue(state, telemetry);
         state.log.append({ ts: Date.now(), type: 'telemetry', telemetry });

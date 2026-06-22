@@ -2507,6 +2507,8 @@ export const requests = defineRequests({
             }),
           ),
           created_at: z.number().optional(),
+          /** Model that produced an assistant message — drives the badge on replay. */
+          model: z.string().optional(),
         }),
       ),
       hasMore: z.boolean(),
