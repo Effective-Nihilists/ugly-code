@@ -461,10 +461,24 @@ const handlers: Record<string, Handler> = {
     const sessionId = String(i.sessionId ?? '');
     const message = String(i.message ?? '');
     // Run the agent loop client-side; it streams codingAgent:event frames back
-    // through emitCustom for useCodingAgentChat to render.
-    void import('../agent/clientAgent').then((m) =>
-      m.runClientAgentTurn(sessionId, message, emitCustom),
-    );
+    // through emitCustom for useCodingAgentChat to render. Surface a pre-loop
+    // failure (e.g. resume/setup throwing) as an error frame instead of letting
+    // the floating promise swallow it — otherwise the turn silently does nothing.
+    void import('../agent/clientAgent')
+      .then((m) => m.runClientAgentTurn(sessionId, message, emitCustom))
+      .catch((e: unknown) => {
+        console.error('[codingAgentChatSend] turn failed', e);
+        emitCustom({
+          type: 'codingAgent:event',
+          sessionId,
+          event: { type: 'message', payload: { type: 'created', payload: {
+            id: 'err_' + Math.random().toString(36).slice(2, 9),
+            role: 'assistant',
+            parts: [{ type: 'text', data: { text: '⚠ ' + (e instanceof Error ? e.message : String(e)) } }, { type: 'finish' }],
+            created_at: Date.now(),
+          } } },
+        });
+      });
     return Promise.resolve({});
   },
   codingAgentChatStop: (i) => {

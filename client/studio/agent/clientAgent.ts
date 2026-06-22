@@ -299,14 +299,45 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
   }
   s.seq = maxSeq + 1;
   s.titleSet = true; // a resumed session already has its title
-  await s.controller.resume({
-    sessionId,
-    model: AGENT_DEFAULT_MODEL,
-    messages,
-    status: 'idle',
-    updatedAt: Date.now(),
-    telemetryTotals: emptyTelemetryTotals(),
-  });
+
+  // Heal an INTERRUPTED ending before resume. A session reloaded mid-turn ends
+  // either on (a) an assistant turn with unresolved tool_use, or (b) a trailing
+  // tool_result with no assistant reply. Left as-is:
+  //   - (a) makes runAgent.resume AUTO-EXECUTE the dangling tool — re-running an
+  //     interrupted command that may hang (e.g. a dev server), which blocks the
+  //     user's next turn entirely ("continue does nothing");
+  //   - (b) ends the context on a user message, so the next send is two
+  //     consecutive user turns → a model-API error → also "nothing happens".
+  // Resolve any dangling tool_use with an interrupted marker, then ensure the
+  // context ends on an assistant turn so the next user message alternates cleanly.
+  const tail = messages[messages.length - 1];
+  if (tail && tail.role === 'assistant' && Array.isArray(tail.content)) {
+    const uses = tail.content.filter((b): b is { type: 'tool_use'; id: string; name: string; input: unknown } => b.type === 'tool_use');
+    if (uses.length > 0) {
+      messages.push({
+        role: 'user',
+        content: uses.map((u) => ({ type: 'tool_result' as const, tool_use_id: u.id, content: '[Interrupted: this tool did not finish before the session was reloaded.]' })),
+      });
+    }
+  }
+  if (messages[messages.length - 1]?.role === 'user') {
+    messages.push({ role: 'assistant', content: [{ type: 'text', text: 'The previous step was interrupted before it finished. Ready to continue.' }] });
+  }
+
+  try {
+    await s.controller.resume({
+      sessionId,
+      model: AGENT_DEFAULT_MODEL,
+      messages,
+      status: 'idle',
+      updatedAt: Date.now(),
+      telemetryTotals: emptyTelemetryTotals(),
+    });
+  } catch (e) {
+    // Resume is best-effort context seeding — a failure must NOT swallow the
+    // user's turn. Log and continue; the send below still runs.
+    console.error('[clientAgent] resume failed (continuing without prior context)', e);
+  }
 }
 
 /** Fold one turn's usage into the session accumulators. */
