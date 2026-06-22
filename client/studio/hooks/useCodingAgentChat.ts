@@ -2671,6 +2671,26 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
                 }
               }
             }
+            // Any tool_use still 'running'/'executing' after a full replay was
+            // INTERRUPTED — the session stopped before the tool finished (or its
+            // result was never persisted). Mark it terminal so the card doesn't
+            // spin forever ("stuck"). This is display-only: a real resume
+            // re-derives the pending tool from the persisted content and runs it.
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.role === 'assistant' &&
+                m.toolUses.some((t) => t.status === 'running' || t.status === 'executing')
+                  ? {
+                      ...m,
+                      toolUses: m.toolUses.map((t) =>
+                        t.status === 'running' || t.status === 'executing'
+                          ? { ...t, status: 'error' as const }
+                          : t,
+                      ),
+                    }
+                  : m,
+              ),
+            );
             setIsStreaming(false);
           } catch (err) {
             console.debug(

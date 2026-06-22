@@ -109,8 +109,16 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         sort: { seq: 1 },
         limit: limit ?? 2000,
       });
+      // The DB sorts `seq` as JSONB text (1,10,11,…,2,20,…) — re-sort NUMERICALLY
+      // so tool_calls precede their results on replay (otherwise the result is
+      // orphaned and the tool card sticks on a forever "executing" spinner) and
+      // the resume seed is in true chronological order. Summary rows reuse a
+      // message's seq; order them just before that message (kind tiebreak).
+      const sorted = [...docs].sort(
+        (a, b) => a.seq - b.seq || (a.kind === 'summary' ? -1 : 0) - (b.kind === 'summary' ? -1 : 0),
+      );
       return {
-        messages: docs.map((d) => ({
+        messages: sorted.map((d) => ({
           seq: d.seq, role: d.role, kind: d.kind, compacted: d.compacted, content: d.content,
         })),
       };
