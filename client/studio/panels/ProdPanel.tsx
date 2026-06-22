@@ -1,0 +1,143 @@
+import React from 'react';
+import { native, permissions } from 'ugly-app/native';
+import { getActiveProjectPath } from '../hooks/useSocket';
+import { ConsoleText } from '../components/ConsoleText';
+
+/** The bits of `.uglyapp`'s persisted deployTarget we surface. */
+interface DeployTarget {
+  workerUrl?: string;
+  customDomainUrl?: string;
+  appDomain?: string;
+  lastDeployedAt?: string;
+}
+
+type UglyProcess = ReturnType<typeof native.process.spawn>;
+const PUBLISH_TOOLS = ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'];
+
+/**
+ * Prod / Publish panel. Mirrors the monolith's PublishTab: shows the deployed
+ * target (live URL + last deploy) and runs `ugly-app publish` for the open
+ * project, streaming the orchestrator's output. The monolith drove a PTY over a
+ * sidecar; here we spawn it over the native bridge (same as the scaffold) and
+ * stream stdout/stderr into a console.
+ */
+export function ProdPanel(): React.ReactElement {
+  const [target, setTarget] = React.useState<DeployTarget | null>(null);
+  const [output, setOutput] = React.useState('');
+  const [running, setRunning] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const procRef = React.useRef<UglyProcess | null>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const loadTarget = React.useCallback(async () => {
+    const cwd = getActiveProjectPath();
+    if (!cwd) return;
+    try {
+      const ua = JSON.parse(await native.fs.readFile(`${cwd}/.uglyapp`)) as { deployTarget?: DeployTarget };
+      setTarget(ua.deployTarget ?? null);
+    } catch {
+      setTarget(null);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadTarget();
+  }, [loadTarget]);
+
+  React.useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [output]);
+
+  const deploy = React.useCallback(async () => {
+    const cwd = getActiveProjectPath();
+    if (!cwd || running) return;
+    setOutput('');
+    setError(null);
+    setRunning(true);
+    type GrantReq = Parameters<typeof permissions.request>[0];
+    await permissions.request({ fs: 'full', process: [...PUBLISH_TOOLS] } as unknown as GrantReq).catch(() => undefined);
+    let buf = '';
+    const append = (chunk: string): void => {
+      buf += chunk;
+      setOutput(buf);
+    };
+    try {
+      const proc = native.process.spawn('bash', ['-lc', 'pnpm exec ugly-app publish'], { cwd });
+      procRef.current = proc;
+      proc.onStdout(append);
+      proc.onStderr(append);
+      proc.onError((e) => {
+        append(`\n[error: ${e}]\n`);
+        setError(e);
+        setRunning(false);
+      });
+      proc.onExit((code) => {
+        append(`\n[exit ${code ?? 'null'}]\n`);
+        setRunning(false);
+        if (code === 0) void loadTarget();
+        else setError(`publish exited with code ${code ?? 'null'}`);
+      });
+    } catch (e) {
+      setError((e as Error).message);
+      setRunning(false);
+    }
+  }, [running, loadTarget]);
+
+  const cancel = React.useCallback(() => {
+    try {
+      procRef.current?.kill();
+    } catch {
+      /* already gone */
+    }
+    setRunning(false);
+  }, []);
+
+  const liveUrl = target?.customDomainUrl ?? target?.workerUrl ?? null;
+
+  return (
+    <div data-id="prod-panel" style={S.root}>
+      <div style={S.header}>
+        <div style={S.targetCol}>
+          {liveUrl ? (
+            <>
+              <a href={liveUrl} target="_blank" rel="noreferrer" style={S.url} onClick={(e) => { e.preventDefault(); void native.system.openExternal({ url: liveUrl }); }}>
+                {liveUrl}
+              </a>
+              {target?.lastDeployedAt && (
+                <span style={S.sub}>last deployed {new Date(target.lastDeployedAt).toLocaleString()}</span>
+              )}
+            </>
+          ) : (
+            <span style={S.sub}>Not deployed yet — deploy to provision Neon + Cloudflare Workers and go live.</span>
+          )}
+        </div>
+        <span style={{ flex: 1 }} />
+        {running ? (
+          <button data-id="prod-cancel" onClick={cancel} style={S.btn}>
+            Cancel
+          </button>
+        ) : (
+          <button data-id="prod-deploy" onClick={() => void deploy()} style={S.deploy}>
+            {liveUrl ? 'Re-deploy' : 'Deploy'} →
+          </button>
+        )}
+      </div>
+      <div ref={scrollRef} data-id="prod-output" style={S.console}>
+        <ConsoleText text={output || (running ? 'Starting publish…' : 'Press Deploy to run `ugly-app publish` (Neon + Cloudflare provisioning + Workers deploy).')} />
+      </div>
+      {error && <div style={S.error}>{error}</div>}
+    </div>
+  );
+}
+
+const S = {
+  root: { height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', color: 'var(--text-primary)', minHeight: 0 },
+  header: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 },
+  targetCol: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
+  url: { fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  sub: { fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' },
+  btn: { background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer' },
+  deploy: { background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  console: { flex: 1, overflow: 'auto', padding: 14, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap', background: 'var(--bg-panel)', minHeight: 0 },
+  error: { padding: '8px 16px', borderTop: '1px solid var(--border)', color: 'var(--error)', fontSize: 12, fontFamily: 'var(--font-mono)' },
+} satisfies Record<string, React.CSSProperties>;

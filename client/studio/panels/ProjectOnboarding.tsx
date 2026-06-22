@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { native, isNativeAvailable } from 'ugly-app/native';
 import { shortcut } from '../utils/platform';
 import { generateTaskId } from '../utils/taskId';
 import { timeAgoShort } from '../utils/timeAgo';
@@ -208,8 +209,9 @@ export function ProjectOnboarding({
     [evalSubmitting, onProjectOpen],
   );
 
-  const hasElectronAPI =
-    typeof window !== 'undefined' && !!(window as any).electronAPI;
+  // The native folder picker (fs.pickDirectory) is available whenever the IDE
+  // runs on the native bridge (Ugly Studio).
+  const hasElectronAPI = isNativeAvailable();
 
   useEffect(() => {
     let cancelled = false;
@@ -237,15 +239,14 @@ export function ProjectOnboarding({
     };
   }, []);
 
-  const handleBrowse = useCallback(
-    async (setter: (val: string) => void) => {
-      if (!hasElectronAPI) return;
-      const api = (window as any).electronAPI;
-      const selected = await api.showOpenDialog?.();
+  const handleBrowse = useCallback(async (setter: (val: string) => void) => {
+    try {
+      const selected = await native.fs.pickDirectory();
       if (selected) setter(selected);
-    },
-    [hasElectronAPI],
-  );
+    } catch {
+      /* no native picker (web) — the text input is the fallback */
+    }
+  }, []);
 
   const handleOpenRecent = useCallback(
     async (projectPath: string) => {

@@ -13,6 +13,7 @@ import { EventsPanel } from './panels/EventsPanel';
 import { WorkersPanel } from './panels/WorkersPanel';
 import { GitPanel } from './panels/GitPanel';
 import { TerminalPanel } from './panels/TerminalPanel';
+import { ProdPanel } from './panels/ProdPanel';
 
 // Top-bar tabs + the sidebar-footer views (git / terminal / prod).
 type WorkspaceTab = 'chat' | 'database' | 'errors' | 'events' | 'workers' | 'git' | 'terminal' | 'prod';
@@ -130,14 +131,7 @@ export default function StudioProjectPage({
           {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel /></div>}
           {tab === 'git' && <div style={S.pane}><GitPanel /></div>}
           {tab === 'terminal' && <div style={S.pane}><TerminalPanel /></div>}
-          {tab === 'prod' && (
-            <div style={S.paneScroll}>
-              <div style={S.placeholder}>
-                <strong>Publish</strong>
-                <span>Deploy this project to production. (Publish flow coming to the workspace — for now use the CLI: <code>pnpm exec ugly-app publish</code>.)</span>
-              </div>
-            </div>
-          )}
+          {tab === 'prod' && <div style={S.pane}><ProdPanel /></div>}
         </div>
       </main>
     </div>

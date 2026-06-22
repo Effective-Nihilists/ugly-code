@@ -6,6 +6,7 @@ import StudioProjectPage from './StudioProjectPage';
 import { ModalStackProvider } from './system/modal/ModalContext';
 import { ModalHost } from './system/modal/ModalHost';
 import { PopoverHost } from './system/popover/PopoverHost';
+import { addRecentProject } from './state/recentProjects';
 
 // The Studio IDE on window.UglyNative, backed by the native transport shim
 // (./hooks/useSocket) instead of the sidecar /rpc socket.
@@ -56,6 +57,7 @@ export default function StudioShell(): React.ReactElement {
 
   const openProject = React.useCallback((name: string, path?: string) => {
     const next: OpenProject = { name, ...(path ? { path } : {}) };
+    if (path) addRecentProject(name, path); // surface it in the picker next time
     setCreating(null);
     setOpen(next);
     pushProjectUrl(next);

@@ -19,6 +19,7 @@ import type { AppRegistry } from '../shared/api';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 import { gradeProject, type GradeDeps } from '../evals/grader';
+import { getRecentProjects } from '../state/recentProjects';
 
 /** Run a shell command through `bash -lc` (so `~` expands + login PATH applies)
  *  and resolve with the LAST stdout line — a trailing `pwd`/`echo` of a path.
@@ -285,7 +286,7 @@ const handlers: Record<string, Handler> = {
     saveSetting(String(i.key), i.value);
     return Promise.resolve({});
   },
-  listRecentProjects: () => Promise.resolve({ projects: [] }),
+  listRecentProjects: () => Promise.resolve({ projects: getRecentProjects() }),
   // ── Database panel: run queries against the project's PG (dev) or Neon (prod)
   // via a node+pg script over native.process. ──
   dbCollections: (i) => runDbScript('collections', String(i.mode ?? 'dev'), {}),
