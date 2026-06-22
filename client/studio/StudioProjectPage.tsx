@@ -5,6 +5,7 @@ import {
 } from './panels/SessionListSidebar';
 import { setActiveProjectPath } from './hooks/useSocket';
 import { loadSessions, saveSessions, type StoredSession } from './state/projectSessions';
+import { sessionApi, resolveProjectId } from './agent/serverSessionApi';
 import { timeAgoShort } from './utils/timeAgo';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { CodingAgentChat } from './panels/CodingAgentChat';
@@ -91,6 +92,32 @@ export default function StudioProjectPage({
     saveSessions(projectPath, stored);
   }, [projectPath, stored]);
 
+  // Source the session list from the server (survives cache-clear + cross-device)
+  // and MERGE with any just-created, not-yet-persisted local sessions (a session
+  // is only persisted server-side on its first turn). The localStorage list above
+  // gives an instant first paint; this reconciles it with the authoritative rows.
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const projectId = await resolveProjectId(projectPath ?? null);
+      const data = await sessionApi.list({ projectId });
+      if (cancelled || !data) return;
+      const mapped: StoredSession[] = data.sessions.map((s) => ({
+        compositeId: s.sessionId,
+        title: s.title || (s.kind === 'main' ? 'Main session' : 'Session'),
+        ...(s.kind === 'main' ? { kind: 'main' as const } : {}),
+        updated_at: s.updated,
+        model: s.model || 'auto',
+      }));
+      setStored((prev) => {
+        const serverIds = new Set(mapped.map((m) => m.compositeId));
+        const localOnly = prev.filter((p) => !serverIds.has(p.compositeId));
+        return [...mapped, ...localOnly];
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [projectPath]);
+
   // Keep ?tab= / ?session= in sync so a reload restores the workspace.
   React.useEffect(() => {
     writeWorkspaceUrl(tab, activeSessionId);
@@ -131,6 +158,8 @@ export default function StudioProjectPage({
   const archiveSession = React.useCallback((id: string) => {
     setStored((prev) => prev.filter((s) => s.compositeId !== id));
     setActiveSessionId((cur) => (cur === id ? null : cur));
+    // Persist the archive so it doesn't reappear on reload (best-effort).
+    if (id !== MAIN_PLACEHOLDER) void sessionApi.archive({ sessionId: id });
   }, []);
 
   // Synthetic "Main session" row when none has been started yet — clicking it

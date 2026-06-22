@@ -15,7 +15,9 @@
 
 import {
   runAgent,
+  emptyTelemetryTotals,
   type AgentController,
+  type AgentMessage,
   type ContentPart,
   type MsgTelemetry,
   type RunAgentSocket,
@@ -29,9 +31,19 @@ import {
 } from '../../../shared/agent';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { SessionLog } from './sessionLog';
+import {
+  sessionApi,
+  resolveProjectId,
+  planCompaction,
+  type ActiveRow,
+  type StoredMessageRow,
+  type StoredRole,
+  type ToolResultPayload,
+  type ToolRowPayload,
+} from './serverSessionApi';
+import { assistantParts, type Part } from './sessionDisplay';
 
 type Emit = (msg: { type: string; [k: string]: unknown }) => void;
-type Part = { type: 'text' | 'tool_call' | 'tool_result' | 'finish'; data?: Record<string, unknown> };
 
 const rid = (): string => 'msg_' + Math.random().toString(36).slice(2, 11);
 
@@ -142,6 +154,16 @@ interface SessionAgentState {
   // message in place and onTurn finalizes it.
   streamMsgId: string | null;
   streamText: string;
+  // ── Server persistence (survive reload) ──
+  // Append-only transcript bookkeeping: `seq` is the next row index; `activeRows`
+  // is the ordered set of currently-uncompacted rows ({seq,id}) — it MUST mirror
+  // runAgent's working-context message order so compaction drops the same window.
+  seq: number;
+  activeRows: ActiveRow[];
+  projectId: string;
+  title: string;
+  titleSet: boolean;
+  resumed: boolean;
 }
 
 const sessions = new Map<string, SessionAgentState>();
@@ -174,27 +196,109 @@ function emitMessage(
   });
 }
 
-/** Build the studio `parts` array for an assistant turn from its content. */
-function assistantParts(content: ContentPart[]): Part[] {
-  const parts: Part[] = [];
-  for (const blk of content) {
-    if (blk.type === 'text' && blk.text) {
-      parts.push({ type: 'text', data: { text: blk.text } });
-    } else if (blk.type === 'tool_use') {
-      parts.push({
-        type: 'tool_call',
-        // The studio renders tool_call.input as a JSON string, not an object.
-        data: {
-          id: blk.id,
-          name: blk.name,
-          input: typeof blk.input === 'string' ? blk.input : JSON.stringify(blk.input ?? {}),
-          finished: true,
-        },
-      });
+
+// ── Server persistence helpers (all best-effort; never break the loop) ───────
+
+/** Append one transcript row + track its seq/id for the compaction window. */
+function persistRow(s: SessionAgentState, sessionId: string, role: StoredRole, payload: unknown): void {
+  const seq = s.seq++;
+  s.activeRows.push({ seq, id: `${sessionId}:${seq}` });
+  void sessionApi.appendMessage({ sessionId, seq, role, content: JSON.stringify(payload) });
+}
+
+/**
+ * Persist a compaction structurally: flag the oldest `droppedCount` active rows
+ * compacted + insert one summary row at the dropped block's seq. Mirrors
+ * runAgent's in-loop `[summary, ...recent]` exactly, so the server's "normal"
+ * query == the model's post-compaction working context (no re-compaction on
+ * reload). Summary `_id`/seq reuse the boundary seq → idempotent across reloads.
+ */
+function persistCompaction(s: SessionAgentState, sessionId: string, droppedCount: number, summaryText: string): void {
+  const plan = planCompaction(s.activeRows, droppedCount, sessionId);
+  if (!plan) return;
+  s.activeRows = plan.newActiveRows;
+  void sessionApi.compact({
+    sessionId,
+    droppedIds: plan.droppedIds,
+    summaryId: plan.summaryId,
+    summarySeq: plan.summarySeq,
+    summaryText,
+  });
+}
+
+/** Upsert the session metadata row (title/status/tokens/cost). */
+function persistMeta(s: SessionAgentState, sessionId: string, status: 'running' | 'idle' | 'done' | 'error'): void {
+  if (!s.projectId) return;
+  void sessionApi.upsert({
+    sessionId,
+    projectId: s.projectId,
+    title: s.title,
+    model: AGENT_DEFAULT_MODEL,
+    status,
+    messageCount: s.messageCount,
+    costUsd: s.cost,
+  });
+}
+
+/** Turn a stored row back into a runAgent working-context message (for resume). */
+function rowToMessage(r: StoredMessageRow): AgentMessage {
+  const payload: unknown = JSON.parse(r.content);
+  if (r.role === 'assistant') return { role: 'assistant', content: payload as ContentPart[] };
+  if (r.role === 'tool') {
+    const results = (payload as Partial<ToolRowPayload>).results ?? [];
+    return {
+      role: 'user',
+      content: results.map((x) => ({ type: 'tool_result' as const, tool_use_id: x.tool_use_id, content: x.content })),
+    };
+  }
+  // user message OR compaction summary → a plain user-text message.
+  return { role: 'user', content: String(payload) };
+}
+
+/**
+ * Lazily reconstruct a prior session into the live controller on the first turn
+ * after a reload. Loads the "normal" transcript (compaction excluded) — which is
+ * exactly runAgent's post-compaction working context — and seeds it via
+ * controller.resume so the next turn continues with full context, no recompaction.
+ */
+async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<void> {
+  if (s.resumed) return;
+  s.resumed = true;
+  s.projectId = await resolveProjectId(getActiveProjectPath());
+  const data = await sessionApi.listMessages({ sessionId, limit: 2000 });
+  const rows = data?.messages ?? [];
+  if (rows.length === 0) return; // brand-new session — nothing to resume
+  // Restore cumulative metadata so the next persistMeta doesn't regress the
+  // stored messageCount/costUsd (the in-memory accumulators restart at 0).
+  const listed = await sessionApi.list({ projectId: s.projectId });
+  const meta = listed?.sessions.find((x) => x.sessionId === sessionId);
+  if (meta) {
+    s.messageCount = meta.messageCount;
+    s.cost = meta.costUsd;
+    if (meta.title) {
+      s.title = meta.title;
+      s.titleSet = true;
     }
   }
-  parts.push({ type: 'finish' });
-  return parts;
+  const messages: AgentMessage[] = [];
+  let maxSeq = -1;
+  s.activeRows = [];
+  for (const r of rows) {
+    maxSeq = Math.max(maxSeq, r.seq);
+    const id = r.kind === 'summary' ? `${sessionId}:summary:${r.seq}` : `${sessionId}:${r.seq}`;
+    s.activeRows.push({ seq: r.seq, id });
+    messages.push(rowToMessage(r));
+  }
+  s.seq = maxSeq + 1;
+  s.titleSet = true; // a resumed session already has its title
+  await s.controller.resume({
+    sessionId,
+    model: AGENT_DEFAULT_MODEL,
+    messages,
+    status: 'idle',
+    updatedAt: Date.now(),
+    telemetryTotals: emptyTelemetryTotals(),
+  });
 }
 
 /** Fold one turn's usage into the session accumulators. */
@@ -285,6 +389,12 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
     createdAt: Date.now(),
     streamMsgId: null,
     streamText: '',
+    seq: 0,
+    activeRows: [],
+    projectId: '',
+    title: '',
+    titleSet: false,
+    resumed: false,
   };
   state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: AGENT_DEFAULT_MODEL });
 
@@ -327,26 +437,40 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
       state.streamText = '';
       state.messageCount += 1;
       state.log.append({ ts: Date.now(), type: 'assistant', content, ...(telemetry ? { telemetry } : {}) });
+      // Persist the assistant turn verbatim (one row, matches one working-context
+      // message) so it survives reload.
+      persistRow(state, sessionId, 'assistant', content);
       if (telemetry) {
         accrue(state, telemetry);
         state.log.append({ ts: Date.now(), type: 'telemetry', telemetry });
         emitTelemetry(state, sessionId);
       }
+      persistMeta(state, sessionId, 'running');
     },
     onEvent: (e) => {
       if (e.type === 'tool_result') {
+        // Emit ONE studio message per result (live UI is unchanged), but persist
+        // ALL of a turn's results as ONE row — runAgent folds them into a single
+        // working-context message, so the server transcript must too (keeps the
+        // compaction seq-mapping exact).
+        const bundle: ToolResultPayload[] = [];
         for (const r of e.results) {
           if (r.type !== 'tool_result') continue;
           const content = r.content;
-          const isError = /^Error:/.test(content);
+          const isError = content.startsWith('Error:');
           emitMessage(emitRef.current, sessionId, 'tool', [
             { type: 'tool_result', data: { tool_call_id: r.tool_use_id, content, is_error: isError } },
           ]);
           state.messageCount += 1;
           state.log.append({ ts: Date.now(), type: 'tool_result', tool_use_id: r.tool_use_id, content, is_error: isError });
+          bundle.push({ tool_use_id: r.tool_use_id, content, is_error: isError });
+        }
+        if (bundle.length > 0) {
+          persistRow(state, sessionId, 'tool', { results: bundle } satisfies ToolRowPayload);
         }
       } else if (e.type === 'compaction') {
         state.log.append({ ts: Date.now(), type: 'compaction', droppedCount: e.droppedCount, ...(e.summary ? { summary: e.summary } : {}) });
+        if (e.summary) persistCompaction(state, sessionId, e.droppedCount, e.summary);
       } else if (e.type === 'error') {
         emitMessage(emitRef.current, sessionId, 'assistant', [
           { type: 'text', data: { text: '⚠ ' + e.message } },
@@ -356,6 +480,7 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
       }
       if (e.type === 'done' || e.type === 'error' || e.type === 'aborted' || e.type === 'budget_exceeded') {
         state.log.append({ ts: Date.now(), type: 'finish', reason: e.type });
+        persistMeta(state, sessionId, e.type === 'error' ? 'error' : 'idle');
         safeEmit(emitRef.current, {
           type: 'codingAgent:event',
           sessionId,
@@ -376,8 +501,17 @@ export async function runClientAgentTurn(
   emit: Emit,
 ): Promise<void> {
   const state = getOrCreate(sessionId, emit);
+  // On the first turn after a reload, rebuild the prior context into the live
+  // controller before sending (no-op for a brand-new session).
+  await ensureResumed(state, sessionId);
   state.messageCount += 1;
   state.log.append({ ts: Date.now(), type: 'user', text: userText });
+  if (!state.titleSet) {
+    state.title = userText.slice(0, 120);
+    state.titleSet = true;
+  }
+  persistRow(state, sessionId, 'user', userText);
+  persistMeta(state, sessionId, 'running');
   await state.controller.send(userText);
 }
 

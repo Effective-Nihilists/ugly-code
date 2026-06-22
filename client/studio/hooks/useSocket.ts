@@ -20,6 +20,8 @@ import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 import { gradeProject, type GradeDeps } from '../evals/grader';
 import { getRecentProjects } from '../state/recentProjects';
+import { sessionApi, resolveProjectId } from '../agent/serverSessionApi';
+import { rowsToDisplayMessages } from '../agent/sessionDisplay';
 
 /** Run a shell command through `bash -lc` (so `~` expands + login PATH applies)
  *  and resolve with the LAST stdout line — a trailing `pwd`/`echo` of a path.
@@ -406,14 +408,55 @@ const handlers: Record<string, Handler> = {
   workersRun: () =>
     Promise.resolve({ runId: 'manual-' + Math.random().toString(36).slice(2, 9) }),
 
-  // ── project-page (session sidebar) reads ──
-  codingAgentListSessions: () => Promise.resolve({ sessions: [] }),
+  // ── project-page (session sidebar) reads — server-backed (survive reload) ──
+  codingAgentListSessions: async () => {
+    const projectId = await resolveProjectId(getActiveProjectPath());
+    const data = await sessionApi.list({ projectId });
+    const sessions = (data?.sessions ?? []).map((s) => ({
+      compositeId: s.sessionId,
+      workspaceId: s.sessionId.split(':')[0] ?? '',
+      sessionId: s.sessionId.split(':')[1] ?? s.sessionId,
+      title: s.title,
+      mode: 'yolo' as const,
+      created_at: s.created,
+      updated_at: s.updated,
+      message_count: s.messageCount,
+      running: s.status === 'running',
+      blocked: false,
+      archived: false,
+      live: false,
+      finished: s.status === 'done' || s.status === 'idle',
+      model: s.model || 'auto',
+      totalTokens: 0,
+      totalCost: s.costUsd,
+      // Surface the main-session flag so the sidebar can pin/label it.
+      kind: s.kind,
+    }));
+    return { sessions };
+  },
   gitStatus: () => Promise.resolve({ branch: 'main', remote: null, files: [] }),
-  deleteCodingAgentSession: () => Promise.resolve({}),
-  // ── coding-agent session protocol (Phase 3 — stubbed; real agent loop next) ──
-  codingAgentChatListMessages: () => Promise.resolve({ messages: [], hasMore: false }),
+  deleteCodingAgentSession: async (i) => {
+    await sessionApi.archive({ sessionId: String(i.sessionId ?? '') });
+    return {};
+  },
+  // ── coding-agent session protocol — server-backed persistence ──
+  codingAgentChatListMessages: async (i) => {
+    const sessionId = String(i.sessionId ?? '');
+    const limit = typeof i.limit === 'number' ? i.limit : 200;
+    const data = await sessionApi.listMessages({ sessionId, limit });
+    const rows = data?.messages ?? [];
+    return { messages: rowsToDisplayMessages(sessionId, rows), hasMore: false };
+  },
   getCodingAgentSnapshot: () => Promise.resolve(null),
-  codingAgentChatCreate: () => Promise.resolve({ sessionId: 'sess-stub:' + Math.random().toString(36).slice(2, 9) }),
+  // Honor resumeSessionId (return it unchanged → no "resume mismatch"); mint a
+  // fresh compositeId for a new session. Persistence is deferred to the first
+  // turn (clientAgent upserts), so we don't create empty session rows.
+  codingAgentChatCreate: (i) =>
+    Promise.resolve({
+      sessionId: i.resumeSessionId
+        ? String(i.resumeSessionId)
+        : 'cs:' + Math.random().toString(36).slice(2, 11),
+    }),
   codingAgentChatSend: (i) => {
     const sessionId = String(i.sessionId ?? '');
     const message = String(i.message ?? '');

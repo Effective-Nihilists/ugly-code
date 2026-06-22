@@ -111,6 +111,97 @@ export const requests = defineRequests({
     output: z.object({ ok: z.boolean() }),
   }),
 
+  // ── Coding-agent session persistence (survive reload) ───────────────────
+  // The coding chat runs client-side; these owner-scoped endpoints give it a
+  // durable home in the project's own Neon backend. See shared/collections.ts
+  // (codingSession / codingSessionMessage) + client/studio/agent/clientAgent.ts.
+  codingSessionUpsert: authReq({
+    input: z.object({
+      sessionId: z.string(),
+      projectId: z.string(),
+      title: z.string().max(300).optional(),
+      kind: z.enum(['main', 'session']).optional(),
+      model: z.string().optional(),
+      status: z.enum(['running', 'idle', 'done', 'error']).optional(),
+      messageCount: z.number().int().min(0).optional(),
+      costUsd: z.number().min(0).optional(),
+    }),
+    output: z.object({ ok: z.boolean() }),
+    rateLimit: { max: 240, window: 60 },
+  }),
+
+  // Append one transcript row (idempotent: _id = sessionId:seq).
+  codingSessionAppendMessage: authReq({
+    input: z.object({
+      sessionId: z.string(),
+      seq: z.number().int().min(0),
+      role: z.enum(['user', 'assistant', 'tool']),
+      content: z.string(),
+    }),
+    output: z.object({ ok: z.boolean() }),
+    rateLimit: { max: 600, window: 60 },
+  }),
+
+  // Persist a compaction: flag the dropped rows (by _id, since summary rows use a
+  // different _id scheme than message rows) + insert one summary row at the
+  // dropped block's seq. Idempotent (summaryId is derived from the boundary seq).
+  codingSessionCompact: authReq({
+    input: z.object({
+      sessionId: z.string(),
+      droppedIds: z.array(z.string()),
+      summaryId: z.string(),
+      summarySeq: z.number().min(0),
+      summaryText: z.string(),
+    }),
+    output: z.object({ ok: z.boolean() }),
+    rateLimit: { max: 120, window: 60 },
+  }),
+
+  // The "normal" transcript (compaction excluded) — display + resume seed.
+  // includeCompacted returns the full original history (expand affordance).
+  codingSessionListMessages: authReq({
+    input: z.object({
+      sessionId: z.string(),
+      limit: z.number().int().min(1).max(2000).optional(),
+      includeCompacted: z.boolean().optional(),
+    }),
+    output: z.object({
+      messages: z.array(
+        z.object({
+          seq: z.number(),
+          role: z.enum(['user', 'assistant', 'tool']),
+          kind: z.enum(['message', 'summary']),
+          compacted: z.boolean(),
+          content: z.string(),
+        }),
+      ),
+    }),
+  }),
+
+  codingSessionList: authReq({
+    input: z.object({ projectId: z.string() }),
+    output: z.object({
+      sessions: z.array(
+        z.object({
+          sessionId: z.string(),
+          title: z.string(),
+          kind: z.enum(['main', 'session']),
+          model: z.string(),
+          status: z.enum(['running', 'idle', 'done', 'error']),
+          messageCount: z.number(),
+          costUsd: z.number(),
+          created: z.number(),
+          updated: z.number(),
+        }),
+      ),
+    }),
+  }),
+
+  codingSessionArchive: authReq({
+    input: z.object({ sessionId: z.string() }),
+    output: z.object({ ok: z.boolean() }),
+  }),
+
   // Example: public request — userId is string | null
   // getPublicData: req({
   //   input: z.object({ id: z.string() }),

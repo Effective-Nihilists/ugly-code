@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-20T03:26:30.759Z",
+  "generatedAt": "2026-06-22T03:48:12.099Z",
   "source": "shared/collections.ts",
   "collections": {
     "perfLog": {
@@ -248,6 +248,123 @@
             "required": true
           }
         }
+      },
+      "meta": {
+        "cache": false,
+        "trackable": false,
+        "public": false,
+        "cascadeFrom": null
+      }
+    },
+    "codingSession": {
+      "name": "codingSession",
+      "schema": {
+        "fields": {
+          "archived": {
+            "type": "boolean",
+            "required": true
+          },
+          "costUsd": {
+            "type": "number",
+            "required": true
+          },
+          "kind": {
+            "type": "string",
+            "required": true
+          },
+          "messageCount": {
+            "type": "number",
+            "required": true
+          },
+          "model": {
+            "type": "string",
+            "required": true
+          },
+          "projectId": {
+            "type": "string",
+            "required": true
+          },
+          "sessionId": {
+            "type": "string",
+            "required": true
+          },
+          "status": {
+            "type": "string",
+            "required": true
+          },
+          "title": {
+            "type": "string",
+            "required": true
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "userId": 1,
+              "projectId": 1
+            }
+          }
+        ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": false,
+        "public": false,
+        "cascadeFrom": null
+      }
+    },
+    "codingSessionMessage": {
+      "name": "codingSessionMessage",
+      "schema": {
+        "fields": {
+          "compacted": {
+            "type": "boolean",
+            "required": true
+          },
+          "content": {
+            "type": "string",
+            "required": true
+          },
+          "kind": {
+            "type": "string",
+            "required": true
+          },
+          "role": {
+            "type": "string",
+            "required": true
+          },
+          "seq": {
+            "type": "number",
+            "required": true
+          },
+          "sessionId": {
+            "type": "string",
+            "required": true
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "sessionId": 1,
+              "compacted": 1,
+              "seq": 1
+            }
+          },
+          {
+            "fields": {
+              "sessionId": 1,
+              "seq": 1
+            }
+          }
+        ]
       },
       "meta": {
         "cache": false,
