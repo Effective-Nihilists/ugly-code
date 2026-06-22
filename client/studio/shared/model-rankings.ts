@@ -13,8 +13,8 @@
  *      reported 90–95% cache-hit rate for Claude Code).
  *   3. `sweTier(score)` — colored tier band for the SWE-bench Verified
  *      badge that replaces the old smartness dots. Top tier (≥82%) is
- *      reserved for frontier-class models; today only Opus 4.7 (87.6%)
- *      lands in green.
+ *      reserved for frontier-class models; today Opus 4.8 (~88%) and
+ *      Opus 4.7 (87.6%) land in green.
  */
 
 import type { CodingAgentModel } from 'ugly-app/shared';
@@ -86,18 +86,22 @@ export function isUglyBotModelId(id: string): boolean {
  * Order is meaningful: it's the order rows appear in the picker (and the
  * order the max-mode runner consumes the pool).
  *
- * 2026-05-11 refresh: all-OSS, strong-tier-only. DeepSeek V4 Pro (SWE
- * 80.6) and Kimi K2.6 (80.2) anchor the frontier; MiniMax M2.7 (78) and
- * GLM-5.1 (75/77.8) cover the value tier. The cheaper / weaker rows
- * (Qwen 30B-A3B, MiniMax M2.5, Kimi K2 Thinking) moved out of the
+ * 2026-06-21 refresh: all-OSS, strong-tier-only. DeepSeek V4 Pro (SWE
+ * 80.6) and Kimi K2.7 Code anchor the frontier; MiniMax M2.7 (~78) and
+ * GLM-5.2 cover the value tier. Swapped the two superseded seats for
+ * their newer, stronger coding versions: Kimi K2.6 → K2.7 Code
+ * (coding-specialized, ~30% fewer reasoning tokens at higher coding
+ * scores) and GLM-5.1 → 5.2 (Terminal-Bench 2.1 81.0, up from 5.1's
+ * 63.5; SWE-bench Pro 62.1 vs 58.4). The cheaper / weaker rows
+ * (Qwen 30B-A3B, MiniMax M2.5, Kimi K2 Thinking) stay out of the
  * default seats — explicit picks still work via the picker.
  */
 export const DEFAULT_POOL_PINNED_IDS: readonly string[] = [
   'deepseek_v4_pro',
   'deepseek_v4_flash',
   'minimax_m2_7',
-  'kimi_k2_6',
-  'glm_5_1',
+  'kimi_k2_7_code',
+  'glm_5_2',
 ] as const;
 
 // ──────────────────────────────────────────────────────────────────
@@ -173,9 +177,10 @@ export interface SweTier {
 
 /**
  * Map a SWE-bench Verified percentage to a five-band tier. The "top tier"
- * green band starts at 82% — narrow enough that today only Opus 4.7
- * (87.6%) lives there. Sonnet 4.6 / Kimi K2.6 / DeepSeek V4 Pro / GLM-5.1 /
- * MiniMax M2.7 / DeepSeek V4 Flash all land in "strong" (75–82%).
+ * green band starts at 82% — narrow enough that today only Opus 4.8 (~88%)
+ * and Opus 4.7 (87.6%) live there. Sonnet 4.6 / Kimi K2.7 Code / DeepSeek
+ * V4 Pro / GLM-5.2 / MiniMax M2.7 / DeepSeek V4 Flash all land in "strong"
+ * (75–82%).
  *
  * Cross-vendor scores aren't strictly apples-to-apples (different
  * harnesses, scaffolds, dates) — the badge is a quick comparator, not a
