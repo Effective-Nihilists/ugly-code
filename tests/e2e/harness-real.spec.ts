@@ -36,7 +36,7 @@ test.describe('coding harness — real filesystem', () => {
 
       // Open the real project (openProject echoes the path → StudioProjectPage).
       await page.getByRole('button', { name: /Open Folder/ }).first().click();
-      await page.getByPlaceholder('/path/to/project').fill(root);
+      await page.getByLabel('Path to existing folder').fill(root);
       await page.getByRole('button', { name: /Open Folder →/ }).click();
       await expect(page.locator('[data-id=home-prompt-input]')).toBeVisible();
 
@@ -58,14 +58,16 @@ test.describe('coding harness — real filesystem', () => {
         })
         .toContain('goodbye world');
 
-      // Every workspace tab mounts its own panel UI without crashing.
-      const panels: Array<[name: string, dataId: string]> = [
-        ['Database', 'database-panel'],
+      // Every workspace panel mounts without crashing. Database is a session tab
+      // (and also a prod sidebar view — hence the explicit tab data-id); Errors /
+      // Events / Workers are prod-scoped sidebar views.
+      await page.locator('[data-id=tab-database]').click();
+      await expect(page.locator('[data-id=database-panel]').first()).toBeVisible({ timeout: 10_000 });
+      for (const [label, id] of [
         ['Errors', 'errors-panel'],
         ['Events', 'events-panel'],
         ['Workers', 'panel-workers'],
-      ];
-      for (const [label, id] of panels) {
+      ] as Array<[string, string]>) {
         await page.getByRole('button', { name: label, exact: true }).click();
         await expect(page.locator(`[data-id=${id}]`).first()).toBeVisible({ timeout: 10_000 });
       }
@@ -81,6 +83,7 @@ test.describe('coding harness — real filesystem', () => {
   // so its edits land under .ugly-studio/worktrees/<id> on a session branch,
   // leaving the project's own copy untouched.
   test('a non-main session is isolated in its own git worktree', async ({ page }) => {
+    test.setTimeout(180_000); // two real AI turns + a worktree provision
     // A REAL git repo (worktrees need a committed HEAD). No package.json → no
     // pnpm install, so the test stays fast (we assert isolation, not deps).
     const root = fs.mkdtempSync(join(tmpdir(), 'uglycode-worktree-'));
@@ -101,14 +104,23 @@ test.describe('coding harness — real filesystem', () => {
       await authenticate(page, auth!);
       await page.goto('/');
       await page.getByRole('button', { name: /Open Folder/ }).first().click();
-      await page.getByPlaceholder('/path/to/project').fill(root);
+      await page.getByLabel('Path to existing folder').fill(root);
       await page.getByRole('button', { name: /Open Folder →/ }).click();
       await expect(page.locator('[data-id=home-prompt-input]')).toBeVisible();
 
       // Session 1 (becomes the MAIN session) — a trivial turn to establish it.
+      // Wait until its turn has produced an assistant reply (logged to disk) so
+      // it's persisted as the project's `main` before session 2 decides on a
+      // worktree; then a short settle for the metadata upsert to land.
       await page.locator('[data-id=home-prompt-input]').fill('Reply with exactly: OK');
       await page.locator('[data-id=home-start-session]').click();
-      await expect.poll(() => fs.existsSync(join(root, '.ugly-studio')) , { timeout: 60_000 }).toBeTruthy();
+      const logHasAssistant = (): boolean => {
+        const dir = join(root, '.ugly-studio', 'sessions');
+        if (!fs.existsSync(dir)) return false;
+        return fs.readdirSync(dir).some((f) => f.endsWith('.jsonl') && fs.readFileSync(join(dir, f), 'utf8').includes('"type":"assistant"'));
+      };
+      await expect.poll(logHasAssistant, { timeout: 90_000, message: 'session 1 should produce an assistant reply' }).toBeTruthy();
+      await page.waitForTimeout(2500);
 
       // Session 2 (NON-main) — edits isolated.txt; this must go to a worktree.
       await page.getByRole('button', { name: /New session/ }).first().click();
@@ -140,7 +152,7 @@ test.describe('coding harness — real filesystem', () => {
 
       expect(errors, `page crashed: ${errors.join('; ')}`).toEqual([]);
     } finally {
-      // Clean up worktrees before removing the repo so git doesn't leave locks.
+      // Prune worktrees before removing the repo so git doesn't leave locks.
       try { execFileSync('git', ['-C', root, 'worktree', 'prune'], { stdio: 'ignore' }); } catch { /* ignore */ }
       fs.rmSync(root, { recursive: true, force: true });
     }

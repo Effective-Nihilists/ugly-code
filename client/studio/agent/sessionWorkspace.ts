@@ -17,7 +17,7 @@
  */
 
 import { native } from 'ugly-app/native';
-import { sessionApi, resolveProjectId } from './serverSessionApi';
+import { loadSessions } from '../state/projectSessions';
 
 export interface SessionWorkspace {
   /** The absolute dir the session's tools operate in (worktree, or project). */
@@ -101,13 +101,15 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
     }
   } catch { /* ignore */ }
 
-  // The MAIN session operates on the project itself (no worktree).
+  // The MAIN session operates on the project itself (no worktree). Decide from
+  // the client's own session store (StudioProjectPage flags the first session
+  // 'main') — no DB dependency, so isolation never silently degrades when
+  // persistence is unavailable.
   let isMain = true;
   try {
-    const projectId = await resolveProjectId(projectPath);
-    const listed = await sessionApi.list({ projectId });
-    const me = listed?.sessions.find((s) => s.sessionId === sessionId);
-    const hasMain = listed?.sessions.some((s) => s.kind === 'main') ?? false;
+    const stored = loadSessions(projectPath);
+    const me = stored.find((s) => s.compositeId === sessionId);
+    const hasMain = stored.some((s) => s.kind === 'main');
     isMain = me ? me.kind === 'main' : !hasMain; // a brand-new session is main iff none exists yet
   } catch { /* default isMain=true on failure → safe */ }
   if (isMain) return fallback();
