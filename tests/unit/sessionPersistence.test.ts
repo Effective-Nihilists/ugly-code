@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { planCompaction, decodeAssistantPayload, type ActiveRow } from '../../client/studio/agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../../client/studio/agent/sessionDisplay';
 import type { StoredMessageRow } from '../../client/studio/agent/serverSessionApi';
+import { compareCodingMessages } from '../../shared/codingCollections';
 
 // Server-side coding-session persistence (survive reload). Two pure transforms
 // carry the load-bearing correctness:
@@ -121,6 +122,44 @@ describe('rowsToDisplayMessages (history replay)', () => {
     expect(msgs[0].parts[0]).toEqual({ type: 'text', data: { text: 'hi' } });
     expect(msgs[1].model).toBeUndefined();
     expect(msgs[1].parts[0]).toEqual({ type: 'text', data: { text: 'legacy' } });
+  });
+});
+
+describe('compareCodingMessages (transcript ordering — DB sorts seq as text)', () => {
+  const sortRows = <T extends { seq: number; kind: string }>(rows: T[]): T[] =>
+    [...rows].sort(compareCodingMessages);
+
+  it('orders numerically, NOT lexically (so tool_calls precede their results)', () => {
+    // The exact lexical scramble the DB returns for seqs 0..21.
+    const lexical = [0, 1, 10, 11, 12, 19, 2, 20, 21, 3, 9].map((seq) => ({ seq, kind: 'message' }));
+    expect(sortRows(lexical).map((r) => r.seq)).toEqual([0, 1, 2, 3, 9, 10, 11, 12, 19, 20, 21]);
+  });
+
+  it('keeps a compaction summary at the head of the block it subsumes', () => {
+    // includeCompacted view: summary shares seq 0 with the (compacted) original.
+    const full = [
+      { seq: 1, kind: 'message' },
+      { seq: 0, kind: 'message' }, // original (compacted) at the boundary
+      { seq: 0, kind: 'summary' }, // summary reuses the boundary seq
+      { seq: 2, kind: 'message' },
+    ];
+    const ordered = sortRows(full);
+    expect(ordered[0].kind).toBe('summary'); // summary first at seq 0
+    expect(ordered.map((r) => r.seq)).toEqual([0, 0, 1, 2]);
+  });
+
+  it('normal view: summary (seq 0) sorts before the kept recents', () => {
+    // After compaction the originals are excluded; only [summary, ...recents].
+    const normal = [
+      { seq: 5, kind: 'message' },
+      { seq: 4, kind: 'message' },
+      { seq: 0, kind: 'summary' },
+    ];
+    expect(sortRows(normal).map((r) => `${r.seq}:${r.kind}`)).toEqual([
+      '0:summary',
+      '4:message',
+      '5:message',
+    ]);
   });
 });
 

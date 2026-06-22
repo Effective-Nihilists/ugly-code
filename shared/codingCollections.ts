@@ -60,6 +60,23 @@ export type CodingSessionMessage = Omit<InferDocType<typeof CodingSessionMessage
   kind: CodingSessionMessageKind;
 };
 
+/**
+ * Stable transcript ordering. The DB sorts `seq` as JSONB TEXT
+ * (1,10,11,…,2,20), so every transcript read MUST re-sort with this:
+ * - numeric `seq` ascending (tool_calls precede their results; resume seed is
+ *   chronological);
+ * - a `summary` row reuses the seq of the oldest message it subsumes, so when it
+ *   ties an original (only in the includeCompacted view) the summary sorts first,
+ *   sitting at the head of the block it represents. In the normal view the
+ *   originals are compacted out, so the summary is the sole row at that seq.
+ */
+export function compareCodingMessages(
+  a: { seq: number; kind: string },
+  b: { seq: number; kind: string },
+): number {
+  return a.seq - b.seq || (a.kind === 'summary' ? -1 : 0) - (b.kind === 'summary' ? -1 : 0);
+}
+
 export const codingCollections = defineCollections({
   codingSession: {
     schema: CodingSessionSchema,

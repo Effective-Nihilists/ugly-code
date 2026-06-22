@@ -12,6 +12,7 @@ import type { TypedDB } from 'ugly-app/server';
 import type { RequestHandlers } from 'ugly-app';
 import { dbDefaults } from 'ugly-app/shared';
 import { collections, type CodingSession, type CodingSessionMessage } from '../shared/collections';
+import { compareCodingMessages } from '../shared/codingCollections';
 import type { requests } from '../shared/api';
 
 type CodingSessionHandlers = Pick<
@@ -110,13 +111,9 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         limit: limit ?? 2000,
       });
       // The DB sorts `seq` as JSONB text (1,10,11,…,2,20,…) — re-sort NUMERICALLY
-      // so tool_calls precede their results on replay (otherwise the result is
-      // orphaned and the tool card sticks on a forever "executing" spinner) and
-      // the resume seed is in true chronological order. Summary rows reuse a
-      // message's seq; order them just before that message (kind tiebreak).
-      const sorted = [...docs].sort(
-        (a, b) => a.seq - b.seq || (a.kind === 'summary' ? -1 : 0) - (b.kind === 'summary' ? -1 : 0),
-      );
+      // (with the summary tiebreak) so tool_calls precede their results on replay
+      // and the resume seed is chronological. See compareCodingMessages.
+      const sorted = [...docs].sort(compareCodingMessages);
       return {
         messages: sorted.map((d) => ({
           seq: d.seq, role: d.role, kind: d.kind, compacted: d.compacted, content: d.content,
