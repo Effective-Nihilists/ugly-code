@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 export interface Skill {
   name: string;
   description: string;
-  scope: 'user' | 'project' | 'command';
+  scope: 'user' | 'project' | 'command' | 'plugin' | 'system';
   /** 'skill' (default) — inserts a `/skill-name` pill that gets prepended
    *  to the outgoing message. 'command' — built-in local action (e.g.
    *  `/clear`) that the panel handles directly on select. */
@@ -43,14 +43,11 @@ async function fetchSkills(): Promise<Skill[]> {
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      const res = await fetch('/api/listSkills', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ input: {} }),
-      });
-      const json = await res.json();
-      const skills = (json.result?.skills ?? json.skills ?? []) as Skill[];
+      // Discover skills over the native bridge (project / user / plugin SKILL.md
+      // dirs). The old `/api/listSkills` sidecar endpoint doesn't exist in the
+      // Workers deployment; see hooks/skillDiscovery.ts.
+      const { discoverSkills } = await import('./skillDiscovery');
+      const skills = await discoverSkills();
       cachedSkills = skills;
       return skills;
     } catch {

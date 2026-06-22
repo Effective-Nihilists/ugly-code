@@ -1,5 +1,4 @@
 import React from 'react';
-import { useGitStatus } from '../hooks/useGitStatus';
 import { useSessionDeletion } from '../hooks/useSessionDeletion';
 import { bootMark } from '../utils/startupTiming';
 import { SessionRow } from './SessionRow';
@@ -223,12 +222,15 @@ export interface SessionListSidebarSession {
   kind?: 'main';
 }
 
-export interface SessionListSidebarFooterNav {
-  activeView: 'session' | 'prod' | 'git' | 'terminal';
-  prodAvailable: boolean;
-  onGoProd(): void;
-  onGoGit(): void;
-  onGoTerminal(): void;
+/** One button in the sidebar footer nav (the prod-scoped views live here). */
+export interface SidebarNavItem {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  disabled?: boolean;
+  badgeCount?: number;
+  onClick(): void;
 }
 
 export interface SessionListSidebarProps {
@@ -238,7 +240,7 @@ export interface SessionListSidebarProps {
   onNewSession(): void;
   onArchiveSession(compositeId: string): void;
   timeAgo(ts: number): string;
-  footerNav?: SessionListSidebarFooterNav;
+  footerNav?: SidebarNavItem[];
   /**
    * Current branch of the project root, displayed in the Repository
    * row's title (`main · <branch>`). Optional — if absent, the row
@@ -288,10 +290,6 @@ export function SessionListSidebar({
   // session per project; we still take the first defensively.
   const mainSession = sessions.find((s) => s.kind === 'main') ?? null;
   const regularSessions = sessions.filter((s) => s.kind !== 'main');
-  // The "N changed" pill used to live in the top bar; it moved here
-  // so the user can see dirty-file count right next to the Git nav
-  // button they'd click to act on it.
-  const { changedCount } = useGitStatus();
   return (
     <aside
       data-id="session-list-sidebar"
@@ -428,7 +426,7 @@ export function SessionListSidebar({
           </span>
         </button>
       )}
-      {footerNav && (
+      {footerNav && footerNav.length > 0 && (
         <div
           style={{
             display: 'flex',
@@ -438,28 +436,18 @@ export function SessionListSidebar({
             background: 'var(--bg-primary)',
           }}
         >
-          <SidebarFooterButton
-            label="Prod"
-            active={footerNav.activeView === 'prod'}
-            disabled={!footerNav.prodAvailable}
-            onClick={footerNav.onGoProd}
-            icon={<ProdIcon />}
-            divider
-          />
-          <SidebarFooterButton
-            label="Git"
-            active={footerNav.activeView === 'git'}
-            onClick={footerNav.onGoGit}
-            icon={<GitIcon />}
-            badgeCount={changedCount}
-            divider
-          />
-          <SidebarFooterButton
-            label="Terminal"
-            active={footerNav.activeView === 'terminal'}
-            onClick={footerNav.onGoTerminal}
-            icon={<TerminalIcon />}
-          />
+          {footerNav.map((item, i) => (
+            <SidebarFooterButton
+              key={item.id}
+              label={item.label}
+              active={item.active}
+              {...(item.disabled ? { disabled: true } : {})}
+              onClick={item.onClick}
+              icon={item.icon}
+              {...(item.badgeCount != null ? { badgeCount: item.badgeCount } : {})}
+              {...(i < footerNav.length - 1 ? { divider: true } : {})}
+            />
+          ))}
         </div>
       )}
     </aside>
@@ -778,62 +766,8 @@ function SidebarFooterButton({
   );
 }
 
-function ProdIcon(): React.ReactElement {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={14}
-      height={14}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 12a8 8 0 0 1 16 0" />
-      <circle cx={12} cy={12} r={1.5} fill="currentColor" />
-    </svg>
-  );
-}
 
-function TerminalIcon(): React.ReactElement {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={14}
-      height={14}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="5 8 9 12 5 16" />
-      <line x1={12} y1={17} x2={19} y2={17} />
-    </svg>
-  );
-}
 
-function GitIcon(): React.ReactElement {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={14}
-      height={14}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx={6} cy={6} r={2} />
-      <circle cx={6} cy={18} r={2} />
-      <circle cx={18} cy={12} r={2} />
-      <path d="M6 8v8" />
-      <path d="M6 12h6a4 4 0 0 0 4-4V8" />
-    </svg>
-  );
-}
 
 /**
  * Renders the regular-session rows with enter/leave animations and

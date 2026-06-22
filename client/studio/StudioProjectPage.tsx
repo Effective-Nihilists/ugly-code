@@ -16,17 +16,32 @@ import { WorkersPanel } from './panels/WorkersPanel';
 import { GitPanel } from './panels/GitPanel';
 import { TerminalPanel } from './panels/TerminalPanel';
 import { ProdPanel } from './panels/ProdPanel';
+import { PreviewPanel } from './panels/PreviewPanel';
+import { FilePanel } from './panels/FilePanel';
+import {
+  PublishIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon,
+} from './panels/navIcons';
 
-// Top-bar tabs + the sidebar-footer views (git / terminal / prod).
-type WorkspaceTab = 'chat' | 'database' | 'errors' | 'events' | 'workers' | 'git' | 'terminal' | 'prod';
+// Two nav surfaces:
+//  - Session top tab picker (per-session, dev-scoped): Agent / Preview / File /
+//    Git / Database.
+//  - Sidebar footer (prod-scoped views): Publish / Database(prod) / Errors /
+//    Events / Workers / Terminal. Errors/Events/Workers are prod-only; Database
+//    appears in both (dev in the top tabs, prod in the sidebar).
+type WorkspaceTab =
+  | 'chat' | 'preview' | 'file' | 'git' | 'database'
+  | 'publish' | 'prodDatabase' | 'errors' | 'events' | 'workers' | 'terminal';
 const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: 'chat', label: 'Agent' },
+  { id: 'preview', label: 'Preview' },
+  { id: 'file', label: 'File' },
+  { id: 'git', label: 'Git' },
   { id: 'database', label: 'Database' },
-  { id: 'errors', label: 'Errors' },
-  { id: 'events', label: 'Events' },
-  { id: 'workers', label: 'Workers' },
 ];
-const ALL_TABS: WorkspaceTab[] = ['chat', 'database', 'errors', 'events', 'workers', 'git', 'terminal', 'prod'];
+const ALL_TABS: WorkspaceTab[] = [
+  'chat', 'preview', 'file', 'git', 'database',
+  'publish', 'prodDatabase', 'errors', 'events', 'workers', 'terminal',
+];
 
 // The open tab + active session live in the URL (alongside ?path=) so a reload
 // restores exactly where you were.
@@ -101,6 +116,7 @@ export default function StudioProjectPage({
     void (async () => {
       const projectId = await resolveProjectId(projectPath ?? null);
       const data = await sessionApi.list({ projectId });
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is mutated by the cleanup closure
       if (cancelled || !data) return;
       const mapped: StoredSession[] = data.sessions.map((s) => ({
         compositeId: s.sessionId,
@@ -194,19 +210,20 @@ export default function StudioProjectPage({
         timeAgo={timeAgoShort}
         archivedCount={0}
         onShowArchived={() => undefined}
-        footerNav={{
-          activeView: tab === 'git' || tab === 'terminal' || tab === 'prod' ? tab : 'session',
-          prodAvailable: true,
-          onGoProd: () => { setTab('prod'); },
-          onGoGit: () => { setTab('git'); },
-          onGoTerminal: () => { setTab('terminal'); },
-        }}
+        footerNav={[
+          { id: 'publish', label: 'Publish', icon: <PublishIcon />, active: tab === 'publish', onClick: () => { setTab('publish'); } },
+          { id: 'prodDatabase', label: 'Database', icon: <DatabaseIcon />, active: tab === 'prodDatabase', onClick: () => { setTab('prodDatabase'); } },
+          { id: 'errors', label: 'Errors', icon: <ErrorsIcon />, active: tab === 'errors', onClick: () => { setTab('errors'); } },
+          { id: 'events', label: 'Events', icon: <EventsIcon />, active: tab === 'events', onClick: () => { setTab('events'); } },
+          { id: 'workers', label: 'Workers', icon: <WorkersIcon />, active: tab === 'workers', onClick: () => { setTab('workers'); } },
+          { id: 'terminal', label: 'Terminal', icon: <TerminalIcon />, active: tab === 'terminal', onClick: () => { setTab('terminal'); } },
+        ]}
       />
       </div>
       <main style={S.main}>
         <header style={S.header}>
           <TabPickerStyles />
-          <button onClick={onBack} style={S.back}>
+          <button data-id="back-to-projects" onClick={onBack} style={S.back}>
             ‹ Projects
           </button>
           <span style={S.name}>{projectName}</span>
@@ -220,6 +237,7 @@ export default function StudioProjectPage({
               return (
                 <button
                   key={t.id}
+                  data-id={`tab-${t.id}`}
                   aria-pressed={active}
                   data-active={active}
                   className="us-chat-tab"
@@ -243,13 +261,18 @@ export default function StudioProjectPage({
               onResumeMissing={archiveSession}
             />
           </div>
-          {tab === 'database' && <div style={S.paneScroll}><DatabasePanel /></div>}
-          {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel /></div>}
-          {tab === 'events' && <div style={S.paneScroll}><EventsPanel /></div>}
-          {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel /></div>}
+          {/* Session tabs (dev-scoped) */}
+          {tab === 'preview' && <div style={S.pane}><PreviewPanel /></div>}
+          {tab === 'file' && <div style={S.pane}><FilePanel /></div>}
           {tab === 'git' && <div style={S.pane}><GitPanel /></div>}
+          {tab === 'database' && <div style={S.paneScroll}><DatabasePanel forceDev /></div>}
+          {/* Sidebar prod views */}
+          {tab === 'publish' && <div style={S.pane}><ProdPanel /></div>}
+          {tab === 'prodDatabase' && <div style={S.paneScroll}><DatabasePanel forceProd /></div>}
+          {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel forceProd /></div>}
+          {tab === 'events' && <div style={S.paneScroll}><EventsPanel /></div>}
+          {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel forceProd /></div>}
           {tab === 'terminal' && <div style={S.pane}><TerminalPanel /></div>}
-          {tab === 'prod' && <div style={S.pane}><ProdPanel /></div>}
         </div>
       </main>
     </div>

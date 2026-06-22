@@ -165,6 +165,38 @@ interface SessionAgentState {
   title: string;
   titleSet: boolean;
   resumed: boolean;
+  /** The first user message (the task), pinned verbatim into every compaction
+   *  summary so the original instruction is never lost to the context window. */
+  taskText: string;
+}
+
+/**
+ * Build the compaction summary. Compaction replaces the oldest turns with this
+ * text in the model's working context, so it MUST carry forward (a) the original
+ * task verbatim and (b) a log of what was already done — otherwise a long session
+ * forgets its goal. Structural (no extra AI call): the task + a bulleted trail of
+ * the assistant's text + tool calls from the dropped turns.
+ */
+function buildCompactionSummary(taskText: string, dropped: AgentMessage[]): string {
+  const trail: string[] = [];
+  for (const m of dropped) {
+    if (m.role !== 'assistant' || !Array.isArray(m.content)) continue;
+    for (const b of m.content) {
+      if (b.type === 'text' && b.text?.trim()) {
+        trail.push(`• ${b.text.trim().replace(/\s+/g, ' ').slice(0, 200)}`);
+      } else if (b.type === 'tool_use') {
+        const arg =
+          typeof b.input === 'object' && b.input
+            ? (Object.values(b.input as Record<string, unknown>).find((v) => typeof v === 'string') as string | undefined)
+            : undefined;
+        trail.push(`• ran ${b.name}${arg ? `(${arg.slice(0, 80)})` : ''}`);
+      }
+    }
+  }
+  const parts = ['[Earlier turns were compacted to stay within the context window.]'];
+  if (taskText) parts.push(`\nOriginal task:\n${taskText.slice(0, 1000)}`);
+  if (trail.length) parts.push(`\nWork done so far (most recent last):\n${trail.slice(-50).join('\n')}`);
+  return parts.join('\n');
 }
 
 const sessions = new Map<string, SessionAgentState>();
@@ -299,6 +331,22 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
   }
   s.seq = maxSeq + 1;
   s.titleSet = true; // a resumed session already has its title
+  // Restore the pinned task so post-reload compaction still preserves it: the
+  // first user row, or (if already compacted) parsed back out of the summary.
+  if (!s.taskText) {
+    const firstUser = rows.find((r) => r.role === 'user' && r.kind === 'message');
+    if (firstUser) {
+      try { s.taskText = String(JSON.parse(firstUser.content)); } catch { /* ignore */ }
+    } else {
+      const summaryRow = rows.find((r) => r.kind === 'summary');
+      if (summaryRow) {
+        try {
+          const m = /Original task:\n([\s\S]*?)(?:\n\n|$)/.exec(String(JSON.parse(summaryRow.content)));
+          if (m) s.taskText = m[1];
+        } catch { /* ignore */ }
+      }
+    }
+  }
 
   // Heal an INTERRUPTED ending before resume. A session reloaded mid-turn ends
   // either on (a) an assistant turn with unresolved tool_use, or (b) a trailing
@@ -434,6 +482,7 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
     title: '',
     titleSet: false,
     resumed: false,
+    taskText: '',
   };
   state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: AGENT_DEFAULT_MODEL });
 
@@ -445,7 +494,14 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
     tools: AGENT_TOOLS,
     toolHandlers: TOOL_HANDLERS,
     budget: { maxTurns: 12 },
-    compaction: { maxContextTokens: 120_000, keepRecentTurns: 8 },
+    // Pin the task + a work-log into every summary so a long session never loses
+    // its original instruction (the system prompt is sent separately and is never
+    // compacted; this preserves the user's goal across compactions).
+    compaction: {
+      maxContextTokens: 120_000,
+      keepRecentTurns: 8,
+      summarize: (dropped) => Promise.resolve(buildCompactionSummary(state.taskText, dropped)),
+    },
     // Live token streaming: create the assistant bubble on the first token, then
     // update it in place as text arrives (onTurn finalizes it authoritatively).
     onText: (_msgId, delta) => {
@@ -549,6 +605,7 @@ export async function runClientAgentTurn(
   await ensureResumed(state, sessionId);
   state.messageCount += 1;
   state.log.append({ ts: Date.now(), type: 'user', text: userText });
+  if (!state.taskText) state.taskText = userText; // pin the original task for summaries
   if (!state.titleSet) {
     state.title = userText.slice(0, 120);
     state.titleSet = true;

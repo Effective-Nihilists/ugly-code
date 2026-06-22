@@ -49,7 +49,9 @@ test.describe('workspace URL (?tab= / ?session=)', () => {
   test('selecting a tab writes ?tab= to the URL', async ({ page }) => {
     await enterStudioShell(page, auth);
     await openProject(page, PROJECT);
-    await page.getByRole('button', { name: 'Database', exact: true }).click();
+    // Target the session tab picker specifically (Database also appears as a
+    // prod view in the sidebar footer).
+    await page.locator('[data-id=tab-database]').click();
     await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('database');
   });
 });
