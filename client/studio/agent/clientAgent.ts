@@ -43,6 +43,7 @@ import {
   type ToolRowPayload,
 } from './serverSessionApi';
 import { assistantParts, type Part } from './sessionDisplay';
+import { ensureSessionWorkspace, getSessionWorkspace } from './sessionWorkspace';
 
 type Emit = (msg: { type: string; [k: string]: unknown }) => void;
 
@@ -118,16 +119,28 @@ const fetchSocket: RunAgentSocket = {
   trackDocs: () => () => {},
 };
 
-// Pass the active project + edit mode so the daemon OS-user-sandboxes tool
-// subprocesses (run_command) for the open project. getActiveProjectPath() is
-// read per-call so it tracks the currently-open project; this client agent
-// runs in edit mode.
-const TOOL_HANDLERS: Record<string, (input: unknown) => Promise<string>> = Object.fromEntries(
-  AGENT_TOOL_NAMES.map((n) => [
-    n,
-    (input: unknown) => dispatchTool(n, input, { projectDir: getActiveProjectPath(), mode: 'edit' }),
-  ]),
-);
+// Per-session tool handlers. They resolve the session's workspace at CALL time:
+// a worktree-isolated session runs its fs ops + run_command in its own worktree
+// dir (with its PORT), while the main session falls back to the open project
+// (relative paths pass through, unchanged behavior). getSessionWorkspace is sync
+// (cached); ensureSessionWorkspace runs once up-front per session (see below).
+function makeToolHandlers(sessionId: string): Record<string, (input: unknown) => Promise<string>> {
+  return Object.fromEntries(
+    AGENT_TOOL_NAMES.map((n) => [
+      n,
+      (input: unknown) => {
+        const ws = getSessionWorkspace(sessionId);
+        const dir = ws?.isWorktree ? ws.dir : getActiveProjectPath();
+        return dispatchTool(n, input, {
+          projectDir: dir,
+          mode: 'edit',
+          ...(ws?.isWorktree ? { workspaceDir: ws.dir } : {}),
+          ...(ws?.port ? { port: ws.port } : {}),
+        });
+      },
+    ]),
+  );
+}
 
 interface PerModelAcc {
   model: string;
@@ -492,7 +505,7 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
     model: AGENT_DEFAULT_MODEL,
     systemPrompt: AGENT_SYSTEM_PROMPT,
     tools: AGENT_TOOLS,
-    toolHandlers: TOOL_HANDLERS,
+    toolHandlers: makeToolHandlers(sessionId),
     budget: { maxTurns: 12 },
     // Pin the task + a work-log into every summary so a long session never loses
     // its original instruction (the system prompt is sent separately and is never
@@ -593,6 +606,33 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
   return state;
 }
 
+/**
+ * Provision the session's isolated workspace before its first turn, streaming
+ * worktree-create + dependency-install progress into the chat as one updating
+ * bubble. Resolves immediately for the main session (no worktree) or once cached.
+ */
+async function ensureWorkspaceStep(sessionId: string, emit: Emit): Promise<void> {
+  if (getSessionWorkspace(sessionId)) return; // already provisioned
+  const progressId = rid();
+  let created = false;
+  const label: Record<string, string> = {
+    creating: 'Setting up isolated workspace',
+    installing: 'Installing dependencies',
+    ready: 'Workspace ready',
+    error: 'Workspace',
+  };
+  await ensureSessionWorkspace(sessionId, getActiveProjectPath(), (stage, text) => {
+    emitMessage(
+      emit,
+      sessionId,
+      'assistant',
+      [{ type: 'text', data: { text: `${label[stage] ?? 'Workspace'}\n\n${text}` } }, { type: 'finish' }],
+      { id: progressId, action: created ? 'updated' : 'created' },
+    );
+    created = true;
+  });
+}
+
 /** Run one user turn to completion (model ↔ tools), streaming studio events. */
 export async function runClientAgentTurn(
   sessionId: string,
@@ -600,6 +640,10 @@ export async function runClientAgentTurn(
   emit: Emit,
 ): Promise<void> {
   const state = getOrCreate(sessionId, emit);
+  // Provision the session's isolated workspace (worktree + deps install) before
+  // the first turn so the agent's tools operate in it. Streams progress into the
+  // chat; a no-op for the main session (runs on the project) or once cached.
+  await ensureWorkspaceStep(sessionId, emit);
   // On the first turn after a reload, rebuild the prior context into the live
   // controller before sending (no-op for a brand-new session).
   await ensureResumed(state, sessionId);

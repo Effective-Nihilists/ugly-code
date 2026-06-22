@@ -10,7 +10,22 @@ import type { AgentToolName } from '../../shared/agent';
  *  daemon. Resolved by the agent loop (clientAgent) per turn. */
 export interface ToolContext {
   projectDir?: string | null;
+  /** Absolute root for resolving the model's (workspace-relative) fs paths. Set
+   *  ONLY for worktree-isolated sessions; when unset, relative paths pass through
+   *  unchanged (the daemon resolves them against the open project). */
+  workspaceDir?: string | null;
   mode?: SandboxMode;
+  /** Unique dev-server port, injected as PORT into run_command spawns. */
+  port?: number;
+}
+
+/** Resolve a model-supplied (workspace-relative) path. Absolute paths pass
+ *  through; relative paths are rooted at `workspaceDir` when set (worktree). */
+function resolvePath(ctx: ToolContext | undefined, path: string): string {
+  if (path.startsWith('/')) return path;
+  const root = ctx?.workspaceDir;
+  if (!root) return path;
+  return root.replace(/\/+$/, '') + '/' + path.replace(/^\.\/?/, '');
 }
 
 export type ToolDispatch = (name: string, input: unknown, ctx?: ToolContext) => Promise<string>;
@@ -19,31 +34,32 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
   const p = (input ?? {}) as Record<string, unknown>;
   switch (name as AgentToolName) {
     case 'list_dir': {
-      const items = await native.fs.readdir(String(p.path ?? '.'));
+      const items = await native.fs.readdir(resolvePath(ctx, String(p.path ?? '.')));
       items.sort((a, b) =>
         a.isDirectory === b.isDirectory ? a.name.localeCompare(b.name) : a.isDirectory ? -1 : 1,
       );
       return items.map((e) => (e.isDirectory ? `${e.name}/` : e.name)).join('\n') || '(empty directory)';
     }
     case 'read_file':
-      return native.fs.readFile(String(p.path));
+      return native.fs.readFile(resolvePath(ctx, String(p.path)));
     case 'write_file':
-      await native.fs.writeFile(String(p.path), String(p.content ?? ''));
+      await native.fs.writeFile(resolvePath(ctx, String(p.path)), String(p.content ?? ''));
       return `Wrote ${String(p.path)}`;
     case 'edit_file': {
-      const path = String(p.path);
+      const rawPath = String(p.path);
+      const path = resolvePath(ctx, rawPath);
       const oldStr = String(p.old);
       const newStr = String(p.new ?? '');
       const cur = await native.fs.readFile(path);
       const idx = cur.indexOf(oldStr);
-      if (idx === -1) throw new Error(`edit_file: \`old\` text not found in ${path}`);
+      if (idx === -1) throw new Error(`edit_file: \`old\` text not found in ${rawPath}`);
       if (cur.indexOf(oldStr, idx + oldStr.length) !== -1)
-        throw new Error(`edit_file: \`old\` text is not unique in ${path} — include more surrounding context`);
+        throw new Error(`edit_file: \`old\` text is not unique in ${rawPath} — include more surrounding context`);
       await native.fs.writeFile(path, cur.slice(0, idx) + newStr + cur.slice(idx + oldStr.length));
-      return `Edited ${path}`;
+      return `Edited ${rawPath}`;
     }
     case 'run_command':
-      return runCommand(String(p.cmd), Array.isArray(p.args) ? p.args.map(String) : [], await sandboxOptFor(ctx));
+      return runCommand(String(p.cmd), Array.isArray(p.args) ? p.args.map(String) : [], await sandboxOptFor(ctx), ctx?.port);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -84,11 +100,18 @@ function runCommand(
   cmd: string,
   args: string[],
   sandbox?: { projectId: string; mode: SandboxMode; projectDir: string },
+  port?: number,
 ): Promise<string> {
   return new Promise((resolve) => {
     let out = '';
     try {
-      const proc = native.process.spawn(cmd, args, sandbox ? { sandbox } : {});
+      // Inject PORT so the session's `pnpm dev` binds its assigned port (the
+      // Preview tab loads http://localhost:<port>).
+      const opts: Parameters<typeof native.process.spawn>[2] = {
+        ...(sandbox ? { sandbox } : {}),
+        ...(port ? { env: { PORT: String(port) } } : {}),
+      };
+      const proc = native.process.spawn(cmd, args, opts);
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (out += c));
       proc.onError((e) => resolve(`${out}\n[error: ${e}]`));

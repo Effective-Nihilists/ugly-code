@@ -1,35 +1,35 @@
 import React from 'react';
-import { getActiveProjectPath } from '../hooks/useSocket';
+import { sessionPort } from '../agent/sessionWorkspace';
 
-// A live preview of the project's running dev server, in an iframe. The dev URL
-// is entered by the user (the daemon runs `npm run dev` via the agent's
-// run_command; its port isn't known here) and persisted per project. Session-
-// scoped. A reload button + open-in-new for when the iframe is sandboxed.
+// A live preview of the running dev server, in an iframe. Each session gets a
+// unique PORT (set in the env of its run_command spawns, so `pnpm dev` binds it),
+// and the preview defaults to http://localhost:<that port>. The user can still
+// override the URL; it's persisted per session.
 
-const keyFor = (path: string | null): string => `ugly-studio:previewUrl:${path ?? 'none'}`;
+const keyFor = (sid: string | null): string => `ugly-studio:previewUrl:${sid ?? 'none'}`;
 
-export function PreviewPanel(): React.ReactElement {
-  const projectPath = getActiveProjectPath();
+export function PreviewPanel({ sessionId }: { sessionId?: string | null }): React.ReactElement {
+  const defaultUrl = `http://localhost:${sessionId ? sessionPort(sessionId) : 4321}`;
   const [url, setUrl] = React.useState<string>(() => {
-    try { return localStorage.getItem(keyFor(projectPath)) ?? 'http://localhost:4321'; } catch { return 'http://localhost:4321'; }
+    try { return localStorage.getItem(keyFor(sessionId ?? null)) ?? defaultUrl; } catch { return defaultUrl; }
   });
   const [committed, setCommitted] = React.useState<string>(url);
   const [reloadKey, setReloadKey] = React.useState(0);
 
   React.useEffect(() => {
     try {
-      const saved = localStorage.getItem(keyFor(projectPath));
+      const saved = localStorage.getItem(keyFor(sessionId ?? null));
       if (saved) { setUrl(saved); setCommitted(saved); }
     } catch { /* ignore */ }
-  }, [projectPath]);
+  }, [sessionId]);
 
   const commit = React.useCallback(() => {
     const u = url.trim();
     if (!u) return;
     setCommitted(u);
     setReloadKey((k) => k + 1);
-    try { localStorage.setItem(keyFor(projectPath), u); } catch { /* ignore */ }
-  }, [url, projectPath]);
+    try { localStorage.setItem(keyFor(sessionId ?? null), u); } catch { /* ignore */ }
+  }, [url, sessionId]);
 
   return (
     <div style={S.root}>

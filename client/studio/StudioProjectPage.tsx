@@ -174,9 +174,12 @@ export default function StudioProjectPage({
   const archiveSession = React.useCallback((id: string) => {
     setStored((prev) => prev.filter((s) => s.compositeId !== id));
     setActiveSessionId((cur) => (cur === id ? null : cur));
-    // Persist the archive so it doesn't reappear on reload (best-effort).
-    if (id !== MAIN_PLACEHOLDER) void sessionApi.archive({ sessionId: id });
-  }, []);
+    // Persist the archive + tear down the session's worktree (best-effort).
+    if (id !== MAIN_PLACEHOLDER) {
+      void sessionApi.archive({ sessionId: id });
+      void import('./agent/sessionWorkspace').then((m) => m.removeSessionWorkspace(id, projectPath ?? null));
+    }
+  }, [projectPath]);
 
   // Synthetic "Main session" row when none has been started yet — clicking it
   // opens the new-session hero, and the first session created becomes main.
@@ -262,7 +265,7 @@ export default function StudioProjectPage({
             />
           </div>
           {/* Session tabs (dev-scoped) */}
-          {tab === 'preview' && <div style={S.pane}><PreviewPanel /></div>}
+          {tab === 'preview' && <div style={S.pane}><PreviewPanel sessionId={activeSessionId} /></div>}
           {tab === 'file' && <div style={S.pane}><FilePanel /></div>}
           {tab === 'git' && <div style={S.pane}><GitPanel /></div>}
           {tab === 'database' && <div style={S.paneScroll}><DatabasePanel forceDev /></div>}

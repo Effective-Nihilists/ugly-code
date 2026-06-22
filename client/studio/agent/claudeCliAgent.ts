@@ -26,6 +26,7 @@ import {
   type ToolResultPayload,
 } from './serverSessionApi';
 import { detectClaudeCli } from './claudeCliDetect';
+import { ensureSessionWorkspace } from './sessionWorkspace';
 
 type Emit = (msg: { type: string; [k: string]: unknown }) => void;
 
@@ -143,6 +144,17 @@ export async function runClaudeCliTurn(sessionId: string, userText: string, mode
   }
   if (!s.title) s.title = userText.slice(0, 120);
 
+  // Provision the isolated workspace (worktree + deps) before spawning claude;
+  // it runs its built-in tools in this cwd. Streams setup progress into the chat.
+  let wsProgressCreated = false;
+  const wsProgressId = rid();
+  const ws = await ensureSessionWorkspace(sessionId, projectPath, (stage, text) => {
+    const label = stage === 'creating' ? 'Setting up isolated workspace' : stage === 'installing' ? 'Installing dependencies' : stage === 'ready' ? 'Workspace ready' : 'Workspace';
+    emitMessage(emit, sessionId, 'assistant', [{ type: 'text', data: { text: `${label}\n\n${text}` } }, { type: 'finish' }], { id: wsProgressId, action: wsProgressCreated ? 'updated' : 'created' });
+    wsProgressCreated = true;
+  });
+  const cwd = ws.dir !== '' ? ws.dir : (projectPath ?? '');
+
   s.messageCount += 1;
   persistRow(s, sessionId, 'user', userText);
   persistMeta(s, sessionId, model, 'running');
@@ -163,7 +175,10 @@ export async function runClaudeCliTurn(sessionId: string, userText: string, mode
     let buffer = '';
     let proc: ReturnType<typeof native.process.spawn>;
     try {
-      proc = native.process.spawn(bin, args, projectPath ? { cwd: projectPath } : {});
+      proc = native.process.spawn(bin, args, {
+        ...(cwd ? { cwd } : {}),
+        ...(ws.port ? { env: { PORT: String(ws.port) } } : {}),
+      });
     } catch (e) {
       emitMessage(emit, sessionId, 'assistant', [{ type: 'text', data: { text: '⚠ Failed to spawn claude: ' + String(e) } }, { type: 'finish' }]);
       emitFinished(emit, sessionId);
