@@ -26,6 +26,7 @@ export function ProdPanel(): React.ReactElement {
   const [output, setOutput] = React.useState('');
   const [running, setRunning] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [stdin, setStdin] = React.useState('');
   const procRef = React.useRef<UglyProcess | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -83,6 +84,21 @@ export function ProdPanel(): React.ReactElement {
     }
   }, [running, loadTarget]);
 
+  // Send a line to the running publish's stdin (answers its prompts — custom
+  // domain, etc.). Echo it into the console so the user sees what they sent.
+  const sendStdin = React.useCallback(() => {
+    const proc = procRef.current;
+    if (!proc || !running) return;
+    const line = stdin;
+    setStdin('');
+    setOutput((o) => `${o}${line}\n`);
+    try {
+      proc.write(`${line}\n`);
+    } catch {
+      /* process gone */
+    }
+  }, [stdin, running]);
+
   const cancel = React.useCallback(() => {
     try {
       procRef.current?.kill();
@@ -125,6 +141,24 @@ export function ProdPanel(): React.ReactElement {
       <div ref={scrollRef} data-id="prod-output" style={S.console}>
         <ConsoleText text={output || (running ? 'Starting publish…' : 'Press Deploy to run `ugly-app publish` (Neon + Cloudflare provisioning + Workers deploy).')} />
       </div>
+      {running && (
+        <div style={S.inputRow}>
+          <span style={S.prompt}>›</span>
+          <input
+            data-id="prod-stdin"
+            value={stdin}
+            onChange={(e) => { setStdin(e.target.value); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') sendStdin();
+            }}
+            placeholder="answer a prompt (e.g. your custom domain) and press Enter"
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            style={S.input}
+          />
+        </div>
+      )}
       {error && <div style={S.error}>{error}</div>}
     </div>
   );
@@ -139,5 +173,8 @@ const S = {
   btn: { background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer' },
   deploy: { background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   console: { flex: 1, overflow: 'auto', padding: 14, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap', background: 'var(--bg-panel)', minHeight: 0 },
+  inputRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 },
+  prompt: { fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 700 },
+  input: { flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' },
   error: { padding: '8px 16px', borderTop: '1px solid var(--border)', color: 'var(--error)', fontSize: 12, fontFamily: 'var(--font-mono)' },
 } satisfies Record<string, React.CSSProperties>;

@@ -3,7 +3,8 @@ import {
   SessionListSidebar,
   type SessionListSidebarSession,
 } from './panels/SessionListSidebar';
-import { nativeRequest, setActiveProjectPath } from './hooks/useSocket';
+import { setActiveProjectPath } from './hooks/useSocket';
+import { loadSessions, saveSessions, type StoredSession } from './state/projectSessions';
 import { timeAgoShort } from './utils/timeAgo';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { CodingAgentChat } from './panels/CodingAgentChat';
@@ -25,21 +26,10 @@ const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: 'workers', label: 'Workers' },
 ];
 
-// Phase 2: the project page — the REAL Studio session sidebar (session list +
-// Prod/Git/Terminal footer buttons + New session) rendering against the native
-// transport. The center workspace (coding-agent chat + the 9-tab rail) is the
-// next phase; for now it's a placeholder.
-interface SessionRow {
-  compositeId: string;
-  title: string;
-  updated_at: number;
-  running: boolean;
-  blocked: boolean;
-  archived?: boolean;
-  model: string;
-  totalTokens: number;
-  totalCost: number;
-}
+// The project page: session sidebar (list + main + New session) + the workspace
+// (coding-agent chat + the tab rail). Sessions persist per project; the main
+// session is the always-present canonical one.
+const MAIN_PLACEHOLDER = '__new-main__';
 
 export default function StudioProjectPage({
   projectName,
@@ -50,34 +40,87 @@ export default function StudioProjectPage({
   projectPath?: string;
   onBack: () => void;
 }): React.ReactElement {
-  const [sessions, setSessions] = React.useState<SessionRow[]>([]);
   const [tab, setTab] = React.useState<WorkspaceTab>('chat');
+  // Sessions are persisted per project; CodingAgentChat assigns the real
+  // compositeId on first turn (onSessionCreated), which we record here.
+  const [stored, setStored] = React.useState<StoredSession[]>(() => loadSessions(projectPath));
+  const [activeSessionId, setActiveSessionId] = React.useState<string | null>(
+    () => loadSessions(projectPath).find((s) => s.kind === 'main')?.compositeId ?? null,
+  );
+  // Bumped to remount CodingAgentChat when switching sessions / starting fresh.
+  const [chatKey, setChatKey] = React.useState(0);
+  const nextKindRef = React.useRef<'main' | 'session'>('main');
 
-  // Tell the native transport which project the panels (DB query, ugly-app CLI)
-  // should target.
   React.useEffect(() => {
     setActiveProjectPath(projectPath ?? null);
     return () => { setActiveProjectPath(null); };
   }, [projectPath]);
 
+  // Reload the session list when the project changes.
   React.useEffect(() => {
-    nativeRequest('codingAgentListSessions', { projectPath, includeArchived: true })
-      .then((r) => { setSessions((r as { sessions?: SessionRow[] } | null)?.sessions ?? []); })
-      .catch(() => { setSessions([]); });
+    const s = loadSessions(projectPath);
+    setStored(s);
+    setActiveSessionId(s.find((x) => x.kind === 'main')?.compositeId ?? null);
   }, [projectPath]);
 
-  const sidebarSessions: SessionListSidebarSession[] = sessions
-    .filter((s) => !s.archived)
-    .map((s) => ({
+  React.useEffect(() => {
+    saveSessions(projectPath, stored);
+  }, [projectPath, stored]);
+
+  const hasRealMain = stored.some((s) => s.kind === 'main');
+
+  const recordSession = React.useCallback((id: string) => {
+    setStored((prev) => {
+      if (prev.some((s) => s.compositeId === id)) return prev;
+      const asMain = nextKindRef.current === 'main' && !prev.some((s) => s.kind === 'main');
+      return [
+        ...prev,
+        { compositeId: id, title: asMain ? 'Main session' : 'Session', updated_at: Date.now(), model: 'auto', ...(asMain ? { kind: 'main' as const } : {}) },
+      ];
+    });
+    setActiveSessionId(id);
+  }, []);
+
+  const selectSession = React.useCallback((id: string) => {
+    if (id === MAIN_PLACEHOLDER) {
+      nextKindRef.current = 'main';
+      setActiveSessionId(null);
+    } else {
+      setActiveSessionId(id);
+    }
+    setChatKey((k) => k + 1);
+    setTab('chat');
+  }, []);
+
+  const newSession = React.useCallback(() => {
+    nextKindRef.current = hasRealMain ? 'session' : 'main';
+    setActiveSessionId(null);
+    setChatKey((k) => k + 1);
+    setTab('chat');
+  }, [hasRealMain]);
+
+  const archiveSession = React.useCallback((id: string) => {
+    setStored((prev) => prev.filter((s) => s.compositeId !== id));
+    setActiveSessionId((cur) => (cur === id ? null : cur));
+  }, []);
+
+  // Synthetic "Main session" row when none has been started yet — clicking it
+  // opens the new-session hero, and the first session created becomes main.
+  const sidebarSessions: SessionListSidebarSession[] = [
+    ...(hasRealMain
+      ? []
+      : [{ compositeId: MAIN_PLACEHOLDER, title: 'Main session', kind: 'main' as const, updated_at: Date.now(), running: false, model: 'auto', totalTokens: 0, totalCost: 0 }]),
+    ...stored.map((s) => ({
       compositeId: s.compositeId,
       title: s.title,
+      ...(s.kind ? { kind: s.kind } : {}),
       updated_at: s.updated_at,
-      running: s.running,
-      blocked: s.blocked,
+      running: false,
       model: s.model,
-      totalTokens: s.totalTokens,
-      totalCost: s.totalCost,
-    }));
+      totalTokens: 0,
+      totalCost: 0,
+    })),
+  ];
 
   return (
     <ThemeProvider>
@@ -85,11 +128,11 @@ export default function StudioProjectPage({
       <div style={S.sidebar}>
       <SessionListSidebar
         sessions={sidebarSessions}
-        activeCompositeId={null}
-        onSelect={(id) => { console.log('[studio] select session', id); }}
-        onNewSession={() => { console.log('[studio] new session'); }}
-        onArchiveSession={(id) => { console.log('[studio] archive', id); }}
-        onResetMainSession={(id) => { console.log('[studio] reset main', id); }}
+        activeCompositeId={activeSessionId ?? MAIN_PLACEHOLDER}
+        onSelect={selectSession}
+        onNewSession={newSession}
+        onArchiveSession={archiveSession}
+        onResetMainSession={archiveSession}
         timeAgo={timeAgoShort}
         archivedCount={0}
         onShowArchived={() => undefined}
@@ -121,9 +164,15 @@ export default function StudioProjectPage({
           ))}
         </header>
         <div style={S.content}>
-          {/* Chat stays mounted (preserves the agent session); others mount on demand. */}
+          {/* Chat stays mounted (preserves the agent session); others mount on demand.
+              key bumps on session switch so the chat reloads the selected session. */}
           <div style={{ ...S.pane, display: tab === 'chat' ? 'flex' : 'none' }}>
-            <CodingAgentChat />
+            <CodingAgentChat
+              key={`${chatKey}:${activeSessionId ?? 'new'}`}
+              {...(activeSessionId ? { initialSessionId: activeSessionId } : {})}
+              onSessionCreated={recordSession}
+              onResumeMissing={archiveSession}
+            />
           </div>
           {tab === 'database' && <div style={S.paneScroll}><DatabasePanel /></div>}
           {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel /></div>}
