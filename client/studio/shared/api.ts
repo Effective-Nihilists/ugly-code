@@ -3325,7 +3325,17 @@ export const requests = defineRequests({
       projectPath: z.string().optional(),
       mode: z.enum(['dev', 'prod']),
       collection: z.string(),
-      pipeline: z.string(),
+      // Structured filter builder (compiled to parameterized JSONB SQL).
+      filters: z
+        .array(
+          z.object({
+            field: z.string(),
+            op: z.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'exists']),
+            value: z.string().optional(),
+          }),
+        )
+        .optional(),
+      sort: z.object({ field: z.string(), dir: z.enum(['asc', 'desc']) }).optional(),
       limit: z.number().optional(),
       skip: z.number().optional(),
     }),
@@ -3333,7 +3343,70 @@ export const requests = defineRequests({
       columns: z.array(z.string()),
       rows: z.array(z.record(z.string(), z.unknown())),
       rowCount: z.number(),
+      total: z.number(),
       durationMs: z.number(),
+    }),
+  }),
+
+  // Exact row count for a collection (vs the estimate in dbCollections).
+  dbCount: req({
+    input: z.object({
+      mode: z.enum(['dev', 'prod']),
+      collection: z.string(),
+    }),
+    output: z.object({ count: z.number() }),
+  }),
+
+  // Collection schema: real columns, indexes, exact count (+ best-effort TS type
+  // is resolved client-side from shared/collections.ts).
+  dbSchema: req({
+    input: z.object({
+      mode: z.enum(['dev', 'prod']),
+      collection: z.string(),
+    }),
+    output: z.object({
+      columns: z.array(z.object({ name: z.string(), type: z.string() })),
+      indexes: z.array(z.object({ name: z.string(), def: z.string() })),
+      count: z.number(),
+    }),
+  }),
+
+  // Raw SQL console. Writes require allowWrite; DROP/TRUNCATE/ALTER and WHERE-less
+  // UPDATE/DELETE require force; UPDATE/DELETE support a dry-run (txn + ROLLBACK).
+  dbExec: req({
+    input: z.object({
+      mode: z.enum(['dev', 'prod']),
+      sql: z.string(),
+      params: z.array(z.unknown()).optional(),
+      allowWrite: z.boolean().optional(),
+      force: z.boolean().optional(),
+      dryRun: z.boolean().optional(),
+    }),
+    output: z.object({
+      kind: z.enum(['read', 'write']),
+      columns: z.array(z.string()).optional(),
+      rows: z.array(z.record(z.string(), z.unknown())).optional(),
+      rowCount: z.number().optional(),
+      affected: z.number().optional(),
+      dryRun: z.boolean().optional(),
+      durationMs: z.number(),
+    }),
+  }),
+
+  // Structured single-doc insert / update / delete (gated by allowWrite).
+  dbMutate: req({
+    input: z.object({
+      mode: z.enum(['dev', 'prod']),
+      collection: z.string(),
+      action: z.enum(['insert', 'update', 'delete']),
+      id: z.string().optional(),
+      doc: z.record(z.string(), z.unknown()).optional(),
+      allowWrite: z.boolean().optional(),
+    }),
+    output: z.object({
+      ok: z.boolean(),
+      _id: z.string(),
+      affected: z.number().optional(),
     }),
   }),
 

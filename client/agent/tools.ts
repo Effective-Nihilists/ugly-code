@@ -5,6 +5,7 @@
 import { native } from 'ugly-app/native';
 import type { SandboxMode } from 'ugly-app/native';
 import type { AgentToolName } from '../../shared/agent';
+import { DB_SCRIPT } from '../studio/db/dbScript';
 
 /** Project + mode context so tool subprocesses can be OS-user sandboxed by the
  *  daemon. Resolved by the agent loop (clientAgent) per turn. */
@@ -62,10 +63,57 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
     }
     case 'run_command':
       return runCommand(String(p.cmd), Array.isArray(p.args) ? p.args.map(String) : [], await sandboxOptFor(ctx), ctx?.port, ctx?.databaseUrl);
+    case 'db_query':
+      return runDb(ctx, 'exec', { sql: String(p.sql ?? ''), allowWrite: false });
+    case 'db_get':
+      return runDb(ctx, 'getDoc', { collection: String(p.collection), id: String(p.id) });
+    case 'db_set':
+      return runDb(ctx, 'mutate', {
+        collection: String(p.collection),
+        action: String(p.action),
+        id: p.id == null ? undefined : String(p.id),
+        doc: (p.doc ?? {}) as Record<string, unknown>,
+        allowWrite: true,
+      });
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
 };
+
+/** Run one DB op (db/dbScript) against the project's local dev DB via a node
+ *  subprocess — same plumbing the Database panel uses. Returns a JSON string the
+ *  agent reads as the tool_result. The dev DB is the bundled local postgres
+ *  (p_<projectId>), so this is the same data the app's dev server sees. */
+function runDb(ctx: ToolContext | undefined, op: string, input: Record<string, unknown>): Promise<string> {
+  const projectDir = ctx?.projectDir;
+  if (!projectDir) return Promise.resolve('[error: no open project — db tools need a project]');
+  return new Promise((resolve) => {
+    let out = '';
+    try {
+      const proc = native.process.spawn('node', ['--input-type=module', '-e', DB_SCRIPT], {
+        cwd: projectDir,
+        env: {
+          UGLY_DB_MODE: 'dev',
+          UGLY_DB_PROJECT: projectDir,
+          UGLY_DB_OP: op,
+          UGLY_DB_INPUT: JSON.stringify(input),
+        },
+      });
+      proc.onStdout((c) => (out += c));
+      proc.onStderr((c) => (out += c));
+      proc.onError((e) => resolve(`[error: ${e}]`));
+      proc.onExit((code) => resolve(code === 0 ? truncate(out.trim()) : `[error: ${out.trim().slice(-400) || 'node exited ' + code}]`));
+    } catch (e) {
+      resolve(`[error: ${(e as Error).message}]`);
+    }
+  });
+}
+
+/** Keep tool results bounded so a huge result set doesn't blow the context. */
+function truncate(s: string): string {
+  const MAX = 12_000;
+  return s.length > MAX ? s.slice(0, MAX) + `\n…[truncated ${s.length - MAX} chars]` : s;
+}
 
 // `.uglyapp.projectId` per project dir — read once, cached (it never changes for
 // an open project), so we don't re-read the file on every tool call.

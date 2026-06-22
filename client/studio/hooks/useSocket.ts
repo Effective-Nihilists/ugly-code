@@ -22,6 +22,7 @@ import { gradeProject, type GradeDeps } from '../evals/grader';
 import { getRecentProjects } from '../state/recentProjects';
 import { sessionApi, resolveProjectId } from '../agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
+import { DB_SCRIPT } from '../db/dbScript';
 
 /** Run a shell command through `bash -lc` (so `~` expands + login PATH applies)
  *  and resolve with the LAST stdout line — a trailing `pwd`/`echo` of a path.
@@ -168,68 +169,8 @@ const ZERO_RUN_TOTALS = {
   tokens: { input: 0, output: 0, cacheRead: 0, cacheCreate: 0 },
 };
 
-// A self-contained Node ESM script (run via native.process in the project) that
-// resolves the project's Postgres connection string for both dev (local .env
-// DATABASE_URL) and prod (Neon, from the project's publish-state) and runs the
-// requested DB op through the project's own ugly-app/server. No backticks/${}
-// so it embeds cleanly; inputs arrive via env.
-const DB_SCRIPT = [
-  "import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import cp from 'node:child_process';",
-  "const mode = process.env.UGLY_DB_MODE, proj = process.env.UGLY_DB_PROJECT, op = process.env.UGLY_DB_OP;",
-  "const input = JSON.parse(process.env.UGLY_DB_INPUT || '{}');",
-  "function connStr(){",
-  "  if (mode === 'prod') {",
-  "    const ua = JSON.parse(fs.readFileSync(path.join(proj, '.uglyapp'), 'utf8'));",
-  "    const st = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.ugly-studio', 'projects', ua.projectId, 'publish-state.json'), 'utf8'));",
-  "    const neon = st.neon || (st.deployTarget && st.deployTarget.neon) || {};",
-  "    const cs = neon.connectionString || neon.connStr || (st.deployTarget && st.deployTarget.neonConnectionString);",
-  "    if (!cs) throw new Error('No Neon connection string in publish-state for ' + ua.projectId);",
-  "    return cs;",
-  "  }",
-  "  // dev: honor an explicit .env DATABASE_URL, else bring up the bundled local postgres.",
-  "  try { const env = fs.readFileSync(path.join(proj, '.env'), 'utf8'); const m = /^(?:DATABASE_URL|POSTGRES_URL)=(.+)$/m.exec(env); if (m) return m[1].trim().replace(/^[\"\\']|[\"\\']$/g, ''); } catch {}",
-  "  return ensureLocalPg();",
-  "}",
-  "function ensureLocalPg(){",
-  "  const pgRoot = path.join(os.homedir(), '.ugly-studio', 'binaries', 'postgres');",
-  "  const ver = fs.readdirSync(pgRoot).filter(d => /^[0-9]/.test(d)).sort().pop();",
-  "  if (!ver) throw new Error('Bundled postgres not found at ' + pgRoot + ' — open Ugly Studio so it downloads its binaries.');",
-  "  const plat = fs.readdirSync(path.join(pgRoot, ver)).find(d => fs.existsSync(path.join(pgRoot, ver, d, 'bin')));",
-  "  const bin = path.join(pgRoot, ver, plat, 'bin'), lib = path.join(pgRoot, ver, plat, 'lib');",
-  "  const PGDATA = path.join(os.homedir(), '.ugly-studio', 'pgdata'), PORT = 55432;",
-  "  const cenv = Object.assign({}, process.env, { DYLD_LIBRARY_PATH: lib, LD_LIBRARY_PATH: lib });",
-  "  const run = (c, a) => cp.execFileSync(path.join(bin, c), a, { env: cenv, stdio: 'pipe' });",
-  "  if (!fs.existsSync(path.join(PGDATA, 'PG_VERSION'))) run('initdb', ['-D', PGDATA, '-U', 'postgres', '--auth=trust', '-E', 'UTF8']);",
-  "  let up = false; try { run('pg_isready', ['-h','127.0.0.1','-p',String(PORT)]); up = true; } catch {}",
-  "  if (!up) run('pg_ctl', ['-D', PGDATA, '-o', '-p '+PORT+' -k /tmp -c listen_addresses=127.0.0.1', '-l', path.join(os.homedir(),'.ugly-studio','pg.log'), '-w', 'start']);",
-  "  let dbName = 'dev'; try { dbName = 'p_' + JSON.parse(fs.readFileSync(path.join(proj, '.uglyapp'),'utf8')).projectId; } catch {}",
-  "  dbName = dbName.replace(/[^a-zA-Z0-9_]/g, '_');",
-  "  try { run('createdb', ['-h','127.0.0.1','-p',String(PORT),'-U','postgres', dbName]); } catch {}",
-  "  return 'postgresql://postgres@127.0.0.1:'+PORT+'/'+dbName;",
-  "}",
-  "process.env.DATABASE_URL = connStr();",
-  "const mod = await import('ugly-app/server');",
-  "mod.createAdapter();",
-  "const q = mod.query || mod.pgQuery;",
-  "let out = {};",
-  "if (op === 'collections') {",
-  "  const sql = \"SELECT c.relname AS name, c.reltuples::bigint AS n FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace WHERE ns.nspname = 'public' AND c.relkind = 'r' AND c.relname NOT LIKE 'pg_%' ORDER BY c.relname\";",
-  "  const r = await q(sql);",
-  "  out = { collections: r.rows.map((x) => ({ name: x.name, estimatedCount: Math.max(0, Number(x.n) || 0) })) };",
-  "} else if (op === 'getDoc') {",
-  "  const r = await q('SELECT data FROM \"' + input.collection + '\" WHERE _id = $1', [input.id]);",
-  "  out = { doc: (r.rows[0] && r.rows[0].data) || null };",
-  "} else if (op === 'getQuery') {",
-  "  const t0 = Date.now();",
-  "  const lim = Math.min(Number(input.limit) || 50, 500), skip = Number(input.skip) || 0;",
-  // getQueryRaw isn't exported in this ugly-app — read the JSONB rows directly.
-  "  const r = await q('SELECT _id, data, created, updated FROM \"' + String(input.collection).replace(/[^A-Za-z0-9_]/g, '') + '\" ORDER BY created DESC LIMIT $1 OFFSET $2', [lim, skip]);",
-  "  const rows = r.rows.map((row) => Object.assign({ _id: row._id }, (row.data && typeof row.data === 'object') ? row.data : {}, { _created: row.created, _updated: row.updated }));",
-  "  const columns = rows.length ? Object.keys(rows[0]) : ['_id'];",
-  "  out = { columns, rows, rowCount: rows.length, durationMs: Date.now() - t0 };",
-  "}",
-  "process.stdout.write(JSON.stringify(out));",
-].join('\n');
+// The Database panel data layer (connection + all DB ops) lives in
+// ../db/dbScript — shared with the agent's DB tools.
 
 /** Spawn the opened project's `ugly-app <cmd> --json` CLI (reads its prod D1
  *  telemetry) and parse the NDJSON output into docs. Resolves [] on any failure
@@ -342,9 +283,31 @@ const handlers: Record<string, Handler> = {
   dbGetQuery: (i) =>
     runDbScript('getQuery', String(i.mode ?? 'dev'), {
       collection: i.collection,
-      pipeline: i.pipeline,
+      filters: i.filters,
+      sort: i.sort,
       limit: i.limit,
       skip: i.skip,
+    }),
+  dbCount: (i) => runDbScript('count', String(i.mode ?? 'dev'), { collection: i.collection }),
+  dbSchema: (i) => runDbScript('schema', String(i.mode ?? 'dev'), { collection: i.collection }),
+  // Raw SQL console. Writes require allowWrite; DROP/TRUNCATE/ALTER + WHERE-less
+  // UPDATE/DELETE require force; UPDATE/DELETE support dryRun (txn + ROLLBACK).
+  dbExec: (i) =>
+    runDbScript('exec', String(i.mode ?? 'dev'), {
+      sql: i.sql,
+      params: i.params,
+      allowWrite: i.allowWrite,
+      force: i.force,
+      dryRun: i.dryRun,
+    }),
+  // Structured insert/update/delete of a single doc (via the doc's JSONB).
+  dbMutate: (i) =>
+    runDbScript('mutate', String(i.mode ?? 'dev'), {
+      collection: i.collection,
+      action: i.action,
+      id: i.id,
+      doc: i.doc,
+      allowWrite: i.allowWrite,
     }),
   // ── telemetry panels: read the project's prod D1 via `ugly-app <cmd> --json` ──
   errorLogGetList: async () => {

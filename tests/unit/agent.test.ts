@@ -10,6 +10,9 @@ describe('agent tool specs', () => {
       'write_file',
       'edit_file',
       'run_command',
+      'db_query',
+      'db_get',
+      'db_set',
     ]);
     for (const t of AGENT_TOOLS) {
       expect(t.parameters?.type).toBe('object');

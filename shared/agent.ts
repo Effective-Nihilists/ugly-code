@@ -53,6 +53,9 @@ export const AGENT_TOOL_NAMES = [
   'write_file',
   'edit_file',
   'run_command',
+  'db_query',
+  'db_get',
+  'db_set',
 ] as const;
 export type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
 
@@ -127,6 +130,46 @@ export const AGENT_TOOLS: TextGenTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'db_query',
+    description:
+      "Run a READ-ONLY SQL query against the project's local dev database and return the rows (JSON). Use this to inspect app state while debugging — e.g. `SELECT _id, data FROM todo ORDER BY created DESC LIMIT 20`. Documents are stored with their fields in a JSONB `data` column (plus `_id`, `created`, `updated`). Writes are rejected here — use db_set to mutate.",
+    parameters: {
+      type: 'object',
+      properties: { sql: { type: 'string', description: 'A single read-only SQL statement (SELECT/WITH/EXPLAIN).' } },
+      required: ['sql'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'db_get',
+    description: "Fetch one document by _id from a collection in the project's local dev database. Returns the document JSON or null.",
+    parameters: {
+      type: 'object',
+      properties: {
+        collection: { type: 'string', description: 'Collection/table name, e.g. "todo".' },
+        id: { type: 'string', description: 'The document _id.' },
+      },
+      required: ['collection', 'id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'db_set',
+    description:
+      "Insert, update, or delete a single document in the project's local dev database (for fixing/seeding state while debugging). `doc` is the full document object (its keys become the JSONB data). For update/delete provide `id`.",
+    parameters: {
+      type: 'object',
+      properties: {
+        collection: { type: 'string', description: 'Collection/table name.' },
+        action: { type: 'string', enum: ['insert', 'update', 'delete'], description: 'The mutation to perform.' },
+        id: { type: 'string', description: 'Document _id (required for update/delete).' },
+        doc: { type: 'object', description: 'The document object (for insert/update).', additionalProperties: true },
+      },
+      required: ['collection', 'action'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export const AGENT_SYSTEM_PROMPT = `You are Ugly Code, an AI coding agent embedded in a web-based IDE that runs inside the Ugly Studio desktop browser. You operate directly on the user's local workspace through a set of file and process tools.
@@ -135,6 +178,7 @@ Guidelines:
 - Work iteratively: inspect the project with list_dir / read_file before editing.
 - Prefer edit_file for small changes; use write_file for new files or full rewrites.
 - run_command takes a binary name + args (no shell). Use it to run git, node, python, rg, etc.
+- db_query / db_get / db_set inspect and fix the project's local dev database (documents live in a JSONB \`data\` column). Use them to debug runtime/data issues — verify what the app actually wrote, reproduce a bad state, or seed fixtures.
 - Keep going until the user's request is fully handled, then give a short summary. Do not ask for confirmation on routine steps.
 - All paths are relative to the workspace root. Be concise in your prose.`;
 
