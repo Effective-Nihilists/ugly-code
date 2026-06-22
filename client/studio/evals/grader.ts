@@ -14,6 +14,12 @@ export interface GradeDeps {
   run(cmd: string, args: string[], cwd: string): Promise<{ out: string; code: number | null }>;
   readFile(path: string): Promise<string>;
   exists(path: string): Promise<boolean>;
+  /**
+   * One-shot LLM completion for `judge:*` gates. Omitted in unit tests (judge
+   * gates then stay pending); in production it calls the model via the agent's
+   * textGen path. Returns the raw model text.
+   */
+  judge?(system: string, user: string): Promise<string>;
 }
 
 type Check = { name: string; passed: boolean; detail?: string };
@@ -35,7 +41,25 @@ export interface GradeInput {
   taskName: string;
   projectPath: string;
   gates?: EvalGate[];
+  /** Prose success criteria — given to the LLM judge as the rubric. */
+  successCriteria?: string;
   runTotals: EvalGradeResult['runTotals'];
+}
+
+/** Parse the judge's `{"points": n, "verdict": "..."}` reply, tolerant of
+ *  code fences / prose around the JSON. */
+export function parseJudge(text: string, max: number): { points: number; verdict: string } {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) {
+    try {
+      const o = JSON.parse(m[0]) as { points?: unknown; verdict?: unknown };
+      const pts = Math.max(0, Math.min(max, Math.round(Number(o.points) || 0)));
+      return { points: pts, verdict: String(o.verdict ?? '').slice(0, 600) || 'no verdict' };
+    } catch {
+      /* fall through */
+    }
+  }
+  return { points: 0, verdict: `unparseable judge reply: ${text.slice(0, 200)}` };
 }
 
 export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<EvalGradeResult> {
@@ -95,15 +119,37 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
       detMax += pts;
       if (passed) detScore += pts;
     } else if (kind.startsWith('judge:')) {
-      // LLM-judge gates aren't auto-scored yet — surface for manual review.
-      judgeResults.push({
-        gateName: gate.name,
-        points: pts,
-        pointsAwarded: 0,
-        rubricKey: kind.slice('judge:'.length),
-        verdict: 'Not auto-graded yet (LLM judge pending) — review against the rubric manually.',
-      });
-      manual.push(gate.name);
+      const rubricKey = kind.slice('judge:'.length);
+      if (deps.judge) {
+        // Score against the success criteria + the gate description, given the
+        // agent's diff as evidence.
+        const diff = await collectDiff(input.projectPath, deps);
+        const system =
+          'You are a strict automated code-eval judge. Award an INTEGER number of points from 0 ' +
+          `to ${pts} based ONLY on the criteria below. Respond with JSON only: ` +
+          '{"points": <int>, "verdict": "<one sentence>"}.';
+        const user =
+          `## Success criteria\n${input.successCriteria ?? '(none provided)'}\n\n` +
+          `## Gate: ${gate.name} (max ${pts} points)\n${gate.description ?? rubricKey}\n\n` +
+          `## The agent's diff\n${diff || '(no changes detected)'}`;
+        let awarded = { points: 0, verdict: '' };
+        try {
+          awarded = parseJudge(await deps.judge(system, user), pts);
+        } catch (e) {
+          awarded = { points: 0, verdict: `judge call failed: ${(e as Error).message}` };
+        }
+        judgeResults.push({ gateName: gate.name, points: pts, pointsAwarded: awarded.points, rubricKey, verdict: awarded.verdict });
+      } else {
+        // No judge available (unit tests) — surface as pending.
+        judgeResults.push({
+          gateName: gate.name,
+          points: pts,
+          pointsAwarded: 0,
+          rubricKey,
+          verdict: 'LLM judge unavailable — review against the rubric manually.',
+        });
+        manual.push(gate.name);
+      }
     } else {
       // custom:<id> — repo-specific checker; not generically runnable client-side.
       checks.push({ name: gate.name, passed: false, detail: 'manual: run the task’s eval/ checker' });
@@ -130,7 +176,8 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
   }
 
   const judgeMax = judgeResults.reduce((a, j) => a + j.points, 0);
-  const score = detScore;
+  const judgeAwarded = judgeResults.reduce((a, j) => a + j.pointsAwarded, 0);
+  const score = detScore + judgeAwarded;
   const scoreMax = detMax + judgeMax;
   const summary = buildSummary(detScore, detMax, judgeResults.length, manual);
 
@@ -158,4 +205,11 @@ function buildSummary(score: number, max: number, judgeCount: number, manual: st
 
 function joinPath(base: string, rel: string): string {
   return `${base.replace(/\/$/, '')}/${rel.replace(/^\//, '')}`;
+}
+
+/** The agent's working-tree diff (capped) — evidence for the LLM judge. */
+async function collectDiff(projectPath: string, deps: GradeDeps): Promise<string> {
+  const r = await deps.run('git', ['diff', '--no-color'], projectPath);
+  const out = r.out ?? '';
+  return out.length > 20_000 ? out.slice(0, 20_000) + '\n…(diff truncated)' : out;
 }

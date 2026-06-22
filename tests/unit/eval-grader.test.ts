@@ -76,12 +76,49 @@ describe('eval grader — deterministic gates', () => {
     expect(r.scoreMax).toBe(3);
   });
 
-  it('judge gates are surfaced (pending), counted in max but awarded 0', async () => {
+  it('judge gates are pending when no judge dep is available', async () => {
     const r = await grade([{ name: 'rubric', points: 4, kind: 'judge:decision-rubric' }], deps({}));
     expect(r.judgeResults?.[0]).toMatchObject({ gateName: 'rubric', points: 4, pointsAwarded: 0, rubricKey: 'decision-rubric' });
     expect(r.score).toBe(0);
     expect(r.scoreMax).toBe(4);
     expect(r.summary).toMatch(/judge/i);
+  });
+
+  it('judge gates call the LLM judge, parse points, and add to the score', async () => {
+    const seen: { system: string; user: string }[] = [];
+    const d: GradeDeps = {
+      ...deps({ run: () => ({ out: 'diff --git a b', code: 0 }) }),
+      judge: async (system, user) => {
+        seen.push({ system, user });
+        return 'Looks good.\n```json\n{"points": 3, "verdict": "covers most criteria"}\n```';
+      },
+    };
+    const r = await gradeProject(
+      {
+        taskName: 't',
+        projectPath: '/proj',
+        gates: [{ name: 'rubric', points: 4, kind: 'judge:decision-rubric' }],
+        successCriteria: 'Do the thing well.',
+        runTotals: RUN_TOTALS,
+      },
+      d,
+    );
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.user).toContain('Do the thing well.'); // criteria fed to the judge
+    expect(seen[0]?.user).toContain('diff --git'); // diff evidence fed in
+    expect(r.judgeResults?.[0]).toMatchObject({ pointsAwarded: 3, verdict: 'covers most criteria' });
+    expect(r.score).toBe(3);
+    expect(r.scoreMax).toBe(4);
+  });
+
+  it('judge points are clamped to the gate max', async () => {
+    const d: GradeDeps = { ...deps({}), judge: async () => '{"points": 99, "verdict": "great"}' };
+    const r = await gradeProject(
+      { taskName: 't', projectPath: '/p', gates: [{ name: 'g', points: 2, kind: 'judge:x' }], runTotals: RUN_TOTALS },
+      d,
+    );
+    expect(r.judgeResults?.[0]?.pointsAwarded).toBe(2);
+    expect(r.score).toBe(2);
   });
 
   it('custom gates become manual checks', async () => {

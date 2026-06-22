@@ -104,6 +104,31 @@ const gradeDeps: GradeDeps = {
     }),
   readFile: (p) => native.fs.readFile(p),
   exists: (p) => native.fs.exists(p),
+  // One-shot LLM judge via the agent's textGen endpoint (no tools).
+  judge: async (system, user) => {
+    const res = await fetch('/api/agentStep', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        input: {
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          options: { maxTokens: 512 },
+        },
+      }),
+    });
+    const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
+    if (json.error) throw new Error(json.error);
+    const content = json.result?.message?.content;
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      return content.map((b) => (b as { type?: string; text?: string }).text ?? '').join('');
+    }
+    return '';
+  },
 };
 // Run totals (cost/tokens/duration) live on the session snapshot, not here;
 // the grader fills the score + gates and the scorecard overlays totals.
@@ -463,6 +488,7 @@ const handlers: Record<string, Handler> = {
         taskName: taskName || 'unknown',
         projectPath,
         ...(task?.gates ? { gates: task.gates } : {}),
+        ...(task?.successCriteria ? { successCriteria: task.successCriteria } : {}),
         runTotals: ZERO_RUN_TOTALS,
       },
       gradeDeps,
