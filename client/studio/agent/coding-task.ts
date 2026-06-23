@@ -6,7 +6,7 @@
 // its emitCustom-style events become task events (task.event:<id>) via uglyTask.emit.
 import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
-import { runClientAgentTurn } from './clientAgent';
+import { runClientAgentTurn, abortClientAgent } from './clientAgent';
 
 const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
 
@@ -27,9 +27,26 @@ if (!g.localStorage) {
   };
 }
 
-const t = taskContext<{ projectPath?: string; sessionId?: string }>();
+const t = taskContext<{ projectPath?: string; sessionId?: string; origin?: string; authToken?: string }>();
 setActiveProjectPath(t.params?.projectPath ?? null);
 const sessionId = t.params?.sessionId ?? t.id ?? 'cs:task';
+
+// 3. The agent loop fetches the project's /api/* with relative URLs + cookie creds — both
+//    unavailable in a Node child. Absolutize against the app origin and carry the session
+//    token (forwarded from the renderer) as a Cookie so /api/agentTurn authenticates.
+const origin = t.params?.origin ?? '';
+const authToken = t.params?.authToken ?? '';
+if (origin) {
+  const realFetch = globalThis.fetch.bind(globalThis);
+  (globalThis as { fetch: typeof fetch }).fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    if (typeof input === 'string' && input.startsWith('/')) {
+      const headers = new Headers(init?.headers);
+      if (authToken && !headers.has('Cookie')) headers.set('Cookie', `auth_token=${authToken}`);
+      return realFetch(origin + input, { ...init, headers });
+    }
+    return realFetch(input, init);
+  }) as typeof fetch;
+}
 
 defineTask({
   onCall: {
@@ -39,6 +56,8 @@ defineTask({
       await runClientAgentTurn(sessionId, p.text, (msg) => t.emit('msg', msg));
       return { ok: true };
     },
+    // Interrupt the running turn (chatStop → task.call('interrupt')).
+    interrupt: async () => { abortClientAgent(sessionId); return { ok: true }; },
     // Identity/state for a freshly-attached UI (history itself is read from the server
     // via codingSessionListMessages, same as before).
     getState: async () => ({ sessionId, projectPath: t.params?.projectPath ?? null }),

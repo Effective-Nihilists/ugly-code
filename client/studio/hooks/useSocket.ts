@@ -14,7 +14,8 @@
 
 import { useContext, useMemo } from 'react';
 import type { AppSocket } from 'ugly-app/client';
-import { native, permissions } from 'ugly-app/native';
+import { native, permissions, nativePlatform, taskEntryUrl } from 'ugly-app/native';
+import { buildId } from '../../../shared/Build';
 import type { AppRegistry } from '../shared/api';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
@@ -83,6 +84,77 @@ export function isConnected(): boolean {
 // can bundle headless). Re-exported here for existing importers (StudioProjectPage, etc.).
 import { getActiveProjectPath, setActiveProjectPath } from '../projectPath';
 export { getActiveProjectPath, setActiveProjectPath };
+
+// ── Background coding-task adoption ──────────────────────────────────────────
+// When the platform can host tasks (Studio desktop, or mobile via the Ugly Proxy),
+// run the coding session as a background task — it outlives the window and is drivable
+// from any device — instead of in this renderer. On the web (dev browser, no host) we
+// fall back to the in-renderer loop. The task's emitCustom-shaped frames flow back via
+// task.listen → emitCustom, so useCodingAgentChat consumes them unchanged.
+const sessionTaskIds = new Map<string, string>();
+const listenedTaskIds = new Set<string>();
+function tasksAvailable(): boolean {
+  return nativePlatform() !== 'web';
+}
+function readAuthTokenCookie(): string {
+  try {
+    const m = document.cookie.split('; ').find((c) => c.startsWith('auth_token='));
+    return m ? m.slice('auth_token='.length) : '';
+  } catch {
+    return '';
+  }
+}
+/** Start (or re-attach to) the session's coding task + wire its events to emitCustom. */
+async function ensureCodingTask(sessionId: string): Promise<string> {
+  const have = sessionTaskIds.get(sessionId);
+  if (have) return have;
+  const id = 'coding:' + sessionId;
+  // Re-attach if it's already running (renderer reload / another window); else start it.
+  const running = (await native.task.enum()).some((t) => t.id === id);
+  if (!running) {
+    await native.task.start({
+      entry: taskEntryUrl('coding', buildId),
+      kind: 'coding',
+      id,
+      params: {
+        projectPath: getActiveProjectPath(),
+        sessionId,
+        origin: location.origin,
+        authToken: readAuthTokenCookie(),
+      },
+    });
+  }
+  sessionTaskIds.set(sessionId, id);
+  if (!listenedTaskIds.has(id)) {
+    listenedTaskIds.add(id);
+    native.task.listen(id, (_event, data) =>
+      emitCustom(data as { type: string; [k: string]: unknown }),
+    );
+  }
+  return id;
+}
+function emitAgentError(sessionId: string, e: unknown): void {
+  console.error('[codingAgentChatSend] turn failed', e);
+  emitCustom({
+    type: 'codingAgent:event',
+    sessionId,
+    event: {
+      type: 'message',
+      payload: {
+        type: 'created',
+        payload: {
+          id: 'err_' + Math.random().toString(36).slice(2, 9),
+          role: 'assistant',
+          parts: [
+            { type: 'text', data: { text: '⚠ ' + (e instanceof Error ? e.message : String(e)) } },
+            { type: 'finish' },
+          ],
+          created_at: Date.now(),
+        },
+      },
+    },
+  });
+}
 
 // Per-session selected model id, so codingAgentChatSend routes to the right
 // runner: the local Claude CLI (claude-code* / claude-cli) vs the in-process
@@ -482,35 +554,44 @@ const handlers: Record<string, Handler> = {
     const sessionId = String(i.sessionId ?? '');
     const message = String(i.message ?? '');
     const model = getSessionModel(sessionId);
-    // Route to the local Claude CLI runner when that's the selected model;
-    // otherwise the in-process ugly.bot agent. Both stream codingAgent:event
-    // frames back through emitCustom. Surface a pre-loop failure as an error
-    // frame instead of letting the floating promise swallow it.
-    const run = isClaudeCliModel(model)
-      ? import('../agent/claudeCliAgent').then((m) => m.runClaudeCliTurn(sessionId, message, model!, emitCustom))
-      : import('../agent/clientAgent').then((m) => m.runClientAgentTurn(sessionId, message, emitCustom));
-    void run.catch((e: unknown) => {
-      console.error('[codingAgentChatSend] turn failed', e);
-      emitCustom({
-        type: 'codingAgent:event',
-        sessionId,
-        event: { type: 'message', payload: { type: 'created', payload: {
-          id: 'err_' + Math.random().toString(36).slice(2, 9),
-          role: 'assistant',
-          parts: [{ type: 'text', data: { text: '⚠ ' + (e instanceof Error ? e.message : String(e)) } }, { type: 'finish' }],
-          created_at: Date.now(),
-        } } },
-      });
-    });
+    // 1. Local Claude CLI model → in-renderer CLI runner (unchanged).
+    if (isClaudeCliModel(model)) {
+      void import('../agent/claudeCliAgent')
+        .then((m) => m.runClaudeCliTurn(sessionId, message, model!, emitCustom))
+        .catch((e) => emitAgentError(sessionId, e));
+      return Promise.resolve({});
+    }
+    // 2. A task host is available (Studio desktop, or mobile via the Ugly Proxy) →
+    //    run the session as a background task; its frames stream back via task.listen.
+    if (tasksAvailable()) {
+      void (async () => {
+        try {
+          const id = await ensureCodingTask(sessionId);
+          await native.task.call(id, 'send', { text: message });
+        } catch (e) {
+          emitAgentError(sessionId, e);
+        }
+      })();
+      return Promise.resolve({});
+    }
+    // 3. Fallback: in-renderer ugly.bot agent loop (web / no host).
+    void import('../agent/clientAgent')
+      .then((m) => m.runClientAgentTurn(sessionId, message, emitCustom))
+      .catch((e) => emitAgentError(sessionId, e));
     return Promise.resolve({});
   },
   codingAgentChatStop: (i) => {
     const sessionId = String(i.sessionId ?? '');
     if (isClaudeCliModel(getSessionModel(sessionId))) {
       void import('../agent/claudeCliAgent').then((m) => m.abortClaudeCli(sessionId));
-    } else {
-      void import('../agent/clientAgent').then((m) => m.abortClientAgent(sessionId));
+      return Promise.resolve({});
     }
+    const taskId = sessionTaskIds.get(sessionId);
+    if (taskId && tasksAvailable()) {
+      void native.task.call(taskId, 'interrupt').catch(() => {});
+      return Promise.resolve({});
+    }
+    void import('../agent/clientAgent').then((m) => m.abortClientAgent(sessionId));
     return Promise.resolve({});
   },
   codingAgentChatClearMessages: () => Promise.resolve({}),
