@@ -25,6 +25,7 @@
   },
   "domain": "code.ugly.bot",
   "tasks": {
-    "coding": "client/studio/agent/coding-task.ts"
+    "coding": "client/studio/agent/coding-task.ts",
+    "tool-smoke": "client/studio/agent/tool-smoke-task.ts"
   }
 }

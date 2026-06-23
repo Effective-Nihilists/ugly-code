@@ -10,11 +10,12 @@ import { runClientAgentTurn, abortClientAgent } from './clientAgent';
 
 const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
 
-// 1. The agent's tools (native.fs / native.process) resolve to node:fs / child_process —
-//    the task child is a real Node process. Install BEFORE the first native.* call.
+// Node-backed window.UglyNative so the agent's tools (native.fs / native.process) resolve to
+// node:fs / child_process. ugly-app's permissions read platform lazily, so this body-level
+// install (after the imports) is respected.
 g.UglyNative = createNodeUglyNative();
 
-// 2. sessionWorkspace persists worktree prefs to localStorage; give it an in-memory shim.
+// sessionWorkspace persists worktree prefs to localStorage; give it an in-memory shim.
 if (!g.localStorage) {
   const mem = new Map<string, string>();
   g.localStorage = {
