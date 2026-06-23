@@ -93,8 +93,19 @@ export { getActiveProjectPath, setActiveProjectPath };
 // task.listen → emitCustom, so useCodingAgentChat consumes them unchanged.
 const sessionTaskIds = new Map<string, string>();
 const listenedTaskIds = new Set<string>();
-function tasksAvailable(): boolean {
-  return nativePlatform() !== 'web';
+let taskHostProbe: Promise<boolean> | null = null;
+// Can this environment actually host a background task? Probe once: the task facade
+// rejects when the platform/host doesn't implement task.* (web, or a test without a task
+// mock), so we cleanly fall back to the in-renderer loop instead of erroring.
+function taskHostAvailable(): Promise<boolean> {
+  if (nativePlatform() === 'web') return Promise.resolve(false);
+  if (!taskHostProbe) {
+    taskHostProbe = native.task
+      .enum()
+      .then(() => true)
+      .catch(() => false);
+  }
+  return taskHostProbe;
 }
 function readAuthTokenCookie(): string {
   try {
@@ -561,23 +572,22 @@ const handlers: Record<string, Handler> = {
         .catch((e) => emitAgentError(sessionId, e));
       return Promise.resolve({});
     }
-    // 2. A task host is available (Studio desktop, or mobile via the Ugly Proxy) →
-    //    run the session as a background task; its frames stream back via task.listen.
-    if (tasksAvailable()) {
-      void (async () => {
-        try {
+    // 2. A task host available (Studio desktop, or mobile via the Ugly Proxy) → run the
+    //    session as a background task; its frames stream back via task.listen. Otherwise
+    //    (web / no host) fall back to the in-renderer ugly.bot agent loop.
+    void (async () => {
+      try {
+        if (await taskHostAvailable()) {
           const id = await ensureCodingTask(sessionId);
           await native.task.call(id, 'send', { text: message });
-        } catch (e) {
-          emitAgentError(sessionId, e);
+        } else {
+          const m = await import('../agent/clientAgent');
+          await m.runClientAgentTurn(sessionId, message, emitCustom);
         }
-      })();
-      return Promise.resolve({});
-    }
-    // 3. Fallback: in-renderer ugly.bot agent loop (web / no host).
-    void import('../agent/clientAgent')
-      .then((m) => m.runClientAgentTurn(sessionId, message, emitCustom))
-      .catch((e) => emitAgentError(sessionId, e));
+      } catch (e) {
+        emitAgentError(sessionId, e);
+      }
+    })();
     return Promise.resolve({});
   },
   codingAgentChatStop: (i) => {
@@ -587,7 +597,8 @@ const handlers: Record<string, Handler> = {
       return Promise.resolve({});
     }
     const taskId = sessionTaskIds.get(sessionId);
-    if (taskId && tasksAvailable()) {
+    if (taskId) {
+      // We ran this session as a task → interrupt it there.
       void native.task.call(taskId, 'interrupt').catch(() => {});
       return Promise.resolve({});
     }

@@ -70,9 +70,7 @@ test.describe('Studio shell — real app', () => {
   test('opening a project reaches the real agent chat (NewSessionHero)', async ({ page }) => {
     await enterStudioShell(page, auth!);
     // Switch to the Open Folder action, type a path, open it (openProject echoes).
-    await page.getByRole('button', { name: /Open Folder/ }).first().click();
-    await page.getByPlaceholder('/path/to/project').fill('/tmp/demo-project');
-    await page.getByRole('button', { name: /Open Folder →/ }).click();
+    await openProject(page);
 
     // StudioProjectPage → the real coding-agent entry (the New Session hero).
     await expect(page.getByRole('button', { name: /‹ Projects|Projects/ })).toBeVisible();
@@ -131,6 +129,63 @@ test.describe('Studio shell — real app', () => {
     await expect(list).toContainText('17 times 3');
     await expect(list).toContainText('8 times 9');
     expect(errors, `page crashed: ${errors.join('; ')}`).toEqual([]);
+  });
+
+  // Background-task adoption: with a task host present, codingAgentChatSend routes the
+  // session through native.task (start + call) instead of the in-renderer loop, and the
+  // task's streamed frames render in the transcript. Deterministic — the reply is scripted
+  // via a task.event (task.listen → emitCustom), so no live AI is needed.
+  test('chat runs the session as a background task', async ({ page }) => {
+    // task.* results make the host-probe succeed → the chat takes the task path.
+    const mock = await enterStudioShell(page, auth!, {
+      'permissions.query': { granted: { fs: 'full', process: 'full' } },
+      'task.enum': { tasks: [] },
+      'task.start': { id: 'placeholder' },
+      'task.call': { ok: true },
+    });
+    await openProject(page);
+
+    await page.locator('[data-id=home-prompt-input]').fill('hello via task');
+    await page.locator('[data-id=home-start-session]').click();
+
+    // The bridge routed the turn through a background task (not the in-renderer loop).
+    await expect
+      .poll(async () => (await mock.calls()).some((c) => c.channel === 'task.start'), { timeout: 15_000 })
+      .toBe(true);
+    await mock.expectInvoked('task.call', { method: 'send' });
+
+    // Stream the user echo + a scripted assistant reply the way the real task would
+    // (task.event:<id> → task.listen → emitCustom) and assert both render.
+    const start = (await mock.calls()).find((c) => c.channel === 'task.start')!;
+    const taskId = (start.payload as { id: string }).id;
+    const sessionId = (start.payload as { params: { sessionId: string } }).params.sessionId;
+    const msgFrame = (role: string, text: string, finish = false) => ({
+      event: 'msg',
+      data: {
+        type: 'codingAgent:event',
+        sessionId,
+        event: {
+          type: 'message',
+          payload: {
+            type: 'created',
+            payload: {
+              id: `${role}-${Math.random().toString(36).slice(2, 7)}`,
+              role,
+              parts: finish
+                ? [{ type: 'text', data: { text } }, { type: 'finish' }]
+                : [{ type: 'text', data: { text } }],
+              created_at: Date.now(),
+            },
+          },
+        },
+      },
+    });
+    await mock.emit(`task.event:${taskId}` as never, msgFrame('user', 'hello via task') as never);
+    await mock.emit(`task.event:${taskId}` as never, msgFrame('assistant', 'TASK_REPLY_OK', true) as never);
+
+    const list = page.locator('[data-id=chat-messages-list]');
+    await expect(list).toContainText('TASK_REPLY_OK', { timeout: 15_000 });
+    await expect(list).toContainText('hello via task');
   });
 
   // "Run eval" loads the 59 ported task defs (client/studio/evals/registry.ts)
