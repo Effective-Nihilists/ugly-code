@@ -35,7 +35,7 @@ import {
   sessionApi,
   resolveProjectId,
   planCompaction,
-  decodeAssistantPayload,
+  reconstructResumeContext,
   type ActiveRow,
   type StoredMessageRow,
   type StoredRole,
@@ -294,21 +294,6 @@ function persistMeta(s: SessionAgentState, sessionId: string, status: 'running' 
   });
 }
 
-/** Turn a stored row back into a runAgent working-context message (for resume). */
-function rowToMessage(r: StoredMessageRow): AgentMessage {
-  const payload: unknown = JSON.parse(r.content);
-  if (r.role === 'assistant') return { role: 'assistant', content: decodeAssistantPayload(payload).content };
-  if (r.role === 'tool') {
-    const results = (payload as Partial<ToolRowPayload>).results ?? [];
-    return {
-      role: 'user',
-      content: results.map((x) => ({ type: 'tool_result' as const, tool_use_id: x.tool_use_id, content: x.content })),
-    };
-  }
-  // user message OR compaction summary → a plain user-text message.
-  return { role: 'user', content: String(payload) };
-}
-
 /**
  * Lazily reconstruct a prior session into the live controller on the first turn
  * after a reload. Loads the "normal" transcript (compaction excluded) — which is
@@ -334,16 +319,9 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
       s.titleSet = true;
     }
   }
-  const messages: AgentMessage[] = [];
-  let maxSeq = -1;
-  s.activeRows = [];
-  for (const r of rows) {
-    maxSeq = Math.max(maxSeq, r.seq);
-    const id = r.kind === 'summary' ? `${sessionId}:summary:${r.seq}` : `${sessionId}:${r.seq}`;
-    s.activeRows.push({ seq: r.seq, id });
-    messages.push(rowToMessage(r));
-  }
-  s.seq = maxSeq + 1;
+  const { messages, activeRows, nextSeq } = reconstructResumeContext(rows, sessionId);
+  s.activeRows = activeRows;
+  s.seq = nextSeq;
   s.titleSet = true; // a resumed session already has its title
   // Restore the pinned task so post-reload compaction still preserves it: the
   // first user row, or (if already compacted) parsed back out of the summary.
@@ -362,30 +340,8 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
     }
   }
 
-  // Heal an INTERRUPTED ending before resume. A session reloaded mid-turn ends
-  // either on (a) an assistant turn with unresolved tool_use, or (b) a trailing
-  // tool_result with no assistant reply. Left as-is:
-  //   - (a) makes runAgent.resume AUTO-EXECUTE the dangling tool — re-running an
-  //     interrupted command that may hang (e.g. a dev server), which blocks the
-  //     user's next turn entirely ("continue does nothing");
-  //   - (b) ends the context on a user message, so the next send is two
-  //     consecutive user turns → a model-API error → also "nothing happens".
-  // Resolve any dangling tool_use with an interrupted marker, then ensure the
-  // context ends on an assistant turn so the next user message alternates cleanly.
-  const tail = messages[messages.length - 1];
-  if (tail && tail.role === 'assistant' && Array.isArray(tail.content)) {
-    const uses = tail.content.filter((b): b is { type: 'tool_use'; id: string; name: string; input: unknown } => b.type === 'tool_use');
-    if (uses.length > 0) {
-      messages.push({
-        role: 'user',
-        content: uses.map((u) => ({ type: 'tool_result' as const, tool_use_id: u.id, content: '[Interrupted: this tool did not finish before the session was reloaded.]' })),
-      });
-    }
-  }
-  if (messages[messages.length - 1]?.role === 'user') {
-    messages.push({ role: 'assistant', content: [{ type: 'text', text: 'The previous step was interrupted before it finished. Ready to continue.' }] });
-  }
-
+  // (Row→message mapping + interrupted-ending healing now live in
+  // reconstructResumeContext above, so they're unit-tested.)
   try {
     await s.controller.resume({
       sessionId,

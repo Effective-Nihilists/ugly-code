@@ -9,6 +9,7 @@
 
 import { native } from 'ugly-app/native';
 import type { ContentPart } from 'ugly-app/agent/client';
+import type { AgentMessage } from '../../../shared/agent';
 
 async function api<T>(name: string, input: unknown): Promise<T | null> {
   try {
@@ -163,3 +164,69 @@ export const sessionApi = {
   archive: (input: { sessionId: string }): Promise<{ ok: boolean } | null> =>
     api('codingSessionArchive', input),
 };
+
+/** Turn a stored transcript row back into a runAgent working-context message (for resume). */
+export function rowToMessage(r: StoredMessageRow): AgentMessage {
+  const payload: unknown = JSON.parse(r.content);
+  if (r.role === 'assistant') {
+    // ContentPart[] and AgentMessage's content union are the same blocks, nominally distinct.
+    return { role: 'assistant', content: decodeAssistantPayload(payload).content as AgentMessage['content'] };
+  }
+  if (r.role === 'tool') {
+    const results = (payload as Partial<ToolRowPayload>).results ?? [];
+    return {
+      role: 'user',
+      content: results.map((x) => ({ type: 'tool_result' as const, tool_use_id: x.tool_use_id, content: x.content })),
+    };
+  }
+  // user message OR compaction summary → a plain user-text message.
+  return { role: 'user', content: String(payload) };
+}
+
+export interface ResumeContext {
+  messages: AgentMessage[];
+  activeRows: ActiveRow[];
+  nextSeq: number;
+}
+
+/**
+ * Rebuild runAgent's working context from stored rows (for resuming a session in a fresh
+ * process — e.g. a new background task after a Studio restart). Maps rows → messages, tracks
+ * activeRows + the next seq, and HEALS an interrupted ending so the next turn alternates
+ * cleanly: a dangling assistant `tool_use` gets an interrupted `tool_result`, and a trailing
+ * user message gets a continue-ready assistant turn. Pure + exported for tests.
+ */
+export function reconstructResumeContext(rows: StoredMessageRow[], sessionId: string): ResumeContext {
+  const messages: AgentMessage[] = [];
+  const activeRows: ActiveRow[] = [];
+  let maxSeq = -1;
+  for (const r of rows) {
+    maxSeq = Math.max(maxSeq, r.seq);
+    const id = r.kind === 'summary' ? `${sessionId}:summary:${r.seq}` : `${sessionId}:${r.seq}`;
+    activeRows.push({ seq: r.seq, id });
+    messages.push(rowToMessage(r));
+  }
+  const tail = messages[messages.length - 1];
+  if (tail && tail.role === 'assistant' && Array.isArray(tail.content)) {
+    const uses = tail.content.filter(
+      (b): b is { type: 'tool_use'; id: string; name: string; input: unknown } => b.type === 'tool_use',
+    );
+    if (uses.length > 0) {
+      messages.push({
+        role: 'user',
+        content: uses.map((u) => ({
+          type: 'tool_result' as const,
+          tool_use_id: u.id,
+          content: '[Interrupted: this tool did not finish before the session was reloaded.]',
+        })),
+      });
+    }
+  }
+  if (messages[messages.length - 1]?.role === 'user') {
+    messages.push({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'The previous step was interrupted before it finished. Ready to continue.' }],
+    });
+  }
+  return { messages, activeRows, nextSeq: maxSeq + 1 };
+}
