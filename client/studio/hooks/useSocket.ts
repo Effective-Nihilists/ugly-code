@@ -79,16 +79,10 @@ export function isConnected(): boolean {
   return true;
 }
 
-// The opened project's absolute path — set by StudioProjectPage. Used to run
-// project-scoped native tools (the DB query script, the `ugly-app` CLI).
-let activeProjectPath: string | null = null;
-export function setActiveProjectPath(p: string | null): void {
-  activeProjectPath = p;
-}
-/** The opened project's absolute path (for the per-session FS log). */
-export function getActiveProjectPath(): string | null {
-  return activeProjectPath;
-}
+// The opened project's absolute path now lives in a React-free module (so the agent loop
+// can bundle headless). Re-exported here for existing importers (StudioProjectPage, etc.).
+import { getActiveProjectPath, setActiveProjectPath } from '../projectPath';
+export { getActiveProjectPath, setActiveProjectPath };
 
 // Per-session selected model id, so codingAgentChatSend routes to the right
 // runner: the local Claude CLI (claude-code* / claude-cli) vs the in-process
@@ -176,7 +170,7 @@ const ZERO_RUN_TOTALS = {
  *  telemetry) and parse the NDJSON output into docs. Resolves [] on any failure
  *  (project not deployed, no CF token, command missing) so panels degrade. */
 function runCli(cmd: string): Promise<{ _id: string; created: number; data: Record<string, unknown> }[]> {
-  const proj = activeProjectPath;
+  const proj = getActiveProjectPath();
   if (!proj) return Promise.resolve([]);
   return new Promise((resolve) => {
     let stdout = '';
@@ -213,7 +207,7 @@ const mapWorkerStatus = (s: unknown): 'completed' | 'failed' =>
   s === 'error' ? 'failed' : 'completed';
 
 function runDbScript(op: string, mode: string, input: unknown): Promise<unknown> {
-  const proj = activeProjectPath;
+  const proj = getActiveProjectPath();
   if (!proj) return Promise.reject(new Error('No active project'));
   return new Promise((resolve, reject) => {
     let stdout = '';
@@ -375,7 +369,7 @@ const handlers: Record<string, Handler> = {
   // parsing shared/cron.ts — `defineWorkers({ name: defineWorker({ schedule,
   // description }) })`. The runs list (below) still comes from prod telemetry.
   workersGetManifest: async () => {
-    const proj = activeProjectPath;
+    const proj = getActiveProjectPath();
     if (!proj) return { available: false, reason: 'No project open.', workers: [] };
     let src = '';
     for (const rel of ['/shared/cron.ts', '/src/shared/cron.ts']) {

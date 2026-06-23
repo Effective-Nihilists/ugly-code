@@ -29,7 +29,7 @@ import {
   AGENT_SYSTEM_PROMPT,
   AGENT_DEFAULT_MODEL,
 } from '../../../shared/agent';
-import { getActiveProjectPath } from '../hooks/useSocket';
+import { getActiveProjectPath } from '../projectPath';
 import { SessionLog } from './sessionLog';
 import {
   sessionApi,
