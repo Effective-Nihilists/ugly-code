@@ -29,7 +29,7 @@
     "textGen": "ugly-app textGen",
     "imageGen": "ugly-app imageGen",
     "upgrade": "node -e \"const e=require('child_process').execSync,x=require('fs').existsSync,g=require('fs').readdirSync;g('node_modules').filter(f=>f.startsWith('.ugly-app-')).forEach(f=>require('fs').rmSync('node_modules/'+f,{recursive:true,force:true}));e(x('yarn.lock')?'yarn add ugly-app@latest':x('pnpm-lock.yaml')?'pnpm add ugly-app@latest':'npm install ugly-app@latest',{stdio:'inherit'});e('node node_modules/ugly-app/dist/cli/index.js upgrade',{stdio:'inherit'})\"",
-    "build:coding-task": "esbuild client/studio/agent/coding-task.ts --bundle --platform=node --format=esm --outfile=dist/client/coding-task.js"
+    "build:tasks": "ugly-app build:tasks"
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
@@ -45,7 +45,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.183.2",
-    "ugly-app": "^0.1.693",
+    "ugly-app": "^0.1.694",
     "yjs": "^13.6.30",
     "zod": "^4.3.6"
   },

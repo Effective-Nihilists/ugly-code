@@ -21,7 +21,10 @@
       "push": "",
       "search": ""
     },
-    "lastDeployedAt": "2026-06-22T20:42:27.600Z"
+    "lastDeployedAt": "2026-06-23T04:04:59.293Z"
   },
-  "domain": "code.ugly.bot"
+  "domain": "code.ugly.bot",
+  "tasks": {
+    "coding": "client/studio/agent/coding-task.ts"
+  }
 }
