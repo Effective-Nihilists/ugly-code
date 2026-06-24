@@ -14,7 +14,7 @@
 
 import { useContext, useMemo } from 'react';
 import type { AppSocket } from 'ugly-app/client';
-import { native, permissions, nativePlatform, taskEntryUrl } from 'ugly-app/native';
+import { native, permissions, taskEntryUrl } from 'ugly-app/native';
 import { buildId } from '../../../shared/Build';
 import type { AppRegistry } from '../shared/api';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
@@ -86,27 +86,13 @@ import { getActiveProjectPath, setActiveProjectPath } from '../projectPath';
 export { getActiveProjectPath, setActiveProjectPath };
 
 // ── Background coding-task adoption ──────────────────────────────────────────
-// When the platform can host tasks (Studio desktop, or mobile via the Ugly Proxy),
-// run the coding session as a background task — it outlives the window and is drivable
-// from any device — instead of in this renderer. On the web (dev browser, no host) we
-// fall back to the in-renderer loop. The task's emitCustom-shaped frames flow back via
-// task.listen → emitCustom, so useCodingAgentChat consumes them unchanged.
+// The coding session runs as a background task (Studio desktop, or mobile via the Ugly
+// Proxy) — it outlives the window and is drivable from any device — instead of in this
+// renderer. The IDE only runs inside Ugly Studio, so there's no in-renderer fallback. The
+// task's emitCustom-shaped frames flow back via task.listen → emitCustom, so
+// useCodingAgentChat consumes them unchanged.
 const sessionTaskIds = new Map<string, string>();
 const listenedTaskIds = new Set<string>();
-let taskHostProbe: Promise<boolean> | null = null;
-// Can this environment actually host a background task? Probe once: the task facade
-// rejects when the platform/host doesn't implement task.* (web, or a test without a task
-// mock), so we cleanly fall back to the in-renderer loop instead of erroring.
-function taskHostAvailable(): Promise<boolean> {
-  if (nativePlatform() === 'web') return Promise.resolve(false);
-  if (!taskHostProbe) {
-    taskHostProbe = native.task
-      .enum()
-      .then(() => true)
-      .catch(() => false);
-  }
-  return taskHostProbe;
-}
 function readAuthTokenCookie(): string {
   try {
     const m = document.cookie.split('; ').find((c) => c.startsWith('auth_token='));
@@ -120,11 +106,18 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
   const have = sessionTaskIds.get(sessionId);
   if (have) return have;
   const id = 'coding:' + sessionId;
-  // Re-attach if it's already running (renderer reload / another window); else start it.
-  const running = (await native.task.enum()).some((t) => t.id === id);
-  if (!running) {
+  const wanted = taskEntryUrl('coding', buildId);
+  // Re-attach to a HEALTHY task from the CURRENT build (renderer reload / another window).
+  // A task left over from a prior deploy runs an old bundle that lacks the methods this
+  // renderer calls (→ "unknown task method: send"), and an exited/errored task can't serve
+  // calls — in those cases stop it and start fresh (the session rebuilds its context from
+  // the DB on the next turn). Entry carries the buildId, so a new deploy never reuses old.
+  const existing = (await native.task.enum()).find((t) => t.id === id);
+  const reusable = existing && existing.status !== 'exited' && existing.status !== 'error' && existing.entry === wanted;
+  if (!reusable) {
+    if (existing) { try { await native.task.stop(id); } catch { /* already gone */ } }
     await native.task.start({
-      entry: taskEntryUrl('coding', buildId),
+      entry: wanted,
       kind: 'coding',
       id,
       params: {
@@ -572,18 +565,13 @@ const handlers: Record<string, Handler> = {
         .catch((e) => emitAgentError(sessionId, e));
       return Promise.resolve({});
     }
-    // 2. A task host available (Studio desktop, or mobile via the Ugly Proxy) → run the
-    //    session as a background task; its frames stream back via task.listen. Otherwise
-    //    (web / no host) fall back to the in-renderer ugly.bot agent loop.
+    // 2. Run the session as a background task (Studio desktop, or mobile via the Ugly
+    //    Proxy); its frames stream back via task.listen. The IDE only runs inside Ugly
+    //    Studio, so there's no in-renderer fallback.
     void (async () => {
       try {
-        if (await taskHostAvailable()) {
-          const id = await ensureCodingTask(sessionId);
-          await native.task.call(id, 'send', { text: message });
-        } else {
-          const m = await import('../agent/clientAgent');
-          await m.runClientAgentTurn(sessionId, message, emitCustom);
-        }
+        const id = await ensureCodingTask(sessionId);
+        await native.task.call(id, 'send', { text: message });
       } catch (e) {
         emitAgentError(sessionId, e);
       }
@@ -597,12 +585,8 @@ const handlers: Record<string, Handler> = {
       return Promise.resolve({});
     }
     const taskId = sessionTaskIds.get(sessionId);
-    if (taskId) {
-      // We ran this session as a task → interrupt it there.
-      void native.task.call(taskId, 'interrupt').catch(() => {});
-      return Promise.resolve({});
-    }
-    void import('../agent/clientAgent').then((m) => m.abortClientAgent(sessionId));
+    // We run the session as a task → interrupt it there (no-op if no turn is in flight).
+    if (taskId) void native.task.call(taskId, 'interrupt').catch(() => {});
     return Promise.resolve({});
   },
   codingAgentChatClearMessages: () => Promise.resolve({}),

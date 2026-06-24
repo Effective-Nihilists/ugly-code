@@ -169,5 +169,8 @@ export const DB_SCRIPT = [
   "  const n = Number((await q('SELECT count(*)::bigint AS n FROM \"'+tbl+'\"')).rows[0].n) || 0;",
   "  out = { columns: cols, indexes: idx, count: n };",
   "}",
-  "process.stdout.write(JSON.stringify(out));",
+  // Force exit after the result flushes: createAdapter()'s pg pool keeps idle connections
+  // (and thus the event loop) alive, so the process would otherwise never exit and the panel
+  // hangs on "Loading…". Exit in the write callback so stdout isn't truncated on a pipe.
+  "process.stdout.write(JSON.stringify(out), () => process.exit(0));",
 ].join('\n');
