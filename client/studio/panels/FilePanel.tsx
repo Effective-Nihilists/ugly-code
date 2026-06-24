@@ -2,7 +2,45 @@ import React from 'react';
 import hljs from 'highlight.js/lib/common';
 import 'highlight.js/styles/github.css';
 import { native } from 'ugly-app/native';
+import { MdastViewer } from 'ugly-app/markdown/client';
 import { getActiveProjectPath } from '../hooks/useSocket';
+import { useTheme } from '../theme/ThemeProvider';
+import { OpenUriContext } from '../components/LinkifiedText';
+
+function isMarkdown(path: string): boolean {
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  return ext === 'md' || ext === 'markdown';
+}
+
+/** Rendered markdown via ugly-app's MdastViewer (needs an explicit measured width;
+ *  mirrors CodingAgentChat's ChatMarkdown so it renders identically + safely). */
+function MarkdownView({ text }: { text: string }): React.ReactElement {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [width, setWidth] = React.useState(0);
+  const { mode } = useTheme();
+  const openUri = React.useContext(OpenUriContext);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setWidth(el.clientWidth);
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) setWidth(Math.max(200, e.contentRect.width));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const handleOpenUri = React.useMemo(
+    () => (openUri ? (uri: string): Promise<void> => { openUri(uri); return Promise.resolve(); } : undefined),
+    [openUri],
+  );
+  return (
+    <div ref={ref} className="us-md" style={{ width: '100%', minWidth: 0, overflow: 'auto', padding: 14, flex: 1, minHeight: 0 }}>
+      {width > 0 && (
+        <MdastViewer width={width} markdown={text} isDark={mode === 'dark'} {...(handleOpenUri ? { openUri: handleOpenUri } : {})} />
+      )}
+    </div>
+  );
+}
 
 // Map a file extension → a highlight.js language id (best-effort; falls back to
 // auto-detection). Keeps highlighting fast + accurate for the common cases.
@@ -46,9 +84,12 @@ export function FilePanel(): React.ReactElement {
   const [open, setOpen] = React.useState<Record<string, Entry[] | undefined>>({});
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [selected, setSelected] = React.useState<string | null>(null);
+  const [content, setContent] = React.useState<string>('');
   const [contentHtml, setContentHtml] = React.useState<string>('');
   const [loadingFile, setLoadingFile] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Markdown files default to the rendered view, toggleable to raw source.
+  const [mdRaw, setMdRaw] = React.useState(false);
 
   const list = React.useCallback(async (dir: string): Promise<Entry[]> => {
     const ents = await native.fs.readdir(dir);
@@ -94,8 +135,11 @@ export function FilePanel(): React.ReactElement {
     setError(null);
     try {
       const text = await native.fs.readFile(path);
+      setContent(text);
       setContentHtml(highlightFile(path, text));
+      setMdRaw(false); // markdown opens in rendered view
     } catch (e) {
+      setContent('');
       setContentHtml('');
       setError(`Could not read ${path}: ${String(e)}`);
     } finally {
@@ -143,9 +187,21 @@ export function FilePanel(): React.ReactElement {
       <div style={S.viewer}>
         {selected ? (
           <>
-            <div style={S.viewerHeader}>{selected.startsWith(root) ? selected.slice(root.length + 1) : selected}</div>
+            <div style={S.viewerHeader}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selected.startsWith(root) ? selected.slice(root.length + 1) : selected}
+              </span>
+              {isMarkdown(selected) && !loadingFile && (
+                <div style={S.segmented}>
+                  <button data-id="md-view-rendered" onClick={() => setMdRaw(false)} style={{ ...S.seg, ...(mdRaw ? {} : S.segActive) }}>Preview</button>
+                  <button data-id="md-view-raw" onClick={() => setMdRaw(true)} style={{ ...S.seg, ...(mdRaw ? S.segActive : {}) }}>Raw</button>
+                </div>
+              )}
+            </div>
             {loadingFile ? (
               <pre style={S.code}>Loading…</pre>
+            ) : isMarkdown(selected) && !mdRaw ? (
+              content ? <MarkdownView text={content} /> : <div style={S.empty}>(empty file)</div>
             ) : (
               <pre style={S.code}>
                 <code className="hljs" style={{ background: 'transparent', padding: 0 }} dangerouslySetInnerHTML={{ __html: contentHtml || '(empty file)' }} />
@@ -170,7 +226,10 @@ const S: Record<string, React.CSSProperties> = {
   dirName: { fontWeight: 600 },
   fileName: { color: 'var(--text-secondary)' },
   viewer: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 },
-  viewerHeader: { flexShrink: 0, padding: '7px 14px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  viewerHeader: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' },
+  segmented: { display: 'inline-flex', flexShrink: 0, gap: 1, padding: 2, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6 },
+  seg: { fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', background: 'transparent', border: 'none', borderRadius: 4, padding: '2px 9px', cursor: 'pointer' },
+  segActive: { background: 'var(--bg-primary)', color: 'var(--accent)' },
   code: { flex: 1, minHeight: 0, overflow: 'auto', margin: 0, padding: 14, fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.6, color: 'var(--text-primary)', whiteSpace: 'pre', tabSize: 2 },
   empty: { padding: 24, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)' },
   error: { padding: '8px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--error)', borderTop: '1px solid var(--border)' },

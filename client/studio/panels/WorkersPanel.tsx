@@ -189,8 +189,13 @@ export function WorkersPanel({
         result: res.result,
         durationMs: res.durationMs,
       });
-      // Refresh the runs list so the new row appears immediately.
+      // Refresh the runs list so the new row appears immediately. On prod the worker is
+      // ENQUEUED (runs async on the server), so poll a few times to surface the run moving
+      // queued → running → completed without a manual Refresh.
       void loadRuns();
+      if (mode === 'prod' && (res.status === 'queued' || res.status === 'running')) {
+        for (let i = 1; i <= 6; i++) setTimeout(() => void loadRuns(), i * 2000);
+      }
     } catch (err) {
       setLastResult({
         status: 'failed',
@@ -531,6 +536,13 @@ export function WorkersPanel({
                       </span>
                     )}
                   </div>
+                  {lastResult.status === 'queued' && (
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>
+                      Enqueued on production — it runs on the server queue. Watch it move to
+                      <b> running → completed</b> in <b>Recent runs</b> below (auto-refreshing),
+                      then click the run for its result + logs.
+                    </div>
+                  )}
                   {lastResult.error && (
                     <pre
                       style={{
