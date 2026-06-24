@@ -1,4 +1,6 @@
 import React from 'react';
+import { native } from 'ugly-app/native';
+import { ChatOpenUriProvider } from './components/LinkifiedText';
 import {
   SessionListSidebar,
   type SessionListSidebarSession,
@@ -42,6 +44,19 @@ const ALL_TABS: WorkspaceTab[] = [
   'chat', 'preview', 'file', 'git', 'database',
   'publish', 'prodDatabase', 'errors', 'events', 'workers', 'terminal',
 ];
+// The dev/session-scoped tabs (the top segmented picker). Prod sidebar views
+// (publish/prodDatabase/errors/events/workers/terminal) are NOT session tabs, so the
+// picker is hidden for them.
+const SESSION_TABS: WorkspaceTab[] = ['chat', 'preview', 'file', 'git', 'database'];
+
+// Resizable session sidebar — width persisted across reloads.
+const SIDEBAR_W_KEY = 'us-session-sidebar-w';
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 560;
+function readSidebarW(): number {
+  const v = Number(localStorage.getItem(SIDEBAR_W_KEY));
+  return v >= SIDEBAR_MIN && v <= SIDEBAR_MAX ? v : 264;
+}
 
 // The open tab + active session live in the URL (alongside ?path=) so a reload
 // restores exactly where you were.
@@ -85,10 +100,40 @@ export default function StudioProjectPage({
   const [chatKey, setChatKey] = React.useState(0);
   const nextKindRef = React.useRef<'main' | 'session'>('main');
 
+  // Resizable sidebar. Window-level pointer listeners (not setPointerCapture) — on macOS the
+  // window-controls drag region swallows mousemove otherwise (see ugly-studio dock-drag notes).
+  const [sidebarW, setSidebarW] = React.useState<number>(readSidebarW);
+  const startResize = React.useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarW;
+    const onMove = (ev: PointerEvent): void => {
+      const w = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, startW + (ev.clientX - startX)));
+      setSidebarW(w);
+    };
+    const onUp = (): void => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setSidebarW((w) => { localStorage.setItem(SIDEBAR_W_KEY, String(w)); return w; });
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [sidebarW]);
+
   React.useEffect(() => {
     setActiveProjectPath(projectPath ?? null);
     return () => { setActiveProjectPath(null); };
   }, [projectPath]);
+
+  // One handler for clickable links across ALL panels (chat tool widgets + publish console +
+  // anything using LinkifiedText). http(s) opens the browser; file:// opens in the OS default.
+  const openUri = React.useCallback((uri: string) => {
+    void native.system.openExternal({ url: uri });
+  }, []);
 
   // Reload the session list when the project actually changes (not on first
   // mount — initial state already came from the URL + store).
@@ -202,7 +247,7 @@ export default function StudioProjectPage({
   return (
     <ThemeProvider>
     <div style={S.root}>
-      <div style={S.sidebar}>
+      <div style={{ ...S.sidebar, width: sidebarW }}>
       <SessionListSidebar
         sessions={sidebarSessions}
         activeCompositeId={activeSessionId ?? MAIN_PLACEHOLDER}
@@ -223,6 +268,13 @@ export default function StudioProjectPage({
         ]}
       />
       </div>
+      <div
+        style={S.resizer}
+        onPointerDown={startResize}
+        role="separator"
+        aria-orientation="vertical"
+        title="Drag to resize"
+      />
       <main style={S.main}>
         <header style={S.header}>
           <TabPickerStyles />
@@ -233,8 +285,9 @@ export default function StudioProjectPage({
           {projectPath && <span style={S.path}>{projectPath}</span>}
           <span style={{ flex: 1 }} />
           {/* Segmented control — matches the sidebar header height (36) and reads
-              as one clean control instead of five separate bordered buttons. */}
-          <div style={S.tabBar}>
+              as one clean control instead of five separate bordered buttons. Shown only
+              for session-scoped views; prod sidebar views (publish/errors/…) hide it. */}
+          {SESSION_TABS.includes(tab) && <div style={S.tabBar}>
             {TABS.map((t) => {
               const active = tab === t.id;
               return (
@@ -251,8 +304,9 @@ export default function StudioProjectPage({
                 </button>
               );
             })}
-          </div>
+          </div>}
         </header>
+        <ChatOpenUriProvider value={openUri}>
         <div style={S.content}>
           {/* Chat stays mounted (preserves the agent session); others mount on demand.
               key bumps on session switch so the chat reloads the selected session. */}
@@ -262,6 +316,7 @@ export default function StudioProjectPage({
               {...(activeSessionId ? { initialSessionId: activeSessionId } : {})}
               onSessionCreated={recordSession}
               onResumeMissing={archiveSession}
+              onOpenUri={openUri}
             />
           </div>
           {/* Session tabs (dev-scoped) */}
@@ -277,6 +332,7 @@ export default function StudioProjectPage({
           {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel forceProd /></div>}
           {tab === 'terminal' && <div style={S.pane}><TerminalPanel /></div>}
         </div>
+        </ChatOpenUriProvider>
       </main>
     </div>
     </ThemeProvider>
@@ -298,7 +354,9 @@ function TabPickerStyles(): React.ReactElement {
 // the rest of the app instead of a hardcoded dark palette.
 const S: Record<string, React.CSSProperties> = {
   root: { display: 'flex', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' },
-  sidebar: { width: 264, flex: 'none', display: 'flex', minHeight: 0, borderRight: '1px solid var(--border)' },
+  sidebar: { flex: 'none', display: 'flex', minHeight: 0, borderRight: '1px solid var(--border)' },
+  // Thin draggable gutter between the session sidebar and the workspace.
+  resizer: { width: 5, flex: 'none', cursor: 'col-resize', background: 'transparent', marginLeft: -3, zIndex: 5 },
   main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
   // Fixed 36px height to line up exactly with the session-list sidebar header.
   // Right padding reserves space for the fixed top-right feedback icon so the

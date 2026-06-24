@@ -2,6 +2,7 @@ import React from 'react';
 import { native, permissions } from 'ugly-app/native';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { ConsoleText } from '../components/ConsoleText';
+import { LinkifiedText } from '../components/LinkifiedText';
 
 /** The bits of `.uglyapp`'s persisted deployTarget we surface. */
 interface DeployTarget {
@@ -139,7 +140,7 @@ export function ProdPanel(): React.ReactElement {
         )}
       </div>
       <div ref={scrollRef} data-id="prod-output" style={S.console}>
-        <ConsoleText text={output || (running ? 'Starting publish…' : 'Press Deploy to run `ugly-app publish` (Neon + Cloudflare provisioning + Workers deploy).')} />
+        <ConsoleText text={output || (running ? 'Starting publish…' : 'Press Deploy to run `ugly-app publish` (Neon + Cloudflare provisioning + Workers deploy).')} TextComponent={LinkifiedText} />
       </div>
       {running && (
         <div style={S.inputRow}>
