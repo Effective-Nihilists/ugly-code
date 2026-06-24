@@ -34,9 +34,12 @@ const sessionId = t.params?.sessionId ?? t.id ?? 'cs:task';
 
 // 3. The agent loop fetches the project's /api/* with relative URLs + cookie creds — both
 //    unavailable in a Node child. Absolutize against the app origin and carry the session
-//    token (forwarded from the renderer) as a Cookie so /api/agentTurn authenticates.
+//    token as a Cookie so /api/agentTurn authenticates. Prefer the host-injected token
+//    (UGLY_AUTH_TOKEN — read from the cookie host-side, works even when HttpOnly + over the
+//    mobile proxy); fall back to the token the renderer forwarded in params.
 const origin = t.params?.origin ?? '';
-const authToken = t.params?.authToken ?? '';
+const authToken = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.UGLY_AUTH_TOKEN
+  ?? t.params?.authToken ?? '';
 if (origin) {
   const realFetch = globalThis.fetch.bind(globalThis);
   (globalThis as { fetch: typeof fetch }).fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
