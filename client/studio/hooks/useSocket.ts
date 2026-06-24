@@ -128,6 +128,16 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
       },
     });
   }
+  // Wait until the child has loaded its bundle (status flips to 'running' on the task's
+  // `ready`) before returning. task.start resolves when the child is SPAWNED, but the runner
+  // then fetches + imports the bundle over https — calling a method before that races the load
+  // and throws "unknown task method". A reused, already-running task passes on the first check.
+  for (let i = 0; i < 200; i++) {
+    const t = (await native.task.enum()).find((x) => x.id === id);
+    if (t?.status === 'running') break;
+    if (t && (t.status === 'error' || t.status === 'exited')) throw new Error('coding task failed to start');
+    await new Promise((r) => setTimeout(r, 100));
+  }
   sessionTaskIds.set(sessionId, id);
   if (!listenedTaskIds.has(id)) {
     listenedTaskIds.add(id);
