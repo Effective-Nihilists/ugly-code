@@ -212,28 +212,87 @@ export function GitPanel(): React.ReactElement {
           )}
         </div>
 
-        <pre style={S.diff}>{colorize(diff)}</pre>
+        <div style={S.diff}><DiffView diff={diff} /></div>
       </div>
     </div>
   );
 }
 
-/** Render a diff with +/- /header coloring. */
-function colorize(diff: string): React.ReactNode {
-  if (!diff) return <span style={{ color: 'var(--text-muted)' }}>Select a file to see its diff.</span>;
-  return diff.split('\n').map((line, i) => {
-    let color = 'var(--text-primary)';
-    if (line.startsWith('+') && !line.startsWith('+++')) color = '#22863a';
-    else if (line.startsWith('-') && !line.startsWith('---')) color = '#cb2431';
-    else if (line.startsWith('@@')) color = 'var(--accent)';
-    else if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('+++') || line.startsWith('---')) color = 'var(--text-muted)';
-    return (
-      <div key={i} style={{ color }}>
-        {line || ' '}
-      </div>
-    );
-  });
+
+// ── GitHub-Desktop-style diff view ───────────────────────────────────────────
+type DiffRowType = 'meta' | 'file' | 'hunk' | 'add' | 'del' | 'context';
+interface DiffRow { type: DiffRowType; oldNo?: number; newNo?: number; text: string }
+
+/** Parse a unified diff (incl. `git show` output) into rows with old/new line numbers. */
+function parseDiff(diff: string): DiffRow[] {
+  const rows: DiffRow[] = [];
+  let oldNo = 0;
+  let newNo = 0;
+  let inHunk = false;
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('diff --git') || line.startsWith('diff --no-index')) { rows.push({ type: 'file', text: line }); inHunk = false; continue; }
+    if (/^(index |--- |\+\+\+ |new file|deleted file|similarity |rename |copy |old mode|new mode|Binary )/.test(line)) { rows.push({ type: 'file', text: line }); continue; }
+    if (line.startsWith('@@')) {
+      const m = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+      if (m) { oldNo = Number(m[1]); newNo = Number(m[2]); }
+      rows.push({ type: 'hunk', text: line });
+      inHunk = true;
+      continue;
+    }
+    if (!inHunk) { rows.push({ type: 'meta', text: line }); continue; }
+    if (line.startsWith('\\')) { rows.push({ type: 'meta', text: line }); continue; } // "\ No newline at end of file"
+    if (line.startsWith('+')) { rows.push({ type: 'add', newNo, text: line.slice(1) }); newNo++; continue; }
+    if (line.startsWith('-')) { rows.push({ type: 'del', oldNo, text: line.slice(1) }); oldNo++; continue; }
+    rows.push({ type: 'context', oldNo, newNo, text: line.startsWith(' ') ? line.slice(1) : line });
+    oldNo++; newNo++;
+  }
+  return rows;
 }
+
+function DiffView({ diff }: { diff: string }): React.ReactElement {
+  if (!diff) return <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Select a file to see its diff.</span>;
+  const rows = parseDiff(diff);
+  return (
+    <div style={D.inner}>
+      {rows.map((r, i) => {
+        if (r.type === 'file') {
+          // Surface the human path from `diff --git a/… b/…`; hide index/mode noise.
+          if (!r.text.startsWith('diff --git')) return null;
+          const m = /b\/(.+)$/.exec(r.text);
+          return <div key={i} style={D.fileHeader}>{m ? m[1] : r.text}</div>;
+        }
+        if (r.type === 'meta') return r.text ? <div key={i} style={D.meta}>{r.text}</div> : null;
+        if (r.type === 'hunk') return <div key={i} style={D.hunk}>{r.text}</div>;
+        const tint = r.type === 'add' ? D.addRow : r.type === 'del' ? D.delRow : undefined;
+        const gut = r.type === 'add' ? D.addGutter : r.type === 'del' ? D.delGutter : undefined;
+        const sign = r.type === 'add' ? '+' : r.type === 'del' ? '-' : ' ';
+        return (
+          <div key={i} style={{ ...D.row, ...tint }}>
+            <span style={{ ...D.gutter, ...gut }}>{r.oldNo ?? ''}</span>
+            <span style={{ ...D.gutter, ...gut }}>{r.newNo ?? ''}</span>
+            <span style={D.sign}>{sign}</span>
+            <span style={D.content}>{r.text || ' '}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const D = {
+  inner: { minWidth: 'max-content', fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.5 },
+  fileHeader: { position: 'sticky' as const, top: 0, padding: '6px 12px', fontWeight: 700, color: 'var(--text-primary)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' },
+  meta: { padding: '0 12px', color: 'var(--text-muted)', whiteSpace: 'pre' as const },
+  hunk: { padding: '2px 12px', color: 'var(--accent)', background: 'var(--bg-secondary)', whiteSpace: 'pre' as const, borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' },
+  row: { display: 'flex', alignItems: 'stretch' },
+  addRow: { background: 'rgba(46,160,67,0.15)' },
+  delRow: { background: 'rgba(248,81,73,0.15)' },
+  gutter: { flex: 'none', width: 44, textAlign: 'right' as const, padding: '0 8px', color: 'var(--text-muted)', userSelect: 'none' as const, boxSizing: 'border-box' as const },
+  addGutter: { background: 'rgba(46,160,67,0.25)', color: 'var(--text-secondary)' },
+  delGutter: { background: 'rgba(248,81,73,0.25)', color: 'var(--text-secondary)' },
+  sign: { flex: 'none', width: 16, textAlign: 'center' as const, color: 'var(--text-muted)', userSelect: 'none' as const },
+  content: { whiteSpace: 'pre' as const, paddingRight: 16, color: 'var(--text-primary)' },
+} satisfies Record<string, React.CSSProperties>;
 
 function badgeStyle(label: string): React.CSSProperties {
   const map: Record<string, string> = { M: 'var(--accent)', A: '#22863a', D: '#cb2431', U: 'var(--text-muted)', R: 'var(--accent)' };
@@ -265,5 +324,5 @@ const S = {
   msg: { fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: 8, resize: 'vertical' as const, outline: 'none' },
   commitBtn: { fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', cursor: 'pointer' },
   notice: { fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'pre-wrap' },
-  diff: { flex: 1, minWidth: 0, overflow: 'auto', margin: 0, padding: 14, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.45, whiteSpace: 'pre' as const, background: 'var(--bg-panel)' },
+  diff: { flex: 1, minWidth: 0, overflow: 'auto', margin: 0, padding: '8px 0', background: 'var(--bg-panel)' },
 } satisfies Record<string, React.CSSProperties>;
