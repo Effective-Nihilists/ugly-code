@@ -2,6 +2,7 @@ import React from 'react';
 import { native } from 'ugly-app/native';
 import { sessionPort } from '../agent/sessionWorkspace';
 import { getActiveProjectPath } from '../hooks/useSocket';
+import { devServerSpawn } from './devServerCmd';
 
 // A live preview of the running dev server, in an iframe. Each session gets a
 // unique PORT (set in the env of its run_command spawns, so `pnpm dev` binds it),
@@ -36,10 +37,8 @@ function startDev(key: string, projectPath: string, port: number): void {
   notify(d);
   d.log = `$ pnpm dev  (PORT=${port})\n`;
   try {
-    const p = native.process.spawn('bash', ['-lc', 'pnpm dev'], {
-      cwd: projectPath,
-      env: { PORT: String(port), FORCE_COLOR: '0', NO_COLOR: '1' },
-    });
+    const spec = devServerSpawn(port);
+    const p = native.process.spawn(spec.cmd, spec.args, { cwd: projectPath, env: spec.env });
     d.proc = p;
     p.onStdout((c) => { d.log = (d.log + c).slice(-12000); notify(d); });
     p.onStderr((c) => { d.log = (d.log + c).slice(-12000); notify(d); });

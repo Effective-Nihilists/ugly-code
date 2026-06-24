@@ -15,6 +15,7 @@
 import { useContext, useMemo } from 'react';
 import type { AppSocket } from 'ugly-app/client';
 import { native, permissions, taskEntryUrl } from 'ugly-app/native';
+import { waitForTaskRunning } from './taskReady';
 import { buildId } from '../../../shared/Build';
 import type { AppRegistry } from '../shared/api';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
@@ -132,12 +133,7 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
   // `ready`) before returning. task.start resolves when the child is SPAWNED, but the runner
   // then fetches + imports the bundle over https — calling a method before that races the load
   // and throws "unknown task method". A reused, already-running task passes on the first check.
-  for (let i = 0; i < 200; i++) {
-    const t = (await native.task.enum()).find((x) => x.id === id);
-    if (t?.status === 'running') break;
-    if (t && (t.status === 'error' || t.status === 'exited')) throw new Error('coding task failed to start');
-    await new Promise((r) => setTimeout(r, 100));
-  }
+  await waitForTaskRunning(id, () => native.task.enum() as Promise<{ id: string; status: string }[]>);
   sessionTaskIds.set(sessionId, id);
   if (!listenedTaskIds.has(id)) {
     listenedTaskIds.add(id);
