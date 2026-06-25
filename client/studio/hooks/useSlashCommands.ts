@@ -24,6 +24,26 @@ export interface Skill {
   kind?: 'skill' | 'command';
 }
 
+/**
+ * What selecting a popup item should DO. Built-in commands (`/clear`) are run
+ * directly by the panel; disk skills are inserted as a pending pill. Keeping
+ * this a pure decision (instead of inlining `setInput('/clear')`) is what stops
+ * the popup from reopening on a command pick — filling the input with "/clear"
+ * re-matches the slash trigger and traps the user in an un-completable loop.
+ */
+export type SlashAction =
+  | { type: 'run-command'; name: string }
+  | { type: 'insert-skill'; name: string };
+
+export function resolveSlashSelection(
+  skill: Pick<Skill, 'name' | 'kind' | 'scope'>,
+): SlashAction {
+  const isCommand = skill.kind === 'command' || skill.scope === 'command';
+  return isCommand
+    ? { type: 'run-command', name: skill.name }
+    : { type: 'insert-skill', name: skill.name };
+}
+
 /** Built-in slash commands surfaced in the popup alongside skills. */
 const BUILTIN_COMMANDS: Skill[] = [
   {

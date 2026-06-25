@@ -82,7 +82,11 @@ import {
 } from '../hooks/useCodingAgentChat';
 import { useGitStatus } from '../hooks/useGitStatus';
 import { useInputHistory } from '../hooks/useInputHistory';
-import { useSlashCommands } from '../hooks/useSlashCommands';
+import {
+  useSlashCommands,
+  resolveSlashSelection,
+  type Skill,
+} from '../hooks/useSlashCommands';
 import { useSocket, getActiveProjectPath } from '../hooks/useSocket';
 import { native } from 'ugly-app/native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -6942,20 +6946,33 @@ CodingAgentChatProps = {}) {
     loadNewerMessages,
   ]);
 
+  // `/clear` wipes the chat history *in place* — same sessionId, same worktree,
+  // same indexes — avoiding the re-init cost (worktree provisioning, codebase-
+  // index banner, dev-server restart) that startNewChat pays. Shared by the
+  // send-handler (typed "/clear" + Enter) and the slash-popup command dispatch.
+  const clearChat = useCallback(() => {
+    setInput('');
+    setAttachments([]);
+    void clearMessages();
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [clearMessages]);
+
+  // Dispatch a built-in slash command picked from the popup (`onRunCommand`).
+  const handleRunCommand = useCallback(
+    (name: string) => {
+      if (name === 'clear') clearChat();
+    },
+    [clearChat],
+  );
+
   const handleSend = useCallback(() => {
     const trimmed = input.trim();
     const hasAttachments = attachments.length > 0;
     if (!trimmed && !pendingSkill && !hasAttachments) return;
-    // Local command: `/clear` wipes the chat history *in place* —
-    // same sessionId, same worktree, same indexes. Avoids the
-    // re-init cost (worktree provisioning, codebase-index banner,
-    // dev-server restart) the user paid back when this called
-    // `startNewChat`.
+    // Local command: typed `/clear` + Enter runs the same in-place wipe as the
+    // slash-popup pick (see clearChat).
     if (trimmed === '/clear' && !pendingSkill) {
-      setInput('');
-      setAttachments([]);
-      void clearMessages();
-      setTimeout(() => inputRef.current?.focus(), 0);
+      clearChat();
       return;
     }
     if (trimmed) history.push(trimmed);
@@ -6978,7 +6995,7 @@ CodingAgentChatProps = {}) {
     attachments,
     pendingSkill,
     sendMessage,
-    clearMessages,
+    clearChat,
     hasMoreNewer,
     jumpToTail,
     pinToBottom,
@@ -7991,6 +8008,7 @@ CodingAgentChatProps = {}) {
             permissionMode={permissionMode}
             pendingSkill={pendingSkill}
             onPendingSkillChange={setPendingSkill}
+            onRunCommand={handleRunCommand}
             awaitingAskUser={
               pendingAskUsers.length > 0 || pendingStepReviews.length > 0
             }
@@ -8023,6 +8041,7 @@ function CodingAgentInputArea({
   permissionMode,
   pendingSkill,
   onPendingSkillChange,
+  onRunCommand,
   awaitingAskUser = false,
   scratchpadCount = 0,
   showScratchpad = false,
@@ -8065,6 +8084,8 @@ function CodingAgentInputArea({
   permissionMode: 'edit' | 'yolo' | 'claude-plan' | undefined;
   pendingSkill: string | null;
   onPendingSkillChange: (skill: string | null) => void;
+  /** Run a built-in slash command (e.g. `/clear`) picked from the popup. */
+  onRunCommand?: (name: string) => void;
   /** When true, disable the textarea and send button because the agent is waiting on an ask_user answer. */
   awaitingAskUser?: boolean;
   scratchpadCount?: number;
@@ -8080,17 +8101,22 @@ function CodingAgentInputArea({
     | null;
 }) {
   const handleSlashSelect = useCallback(
-    (skill: { name: string; kind?: string; scope: string }) => {
-      const isCommand = skill.kind === 'command' || skill.scope === 'command';
-      if (isCommand) {
-        setInput(`/${skill.name}`);
+    (skill: Skill) => {
+      const action = resolveSlashSelection(skill);
+      if (action.type === 'run-command') {
+        // Built-in commands run on select — never write "/clear" back into the
+        // input (it re-matches the slash trigger and reopens the popup, which is
+        // the bug that made `/clear` impossible to complete). Clear the partial
+        // query and hand off to the panel's command dispatcher.
+        setInput('');
+        onRunCommand?.(action.name);
       } else {
-        onPendingSkillChange(skill.name);
+        onPendingSkillChange(action.name);
         setInput('');
       }
       setTimeout(() => inputRef.current?.focus(), 0);
     },
-    [setInput, onPendingSkillChange, inputRef],
+    [setInput, onPendingSkillChange, onRunCommand, inputRef],
   );
 
   const slash = useSlashCommands({
