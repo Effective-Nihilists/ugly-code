@@ -6,7 +6,7 @@
 // its emitCustom-style events become task events (task.event:<id>) via uglyTask.emit.
 import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
-import { runClientAgentTurn, abortClientAgent, type AgentSelection } from './clientAgent';
+import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, type AgentSelection } from './clientAgent';
 
 const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
 
@@ -62,6 +62,9 @@ defineTask({
     },
     // Interrupt the running turn (chatStop → task.call('interrupt')).
     interrupt: async () => { abortClientAgent(sessionId); return { ok: true }; },
+    // `/clear`: drop the in-memory agent context (keeps the worktree); the renderer
+    // wipes the persisted transcript separately so the next turn starts empty.
+    clear: async () => { clearClientAgentSession(sessionId); return { ok: true }; },
     // Identity/state for a freshly-attached UI (history itself is read from the server
     // via codingSessionListMessages, same as before).
     getState: async () => ({ sessionId, projectPath: t.params?.projectPath ?? null }),

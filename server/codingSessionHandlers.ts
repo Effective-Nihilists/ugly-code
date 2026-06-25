@@ -23,6 +23,7 @@ type CodingSessionHandlers = Pick<
   | 'codingSessionListMessages'
   | 'codingSessionList'
   | 'codingSessionArchive'
+  | 'codingSessionClearMessages'
 >;
 
 /** `getDb` returns the per-request TypedDB (app.db on Node, typedDb on Workers). */
@@ -144,6 +145,27 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       if (sess?.userId !== userId) throw new Error('Session not found');
       await db.setDocFields(collections.codingSession, sessionId, { archived: true });
       return { ok: true };
+    },
+
+    // `/clear`: delete every message row for the session (compacted ones too) so a
+    // reload/resume starts from an empty transcript, and zero the session counters.
+    // The session doc + its worktree binding are kept — same session, fresh history.
+    codingSessionClearMessages: async (userId, { sessionId }) => {
+      const db = getDb();
+      const sess = await db.getDoc(collections.codingSession, sessionId);
+      if (sess && sess.userId !== userId) throw new Error('Session not found');
+      const docs: CodingSessionMessage[] = await db.getDocs(
+        collections.codingSessionMessage,
+        { sessionId, userId },
+        { limit: 5000 },
+      );
+      for (const d of docs) {
+        await db.deleteDoc(collections.codingSessionMessage, d._id);
+      }
+      if (sess) {
+        await db.setDocFields(collections.codingSession, sessionId, { messageCount: 0, costUsd: 0 });
+      }
+      return { ok: true, deleted: docs.length };
     },
   };
 }

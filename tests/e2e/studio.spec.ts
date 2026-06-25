@@ -188,6 +188,70 @@ test.describe('Studio shell — real app', () => {
     await expect(list).toContainText('hello via task');
   });
 
+  // Regression: `/clear` from the slash popup wipes the conversation in place.
+  // It used to do nothing — clearMessages bailed because the no-op
+  // codingAgentChatClearMessages returned `{}` (no `ok`), so setMessages([])
+  // never ran. The fix returns `{ ok: true }` (+ resets the task / persistence).
+  test('/clear wipes the conversation', async ({ page }) => {
+    const mock = await enterStudioShell(page, auth!, {
+      'permissions.query': { granted: { fs: 'full', process: 'full' } },
+      'task.enum': { tasks: [] },
+      'task.start': { id: 'placeholder' },
+      'task.call': { ok: true },
+    });
+    await openProject(page);
+
+    await page.locator('[data-id=home-prompt-input]').fill('seed the conversation');
+    await page.locator('[data-id=home-start-session]').click();
+
+    await expect
+      .poll(async () => (await mock.calls()).some((c) => c.channel === 'task.start'), { timeout: 15_000 })
+      .toBe(true);
+    const start = (await mock.calls()).find((c) => c.channel === 'task.start')!;
+    const taskId = (start.payload as { id: string }).id;
+    const sessionId = (start.payload as { params: { sessionId: string } }).params.sessionId;
+    const msgFrame = (role: string, text: string, finish = false) => ({
+      event: 'msg',
+      data: {
+        type: 'codingAgent:event',
+        sessionId,
+        event: {
+          type: 'message',
+          payload: {
+            type: 'created',
+            payload: {
+              id: `${role}-${Math.random().toString(36).slice(2, 7)}`,
+              role,
+              parts: finish
+                ? [{ type: 'text', data: { text } }, { type: 'finish' }]
+                : [{ type: 'text', data: { text } }],
+              created_at: Date.now(),
+            },
+          },
+        },
+      },
+    });
+    await mock.emit(`task.event:${taskId}` as never, msgFrame('user', 'seed the conversation') as never);
+    await mock.emit(`task.event:${taskId}` as never, msgFrame('assistant', 'SEEDED_REPLY', true) as never);
+
+    const list = page.locator('[data-id=chat-messages-list]');
+    await expect(list).toContainText('SEEDED_REPLY', { timeout: 15_000 });
+
+    // Type `/clear`, which opens the slash popup with the built-in `/clear`
+    // selected; Enter dispatches the command (it must NOT just re-insert "/clear"
+    // into the input, the old trap).
+    const input = page.locator('[data-id=chat-input]');
+    await input.fill('/clear');
+    await input.press('Enter');
+
+    // Conversation wiped: both messages gone, input cleared, and the task was told
+    // to reset its context.
+    await expect(list).not.toContainText('SEEDED_REPLY');
+    await expect(list).not.toContainText('seed the conversation');
+    await expect(input).toHaveValue('');
+    await mock.expectInvoked('task.call', { method: 'clear' });
+  });
+
   // "Run eval" loads the 59 ported task defs (client/studio/evals/registry.ts)
   // into the picker, sorted easy → hard. Pure client-side (no AI/native), so it
   // runs in the deterministic suite.

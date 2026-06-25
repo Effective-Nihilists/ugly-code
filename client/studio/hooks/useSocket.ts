@@ -631,7 +631,18 @@ const handlers: Record<string, Handler> = {
     if (taskId) void native.task.call(taskId, 'interrupt').catch(() => {});
     return Promise.resolve({});
   },
-  codingAgentChatClearMessages: () => Promise.resolve({}),
+  // `/clear`: wipe the conversation in place. Reset the running task's in-memory
+  // agent context (so the model forgets) + delete the persisted transcript (so a
+  // resume starts empty) — both best-effort — and return `{ ok: true }` so the
+  // hook's clearMessages proceeds to empty the UI. Previously this returned `{}`,
+  // so clearMessages bailed on `!ok` and `/clear` did nothing.
+  codingAgentChatClearMessages: (i) => {
+    const sessionId = String(i.sessionId ?? '');
+    const taskId = sessionTaskIds.get(sessionId);
+    if (taskId) void native.task.call(taskId, 'clear').catch(() => {});
+    void sessionApi.clearMessages({ sessionId }).catch(() => {});
+    return Promise.resolve({ ok: true });
+  },
   codingAgentToolStop: () => Promise.resolve({}),
   codingAgentChatSetModel: (i) => {
     setSessionModel(String(i.sessionId ?? ''), String(i.model ?? ''));

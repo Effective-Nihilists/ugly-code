@@ -709,3 +709,20 @@ export async function runClientAgentTurn(
 export function abortClientAgent(sessionId: string): void {
   sessions.get(sessionId)?.controller.abort();
 }
+
+/**
+ * `/clear`: discard this session's in-memory agent context so the conversation
+ * starts fresh WITHOUT tearing down the worktree. We abort any in-flight turn,
+ * dispose the runAgent controller, and drop the session entry — the next turn
+ * rebuilds it via getOrCreate (seq back to 0, empty history) and `ensureResumed`
+ * re-reads the persisted transcript, which the caller wipes server-side in the
+ * same `/clear`. The provisioned workspace (separate map) is untouched, so no
+ * worktree re-provision on the next message.
+ */
+export function clearClientAgentSession(sessionId: string): void {
+  const s = sessions.get(sessionId);
+  if (!s) return;
+  try { s.controller.abort(); } catch { /* no in-flight turn */ }
+  try { s.controller.dispose(); } catch { /* already torn down */ }
+  sessions.delete(sessionId);
+}

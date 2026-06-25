@@ -202,6 +202,14 @@ export const requests = defineRequests({
     output: z.object({ ok: z.boolean() }),
   }),
 
+  // `/clear`: wipe a session's transcript in place (same session/worktree). Deletes
+  // every persisted message row so a reload/resume starts empty, and zeroes the
+  // session's running counters.
+  codingSessionClearMessages: authReq({
+    input: z.object({ sessionId: z.string() }),
+    output: z.object({ ok: z.boolean(), deleted: z.number() }),
+  }),
+
   // Example: public request — userId is string | null
   // getPublicData: req({
   //   input: z.object({ id: z.string() }),

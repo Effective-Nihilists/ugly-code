@@ -163,6 +163,10 @@ export const sessionApi = {
 
   archive: (input: { sessionId: string }): Promise<{ ok: boolean } | null> =>
     api('codingSessionArchive', input),
+
+  /** `/clear`: wipe the session's persisted transcript so a resume starts empty. */
+  clearMessages: (input: { sessionId: string }): Promise<{ ok: boolean; deleted: number } | null> =>
+    api('codingSessionClearMessages', input),
 };
 
 /** Turn a stored transcript row back into a runAgent working-context message (for resume). */
