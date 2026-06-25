@@ -44,8 +44,25 @@ import {
 } from './serverSessionApi';
 import { assistantParts, type Part } from './sessionDisplay';
 import { ensureSessionWorkspace, getSessionWorkspace } from './sessionWorkspace';
+import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
 
 type Emit = (msg: { type: string; [k: string]: unknown }) => void;
+
+/**
+ * The user-controlled session axes the chat header surfaces. The client agent
+ * runs a single CONCRETE model — it has no auto-router / pattern engine — so
+ * `modelMode` and `patternMode` are passthrough state: it must echo the user's
+ * picks back in every `session_state` snapshot or the chat header silently
+ * resets them each turn (picked deepseek_v4_flash → flipped to sonnet; pattern
+ * "none" → flipped to "auto"). Plumbed in from useSocket via the coding task.
+ */
+export interface AgentSelection {
+  model?: string;
+  reasoningEffort?: ReasoningEffort;
+  permissionMode?: SessionSnapshot['permissionMode'];
+  modelMode?: SessionSnapshot['modelMode'];
+  patternMode?: SessionSnapshot['patternMode'];
+}
 
 const rid = (): string => 'msg_' + Math.random().toString(36).slice(2, 11);
 
@@ -182,6 +199,81 @@ interface SessionAgentState {
   /** The first user message (the task), pinned verbatim into every compaction
    *  summary so the original instruction is never lost to the context window. */
   taskText: string;
+  // ── User-selected axes (drive the run + echoed in every session_state) ──
+  // `model` is authoritative for the runAgent loop (read live each turn via a
+  // getter on its config); the rest are passthrough state the header reads back.
+  model: string;
+  reasoningEffort: ReasoningEffort;
+  permissionMode: SessionSnapshot['permissionMode'];
+  modelMode: SessionSnapshot['modelMode'];
+  patternMode: SessionSnapshot['patternMode'];
+}
+
+/** Fold a (partial) user selection onto the session state. Called on create and
+ *  on every subsequent turn so a mid-session model/mode swap takes effect. */
+function applySelection(s: SessionAgentState, sel?: AgentSelection): void {
+  if (!sel) return;
+  if (sel.model) s.model = sel.model;
+  if (sel.reasoningEffort) s.reasoningEffort = sel.reasoningEffort;
+  if (sel.permissionMode) s.permissionMode = sel.permissionMode;
+  if (sel.modelMode) s.modelMode = sel.modelMode;
+  if (sel.patternMode) s.patternMode = sel.patternMode;
+}
+
+/**
+ * Build the `session_state` snapshot payload from the session's live telemetry
+ * + the user's selected axes. Pure (no emit) so the echo-the-selection contract
+ * is unit-testable. The chat hook's `applySnapshot` reads `finishPipeline`
+ * WITHOUT guards, so the empty shape is always present (the client agent has no
+ * finish pipeline).
+ */
+export function composeSessionSnapshot(args: {
+  sessionId: string;
+  cwd: string;
+  createdAt: number;
+  updatedAt: number;
+  model: string;
+  reasoningEffort: ReasoningEffort;
+  permissionMode: SessionSnapshot['permissionMode'];
+  modelMode: SessionSnapshot['modelMode'];
+  patternMode: SessionSnapshot['patternMode'];
+  cost: number;
+  promptTokens: number;
+  completionTokens: number;
+  perModel: PerModelAcc[];
+  messageCount: number;
+}): Record<string, unknown> {
+  return {
+    compositeId: args.sessionId,
+    workspaceId: args.sessionId.split(':')[0] ?? '',
+    sessionId: args.sessionId.split(':')[1] ?? args.sessionId,
+    title: '',
+    cwd: args.cwd,
+    createdAt: args.createdAt,
+    updatedAt: args.updatedAt,
+    mode: args.permissionMode === 'yolo' ? ('yolo' as const) : ('edit' as const),
+    model: args.model,
+    reasoningEffort: args.reasoningEffort,
+    supportsReasoning: false,
+    permissionMode: args.permissionMode,
+    modelMode: args.modelMode,
+    patternMode: args.patternMode,
+    resolvedPattern: null,
+    currentStepId: null,
+    currentStepIter: 0,
+    currentStepFinished: false,
+    worktree: null,
+    worktreeBlocked: false,
+    worktreeStatus: null,
+    finishPipeline: { running: false, done: false, ok: false, stages: [] },
+    cost: args.cost,
+    promptTokens: args.promptTokens,
+    completionTokens: args.completionTokens,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    perModel: args.perModel,
+    messageCount: args.messageCount,
+  };
 }
 
 /**
@@ -287,7 +379,7 @@ function persistMeta(s: SessionAgentState, sessionId: string, status: 'running' 
     sessionId,
     projectId: s.projectId,
     title: s.title,
-    model: AGENT_DEFAULT_MODEL,
+    model: s.model,
     status,
     messageCount: s.messageCount,
     costUsd: s.cost,
@@ -345,7 +437,7 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
   try {
     await s.controller.resume({
       sessionId,
-      model: AGENT_DEFAULT_MODEL,
+      model: s.model,
       messages,
       status: 'idle',
       updatedAt: Date.now(),
@@ -360,7 +452,7 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
 
 /** Fold one turn's usage into the session accumulators. */
 function accrue(s: SessionAgentState, t: MsgTelemetry): void {
-  const model = t.model ?? AGENT_DEFAULT_MODEL;
+  const model = t.model ?? s.model;
   const input = t.inputTokens ?? 0;
   const output = t.outputTokens ?? 0;
   const cost = t.costUsd ?? 0;
@@ -384,42 +476,22 @@ function accrue(s: SessionAgentState, t: MsgTelemetry): void {
  * thing is best-effort via safeEmit.
  */
 function emitTelemetry(s: SessionAgentState, sessionId: string): void {
-  const now = Date.now();
-  const snap = {
-    compositeId: sessionId,
-    workspaceId: sessionId.split(':')[0] ?? '',
-    sessionId: sessionId.split(':')[1] ?? sessionId,
-    title: '',
+  const snap = composeSessionSnapshot({
+    sessionId,
     cwd: getActiveProjectPath() ?? '',
     createdAt: s.createdAt,
-    updatedAt: now,
-    mode: 'yolo' as const,
-    model: AGENT_DEFAULT_MODEL,
-    reasoningEffort: 'medium',
-    supportsReasoning: false,
-    permissionMode: 'edit' as const,
-    modelMode: { kind: 'auto' as const },
-    patternMode: 'auto' as const,
-    resolvedPattern: null,
-    currentStepId: null,
-    currentStepIter: 0,
-    currentStepFinished: false,
-    worktree: null,
-    worktreeBlocked: false,
-    worktreeStatus: null,
-    // The chat hook's applySnapshot reads finishPipeline.{running,done,ok} and
-    // .stages.map() WITHOUT guards — omit it and `session_state` crashes the
-    // whole CodingAgentChat (white screen) right after the reply renders. The
-    // client-side agent has no finish pipeline, so send the empty shape.
-    finishPipeline: { running: false, done: false, ok: false, stages: [] },
+    updatedAt: Date.now(),
+    model: s.model,
+    reasoningEffort: s.reasoningEffort,
+    permissionMode: s.permissionMode,
+    modelMode: s.modelMode,
+    patternMode: s.patternMode,
     cost: s.cost,
     promptTokens: s.promptTokens,
     completionTokens: s.completionTokens,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
     perModel: [...s.perModel.values()],
     messageCount: s.messageCount,
-  };
+  });
   safeEmit(s.emitRef.current, {
     type: 'codingAgent:event',
     sessionId,
@@ -427,10 +499,11 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
   });
 }
 
-function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
+function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection): SessionAgentState {
   const existing = sessions.get(sessionId);
   if (existing) {
     existing.emitRef.current = emit;
+    applySelection(existing, selection);
     return existing;
   }
   const emitRef = { current: emit };
@@ -453,13 +526,28 @@ function getOrCreate(sessionId: string, emit: Emit): SessionAgentState {
     titleSet: false,
     resumed: false,
     taskText: '',
+    // Selection defaults — overwritten by `selection` (and any subsequent
+    // turn's selection) via applySelection. Default to the framework model so a
+    // session that somehow arrives without a pick still runs.
+    model: AGENT_DEFAULT_MODEL,
+    reasoningEffort: 'medium',
+    permissionMode: 'edit',
+    modelMode: { kind: 'auto' },
+    patternMode: 'auto',
   };
-  state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: AGENT_DEFAULT_MODEL });
+  applySelection(state, selection);
+  state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: state.model });
 
   state.controller = runAgent({
     socket: fetchSocket,
     sessionId,
-    model: AGENT_DEFAULT_MODEL,
+    // Live getter: runAgent reads `config.model` afresh on every turn request,
+    // so a mid-session model swap (applySelection on the next send) takes effect
+    // without rebuilding the controller. This is what actually routes the turn
+    // to the user's pick (e.g. deepseek_v4_flash) instead of the default.
+    get model() {
+      return state.model;
+    },
     systemPrompt: AGENT_SYSTEM_PROMPT,
     tools: AGENT_TOOLS,
     toolHandlers: makeToolHandlers(sessionId),
@@ -595,8 +683,9 @@ export async function runClientAgentTurn(
   sessionId: string,
   userText: string,
   emit: Emit,
+  selection?: AgentSelection,
 ): Promise<void> {
-  const state = getOrCreate(sessionId, emit);
+  const state = getOrCreate(sessionId, emit, selection);
   // Provision the session's isolated workspace (worktree + deps install) before
   // the first turn so the agent's tools operate in it. Streams progress into the
   // chat; a no-op for the main session (runs on the project) or once cached.

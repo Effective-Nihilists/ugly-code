@@ -2496,9 +2496,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       console.log(
         `[session-origin] useCodingAgentChat.startNewChat chatCreate model=${createModel} mode=${serverMode}`,
       );
+      // Carry the mode axes too: the per-axis set* RPCs return early while
+      // there's no sessionId, so a new-session hero pre-pick (e.g. patternMode
+      // "none" or a modelMode set before the first message) would otherwise be
+      // lost until the session existed. chatCreate seeds them up-front.
       const { sessionId: newId } = await agentApi(backend.chatCreate, {
         model: createModel,
         mode: serverMode,
+        patternMode,
+        modelMode,
       });
       console.debug('[CodingAgentChat] Session created: %s', newId);
       setSessionId(newId);
@@ -2524,7 +2530,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       setError(errMsg);
       return null;
     }
-  }, [sessionId, model, permissionMode, reasoningEffort, backend]);
+  }, [sessionId, model, permissionMode, patternMode, modelMode, reasoningEffort, backend]);
 
   // Resume the agent session on mount when `initialSessionId` is set:
   // attach to the existing composite ID and backfill the rendered

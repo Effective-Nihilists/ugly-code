@@ -6,7 +6,7 @@
 // its emitCustom-style events become task events (task.event:<id>) via uglyTask.emit.
 import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
-import { runClientAgentTurn, abortClientAgent } from './clientAgent';
+import { runClientAgentTurn, abortClientAgent, type AgentSelection } from './clientAgent';
 
 const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
 
@@ -56,8 +56,8 @@ defineTask({
   onCall: {
     // Run one agent turn. The loop's emitCustom-shaped frames stream to listeners as the
     // 'msg' task event; the UI adapter feeds them to its existing onCustomMessage handler.
-    send: async (p: { text: string }) => {
-      await runClientAgentTurn(sessionId, p.text, (msg) => t.emit('msg', msg));
+    send: async (p: { text: string; selection?: AgentSelection }) => {
+      await runClientAgentTurn(sessionId, p.text, (msg) => t.emit('msg', msg), p.selection);
       return { ok: true };
     },
     // Interrupt the running turn (chatStop → task.call('interrupt')).

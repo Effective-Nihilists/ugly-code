@@ -186,6 +186,31 @@ export function getSessionModel(sessionId: string): string | null {
   } catch { /* ignore */ }
   return null;
 }
+
+// Per-session selection of the non-model axes (modelMode / patternMode /
+// permissionMode / reasoningEffort). The client-side coding agent runs a single
+// concrete model and has no auto-router/pattern engine, but it MUST be told the
+// user's picks so it echoes them in every session_state snapshot — otherwise the
+// chat header silently resets them to defaults each turn. The set* RPCs (below)
+// were previously no-ops, which is exactly why "none"/"max"/etc. reverted.
+interface SessionAxes {
+  modelMode?: unknown;
+  patternMode?: string;
+  permissionMode?: string;
+  reasoningEffort?: string;
+}
+const sessionAxes = new Map<string, SessionAxes>();
+function patchSessionAxes(sessionId: string, patch: SessionAxes): void {
+  if (!sessionId) return;
+  sessionAxes.set(sessionId, { ...(sessionAxes.get(sessionId) ?? {}), ...patch });
+}
+/** Compose the full selection the coding task needs for a turn: the routed
+ *  model plus the user-picked axes. Passed verbatim into `runClientAgentTurn`. */
+function buildSelection(sessionId: string): Record<string, unknown> {
+  const axes = sessionAxes.get(sessionId) ?? {};
+  const model = getSessionModel(sessionId);
+  return { ...(model ? { model } : {}), ...axes };
+}
 /** A local Claude Code CLI model id (defined here to avoid a static import cycle
  *  with claudeCliAgent, which imports from this module). */
 function isClaudeCliModel(model: string | null | undefined): boolean {
@@ -558,6 +583,17 @@ const handlers: Record<string, Handler> = {
       ? String(i.resumeSessionId)
       : 'cs:' + Math.random().toString(36).slice(2, 11);
     if (i.model) setSessionModel(sessionId, String(i.model));
+    // Seed the session's axes from create-time picks so the first turn's
+    // snapshot echoes them (the per-axis set* RPCs no-op while sessionId is
+    // null, so a new-session hero pre-pick only arrives here). `mode` is the
+    // legacy permission axis ('edit' | 'yolo').
+    if (i.mode) patchSessionAxes(sessionId, { permissionMode: String(i.mode) });
+    if (i.patternMode) patchSessionAxes(sessionId, { patternMode: String(i.patternMode) });
+    if (i.modelMode) {
+      patchSessionAxes(sessionId, { modelMode: i.modelMode });
+      const mm = i.modelMode as { kind?: string; model?: string };
+      if (mm.kind === 'single' && mm.model) setSessionModel(sessionId, mm.model);
+    }
     return Promise.resolve({ sessionId });
   },
   codingAgentChatSend: (i) => {
@@ -577,7 +613,7 @@ const handlers: Record<string, Handler> = {
     void (async () => {
       try {
         const id = await ensureCodingTask(sessionId);
-        await native.task.call(id, 'send', { text: message });
+        await native.task.call(id, 'send', { text: message, selection: buildSelection(sessionId) });
       } catch (e) {
         emitAgentError(sessionId, e);
       }
@@ -601,12 +637,32 @@ const handlers: Record<string, Handler> = {
     setSessionModel(String(i.sessionId ?? ''), String(i.model ?? ''));
     return Promise.resolve({});
   },
-  codingAgentSetReasoningEffort: () => Promise.resolve({}),
+  // The four set* RPCs below record the user's pick per session so the next
+  // turn's snapshot echoes it (they were no-ops, which is why picks reverted).
+  codingAgentSetReasoningEffort: (i) => {
+    patchSessionAxes(String(i.sessionId ?? ''), { reasoningEffort: String(i.effort ?? '') });
+    return Promise.resolve({});
+  },
   codingAgentGrantPermission: () => Promise.resolve({}),
   codingAgentSkipPermissions: () => Promise.resolve({}),
-  codingAgentSetPermissionMode: () => Promise.resolve({}),
-  codingAgentSetModelMode: () => Promise.resolve({}),
-  codingAgentSetPatternMode: () => Promise.resolve({}),
+  codingAgentSetPermissionMode: (i) => {
+    patchSessionAxes(String(i.sessionId ?? ''), { permissionMode: String(i.permissionMode ?? '') });
+    return Promise.resolve({});
+  },
+  codingAgentSetModelMode: (i) => {
+    const sessionId = String(i.sessionId ?? '');
+    patchSessionAxes(sessionId, { modelMode: i.modelMode });
+    // A concrete single-model pick must also update the routed model (the run +
+    // the CLI-vs-ugly.bot routing both read getSessionModel) — without this a
+    // mid-session swap kept running the old model.
+    const mm = i.modelMode as { kind?: string; model?: string } | undefined;
+    if (mm?.kind === 'single' && mm.model) setSessionModel(sessionId, mm.model);
+    return Promise.resolve({});
+  },
+  codingAgentSetPatternMode: (i) => {
+    patchSessionAxes(String(i.sessionId ?? ''), { patternMode: String(i.patternMode ?? '') });
+    return Promise.resolve({});
+  },
   markSessionViewed: () => Promise.resolve({}),
   getCodingAgentWorktreeBehind: () => Promise.resolve({ behind: 0 }),
   getCodingAgentWorktreeAhead: () => Promise.resolve({ ahead: 0 }),
