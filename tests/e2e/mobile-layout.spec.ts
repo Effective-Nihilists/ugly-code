@@ -40,4 +40,17 @@ test.describe('Mobile workspace — nav drawer', () => {
     );
     expect(overflow).toBeLessThanOrEqual(1); // allow sub-pixel rounding
   });
+
+  test('database pane does not overflow the viewport at phone width', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await enterStudioShell(page, auth!);
+    await openProject(page);
+    await page.locator('[data-id="mobile-nav-toggle"]').click();
+    await page.locator('[data-id="mobile-view-database"]').click();
+    await expect(page.locator('[data-id="mobile-nav-drawer"]')).not.toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
 });

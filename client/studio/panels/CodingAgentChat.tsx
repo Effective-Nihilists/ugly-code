@@ -8275,7 +8275,11 @@ function CodingAgentInputArea({
   return (
     <div
       style={{
-        padding: '8px 12px',
+        paddingTop: 8,
+        paddingLeft: 12,
+        paddingRight: 12,
+        // Clear the on-screen home indicator on the native mobile shell.
+        paddingBottom: 'calc(8px + var(--safe-area-inset-bottom))',
         borderTop: '1px solid var(--border)',
         background: 'var(--bg-panel)',
         flexShrink: 0,
@@ -8623,7 +8627,7 @@ function EvalScorecardModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 40,
+        padding: 'clamp(16px, 5vw, 40px)',
       }}
     >
       <div
