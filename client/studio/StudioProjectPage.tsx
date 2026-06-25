@@ -129,7 +129,7 @@ export default function StudioProjectPage({
   // nav drawer (the sidebar isn't rendered inline). Leaving mobile closes it.
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const closeDrawer = React.useCallback(() => setDrawerOpen(false), []);
+  const closeDrawer = React.useCallback(() => { setDrawerOpen(false); }, []);
   React.useEffect(() => { if (!isMobile) setDrawerOpen(false); }, [isMobile]);
 
   React.useEffect(() => {
@@ -300,7 +300,7 @@ export default function StudioProjectPage({
           {isMobile ? (
             <button
               data-id="mobile-nav-toggle"
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => { setDrawerOpen(true); }}
               style={S.hamburger}
               aria-label="Open navigation"
             >
@@ -373,7 +373,7 @@ export default function StudioProjectPage({
             style={{ ...S.scrim, ...(drawerOpen ? S.scrimOpen : {}) }}
           />
           <div data-id="mobile-nav-drawer" style={{ ...S.drawer, ...(drawerOpen ? S.drawerOpen : {}) }}>
-            <button onClick={() => { onBack(); closeDrawer(); }} style={S.drawerBack}>
+            <button data-id="mobile-drawer-back" onClick={() => { onBack(); closeDrawer(); }} style={S.drawerBack}>
               ‹ Projects
             </button>
             <div style={S.viewsList}>

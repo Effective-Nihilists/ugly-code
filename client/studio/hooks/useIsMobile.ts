@@ -19,10 +19,10 @@ export function useIsMobile(maxWidth = MOBILE_MAX_WIDTH): boolean {
     typeof window === 'undefined' ? false : isMobileWidth(window.innerWidth, maxWidth),
   );
   useEffect(() => {
-    const onResize = (): void => setIsMobile(isMobileWidth(window.innerWidth, maxWidth));
+    const onResize = (): void => { setIsMobile(isMobileWidth(window.innerWidth, maxWidth)); };
     onResize();
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => { window.removeEventListener('resize', onResize); };
   }, [maxWidth]);
   return isMobile;
 }
