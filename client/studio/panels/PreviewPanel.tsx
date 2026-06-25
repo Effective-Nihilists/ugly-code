@@ -108,7 +108,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   }, [devKey, port, sessionId]);
 
   return (
-    <div style={S.root}>
+    <div data-id="preview-panel" style={S.root}>
       <div style={S.bar}>
         <button
           data-id="preview-start"
