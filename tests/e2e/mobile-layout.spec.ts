@@ -64,3 +64,16 @@ test.describe('Mobile workspace — nav drawer', () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 });
+
+// The landing page renders for non-native browsers, so this needs NO auth.
+test.describe('Mobile landing page', () => {
+  test('landing has no horizontal overflow at phone width', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('/'); // non-native browser → landing page
+    await expect(page.getByText('Three layers.', { exact: false }).first()).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+});

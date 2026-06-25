@@ -203,7 +203,16 @@ export default function StudioLandingPage(): React.ReactElement {
   }, []);
 
   return (
-    <View style={{ flex: 1, background: BG }}>
+    <View
+      style={{
+        flex: 1,
+        background: BG,
+        // viewport-fit=cover lets content slide under a notch in landscape;
+        // env() insets are 0 on normal devices, so this is a no-op elsewhere.
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
       <ScrollView showScrollArrow>
         <NavBar />
         <HeroInstall
@@ -1127,6 +1136,7 @@ function ToolChart() {
 }
 
 function ToolList() {
+  const isDesktop = useIsDesktop();
   const tools: { name: string; gap?: boolean }[] = [
     { name: 'read' }, { name: 'edit' }, { name: 'bash' },
     { name: 'grep' }, { name: 'glob' }, { name: 'write' },
@@ -1145,7 +1155,7 @@ function ToolList() {
     { name: 'database_sql_query', gap: true },
   ];
   return (
-    <div style={{ border: `1px solid ${BORDER}`, background: BG_ELEV, padding: 28 }}>
+    <div style={{ border: `1px solid ${BORDER}`, background: BG_ELEV, padding: isDesktop ? 28 : 18 }}>
       <div
         style={{
           display: 'flex',
@@ -1178,7 +1188,7 @@ function ToolList() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
           border: `1px solid ${BORDER}`,
         }}
       >
