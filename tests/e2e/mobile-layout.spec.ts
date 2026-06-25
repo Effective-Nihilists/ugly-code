@@ -53,4 +53,14 @@ test.describe('Mobile workspace — nav drawer', () => {
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });
+
+  test('project picker fits a phone with no horizontal overflow', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await enterStudioShell(page, auth!); // lands on the picker (no project opened)
+    await expect(page.getByRole('button', { name: /Create Project/ })).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
 });

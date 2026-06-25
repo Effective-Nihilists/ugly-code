@@ -5,6 +5,7 @@ import { generateTaskId } from '../utils/taskId';
 import { timeAgoShort } from '../utils/timeAgo';
 import { EvalPickerModal } from './EvalPickerModal';
 import { ManifestoFooter } from './ManifestoFooter';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 /**
  * Render text with each word in its own animated <span>. Words cascade
@@ -126,6 +127,8 @@ export function ProjectOnboarding({
   // mount/exit transitions and clashed with the project tab strip
   // that lives in the same bar.
 
+  // Below 768px the two-column hero/recents grid collapses to one column.
+  const isMobile = useIsMobile();
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [activeAction, setActiveAction] = useState<ActionTab>('new');
   const [newName, setNewName] = useState('');
@@ -408,10 +411,10 @@ export function ProjectOnboarding({
           style={{
             maxWidth: 1280,
             margin: '0 auto',
-            padding: '56px 40px 40px',
+            padding: isMobile ? '24px 16px' : '56px 40px 40px',
             display: 'grid',
-            gridTemplateColumns: 'minmax(380px, 420px) 1fr',
-            gap: 56,
+            gridTemplateColumns: isMobile ? '1fr' : 'minmax(380px, 420px) 1fr',
+            gap: isMobile ? 24 : 56,
             alignItems: 'flex-start',
           }}
         >
