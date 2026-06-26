@@ -54,6 +54,37 @@ test.describe('Mobile workspace — nav drawer', () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
+  test('respects safe-area insets (simulated notch) in the workspace', async ({ page }) => {
+    const TOP = 44;
+    const BOTTOM = 34;
+    await page.setViewportSize(PHONE);
+    await enterStudioShell(page, auth!);
+    await openProject(page);
+
+    // env(safe-area-inset-*) is 0 in a desktop browser, so simulate a notch by
+    // overriding the CSS vars the layout reads (this style tag wins the cascade).
+    await page.addStyleTag({
+      content: `:root { --safe-area-inset-top: ${TOP}px; --safe-area-inset-bottom: ${BOTTOM}px; }`,
+    });
+
+    // The header content (hamburger) clears the top inset instead of hiding
+    // under the status bar.
+    const toggleBox = await page.locator('[data-id="mobile-nav-toggle"]').boundingBox();
+    expect(toggleBox).not.toBeNull();
+    expect(toggleBox!.y).toBeGreaterThanOrEqual(TOP - 2);
+
+    // The fixed feedback button also clears the status bar.
+    const fbBox = await page.locator('[data-id="feedback-button"]').boundingBox();
+    expect(fbBox).not.toBeNull();
+    expect(fbBox!.y).toBeGreaterThanOrEqual(TOP - 2);
+
+    // The composer clears the home indicator (bottom inset) — its bottom edge
+    // sits at least BOTTOM px above the viewport bottom.
+    const inputBox = await page.locator('[data-id="home-prompt-input"]').boundingBox();
+    expect(inputBox).not.toBeNull();
+    expect(inputBox!.y + inputBox!.height).toBeLessThanOrEqual(PHONE.height - BOTTOM + 2);
+  });
+
   test('project picker fits a phone with no horizontal overflow', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await enterStudioShell(page, auth!); // lands on the picker (no project opened)

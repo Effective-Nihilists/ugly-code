@@ -434,7 +434,11 @@ function TabPickerStyles(): React.ReactElement {
 // Themed via the studio CSS variables (light + dark) so the workspace matches
 // the rest of the app instead of a hardcoded dark palette.
 const S: Record<string, React.CSSProperties> = {
-  root: { display: 'flex', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' },
+  // 100dvh (not 100vh) tracks the mobile browser/keyboard chrome. Safe-area
+  // padding on L/R/bottom keeps content clear of side notches + the home
+  // indicator; the header owns the TOP inset so its bar fills behind the status
+  // bar (immersive). All env() insets are 0 on desktop → a no-op there.
+  root: { display: 'flex', height: '100dvh', boxSizing: 'border-box', paddingLeft: 'var(--safe-area-inset-left)', paddingRight: 'var(--safe-area-inset-right)', paddingBottom: 'var(--safe-area-inset-bottom)', background: 'var(--bg-primary)', color: 'var(--text-primary)' },
   sidebar: { flex: 'none', display: 'flex', minHeight: 0, borderRight: '1px solid var(--border)' },
   // Thin draggable gutter between the session sidebar and the workspace.
   resizer: { width: 5, flex: 'none', cursor: 'col-resize', background: 'transparent', marginLeft: -3, zIndex: 5 },
@@ -442,7 +446,9 @@ const S: Record<string, React.CSSProperties> = {
   // Fixed 36px height to line up exactly with the session-list sidebar header.
   // Right padding reserves space for the fixed top-right feedback icon so the
   // tab control never slides under it (see [data-id='feedback-button'] in styles.css).
-  header: { display: 'flex', alignItems: 'center', gap: 10, height: 36, padding: '0 42px 0 12px', boxSizing: 'border-box', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 },
+  // Height grows by the top inset and paddingTop pushes content below the notch,
+  // so the panel background fills behind the status bar (immersive header).
+  header: { display: 'flex', alignItems: 'center', gap: 10, height: 'calc(36px + var(--safe-area-inset-top))', paddingTop: 'var(--safe-area-inset-top)', paddingRight: 42, paddingBottom: 0, paddingLeft: 12, boxSizing: 'border-box', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 },
   back: { fontFamily: 'var(--font-mono)', fontSize: 11.5, lineHeight: 1, height: 24, display: 'inline-flex', alignItems: 'center', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '0 9px', cursor: 'pointer', flexShrink: 0 },
   name: { fontFamily: 'var(--font-mono)', fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 },
   path: { fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 320 },

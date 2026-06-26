@@ -571,8 +571,9 @@ h6 {
    header reserves right padding so the tab control never slides under it. */
 [data-id='feedback-button'] {
   position: fixed !important;
-  top: 5px !important;
-  right: 8px !important;
+  /* Clear the status bar / notch on mobile-wrapped surfaces (env = 0 on desktop). */
+  top: calc(5px + var(--safe-area-inset-top)) !important;
+  right: calc(8px + var(--safe-area-inset-right)) !important;
   bottom: auto !important;
   left: auto !important;
   z-index: 1000 !important;

@@ -8275,11 +8275,9 @@ function CodingAgentInputArea({
   return (
     <div
       style={{
-        paddingTop: 8,
-        paddingLeft: 12,
-        paddingRight: 12,
-        // Clear the on-screen home indicator on the native mobile shell.
-        paddingBottom: 'calc(8px + var(--safe-area-inset-bottom))',
+        // The workspace root owns the bottom safe-area inset (single source of
+        // truth), so the composer keeps plain padding to avoid double-counting.
+        padding: '8px 12px',
         borderTop: '1px solid var(--border)',
         background: 'var(--bg-panel)',
         flexShrink: 0,
