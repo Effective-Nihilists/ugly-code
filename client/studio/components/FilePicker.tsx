@@ -38,6 +38,9 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
       setRaw(ents);
       setPath(dir);
     } catch (e) {
+      // console.error is captured to the project's server error_log (ugly-app Logger),
+      // so proxied readdir failures are diagnosable without the webview console.
+      console.error('[FilePicker] readdir failed', { dir, message: (e as Error)?.message });
       setError((e as Error)?.message || 'Could not open this folder');
     } finally {
       setLoading(false);
