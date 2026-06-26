@@ -7,7 +7,7 @@ import { native } from 'ugly-app/native';
 import type { HostDirent } from 'ugly-app/native';
 import { Folder, FileText, ArrowUp, Check } from 'lucide-react';
 import { Modal } from '../system/modal/Modal';
-import { filterEntries, joinPath, parentPath, basename, type PickMode } from './filePickerUtils';
+import { filterEntries, joinPath, parentPath, basename, resolveStart, type PickMode } from './filePickerUtils';
 
 export interface FilePickerProps {
   /** What's selectable. Folders are always navigable regardless. */
@@ -22,7 +22,7 @@ export interface FilePickerProps {
 }
 
 export function FilePicker({ mode, extensions, startPath, title, onResult }: FilePickerProps) {
-  const [path, setPath] = useState(startPath ?? '~');
+  const [path, setPath] = useState(() => resolveStart(startPath));
   const [raw, setRaw] = useState<HostDirent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +45,7 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
   }, []);
 
   useEffect(() => {
-    void load(startPath ?? '~');
+    void load(resolveStart(startPath));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

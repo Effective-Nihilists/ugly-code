@@ -11,6 +11,16 @@ export interface PickEntry {
   isDirectory: boolean;
 }
 
+/**
+ * Pick an initial directory `fs.readdir` can actually open. '~' is NOT expanded on the
+ * client (nor by the host's readdir), so a '~'-based or empty start falls back to the
+ * filesystem root for navigation; an absolute path passes through.
+ */
+export function resolveStart(startPath?: string): string {
+  if (!startPath || startPath.startsWith('~')) return '/';
+  return startPath;
+}
+
 /** Go up one directory, preserving a leading '~' or '/'. Root paths return themselves. */
 export function parentPath(path: string): string {
   const trimmed = path.replace(/\/+$/, '');

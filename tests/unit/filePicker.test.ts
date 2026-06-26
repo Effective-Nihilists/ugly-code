@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { parentPath, joinPath, basename, matchesExtension, filterEntries } from '../../client/studio/components/filePickerUtils';
+import { parentPath, joinPath, basename, matchesExtension, filterEntries, resolveStart } from '../../client/studio/components/filePickerUtils';
 import type { HostDirent } from 'ugly-app/native';
 
 const dir = (name: string): HostDirent => ({ name, isDirectory: true, isFile: false }) as HostDirent;
 const file = (name: string): HostDirent => ({ name, isDirectory: false, isFile: true }) as HostDirent;
+
+describe('resolveStart', () => {
+  it("falls back to root for '~'-based or empty starts; passes absolute paths through", () => {
+    expect(resolveStart('~/Documents/Ugly Studio')).toBe('/');
+    expect(resolveStart('~')).toBe('/');
+    expect(resolveStart('')).toBe('/');
+    expect(resolveStart(undefined)).toBe('/');
+    expect(resolveStart('/Users/admin/Documents')).toBe('/Users/admin/Documents');
+  });
+});
 
 describe('parentPath', () => {
   it('goes up one level, preserving root markers', () => {
