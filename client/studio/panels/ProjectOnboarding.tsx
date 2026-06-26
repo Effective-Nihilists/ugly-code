@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { native, isNativeAvailable } from 'ugly-app/native';
+import { FilePicker } from '../components/FilePicker';
 import { shortcut } from '../utils/platform';
 import { generateTaskId } from '../utils/taskId';
 import { timeAgoShort } from '../utils/timeAgo';
@@ -136,6 +137,7 @@ export function ProjectOnboarding({
   const [openPath, setOpenPath] = useState('');
   const [cloneUrl, setCloneUrl] = useState('');
   const [cloneDir, setCloneDir] = useState('');
+  const [picker, setPicker] = useState<{ startPath: string; onPick: (p: string) => void } | null>(null);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -242,13 +244,11 @@ export function ProjectOnboarding({
     };
   }, []);
 
-  const handleBrowse = useCallback(async (setter: (val: string) => void) => {
-    try {
-      const selected = await native.fs.pickDirectory();
-      if (selected) setter(selected);
-    } catch {
-      /* no native picker (web) — the text input is the fallback */
-    }
+  const handleBrowse = useCallback((setter: (val: string) => void, current: string) => {
+    // Custom in-app folder picker — works over the Ugly Proxy (it navigates via
+    // native.fs.readdir), unlike the native fs.pickDirectory dialog which would open on
+    // the desktop and be invisible on a phone. '~' resolves to home on the host.
+    setPicker({ startPath: current.trim() || '~', onPick: setter });
   }, []);
 
   const handleOpenRecent = useCallback(
@@ -542,7 +542,7 @@ export function ProjectOnboarding({
                     value={newParentDir}
                     onChange={setNewParentDir}
                     browsable={hasElectronAPI}
-                    onBrowse={() => void handleBrowse(setNewParentDir)}
+                    onBrowse={() => handleBrowse(setNewParentDir, newParentDir)}
                   />
                   <button
                     type="button"
@@ -573,7 +573,7 @@ export function ProjectOnboarding({
                         : '/path/to/project'
                     }
                     browsable={hasElectronAPI}
-                    onBrowse={() => void handleBrowse(setOpenPath)}
+                    onBrowse={() => handleBrowse(setOpenPath, openPath)}
                     autoFocus
                   />
                   <button
@@ -608,7 +608,7 @@ export function ProjectOnboarding({
                     onChange={setCloneDir}
                     placeholder={hasElectronAPI ? '~' : ''}
                     browsable={hasElectronAPI}
-                    onBrowse={() => void handleBrowse(setCloneDir)}
+                    onBrowse={() => handleBrowse(setCloneDir, cloneDir)}
                   />
                   <button
                     type="button"
@@ -635,6 +635,16 @@ export function ProjectOnboarding({
               >
                 {error}
               </div>
+            )}
+            {picker && (
+              <FilePicker
+                mode="folder"
+                startPath={picker.startPath}
+                onResult={(p) => {
+                  if (p) picker.onPick(p);
+                  setPicker(null);
+                }}
+              />
             )}
           </section>
 
