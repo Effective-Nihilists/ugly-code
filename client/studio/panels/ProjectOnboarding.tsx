@@ -398,6 +398,14 @@ export function ProjectOnboarding({
         background: 'var(--bg-primary)',
         color: 'var(--text-primary)',
         minHeight: 0,
+        // Bespoke full-height page (bypasses PageLayout) → apply safe-area itself
+        // so the "Pick your poison" hero clears the notch / status bar. env() is
+        // 0 on desktop, so this is a no-op there.
+        boxSizing: 'border-box',
+        paddingTop: 'var(--safe-area-inset-top)',
+        paddingBottom: 'var(--safe-area-inset-bottom)',
+        paddingLeft: 'var(--safe-area-inset-left)',
+        paddingRight: 'var(--safe-area-inset-right)',
       }}
     >
       <main

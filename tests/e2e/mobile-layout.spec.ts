@@ -94,6 +94,19 @@ test.describe('Mobile workspace — nav drawer', () => {
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });
+
+  test('project picker hero clears the top safe-area inset (simulated notch)', async ({ page }) => {
+    const TOP = 44;
+    await page.setViewportSize(PHONE);
+    await enterStudioShell(page, auth!);
+    const hero = page.getByText('Pick your poison', { exact: false }).first();
+    await expect(hero).toBeVisible();
+    await page.addStyleTag({ content: `:root { --safe-area-inset-top: ${TOP}px; }` });
+
+    const heroBox = await hero.boundingBox();
+    expect(heroBox).not.toBeNull();
+    expect(heroBox!.y).toBeGreaterThanOrEqual(TOP - 2);
+  });
 });
 
 // The landing page renders for non-native browsers, so this needs NO auth.
