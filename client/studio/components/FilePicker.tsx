@@ -82,7 +82,7 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
         </div>
       </div>
 
-      <div style={{ height: 320, overflowY: 'auto', padding: 6 }}>
+      <div style={{ flex: 1, minHeight: 120, maxHeight: '60vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', touchAction: 'pan-y', padding: 6 }}>
         {loading ? (
           <div style={muted}>Loading…</div>
         ) : error ? (
