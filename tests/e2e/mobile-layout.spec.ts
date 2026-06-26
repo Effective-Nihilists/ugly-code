@@ -107,4 +107,17 @@ test.describe('Mobile landing page', () => {
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });
+
+  test('nav bar respects the top safe-area inset (simulated notch)', async ({ page }) => {
+    const TOP = 44;
+    await page.setViewportSize(PHONE);
+    await page.goto('/');
+    await expect(page.getByText('Three layers.', { exact: false }).first()).toBeVisible();
+    await page.addStyleTag({ content: `:root { --safe-area-inset-top: ${TOP}px; }` });
+
+    // The logo (first nav link) clears the status bar instead of hiding under it.
+    const logoBox = await page.locator('a[href="/"]').first().boundingBox();
+    expect(logoBox).not.toBeNull();
+    expect(logoBox!.y).toBeGreaterThanOrEqual(TOP - 2);
+  });
 });

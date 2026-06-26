@@ -299,6 +299,9 @@ function NavBar() {
         top: 0,
         zIndex: 30,
         backdropFilter: 'blur(12px)',
+        // Fill behind the status bar / notch so the logo + links sit below it
+        // (env = 0 on desktop → no-op).
+        paddingTop: 'var(--safe-area-inset-top)',
       }}
     >
       <Shell>
