@@ -1,5 +1,6 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
+import { useSafeAreaInsets } from 'ugly-app/client';
 import { ChatOpenUriProvider } from './components/LinkifiedText';
 import {
   SessionListSidebar,
@@ -89,6 +90,7 @@ export default function StudioProjectPage({
   projectPath?: string;
   onBack: () => void;
 }): React.ReactElement {
+  const insets = useSafeAreaInsets();
   const urlInit = React.useMemo(() => readWorkspaceUrl(), []);
   const [tab, setTab] = React.useState<WorkspaceTab>(urlInit.tab ?? 'chat');
   // Sessions are persisted per project; CodingAgentChat assigns the real
@@ -279,7 +281,7 @@ export default function StudioProjectPage({
 
   return (
     <ThemeProvider>
-    <div style={S.root}>
+    <div style={{ ...S.root, paddingBottom: `max(${insets.bottom}px, var(--keyboard-inset-height, 0px))` }}>
       {!isMobile && (
         <>
           <div style={{ ...S.sidebar, width: sidebarW }}>

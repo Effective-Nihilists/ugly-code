@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { native, isNativeAvailable } from 'ugly-app/native';
+import { useSafeAreaInsets } from 'ugly-app/client';
 import { FilePicker } from '../components/FilePicker';
 import { shortcut } from '../utils/platform';
 import { generateTaskId } from '../utils/taskId';
@@ -130,6 +131,7 @@ export function ProjectOnboarding({
 
   // Below 768px the two-column hero/recents grid collapses to one column.
   const isMobile = useIsMobile();
+  const insets = useSafeAreaInsets();
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [activeAction, setActiveAction] = useState<ActionTab>('new');
   const [newName, setNewName] = useState('');
@@ -392,7 +394,9 @@ export function ProjectOnboarding({
       className="us-picker-exit"
       data-leaving={leaving ? 'true' : 'false'}
       style={{
-        height: '100%',
+        // 100dvh (not 100%) tracks the mobile browser/keyboard chrome, matching
+        // the workspace root.
+        height: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--bg-primary)',
@@ -403,7 +407,14 @@ export function ProjectOnboarding({
         // 0 on desktop, so this is a no-op there.
         boxSizing: 'border-box',
         paddingTop: 'var(--safe-area-inset-top)',
-        paddingBottom: 'var(--safe-area-inset-bottom)',
+        // Reserve room for the soft keyboard so focused inputs (project name, git
+        // URL, recents filter) stay visible above it. Two sources, whichever is
+        // larger: `insets.bottom` (framework — folds keyboard into bottom; works in
+        // mobile Safari via visualViewport) and `--keyboard-inset-height` (set by the
+        // native iOS UglyBrowser shell from keyboardWillShow — the only reliable
+        // signal there, since the keyboard overlays content and visualViewport never
+        // shrinks). Both are 0 when no keyboard / on desktop, so this is a no-op then.
+        paddingBottom: `max(${insets.bottom}px, var(--keyboard-inset-height, 0px))`,
         paddingLeft: 'var(--safe-area-inset-left)',
         paddingRight: 'var(--safe-area-inset-right)',
       }}
