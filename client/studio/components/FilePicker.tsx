@@ -84,8 +84,10 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
           <button data-id="file-picker-up" onClick={() => void load(parentPath(path))} disabled={loading} aria-label="Up one folder" style={iconBtn}>
             <ArrowUp size={15} />
           </button>
+          {/* direction:rtl keeps the END of long paths visible (ellipsis on the left);
+              <bdi> isolates the path as LTR so segments don't reorder (e.g. the leading ~/). */}
           <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: 'rtl', textAlign: 'left' }}>
-            {path}
+            <bdi>{path}</bdi>
           </div>
         </div>
       </div>
