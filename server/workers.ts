@@ -24,8 +24,10 @@ import type { RequestHandlers } from 'ugly-app';
 import type { TypedDB } from 'ugly-app/server';
 import type { WorkerHandlers } from 'ugly-app/shared';
 
+import { dbDefaults } from 'ugly-app/shared';
 import { messages, requests } from '../shared/api';
 import { collections } from '../shared/collections';
+import type { RecentProject } from '../shared/collections';
 import { cronTasks } from '../shared/cron';
 import { agentTurnHandler } from 'ugly-app/agent/server';
 import { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } from '../shared/agent';
@@ -45,6 +47,34 @@ const workersDb = (): TypedDB => {
 const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
   agentTurn: agentTurnHandler({ tools: AGENT_TOOLS, systemPrompt: AGENT_SYSTEM_PROMPT }),
   ...makeCodingSessionHandlers(workersDb),
+
+  // Recent projects — synced across the user's devices/sessions. Mirrors the
+  // Node entry (server/index.ts) but reads the per-request TypedDB via workersDb().
+  recordRecentProject: async (userId, { deviceId, deviceLabel, path, name }) => {
+    const _id = `${userId}:${deviceId}:${path}`;
+    const trimmed = name.trim();
+    const label = trimmed !== '' ? trimmed : (path.split('/').filter(Boolean).pop() ?? path);
+    const doc: RecentProject = {
+      _id,
+      userId,
+      deviceId,
+      deviceLabel,
+      path,
+      name: label,
+      lastOpened: Date.now(),
+      ...dbDefaults(),
+    };
+    await workersDb().setDoc(collections.recentProject, doc);
+    return { id: _id };
+  },
+
+  removeRecentProject: async (userId, { id }) => {
+    const db = workersDb();
+    const row = await db.getDoc(collections.recentProject, id);
+    if (row && row.userId !== userId) throw new Error('Recent project not found');
+    if (row) await db.deleteDoc(collections.recentProject, id);
+    return { ok: true };
+  },
 };
 
 // Cron handlers run on Cloudflare Cron Triggers (matches the schedule
