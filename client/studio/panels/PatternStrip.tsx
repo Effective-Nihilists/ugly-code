@@ -142,29 +142,12 @@ export const PatternStrip: FC<PatternStripProps> = ({
 }) => {
   if (patternMode === 'none') return null;
 
-  // Pre-resolution placeholder — keeps the second toolbar row stable
-  // from the moment the session starts so the layout doesn't shift
-  // after the classifier returns.
-  if (!pattern) {
-    const hint =
-      patternMode === 'auto' ? 'resolving…' : 'waiting for first turn…';
-    return (
-      <div className="pattern-strip" data-id="pattern-strip">
-        <div className="pattern-strip-row">
-          <span className="pattern-strip-label">Pattern</span>
-          <span
-            style={{
-              fontSize: 11,
-              color: 'var(--text-muted)',
-              fontStyle: 'italic',
-            }}
-          >
-            {hint}
-          </span>
-        </div>
-      </div>
-    );
-  }
+  // No resolved pattern yet — hide the strip entirely rather than show a
+  // perpetual "resolving…" placeholder. ('auto' only resolves on the host
+  // mid-turn; the client agent doesn't resolve patterns at all, so the
+  // placeholder would otherwise never clear.) The strip appears once a
+  // concrete pattern is resolved.
+  if (!pattern) return null;
 
   const layout = PATTERN_LAYOUTS[pattern];
   if (!layout) return null;
