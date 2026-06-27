@@ -1,6 +1,6 @@
 {
   "name": "ugly-code",
-  "version": "0.1.40",
+  "version": "0.1.41",
   "type": "module",
   "scripts": {
     "dev": "ugly-app dev --watch",

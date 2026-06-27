@@ -260,7 +260,9 @@ export function ProjectOnboarding({
       el instanceof HTMLElement &&
       (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')
     ) {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // 'nearest' scrolls the minimum to reveal the field just above the keyboard,
+      // rather than 'center' which yanks it high up the (shortened) viewport.
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
   }, []);
   useEffect(() => {
@@ -276,7 +278,7 @@ export function ProjectOnboarding({
         t instanceof HTMLElement &&
         (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')
       ) {
-        setTimeout(() => t.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
+        setTimeout(() => t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
       }
     };
     document.addEventListener('focusin', onFocusIn);
