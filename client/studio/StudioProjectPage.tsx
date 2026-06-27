@@ -459,8 +459,8 @@ const S: Record<string, React.CSSProperties> = {
   tabSeg: { height: '100%', display: 'inline-flex', alignItems: 'center', padding: '0 11px', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.01em', color: 'var(--text-muted)', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', transition: 'color 120ms ease, background 120ms ease, box-shadow 120ms ease' },
   tabSegActive: { background: 'var(--bg-primary)', color: 'var(--accent)', boxShadow: '0 1px 2px rgba(0,0,0,0.16)' },
   content: { flex: 1, minHeight: 0, display: 'flex', position: 'relative', background: 'var(--bg-primary)' },
-  pane: { flex: 1, minHeight: 0, flexDirection: 'column', display: 'flex' },
-  paneScroll: { flex: 1, minHeight: 0, overflow: 'auto' },
+  pane: { flex: 1, minHeight: 0, minWidth: 0, flexDirection: 'column', display: 'flex' },
+  paneScroll: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'auto' },
   placeholder: { display: 'flex', flexDirection: 'column', gap: 8, padding: 32, maxWidth: 560, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 },
   // --- Mobile nav drawer (rendered below 768px) ---
   hamburger: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 28, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', flexShrink: 0, padding: 0 },
