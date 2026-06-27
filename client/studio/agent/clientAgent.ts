@@ -47,7 +47,7 @@ import { ensureSessionWorkspace, getSessionWorkspace } from './sessionWorkspace'
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
 import { composeSessionSnapshot, type PerModelAcc } from './sessionSnapshot';
 export { composeSessionSnapshot };
-import { startCodebasePoll, stopCodebasePoll } from './codebaseReadiness';
+import { startCodebasePoll, stopCodebasePoll, fetchArchitectureDoc } from './codebaseReadiness';
 
 type Emit = (msg: { type: string; [k: string]: unknown }) => void;
 
@@ -203,6 +203,9 @@ interface SessionAgentState {
   // Live codebase-analysis readiness (semantic index + architecture), polled from the host
   // via codebase.status and echoed in every session_state so the header pill tracks it.
   codebaseReadiness?: SessionSnapshot['codebaseReadiness'];
+  // The host-generated ARCHITECTURE.md, fetched once it's ready and injected into the
+  // system prompt (live getter) so the agent has a codebase map without reading files.
+  architectureDoc?: string;
 }
 
 /** Fold a (partial) user selection onto the session state. Called on create and
@@ -489,6 +492,12 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
   startCodebasePoll(sessionId, getActiveProjectPath() ?? '', (r) => {
     state.codebaseReadiness = r as SessionSnapshot['codebaseReadiness'];
     emitTelemetry(state, sessionId);
+    // Once the architecture doc is ready, fetch it once and inject (via the systemPrompt getter).
+    if (!state.architectureDoc && r?.architecture?.status === 'ready') {
+      void fetchArchitectureDoc(getActiveProjectPath() ?? '').then((doc) => {
+        if (doc) state.architectureDoc = doc;
+      });
+    }
   });
 
   state.controller = runAgent({
@@ -501,7 +510,14 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     get model() {
       return state.model;
     },
-    systemPrompt: AGENT_SYSTEM_PROMPT,
+    // Live getter (read per turn, like model): once the host's architecture analysis is
+    // ready we fetch ARCHITECTURE.md and append it as a codebase map, so the agent gets
+    // structural context up front without spending turns reading files.
+    get systemPrompt() {
+      return state.architectureDoc
+        ? `${AGENT_SYSTEM_PROMPT}\n\n# Project architecture (auto-generated map — exports, types, inheritance)\n\n${state.architectureDoc}`
+        : AGENT_SYSTEM_PROMPT;
+    },
     tools: AGENT_TOOLS,
     toolHandlers: makeToolHandlers(sessionId),
     budget: { maxTurns: 12 },

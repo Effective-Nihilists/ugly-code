@@ -51,3 +51,17 @@ export function stopCodebasePoll(sessionId: string): void {
     pollers.delete(sessionId);
   }
 }
+
+/** Read the host-generated ARCHITECTURE.md for a project (null if absent/not built yet).
+ *  The architecture manager writes it to <project>/.ugly-studio/ARCHITECTURE.md. */
+export async function fetchArchitectureDoc(cwd: string): Promise<string | null> {
+  if (!cwd) return null;
+  try {
+    const path = `${cwd.replace(/\/+$/, '')}/.ugly-studio/ARCHITECTURE.md`;
+    const res = (await inv('fs.readFile', { path })) as { content?: string };
+    const content = res?.content;
+    return content && content.trim() ? content : null;
+  } catch {
+    return null;
+  }
+}
