@@ -5,6 +5,7 @@ import {
   type PatternAxisValue,
   type PermissionAxisValue,
 } from '../components/AgentAxisSelector';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { useSocket } from '../hooks/useSocket';
 import {
   setStudioUserSetting,
@@ -107,6 +108,7 @@ export function NewSessionHero({
   onOpenSettings,
 }: NewSessionHeroProps): React.ReactElement {
   const socket = useSocket();
+  const isMobile = useIsMobile();
   const [prompt, setPrompt] = useState('');
 
   // Persisted per-user axis defaults — survive restarts and are what
@@ -389,12 +391,24 @@ export function NewSessionHero({
             <div
               style={{
                 display: 'flex',
-                alignItems: 'flex-start',
+                // Stack the START button below the input on mobile so neither runs
+                // off the right edge; keep them side-by-side on desktop.
+                flexDirection: isMobile ? 'column' : 'row',
+                alignItems: isMobile ? 'stretch' : 'flex-start',
                 background: 'var(--bg-panel)',
                 border: '2px solid var(--border)',
                 transition: 'border-color 160ms ease, box-shadow 160ms ease',
               }}
             >
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
               <span
                 style={{
                   fontFamily: 'var(--font-label)',
@@ -435,15 +449,17 @@ export function NewSessionHero({
                   resize: 'none',
                   lineHeight: 1.4,
                   minHeight: 96,
+                  minWidth: 0,
                   overflowY: 'hidden',
                 }}
               />
+              </div>
               <button
                 data-id="home-start-session"
                 type="submit"
                 style={{
                   alignSelf: 'stretch',
-                  padding: '0 24px',
+                  padding: isMobile ? '16px 24px' : '0 24px',
                   margin: 0,
                   background:
                     'linear-gradient(135deg, #FF8041 0%, #FF5500 50%, #E63900 100%)',
