@@ -1932,18 +1932,8 @@ export const requests = defineRequests({
     }),
   }),
 
-  listRecentProjects: req({
-    input: z.object({}),
-    output: z.object({
-      projects: z.array(
-        z.object({
-          name: z.string(),
-          path: z.string(),
-          lastOpened: z.number(),
-        }),
-      ),
-    }),
-  }),
+  // Recent projects are now synced via the ugly-app `recentProject` collection
+  // (see client/studio/state/recentProjects.ts) rather than this native shim.
 
   initProject: req({
     input: z.object({

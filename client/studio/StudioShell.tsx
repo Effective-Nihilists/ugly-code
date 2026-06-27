@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAppOptional } from 'ugly-app/client';
 import { ProjectsProvider } from './state/ProjectsContext';
 import { ProjectOnboarding } from './panels/ProjectOnboarding';
 import { ProjectCreationProgress } from './panels/ProjectCreationProgress';
@@ -6,7 +7,7 @@ import StudioProjectPage from './StudioProjectPage';
 import { ModalStackProvider } from './system/modal/ModalContext';
 import { ModalHost } from './system/modal/ModalHost';
 import { PopoverHost } from './system/popover/PopoverHost';
-import { addRecentProject } from './state/recentProjects';
+import { recordRecentProject } from './state/recentProjects';
 
 // The Studio IDE on window.UglyNative, backed by the native transport shim
 // (./hooks/useSocket) instead of the sidecar /rpc socket.
@@ -54,14 +55,19 @@ export default function StudioShell(): React.ReactElement {
   // When set, the picker has handed off to the live "Create Project" progress
   // view (streams `npx ugly-app init` + `pnpm install`); on success it opens.
   const [creating, setCreating] = React.useState<{ name: string; parentDir: string } | null>(null);
+  // The ugly-app socket (cross-device sync). Optional: a logged-out shell still
+  // renders the picker; it just won't record/sync recents until sign-in.
+  const app = useAppOptional();
 
   const openProject = React.useCallback((name: string, path?: string) => {
     const next: OpenProject = { name, ...(path ? { path } : {}) };
-    if (path) addRecentProject(name, path); // surface it in the picker next time
+    // Stamp this open into the synced recent-projects list (desktop only —
+    // recordRecentProject no-ops when there's no local host to point at).
+    if (path) void recordRecentProject(app?.socket, name, path);
     setCreating(null);
     setOpen(next);
     pushProjectUrl(next);
-  }, []);
+  }, [app]);
   const closeProject = React.useCallback(() => {
     setOpen(null);
     pushProjectUrl(null);

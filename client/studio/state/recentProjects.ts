@@ -1,43 +1,135 @@
-// Recent-projects list, persisted in the IDE's localStorage (survives reloads +
-// app restarts in the Electron session). Recorded whenever a project opens
-// (create / open-folder / clone / recent / eval) and read by the picker.
+// Recent-projects list — synced across all of the user's devices and sessions
+// via the `recentProject` collection (trackDocs), replacing the old per-browser
+// localStorage list. Each row is stamped with the desktop (`deviceId` +
+// `deviceLabel`) that physically holds the files, so a phone can reconnect to the
+// right host. Recording happens only on a desktop (where `proxy.self` resolves) —
+// a phone/web client has no local filesystem to host, so it only reads the list.
 
-export interface RecentProject {
-  name: string;
-  path: string;
-  lastOpened: number;
+import { useEffect, useState } from 'react';
+import { useAppOptional } from 'ugly-app/client';
+import { installUglyNative, isNativeAvailable } from 'ugly-app/native';
+import type { RecentProject } from '../../../shared/collections';
+
+export type { RecentProject };
+
+// Minimal structural view of the app socket for the calls we make. The context
+// socket from useApp() is typed to framework requests only; recordRecentProject /
+// removeRecentProject are app-specific, and trackDocs is a runtime method — so we
+// reach them through this narrow interface rather than fighting the registry type.
+interface RecentSocket {
+  request(name: string, input: unknown): Promise<unknown>;
+  trackDocs<T>(
+    collection: string,
+    params: { keys?: Record<string, string> },
+    cb: (docs: T[]) => void,
+  ): () => void;
 }
 
-const KEY = 'ugly-studio:recent-projects';
-const MAX = 24;
-
-export function getRecentProjects(): RecentProject[] {
+/** This device's stable proxy identity, or null off a native desktop host. */
+async function selfDevice(): Promise<{ deviceId: string; deviceLabel: string } | null> {
+  if (!isNativeAvailable()) return null;
   try {
-    const raw = localStorage.getItem(KEY);
-    const arr = raw ? (JSON.parse(raw) as unknown) : [];
-    if (!Array.isArray(arr)) return [];
-    return arr.filter((p): p is RecentProject => !!p && typeof (p as RecentProject).path === 'string');
+    // proxy.self rides the low-level UglyNative protocol (not the high-level
+    // facade). Cast the invoke: the channel may predate the installed ugly-app's
+    // typed contract, and resolves to null off a desktop host anyway.
+    const invoke = installUglyNative().invoke as (channel: string, payload?: unknown) => Promise<unknown>;
+    const r = await invoke('proxy.self');
+    if (r && typeof r === 'object') {
+      const o = r as { deviceId?: unknown; deviceLabel?: unknown };
+      if (typeof o.deviceId === 'string' && o.deviceId) {
+        return {
+          deviceId: o.deviceId,
+          deviceLabel: typeof o.deviceLabel === 'string' ? o.deviceLabel : '',
+        };
+      }
+    }
   } catch {
-    return [];
+    /* not a desktop host, or channel unavailable (older shell) — nothing to stamp */
+  }
+  return null;
+}
+
+/**
+ * Record (or bump) a recently-opened project for the current user. No-op on a
+ * client that isn't a desktop host (the phone reads recents but never creates
+ * them). Best-effort: never throws into the open flow.
+ */
+export async function recordRecentProject(socket: unknown, name: string, path: string): Promise<void> {
+  if (!socket || !path) return;
+  const self = await selfDevice();
+  if (!self) return;
+  try {
+    await (socket as RecentSocket).request('recordRecentProject', {
+      deviceId: self.deviceId,
+      deviceLabel: self.deviceLabel,
+      path,
+      name,
+    });
+  } catch {
+    /* recents are best-effort */
   }
 }
 
-/** Add (or bump to the front) a project. Most-recent first, capped at MAX. */
-export function addRecentProject(name: string, path: string): void {
-  if (!path) return;
+/**
+ * Ask the native proxy layer to (re)connect to a specific desktop host before
+ * opening one of its projects. Dispatched as a plain `uglyNative` DOM event, so
+ * it needs no proxy import and is simply ignored where no proxy client is
+ * installed (e.g. on the desktop itself, where the files are already local, or
+ * on an older shell). Best-effort — the open still falls back to the host picker.
+ */
+export function connectToHost(deviceId: string, label?: string): void {
+  if (!deviceId || typeof window === 'undefined' || typeof CustomEvent !== 'function') return;
   try {
-    const label = name.trim() ? name : (path.split('/').pop() ?? path);
-    const next = [{ name: label, path, lastOpened: Date.now() }, ...getRecentProjects().filter((p) => p.path !== path)];
-    localStorage.setItem(KEY, JSON.stringify(next.slice(0, MAX)));
+    window.dispatchEvent(
+      new CustomEvent('uglyNative', { detail: { event: 'proxy:connect', data: { deviceId, label } } }),
+    );
   } catch {
-    /* localStorage unavailable — recents are best-effort */
+    /* best-effort */
   }
 }
 
-export function removeRecentProject(path: string): void {
+/** Remove a recent project by its synced doc id (the ProjectRow delete button). */
+export async function removeRecentProject(socket: unknown, id: string): Promise<void> {
+  if (!socket || !id) return;
   try {
-    localStorage.setItem(KEY, JSON.stringify(getRecentProjects().filter((p) => p.path !== path)));
+    await (socket as RecentSocket).request('removeRecentProject', { id });
   } catch {
-    /* ignore */
+    /* best-effort */
   }
+}
+
+/**
+ * Live, cross-device recent-projects list, most-recent first. Empty until the
+ * socket connects (and for logged-out users). Driven by trackDocs, so a project
+ * opened on any of the user's desktops appears here within a frame.
+ */
+export function useRecentProjects(): RecentProject[] {
+  const app = useAppOptional();
+  const [projects, setProjects] = useState<RecentProject[]>([]);
+  useEffect(() => {
+    if (!app) return;
+    const { socket, userId } = app;
+    const unsub = (socket as unknown as RecentSocket).trackDocs<RecentProject>(
+      'recentProject',
+      { keys: { userId } },
+      (docs) => setProjects([...docs].sort((a, b) => b.lastOpened - a.lastOpened)),
+    );
+    return unsub;
+  }, [app]);
+  return projects;
+}
+
+/** This desktop's deviceId (or null on web/phone), for the "This device" badge. */
+export function useSelfDeviceId(): string | null {
+  const [id, setId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void selfDevice().then((s) => {
+      if (!cancelled) setId(s?.deviceId ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return id;
 }

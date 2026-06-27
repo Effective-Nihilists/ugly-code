@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { native, isNativeAvailable } from 'ugly-app/native';
+import { isNativeAvailable } from 'ugly-app/native';
+import { useAppOptional } from 'ugly-app/client';
+import {
+  useRecentProjects,
+  useSelfDeviceId,
+  removeRecentProject,
+  connectToHost,
+  type RecentProject,
+} from '../state/recentProjects';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { FilePicker } from '../components/FilePicker';
 import { shortcut } from '../utils/platform';
@@ -71,12 +79,6 @@ function useCountUp(target: number, durationMs: number): number {
  *   - Clone from Git → `git clone <url>` using the connected GitHub
  */
 
-interface RecentProject {
-  name: string;
-  path: string;
-  lastOpened: number;
-}
-
 interface ProjectOnboardingProps {
   /**
    * Fires when a project has been opened (picked, created, or cloned).
@@ -134,7 +136,11 @@ export function ProjectOnboarding({
   const keyboardHeight = useKeyboardHeight();
   const keyboardRef = useRef(keyboardHeight);
   keyboardRef.current = keyboardHeight;
-  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+  // Recent projects are synced across the user's devices/sessions (trackDocs).
+  // selfDeviceId tells us which rows live on *this* desktop vs another machine.
+  const recentProjects = useRecentProjects();
+  const selfDeviceId = useSelfDeviceId();
+  const app = useAppOptional();
   const [activeAction, setActiveAction] = useState<ActionTab>('new');
   const [newName, setNewName] = useState('');
   const [newParentDir, setNewParentDir] = useState('~/Documents/Ugly Studio');
@@ -233,12 +239,7 @@ export function ProjectOnboarding({
           return;
         }
         setConnectionStatus('connected');
-        try {
-          const { projects } = await apiRequest('listRecentProjects', {});
-          if (!cancelled) setRecentProjects(projects ?? []);
-        } catch {
-          /* no recent projects yet */
-        }
+        // Recent projects now arrive via the synced trackDocs hook above.
       } catch {
         if (!cancelled) setConnectionStatus('error');
       }
@@ -293,11 +294,17 @@ export function ProjectOnboarding({
   }, []);
 
   const handleOpenRecent = useCallback(
-    async (projectPath: string) => {
+    async (project: RecentProject) => {
       setLoading(true);
       setError(null);
+      // If the project lives on another desktop (or we're a phone, where
+      // selfDeviceId is null), ask the proxy to connect to that specific host
+      // first so the fs calls tunnel to the machine that holds the files.
+      if (project.deviceId && project.deviceId !== selfDeviceId) {
+        connectToHost(project.deviceId, project.deviceLabel);
+      }
       try {
-        const result = await apiRequest('openProject', { path: projectPath });
+        const result = await apiRequest('openProject', { path: project.path });
         onProjectOpen(result.name, result.path);
       } catch (err) {
         const msg = (err as Error).message;
@@ -306,10 +313,12 @@ export function ProjectOnboarding({
           msg.includes('no such file') ||
           msg.includes('Not a directory')
         ) {
-          setRecentProjects((prev) =>
-            prev.filter((p) => p.path !== projectPath),
-          );
-          setError(`Project folder no longer exists: ${projectPath}`);
+          // Only prune when the folder is gone on the host that owns it — a
+          // remote host being offline shouldn't delete a perfectly good entry.
+          if (!project.deviceId || project.deviceId === selfDeviceId) {
+            void removeRecentProject(app?.socket, project._id);
+          }
+          setError(`Project folder no longer exists: ${project.path}`);
         } else {
           setError(`Failed to open project: ${msg}`);
         }
@@ -317,7 +326,7 @@ export function ProjectOnboarding({
         setLoading(false);
       }
     },
-    [onProjectOpen],
+    [onProjectOpen, selfDeviceId, app],
   );
 
   const handleNewProject = useCallback(() => {
@@ -830,10 +839,12 @@ export function ProjectOnboarding({
               ) : (
                 filteredRecents.map((p, i) => (
                   <ProjectRow
-                    key={p.path}
+                    key={p._id}
                     index={i + 1}
                     project={p}
-                    onOpen={() => void handleOpenRecent(p.path)}
+                    isThisDevice={!!selfDeviceId && p.deviceId === selfDeviceId}
+                    onOpen={() => void handleOpenRecent(p)}
+                    onDelete={() => void removeRecentProject(app?.socket, p._id)}
                     delayMs={1100 + i * 70}
                   />
                 ))
@@ -1268,20 +1279,34 @@ function LabelInput({
 function ProjectRow({
   index,
   project,
+  isThisDevice,
   onOpen,
+  onDelete,
   delayMs,
 }: {
   index: number;
   project: RecentProject;
+  isThisDevice: boolean;
   onOpen(): void;
+  onDelete(): void;
   delayMs?: number;
 }): React.ReactElement {
   const indexDelay = delayMs != null ? delayMs + 100 : undefined;
+  // Shown so the user knows which machine each project lives on — and, for a
+  // remote project, which desktop the open will reconnect to.
+  const deviceText = isThisDevice ? 'This device' : project.deviceLabel || 'Another device';
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       data-id={`recent-project-${project.path}`}
       onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
       className="us-fade-up"
       style={{
         display: 'grid',
@@ -1351,6 +1376,38 @@ function ProjectRow({
         >
           {project.path}
         </span>
+        <span
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            fontFamily: 'var(--font-label)',
+            fontSize: 10,
+            color: isThisDevice ? 'var(--text-secondary)' : 'var(--accent, #FF5500)',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            minWidth: 0,
+          }}
+        >
+          <svg
+            width={11}
+            height={11}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
+          >
+            <rect x={2} y={3} width={20} height={14} rx={2} />
+            <path d="M8 21h8M12 17v4" />
+          </svg>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {deviceText}
+          </span>
+        </span>
       </span>
       <span
         style={{
@@ -1364,27 +1421,54 @@ function ProjectRow({
       >
         {timeAgoShort(project.lastOpened)}
       </span>
-      <span
-        style={{
-          color: 'var(--text-muted)',
-          flexShrink: 0,
-        }}
-      >
-        <svg
-          width={14}
-          height={14}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <button
+          type="button"
+          aria-label="Remove from recent projects"
+          data-id={`recent-project-delete-${project.path}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          style={{
+            display: 'inline-flex',
+            padding: 4,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--text-muted)',
+          }}
         >
-          <path d="M5 12h14" />
-          <path d="M13 6l6 6-6 6" />
-        </svg>
+          <svg
+            width={13}
+            height={13}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+        <span style={{ color: 'var(--text-muted)' }}>
+          <svg
+            width={14}
+            height={14}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M5 12h14" />
+            <path d="M13 6l6 6-6 6" />
+          </svg>
+        </span>
       </span>
-    </button>
+    </div>
   );
 }
 

@@ -20,7 +20,7 @@ import { dbDefaults } from 'ugly-app/shared';
 import { messages, requests } from '../shared/api';
 import { AGENT_DEFAULT_MODEL, AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
 import { agentTurnHandler } from 'ugly-app/agent/server';
-import type { Todo } from '../shared/collections';
+import type { Todo, RecentProject } from '../shared/collections';
 import { collections } from '../shared/collections';
 import { makeCodingSessionHandlers } from './codingSessionHandlers';
 import { cronTasks } from '../shared/cron';
@@ -91,6 +91,38 @@ const app = createApp(
       const todo = await app.db.getDoc(collections.todo, todoId);
       if (!todo?.userId || todo.userId !== userId) throw new Error('Todo not found');
       await app.db.deleteDoc(collections.todo, todoId);
+      return { ok: true };
+    },
+
+    // Upsert a recent project for this user. The id is deterministic on
+    // (userId, deviceId, path) so re-opening the same project on the same
+    // desktop bumps lastOpened in place rather than piling up rows. The
+    // collection's trackKeys: ['userId'] makes the write fan out to every other
+    // session/device of this user via trackDocs.
+    recordRecentProject: async (userId, { deviceId, deviceLabel, path, name }) => {
+      const _id = `${userId}:${deviceId}:${path}`;
+      const trimmed = name.trim();
+      const label = trimmed !== '' ? trimmed : (path.split('/').filter(Boolean).pop() ?? path);
+      const doc: RecentProject = {
+        _id,
+        userId,
+        deviceId,
+        deviceLabel,
+        path,
+        name: label,
+        lastOpened: Date.now(),
+        ...dbDefaults(),
+      };
+      await app.db.setDoc(collections.recentProject, doc);
+      return { id: _id };
+    },
+
+    removeRecentProject: async (userId, { id }) => {
+      const row = await app.db.getDoc(collections.recentProject, id);
+      // Ownership check: only the user who recorded it may remove it. Treat an
+      // already-missing row as success (idempotent delete).
+      if (row && row.userId !== userId) throw new Error('Recent project not found');
+      if (row) await app.db.deleteDoc(collections.recentProject, id);
       return { ok: true };
     },
 

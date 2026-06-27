@@ -22,7 +22,6 @@ import { composeSessionSnapshot } from '../agent/sessionSnapshot';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 import { gradeProject, type GradeDeps } from '../evals/grader';
-import { getRecentProjects } from '../state/recentProjects';
 import { sessionApi, resolveProjectId } from '../agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
 import { DB_SCRIPT } from '../db/dbScript';
@@ -376,7 +375,6 @@ const handlers: Record<string, Handler> = {
     saveSetting(String(i.key), i.value);
     return Promise.resolve({});
   },
-  listRecentProjects: () => Promise.resolve({ projects: getRecentProjects() }),
   // ── Database panel: run queries against the project's PG (dev) or Neon (prod)
   // via a node+pg script over native.process. ──
   dbCollections: (i) => runDbScript('collections', String(i.mode ?? 'dev'), {}),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TodoSchema, ConversationSchema, MessageSchema, collections } from '../../shared/collections';
+import { TodoSchema, ConversationSchema, MessageSchema, RecentProjectSchema, collections } from '../../shared/collections';
 
 describe('Collection schemas', () => {
   it('TodoSchema validates a valid todo', () => {
@@ -21,5 +21,24 @@ describe('Collection schemas', () => {
       expect(col.schema, `${name} should have a schema`).toBeDefined();
       expect(col.meta, `${name} should have meta`).toBeDefined();
     }
+  });
+
+  it('RecentProjectSchema validates a stamped recent project', () => {
+    const result = RecentProjectSchema.safeParse({
+      userId: 'user-1',
+      deviceId: 'device-abc',
+      deviceLabel: 'MacBook Pro',
+      path: '/Users/me/projects/foo',
+      name: 'foo',
+      lastOpened: 1_700_000_000_000,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('recentProject collection syncs per-user via trackKeys', () => {
+    // trackable + trackKeys:['userId'] is what makes the list live-sync across
+    // every device/session of the same user (dbkey.recentProject.userId.<id>).
+    expect(collections.recentProject.meta.trackable).toBe(true);
+    expect(collections.recentProject.meta.trackKeys).toEqual(['userId']);
   });
 });

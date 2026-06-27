@@ -43,6 +43,25 @@ export const requests = defineRequests({
     output: z.object({ ok: z.boolean() }),
   }),
 
+  // Recent projects — synced across the user's devices/sessions. Recorded
+  // whenever a project opens on a desktop, stamped with that desktop's stable
+  // `deviceId`/`deviceLabel` so a phone can reconnect to the right host. Reads
+  // use socket.trackDocs('recentProject', { keys: { userId } }); no list endpoint.
+  recordRecentProject: authReq({
+    input: z.object({
+      deviceId: z.string().min(1),
+      deviceLabel: z.string().default(''),
+      path: z.string().min(1),
+      name: z.string().default(''),
+    }),
+    output: z.object({ id: z.string() }),
+  }),
+
+  removeRecentProject: authReq({
+    input: z.object({ id: z.string().min(1) }),
+    output: z.object({ ok: z.boolean() }),
+  }),
+
   // Push notification test — send a push via ugly.bot
   sendPush: authReq({
     input: z.object({

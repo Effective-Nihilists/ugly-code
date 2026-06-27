@@ -33,6 +33,21 @@ export const CollabDocSchema = z.object({
 });
 export type CollabDoc = InferDocType<typeof CollabDocSchema>;
 
+// Recent projects — synced across all of a user's devices/sessions (replaces the
+// old localStorage list). Each row is stamped with the desktop (`deviceId` +
+// human-readable `deviceLabel`) that physically holds the project files, so a
+// phone can reconnect to the right host via the proxy. The doc `_id` is
+// deterministic (`${userId}:${deviceId}:${path}`) so re-opening upserts one row.
+export const RecentProjectSchema = z.object({
+  userId: z.string(),
+  deviceId: z.string(),
+  deviceLabel: z.string(),
+  path: z.string(),
+  name: z.string(),
+  lastOpened: z.number(),
+});
+export type RecentProject = InferDocType<typeof RecentProjectSchema>;
+
 // Coding-agent session collections live in their own module (codingCollections)
 // to keep this file under TypeScript's type-instantiation budget — see that file
 // for the full rationale. Re-export their types for convenience.
@@ -72,6 +87,10 @@ const baseCollections = defineCollections({
   collabDoc: {
     schema: CollabDocSchema,
     meta: { cache: false, trackable: false, public: false, cascadeFrom: null },
+  },
+  recentProject: {
+    schema: RecentProjectSchema,
+    meta: { cache: false, trackable: true, public: false, cascadeFrom: null, trackKeys: ['userId'] },
   },
 });
 
