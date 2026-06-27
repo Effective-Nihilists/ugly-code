@@ -141,8 +141,8 @@ export function ProjectCreationProgress({
 }
 
 const S = {
-  root: { height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', color: 'var(--text-primary)', minHeight: 0 },
-  header: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 },
+  root: { height: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', color: 'var(--text-primary)', minHeight: 0, boxSizing: 'border-box', paddingLeft: 'var(--safe-area-inset-left)', paddingRight: 'var(--safe-area-inset-right)', paddingBottom: 'var(--safe-area-inset-bottom)' },
+  header: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', paddingTop: 'calc(12px + var(--safe-area-inset-top))', borderBottom: '1px solid var(--border)', flexShrink: 0 },
   title: { fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 14 },
   sub: { fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' },
   btn: { background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer' },

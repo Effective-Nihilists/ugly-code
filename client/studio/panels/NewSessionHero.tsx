@@ -262,7 +262,11 @@ export function NewSessionHero({
         style={{
           width: '100%',
           maxWidth: 900,
-          padding: '40px',
+          // border-box + responsive padding: without border-box, width:100% +
+          // 40px padding renders 80px WIDER than the viewport → horizontal
+          // overflow on mobile (the hero/input ran off the right edge).
+          boxSizing: 'border-box',
+          padding: 'clamp(20px, 5vw, 40px)',
           margin: '0 auto',
         }}
       >
@@ -275,8 +279,11 @@ export function NewSessionHero({
             style={{
               fontFamily: 'var(--font-heading)',
               fontWeight: 800,
-              fontSize: 'clamp(48px, 7.5vw, 92px)',
+              // Lower min so "What do you want" fits a ~360px phone without
+              // clipping; still scales up to 92px on desktop.
+              fontSize: 'clamp(34px, 7.5vw, 92px)',
               lineHeight: 0.96,
+              overflowWrap: 'break-word',
               letterSpacing: '-0.04em',
               color: 'var(--text-primary)',
               margin: '0 0 44px 0',
