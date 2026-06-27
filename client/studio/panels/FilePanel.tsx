@@ -6,6 +6,8 @@ import { MdastViewer } from 'ugly-app/markdown/client';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { useTheme } from '../theme/ThemeProvider';
 import { OpenUriContext } from '../components/LinkifiedText';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { FileIcon } from './navIcons';
 
 function isMarkdown(path: string): boolean {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
@@ -90,6 +92,11 @@ export function FilePanel(): React.ReactElement {
   const [error, setError] = React.useState<string | null>(null);
   // Markdown files default to the rendered view, toggleable to raw source.
   const [mdRaw, setMdRaw] = React.useState(false);
+  // On mobile the 280px tree would crowd out the viewer, so it collapses into an
+  // on-demand drawer (opened via the "Files" button, dismissed when a file is
+  // picked). Desktop keeps the persistent side-by-side tree.
+  const isMobile = useIsMobile();
+  const [treeOpen, setTreeOpen] = React.useState(false);
 
   const list = React.useCallback(async (dir: string): Promise<Entry[]> => {
     const ents = await native.fs.readdir(dir);
@@ -131,6 +138,7 @@ export function FilePanel(): React.ReactElement {
 
   const openFile = React.useCallback(async (path: string) => {
     setSelected(path);
+    setTreeOpen(false); // mobile: dismiss the file drawer once a file is chosen
     setLoadingFile(true);
     setError(null);
     try {
@@ -183,31 +191,56 @@ export function FilePanel(): React.ReactElement {
 
   return (
     <div style={S.root}>
-      <div style={S.tree}>{renderDir(root, 0)}</div>
+      {/* Desktop: persistent tree column. Mobile: an on-demand drawer (below). */}
+      {!isMobile && <div style={S.tree}>{renderDir(root, 0)}</div>}
+
+      {isMobile && treeOpen && (
+        <>
+          <div style={S.backdrop} onClick={() => setTreeOpen(false)} />
+          <div style={S.treeDrawer} data-id="file-tree-drawer">
+            <div style={S.drawerHeader}>
+              <span>Files</span>
+              <button data-id="file-tree-close" onClick={() => setTreeOpen(false)} style={S.drawerClose}>Done</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{renderDir(root, 0)}</div>
+          </div>
+        </>
+      )}
+
       <div style={S.viewer}>
-        {selected ? (
-          <>
-            <div style={S.viewerHeader}>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {(isMobile || selected) && (
+          <div style={S.viewerHeader}>
+            {isMobile && (
+              <button data-id="file-tree-open" onClick={() => setTreeOpen(true)} style={S.filesBtn}>
+                <FileIcon />
+                Files
+              </button>
+            )}
+            {selected ? (
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {selected.startsWith(root) ? selected.slice(root.length + 1) : selected}
               </span>
-              {isMarkdown(selected) && !loadingFile && (
-                <div style={S.segmented}>
-                  <button data-id="md-view-rendered" onClick={() => setMdRaw(false)} style={{ ...S.seg, ...(mdRaw ? {} : S.segActive) }}>Preview</button>
-                  <button data-id="md-view-raw" onClick={() => setMdRaw(true)} style={{ ...S.seg, ...(mdRaw ? S.segActive : {}) }}>Raw</button>
-                </div>
-              )}
-            </div>
-            {loadingFile ? (
-              <pre style={S.code}>Loading…</pre>
-            ) : isMarkdown(selected) && !mdRaw ? (
-              content ? <MarkdownView text={content} /> : <div style={S.empty}>(empty file)</div>
             ) : (
-              <pre style={S.code}>
-                <code className="hljs" style={{ background: 'transparent', padding: 0 }} dangerouslySetInnerHTML={{ __html: contentHtml || '(empty file)' }} />
-              </pre>
+              <span style={{ flex: 1 }} />
             )}
-          </>
+            {selected && isMarkdown(selected) && !loadingFile && (
+              <div style={S.segmented}>
+                <button data-id="md-view-rendered" onClick={() => setMdRaw(false)} style={{ ...S.seg, ...(mdRaw ? {} : S.segActive) }}>Preview</button>
+                <button data-id="md-view-raw" onClick={() => setMdRaw(true)} style={{ ...S.seg, ...(mdRaw ? S.segActive : {}) }}>Raw</button>
+              </div>
+            )}
+          </div>
+        )}
+        {selected ? (
+          loadingFile ? (
+            <pre style={S.code}>Loading…</pre>
+          ) : isMarkdown(selected) && !mdRaw ? (
+            content ? <MarkdownView text={content} /> : <div style={S.empty}>(empty file)</div>
+          ) : (
+            <pre style={S.code}>
+              <code className="hljs" style={{ background: 'transparent', padding: 0 }} dangerouslySetInnerHTML={{ __html: contentHtml || '(empty file)' }} />
+            </pre>
+          )
         ) : (
           <div style={S.empty}>Select a file to view its contents.</div>
         )}
@@ -220,6 +253,11 @@ export function FilePanel(): React.ReactElement {
 const S: Record<string, React.CSSProperties> = {
   root: { display: 'flex', height: '100%', minHeight: 0, background: 'var(--bg-primary)' },
   tree: { width: 280, flexShrink: 0, overflow: 'auto', borderRight: '1px solid var(--border)', padding: '6px 0', fontFamily: 'var(--font-mono)', fontSize: 12.5 },
+  backdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1290 },
+  treeDrawer: { position: 'fixed', top: 0, left: 0, bottom: 0, width: 'min(86vw, 320px)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', borderRight: '1px solid var(--border)', zIndex: 1300, boxSizing: 'border-box', paddingTop: 'var(--safe-area-inset-top)', paddingBottom: 'var(--safe-area-inset-bottom)', fontFamily: 'var(--font-mono)', fontSize: 12.5 },
+  drawerHeader: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-label)', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' },
+  drawerClose: { fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 },
+  filesBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' },
   row: { display: 'flex', alignItems: 'center', gap: 4, height: 22, padding: '0 8px', cursor: 'pointer', whiteSpace: 'nowrap', color: 'var(--text-primary)' },
   rowActive: { background: 'var(--accent-dim)', color: 'var(--accent)' },
   caret: { width: 12, flexShrink: 0, color: 'var(--text-muted)', fontSize: 10 },
