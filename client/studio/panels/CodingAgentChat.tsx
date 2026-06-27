@@ -5426,12 +5426,6 @@ function CodebaseReadinessPill({
     | import('../shared/api').SessionSnapshot['codebaseReadiness']
     | null;
 }) {
-  // No readiness data → hide the pill rather than show a perpetual "loading".
-  // The client agent (code.ugly.bot) doesn't run the architecture/semantic-index
-  // surfaces, so readiness is always null there; on hosts that do, the pill
-  // appears once the first status arrives.
-  if (!readiness) return null;
-
   const arch = readiness?.architecture;
   const indexer = readiness?.indexer;
   const archActive = arch?.status === 'building';
@@ -5441,8 +5435,10 @@ function CodebaseReadinessPill({
   const anyActive = archActive || idxActive;
   const anyError = arch?.status === 'failed' || indexer?.status === 'error';
 
-  let tone: 'active' | 'ready' | 'idle' | 'error';
-  if (anyError) tone = 'error';
+  // null = the client agent hasn't reported yet (poll spinning up the host indexer).
+  let tone: 'loading' | 'active' | 'ready' | 'idle' | 'error';
+  if (!readiness) tone = 'loading';
+  else if (anyError) tone = 'error';
   else if (anyActive) tone = 'active';
   else if (archReady && idxReady) tone = 'ready';
   else tone = 'idle';
@@ -5487,7 +5483,9 @@ function CodebaseReadinessPill({
     return 'Semantic index: not indexed';
   })();
   const shortLabel =
-    tone === 'active'
+    tone === 'loading'
+      ? 'Codebase: loading…'
+      : tone === 'active'
       ? 'Codebase: analyzing…'
       : tone === 'ready'
       ? 'Codebase: ready'
@@ -5495,7 +5493,9 @@ function CodebaseReadinessPill({
       ? 'Codebase: error'
       : 'Codebase: idle';
   const fullHeadline =
-    tone === 'active'
+    tone === 'loading'
+      ? 'Codebase analysis: loading…'
+      : tone === 'active'
       ? 'Codebase analysis running — AI coding quality reduced until ready'
       : tone === 'ready'
       ? 'Codebase analysis ready'

@@ -1404,7 +1404,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           lastMessage: snap.lspStatus.lastMessage,
         }),
       });
-      setCodebaseReadiness(snap.codebaseReadiness);
+      // Only when present — the mount snapshot omits it, and the indexer poll streams it in
+      // separate session_state events; an unconditional set would clobber live readiness.
+      if (snap.codebaseReadiness !== undefined) setCodebaseReadiness(snap.codebaseReadiness);
       if (snap.title && snap.title !== 'New session') {
         onTitleChanged?.(snap.title);
       }

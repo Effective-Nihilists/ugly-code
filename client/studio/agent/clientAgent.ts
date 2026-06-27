@@ -47,6 +47,7 @@ import { ensureSessionWorkspace, getSessionWorkspace } from './sessionWorkspace'
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
 import { composeSessionSnapshot, type PerModelAcc } from './sessionSnapshot';
 export { composeSessionSnapshot };
+import { startCodebasePoll, stopCodebasePoll } from './codebaseReadiness';
 
 type Emit = (msg: { type: string; [k: string]: unknown }) => void;
 
@@ -199,6 +200,9 @@ interface SessionAgentState {
   permissionMode: SessionSnapshot['permissionMode'];
   modelMode: SessionSnapshot['modelMode'];
   patternMode: SessionSnapshot['patternMode'];
+  // Live codebase-analysis readiness (semantic index + architecture), polled from the host
+  // via codebase.status and echoed in every session_state so the header pill tracks it.
+  codebaseReadiness?: SessionSnapshot['codebaseReadiness'];
 }
 
 /** Fold a (partial) user selection onto the session state. Called on create and
@@ -431,6 +435,9 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
     perModel: [...s.perModel.values()],
     messageCount: s.messageCount,
   });
+  // Fold in the latest codebase readiness (the indexer poll updates s.codebaseReadiness and
+  // re-emits) so every session_state carries it — applySnapshot only reads what's present.
+  if (s.codebaseReadiness !== undefined) snap['codebaseReadiness'] = s.codebaseReadiness;
   safeEmit(s.emitRef.current, {
     type: 'codingAgent:event',
     sessionId,
@@ -476,6 +483,13 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
   };
   applySelection(state, selection);
   state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: state.model });
+
+  // Kick off the host's semantic index + architecture doc for this project and stream their
+  // readiness into session_state (drives the chat header's codebase pill: indexing → ready).
+  startCodebasePoll(sessionId, getActiveProjectPath() ?? '', (r) => {
+    state.codebaseReadiness = r as SessionSnapshot['codebaseReadiness'];
+    emitTelemetry(state, sessionId);
+  });
 
   state.controller = runAgent({
     socket: fetchSocket,
@@ -663,5 +677,6 @@ export function clearClientAgentSession(sessionId: string): void {
   if (!s) return;
   try { s.controller.abort(); } catch { /* no in-flight turn */ }
   try { s.controller.dispose(); } catch { /* already torn down */ }
+  stopCodebasePoll(sessionId);
   sessions.delete(sessionId);
 }

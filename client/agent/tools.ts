@@ -2,7 +2,7 @@
 // operation against the unified native API (fulfilled by the Ugly Studio
 // desktop daemon). Returns a string the agent loop feeds back as `tool_result`.
 
-import { native } from 'ugly-app/native';
+import { native, installUglyNative } from 'ugly-app/native';
 import type { SandboxMode } from 'ugly-app/native';
 import type { AgentToolName } from '../../shared/agent';
 import { DB_SCRIPT } from '../studio/db/dbScript';
@@ -45,6 +45,28 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
     }
     case 'read_file':
       return native.fs.readFile(resolvePath(ctx, String(p.path)));
+    case 'codebase_search': {
+      // Semantic search over the host's index (codebase.* is a host-only channel; no facade
+      // method, so call the raw UglyNative). Scoped to the open project; the worktree (if
+      // any) rides as the overlay so the agent sees its own uncommitted edits.
+      const projectPath = ctx?.projectDir ?? '';
+      if (!projectPath) return 'codebase_search unavailable: no project is open.';
+      const res = (await installUglyNative().invoke('codebase.search' as never, {
+        projectPath,
+        query: String(p.query ?? ''),
+        limit: typeof p.limit === 'number' ? p.limit : 10,
+        ...(ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : {}),
+      } as never)) as {
+        results?: Array<{ file_path: string; start_line: number; end_line: number; content: string; score: number }>;
+      };
+      const results = res?.results ?? [];
+      if (!results.length) {
+        return 'No semantic matches (the index may still be building — fall back to list_dir/read_file or run_command rg).';
+      }
+      return results
+        .map((r) => `${r.file_path}:${r.start_line}-${r.end_line}  (score ${r.score.toFixed(2)})\n${r.content}`)
+        .join('\n\n---\n\n');
+    }
     case 'write_file':
       await native.fs.writeFile(resolvePath(ctx, String(p.path)), String(p.content ?? ''));
       return `Wrote ${String(p.path)}`;

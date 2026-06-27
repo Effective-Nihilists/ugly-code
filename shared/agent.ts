@@ -56,6 +56,7 @@ export const AGENT_TOOL_NAMES = [
   'db_query',
   'db_get',
   'db_set',
+  'codebase_search',
 ] as const;
 export type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
 
@@ -113,6 +114,23 @@ export const AGENT_TOOLS: TextGenTool[] = [
         new: { type: 'string', description: 'The replacement text.' },
       },
       required: ['path', 'old', 'new'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'codebase_search',
+    description:
+      'Semantic search over the indexed codebase — find code by meaning/intent, not exact text. Returns the most relevant chunks with file path + line range. Prefer this over reading many files when locating where something is implemented or used.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Natural-language description of what to find, e.g. "where the websocket reconnect backoff is handled".',
+        },
+        limit: { type: 'number', description: 'Max results to return (default 10).' },
+      },
+      required: ['query'],
       additionalProperties: false,
     },
   },
