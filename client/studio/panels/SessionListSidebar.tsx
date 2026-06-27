@@ -260,6 +260,12 @@ export interface SessionListSidebarProps {
    */
   archivedCount?: number;
   onShowArchived?(): void;
+  /**
+   * The per-session views (Agent/Preview/File/Git/Database). Rendered as an
+   * indented sub-list directly beneath the active session row — collapsed for
+   * all other sessions. Each item's `active`/`onClick` drive the open view.
+   */
+  sessionViews?: SidebarNavItem[];
 }
 
 export function SessionListSidebar({
@@ -274,6 +280,7 @@ export function SessionListSidebar({
   onResetMainSession,
   archivedCount,
   onShowArchived,
+  sessionViews,
 }: SessionListSidebarProps): React.ReactElement {
   const sidebarMountLoggedRef = React.useRef(false);
   if (!sidebarMountLoggedRef.current) {
@@ -340,15 +347,20 @@ export function SessionListSidebar({
         {mainSession && (
           // The repo / no-worktree "main" session is always present and
           // is always the first row, directly under the Sessions header.
-          <RepositoryRow
-            session={mainSession}
-            branch={repoBranch}
-            active={mainSession.compositeId === activeCompositeId}
-            onClick={() => onSelect(mainSession.compositeId)}
-            {...(onResetMainSession
-              ? { onReset: () => onResetMainSession(mainSession.compositeId) }
-              : {})}
-          />
+          <React.Fragment>
+            <RepositoryRow
+              session={mainSession}
+              branch={repoBranch}
+              active={mainSession.compositeId === activeCompositeId}
+              onClick={() => onSelect(mainSession.compositeId)}
+              {...(onResetMainSession
+                ? { onReset: () => onResetMainSession(mainSession.compositeId) }
+                : {})}
+            />
+            {sessionViews && mainSession.compositeId === activeCompositeId && (
+              <SessionSubNav items={sessionViews} />
+            )}
+          </React.Fragment>
         )}
         <SessionRowList
           regularSessions={regularSessions}
@@ -356,6 +368,7 @@ export function SessionListSidebar({
           onSelect={onSelect}
           onArchiveSession={onArchiveSession}
           timeAgo={timeAgo}
+          {...(sessionViews ? { sessionViews } : {})}
         />
         {/* "+ New session" sits directly below the last session row —
             a quiet, low-key action, not a prominent CTA. */}
@@ -766,6 +779,87 @@ function SidebarFooterButton({
   );
 }
 
+/**
+ * The per-session view sub-nav (Agent/Preview/File/Git/Database), rendered
+ * indented directly under the active session row. Mirrors the orange-accent
+ * active treatment used by SessionRow / SidebarFooterButton so the selected view
+ * reads consistently with the rest of the rail.
+ */
+function SessionSubNav({ items }: { items: SidebarNavItem[] }): React.ReactElement {
+  return (
+    <div
+      data-id="session-subnav"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'var(--bg-secondary)',
+        borderBottom: '1px solid var(--border)',
+      }}
+    >
+      {items.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          data-id={`session-view-${item.id}`}
+          aria-pressed={item.active}
+          onClick={item.onClick}
+          style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            height: 30,
+            padding: '0 14px 0 28px',
+            border: 'none',
+            background: item.active ? 'var(--accent-dim)' : 'transparent',
+            color: item.active ? 'var(--accent)' : 'var(--text-secondary)',
+            fontFamily: '"JetBrains Mono", monospace',
+            fontSize: 11.5,
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+          onMouseEnter={(e) => {
+            if (!item.active) e.currentTarget.style.color = 'var(--text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            if (!item.active) e.currentTarget.style.color = 'var(--text-secondary)';
+          }}
+        >
+          {item.active && (
+            <span
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 3,
+                background: 'var(--accent)',
+                boxShadow: '0 0 12px var(--accent)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          <span
+            style={{
+              display: 'inline-flex',
+              width: 14,
+              height: 14,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            {item.icon}
+          </span>
+          <span style={{ flex: 1 }}>{item.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 
 
 
@@ -781,12 +875,14 @@ function SessionRowList({
   onSelect,
   onArchiveSession,
   timeAgo,
+  sessionViews,
 }: {
   regularSessions: SessionListSidebarSession[];
   activeCompositeId: string | null;
   onSelect(compositeId: string): void;
   onArchiveSession(compositeId: string): void;
   timeAgo(ts: number): string;
+  sessionViews?: SidebarNavItem[];
 }): React.ReactElement {
   // Build the rendered order (parents with peers indented underneath)
   // BEFORE running it through the transition list, so leave animations
@@ -854,9 +950,11 @@ function SessionRowList({
         const { s, isChild } = item;
         const leaving = phase === 'leaving';
         const deleting = isDeleting(s.compositeId);
+        const showViews =
+          !leaving && sessionViews && s.compositeId === activeCompositeId;
         return (
+          <React.Fragment key={s.compositeId}>
           <AnimatedRow
-            key={s.compositeId}
             leaving={leaving}
             isChild={isChild}
             delayMs={delayMs}
@@ -894,6 +992,8 @@ function SessionRowList({
               deleting={deleting}
             />
           </AnimatedRow>
+          {showViews && sessionViews && <SessionSubNav items={sessionViews} />}
+          </React.Fragment>
         );
       })}
     </>

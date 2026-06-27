@@ -23,6 +23,7 @@ import { PreviewPanel } from './panels/PreviewPanel';
 import { FilePanel } from './panels/FilePanel';
 import {
   PublishIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon,
+  AgentIcon, PreviewIcon, FileIcon, GitIcon,
 } from './panels/navIcons';
 import { useIsMobile } from './hooks/useIsMobile';
 
@@ -46,10 +47,16 @@ const ALL_TABS: WorkspaceTab[] = [
   'chat', 'preview', 'file', 'git', 'database',
   'publish', 'prodDatabase', 'errors', 'events', 'workers', 'terminal',
 ];
-// The dev/session-scoped tabs (the top segmented picker). Prod sidebar views
-// (publish/prodDatabase/errors/events/workers/terminal) are NOT session tabs, so the
-// picker is hidden for them.
-const SESSION_TABS: WorkspaceTab[] = ['chat', 'preview', 'file', 'git', 'database'];
+// Icons for the per-session view sub-nav (rendered under the active session row in
+// the sidebar). Keyed by the same ids as TABS. The session-scoped views
+// (chat/preview/file/git/database) now live in the sidebar, not a top tab bar.
+const SESSION_VIEW_ICONS: Record<string, React.ReactNode> = {
+  chat: <AgentIcon />,
+  preview: <PreviewIcon />,
+  file: <FileIcon />,
+  git: <GitIcon />,
+  database: <DatabaseIcon />,
+};
 
 // Resizable session sidebar — width persisted across reloads.
 const SIDEBAR_W_KEY = 'us-session-sidebar-w';
@@ -267,6 +274,16 @@ export default function StudioProjectPage({
     timeAgo: timeAgoShort,
     archivedCount: 0,
     onShowArchived: () => undefined,
+    // The five session views (Agent/Preview/File/Git/Database) render as an indented
+    // sub-list under the active session row. Selecting one switches the view (and
+    // closes the drawer on mobile).
+    sessionViews: TABS.map((t) => ({
+      id: t.id,
+      label: t.label,
+      icon: SESSION_VIEW_ICONS[t.id],
+      active: tab === t.id,
+      onClick: () => { setTab(t.id); closeDrawer(); },
+    })),
     footerNav: [
       { id: 'publish', label: 'Publish', icon: <PublishIcon />, active: tab === 'publish', onClick: () => { setTab('publish'); closeDrawer(); } },
       { id: 'prodDatabase', label: 'Database', icon: <DatabaseIcon />, active: tab === 'prodDatabase', onClick: () => { setTab('prodDatabase'); closeDrawer(); } },
@@ -315,29 +332,10 @@ export default function StudioProjectPage({
           )}
           <span style={S.name}>{isMobile ? activeViewLabel : projectName}</span>
           {!isMobile && projectPath && <span style={S.path}>{projectPath}</span>}
+          {/* On desktop the header now shows the active view name (the five
+              session views moved into the sidebar's per-session sub-nav). */}
+          {!isMobile && <span style={S.path}>· {activeViewLabel}</span>}
           <span style={{ flex: 1 }} />
-          {/* Segmented control — matches the sidebar header height (36) and reads
-              as one clean control instead of five separate bordered buttons. Shown only
-              for session-scoped views; prod sidebar views (publish/errors/…) hide it.
-              Hidden on mobile — views move into the nav drawer. */}
-          {!isMobile && SESSION_TABS.includes(tab) && <div style={S.tabBar}>
-            {TABS.map((t) => {
-              const active = tab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  data-id={`tab-${t.id}`}
-                  aria-pressed={active}
-                  data-active={active}
-                  className="us-chat-tab"
-                  onClick={() => { setTab(t.id); }}
-                  style={{ ...S.tabSeg, ...(active ? S.tabSegActive : {}) }}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>}
         </header>
         <ChatOpenUriProvider value={openUri}>
         <div style={S.content}>
