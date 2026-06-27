@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { native, isNativeAvailable } from 'ugly-app/native';
-import { useSafeAreaInsets } from 'ugly-app/client';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { FilePicker } from '../components/FilePicker';
 import { shortcut } from '../utils/platform';
 import { generateTaskId } from '../utils/taskId';
@@ -131,7 +131,9 @@ export function ProjectOnboarding({
 
   // Below 768px the two-column hero/recents grid collapses to one column.
   const isMobile = useIsMobile();
-  const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
+  const keyboardRef = useRef(keyboardHeight);
+  keyboardRef.current = keyboardHeight;
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [activeAction, setActiveAction] = useState<ActionTab>('new');
   const [newName, setNewName] = useState('');
@@ -244,6 +246,41 @@ export function ProjectOnboarding({
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Keep the focused field above the on-screen keyboard. The native iOS shell
+  // overlays the keyboard (the page is laid out full-height behind it), so the
+  // browser never auto-scrolls focused inputs into view — we shrink the page to
+  // the area above the keyboard (see container height below) and scroll the
+  // active field into that area ourselves, both when the keyboard opens and when
+  // a different field is tapped while it's already up.
+  const scrollActiveFieldIntoView = useCallback(() => {
+    const el = document.activeElement;
+    if (
+      el instanceof HTMLElement &&
+      (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')
+    ) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, []);
+  useEffect(() => {
+    if (keyboardHeight <= 0) return;
+    const id = setTimeout(scrollActiveFieldIntoView, 60);
+    return () => clearTimeout(id);
+  }, [keyboardHeight, scrollActiveFieldIntoView]);
+  useEffect(() => {
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target;
+      if (
+        keyboardRef.current > 0 &&
+        t instanceof HTMLElement &&
+        (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')
+      ) {
+        setTimeout(() => t.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
+      }
+    };
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
   }, []);
 
   const handleBrowse = useCallback((setter: (val: string) => void, current: string) => {
@@ -394,9 +431,12 @@ export function ProjectOnboarding({
       className="us-picker-exit"
       data-leaving={leaving ? 'true' : 'false'}
       style={{
-        // 100dvh (not 100%) tracks the mobile browser/keyboard chrome, matching
-        // the workspace root.
-        height: '100dvh',
+        // Shrink the whole page to the area ABOVE the on-screen keyboard. The native
+        // iOS shell overlays the keyboard so the viewport never shrinks on its own;
+        // subtracting the measured keyboard height keeps the scrollable form within
+        // the visible region (and the focus effect above scrolls the field into it).
+        // 0 when closed / on desktop → plain 100dvh.
+        height: keyboardHeight > 0 ? `calc(100dvh - ${keyboardHeight}px)` : '100dvh',
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--bg-primary)',
@@ -407,14 +447,7 @@ export function ProjectOnboarding({
         // 0 on desktop, so this is a no-op there.
         boxSizing: 'border-box',
         paddingTop: 'var(--safe-area-inset-top)',
-        // Reserve room for the soft keyboard so focused inputs (project name, git
-        // URL, recents filter) stay visible above it. Two sources, whichever is
-        // larger: `insets.bottom` (framework — folds keyboard into bottom; works in
-        // mobile Safari via visualViewport) and `--keyboard-inset-height` (set by the
-        // native iOS UglyBrowser shell from keyboardWillShow — the only reliable
-        // signal there, since the keyboard overlays content and visualViewport never
-        // shrinks). Both are 0 when no keyboard / on desktop, so this is a no-op then.
-        paddingBottom: `max(${insets.bottom}px, var(--keyboard-inset-height, 0px))`,
+        paddingBottom: 'var(--safe-area-inset-bottom)',
         paddingLeft: 'var(--safe-area-inset-left)',
         paddingRight: 'var(--safe-area-inset-right)',
       }}
@@ -808,12 +841,14 @@ export function ProjectOnboarding({
         </div>
       </main>
 
-      <div
-        className="us-fade-up"
-        style={{ animationDelay: '1400ms', animationDuration: '320ms' }}
-      >
-        <ManifestoFooter />
-      </div>
+      {keyboardHeight === 0 && (
+        <div
+          className="us-fade-up"
+          style={{ animationDelay: '1400ms', animationDuration: '320ms' }}
+        >
+          <ManifestoFooter />
+        </div>
+      )}
 
       {/* Floating "Run eval" button — opens a picker of every available
         eval task. On pick, the server carves a one-off project under
