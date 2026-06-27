@@ -12,13 +12,12 @@ export interface PickEntry {
 }
 
 /**
- * Pick an initial directory `fs.readdir` can actually open. '~' is NOT expanded on the
- * client (nor by the host's readdir), so a '~'-based or empty start falls back to the
- * filesystem root for navigation; an absolute path passes through.
+ * The initial directory to open. The host expands a leading '~' to its home dir, so
+ * '~'-based paths (e.g. the default '~/Documents/Ugly Studio') pass through; an empty start
+ * defaults to the host home. The picker falls back to '~' then '/' if a path can't be read.
  */
 export function resolveStart(startPath?: string): string {
-  if (!startPath || startPath.startsWith('~')) return '/';
-  return startPath;
+  return startPath && startPath.trim() ? startPath : '~';
 }
 
 /** Go up one directory, preserving a leading '~' or '/'. Root paths return themselves. */

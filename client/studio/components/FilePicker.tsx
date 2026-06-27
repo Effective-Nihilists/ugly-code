@@ -29,7 +29,7 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
   const [showHidden, setShowHidden] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
-  const load = useCallback(async (dir: string) => {
+  const load = useCallback(async (dir: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
     setSelectedFile(null);
@@ -37,18 +37,26 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
       const ents = await native.fs.readdir(dir);
       setRaw(ents);
       setPath(dir);
+      return true;
     } catch (e) {
       // console.error is captured to the project's server error_log (ugly-app Logger),
       // so proxied readdir failures are diagnosable without the webview console.
       console.error('[FilePicker] readdir failed', { dir, message: (e as Error)?.message });
       setError((e as Error)?.message || 'Could not open this folder');
+      return false;
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load(resolveStart(startPath));
+    // Open the requested default (e.g. ~/Documents/Ugly Studio); if it doesn't exist, fall
+    // back to the host home, then root, so the picker always lands somewhere navigable.
+    void (async () => {
+      for (const dir of [resolveStart(startPath), '~', '/']) {
+        if (await load(dir)) return;
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

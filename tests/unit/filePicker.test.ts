@@ -6,11 +6,11 @@ const dir = (name: string): HostDirent => ({ name, isDirectory: true, isFile: fa
 const file = (name: string): HostDirent => ({ name, isDirectory: false, isFile: true }) as HostDirent;
 
 describe('resolveStart', () => {
-  it("falls back to root for '~'-based or empty starts; passes absolute paths through", () => {
-    expect(resolveStart('~/Documents/Ugly Studio')).toBe('/');
-    expect(resolveStart('~')).toBe('/');
-    expect(resolveStart('')).toBe('/');
-    expect(resolveStart(undefined)).toBe('/');
+  it("passes '~'-based and absolute paths through; empty defaults to home", () => {
+    expect(resolveStart('~/Documents/Ugly Studio')).toBe('~/Documents/Ugly Studio');
+    expect(resolveStart('~')).toBe('~');
+    expect(resolveStart('')).toBe('~');
+    expect(resolveStart(undefined)).toBe('~');
     expect(resolveStart('/Users/admin/Documents')).toBe('/Users/admin/Documents');
   });
 });
