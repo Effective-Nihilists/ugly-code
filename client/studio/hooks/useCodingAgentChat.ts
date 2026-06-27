@@ -1433,8 +1433,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       try {
         const res = (await agentApi(backend.getSnapshot, {
           compositeId: sessionId,
-        })) as { snapshot: SessionSnapshot | null };
-        if (cancelled || !res.snapshot) return;
+        })) as { snapshot: SessionSnapshot | null } | null;
+        if (cancelled || !res?.snapshot) return;
         applySnapshot(res.snapshot);
       } catch (err) {
         console.warn(

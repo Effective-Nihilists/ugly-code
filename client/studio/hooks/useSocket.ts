@@ -17,7 +17,8 @@ import type { AppSocket } from 'ugly-app/client';
 import { native, permissions, taskEntryUrl } from 'ugly-app/native';
 import { waitForTaskRunning } from './taskReady';
 import { buildId } from '../../../shared/Build';
-import type { AppRegistry } from '../shared/api';
+import type { AppRegistry, ReasoningEffort, SessionSnapshot } from '../shared/api';
+import { composeSessionSnapshot } from '../agent/sessionSnapshot';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 import { gradeProject, type GradeDeps } from '../evals/grader';
@@ -574,7 +575,36 @@ const handlers: Record<string, Handler> = {
     const rows = data?.messages ?? [];
     return { messages: rowsToDisplayMessages(sessionId, rows), hasMore: false };
   },
-  getCodingAgentSnapshot: () => Promise.resolve(null),
+  // The mount-time authoritative read. The client agent's session axes live here
+  // (sessionAxes + getSessionModel), so compose the snapshot from them — previously
+  // this returned null, so the chat header's model/mode/reasoning/pattern never
+  // populated (and the null crashed the hook's `res.snapshot` read). Runtime fields
+  // (codebase readiness, tokens, worktree) fill in from the running task's live
+  // session_state stream once a turn starts.
+  getCodingAgentSnapshot: (i) => {
+    const sessionId = String(i.compositeId ?? i.sessionId ?? '');
+    if (!sessionId) return Promise.resolve({ snapshot: null });
+    const axes = sessionAxes.get(sessionId) ?? {};
+    const model = getSessionModel(sessionId) ?? 'auto';
+    const now = Date.now();
+    const snapshot = composeSessionSnapshot({
+      sessionId,
+      cwd: getActiveProjectPath() ?? '',
+      createdAt: now,
+      updatedAt: now,
+      model,
+      reasoningEffort: (axes.reasoningEffort as ReasoningEffort | undefined) ?? 'medium',
+      permissionMode: (axes.permissionMode as SessionSnapshot['permissionMode'] | undefined) ?? 'edit',
+      modelMode: (axes.modelMode as SessionSnapshot['modelMode'] | undefined) ?? { kind: 'single', model },
+      patternMode: (axes.patternMode as SessionSnapshot['patternMode'] | undefined) ?? 'auto',
+      cost: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      perModel: [],
+      messageCount: 0,
+    });
+    return Promise.resolve({ snapshot });
+  },
   // Honor resumeSessionId (return it unchanged → no "resume mismatch"); mint a
   // fresh compositeId for a new session. Persistence is deferred to the first
   // turn (clientAgent upserts), so we don't create empty session rows.

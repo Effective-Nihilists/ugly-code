@@ -45,6 +45,8 @@ import {
 import { assistantParts, type Part } from './sessionDisplay';
 import { ensureSessionWorkspace, getSessionWorkspace } from './sessionWorkspace';
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
+import { composeSessionSnapshot, type PerModelAcc } from './sessionSnapshot';
+export { composeSessionSnapshot };
 
 type Emit = (msg: { type: string; [k: string]: unknown }) => void;
 
@@ -160,16 +162,6 @@ function makeToolHandlers(sessionId: string): Record<string, (input: unknown) =>
   );
 }
 
-interface PerModelAcc {
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-  cost: number;
-  turnCount: number;
-}
-
 interface SessionAgentState {
   controller: AgentController;
   emitRef: { current: Emit };
@@ -220,61 +212,8 @@ function applySelection(s: SessionAgentState, sel?: AgentSelection): void {
   if (sel.patternMode) s.patternMode = sel.patternMode;
 }
 
-/**
- * Build the `session_state` snapshot payload from the session's live telemetry
- * + the user's selected axes. Pure (no emit) so the echo-the-selection contract
- * is unit-testable. The chat hook's `applySnapshot` reads `finishPipeline`
- * WITHOUT guards, so the empty shape is always present (the client agent has no
- * finish pipeline).
- */
-export function composeSessionSnapshot(args: {
-  sessionId: string;
-  cwd: string;
-  createdAt: number;
-  updatedAt: number;
-  model: string;
-  reasoningEffort: ReasoningEffort;
-  permissionMode: SessionSnapshot['permissionMode'];
-  modelMode: SessionSnapshot['modelMode'];
-  patternMode: SessionSnapshot['patternMode'];
-  cost: number;
-  promptTokens: number;
-  completionTokens: number;
-  perModel: PerModelAcc[];
-  messageCount: number;
-}): Record<string, unknown> {
-  return {
-    compositeId: args.sessionId,
-    workspaceId: args.sessionId.split(':')[0] ?? '',
-    sessionId: args.sessionId.split(':')[1] ?? args.sessionId,
-    title: '',
-    cwd: args.cwd,
-    createdAt: args.createdAt,
-    updatedAt: args.updatedAt,
-    mode: args.permissionMode === 'yolo' ? ('yolo' as const) : ('edit' as const),
-    model: args.model,
-    reasoningEffort: args.reasoningEffort,
-    supportsReasoning: false,
-    permissionMode: args.permissionMode,
-    modelMode: args.modelMode,
-    patternMode: args.patternMode,
-    resolvedPattern: null,
-    currentStepId: null,
-    currentStepIter: 0,
-    currentStepFinished: false,
-    worktree: null,
-    worktreeBlocked: false,
-    worktreeStatus: null,
-    finishPipeline: { running: false, done: false, ok: false, stages: [] },
-    cost: args.cost,
-    promptTokens: args.promptTokens,
-    completionTokens: args.completionTokens,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-    perModel: args.perModel,
-    messageCount: args.messageCount,
-  };
-}
+// composeSessionSnapshot moved to ./sessionSnapshot (shared with the renderer's
+// getCodingAgentSnapshot); re-exported above.
 
 /**
  * Build the compaction summary. Compaction replaces the oldest turns with this
