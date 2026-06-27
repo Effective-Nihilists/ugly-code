@@ -7236,6 +7236,10 @@ CodingAgentChatProps = {}) {
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
+          // Flex child of the workspace `content` row — without minWidth:0 it won't
+          // shrink to the viewport on mobile and the whole chat column (header,
+          // messages, composer) overflows off the right edge.
+          minWidth: 0,
           position: 'relative',
         }}
       >
@@ -8278,6 +8282,7 @@ function CodingAgentInputArea({
         // The workspace root owns the bottom safe-area inset (single source of
         // truth), so the composer keeps plain padding to avoid double-counting.
         padding: '8px 12px',
+        boxSizing: 'border-box',
         borderTop: '1px solid var(--border)',
         background: 'var(--bg-panel)',
         flexShrink: 0,
@@ -8437,6 +8442,7 @@ function CodingAgentInputArea({
               display: 'flex',
               alignItems: 'center',
               gap: 8,
+              minWidth: 0,
             }}
           >
             {pendingSkill && (
@@ -8511,6 +8517,7 @@ function CodingAgentInputArea({
               disabled={awaitingAskUser}
               style={{
                 flex: 1,
+                minWidth: 0,
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
