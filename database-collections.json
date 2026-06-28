@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-22T03:48:12.099Z",
+  "generatedAt": "2026-06-27T22:53:42.301Z",
   "source": "shared/collections.ts",
   "collections": {
     "perfLog": {
@@ -254,6 +254,46 @@
         "trackable": false,
         "public": false,
         "cascadeFrom": null
+      }
+    },
+    "recentProject": {
+      "name": "recentProject",
+      "schema": {
+        "fields": {
+          "deviceId": {
+            "type": "string",
+            "required": true
+          },
+          "deviceLabel": {
+            "type": "string",
+            "required": true
+          },
+          "lastOpened": {
+            "type": "number",
+            "required": true
+          },
+          "name": {
+            "type": "string",
+            "required": true
+          },
+          "path": {
+            "type": "string",
+            "required": true
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        }
+      },
+      "meta": {
+        "cache": false,
+        "trackable": true,
+        "public": false,
+        "cascadeFrom": null,
+        "trackKeys": [
+          "userId"
+        ]
       }
     },
     "codingSession": {
