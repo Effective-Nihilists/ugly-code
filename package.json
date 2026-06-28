@@ -1,6 +1,6 @@
 {
   "name": "ugly-code",
-  "version": "0.1.43",
+  "version": "0.1.44",
   "type": "module",
   "scripts": {
     "dev": "ugly-app dev --watch",
@@ -40,6 +40,7 @@
     "anser": "^2.3.5",
     "codemirror": "^6.0.2",
     "highlight.js": "^11.11.1",
+    "lru-cache": "^11.0.0",
     "lucide-react": "^1.8.0",
     "nanoid": "^5.1.5",
     "react": "^18.3.1",
