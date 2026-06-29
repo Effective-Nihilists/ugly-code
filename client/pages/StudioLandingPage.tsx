@@ -338,7 +338,7 @@ function NavBar() {
                 marginLeft: 14,
               }}
             >
-              / studio
+              / code
             </span>
           </a>
           <div
@@ -482,7 +482,7 @@ function HeroInstall({
                 boxShadow: `0 0 10px ${BRAND}`,
               }}
             />
-            The studio from the YouTube show
+            The coding platform from the YouTube show
           </div>
         </ScrollAnimatedView>
 
@@ -498,11 +498,11 @@ function HeroInstall({
               margin: '0 0 28px',
             }}
           >
-            <span style={{ display: 'block' }}>Three layers.</span>
+            <span style={{ display: 'block' }}>Ugly Code.</span>
+            <span style={{ display: 'block' }}>Beats Claude Code —</span>
             <span style={{ display: 'block' }}>
-              One <span style={{ color: BRAND }}>cheap</span> model.
+              on a <span style={{ color: BRAND }}>cheap</span> model.
             </span>
-            <span style={{ display: 'block' }}>Stacked, they ship.</span>
           </h1>
         </ScrollAnimatedView>
 
@@ -518,13 +518,16 @@ function HeroInstall({
             }}
           >
             <strong style={{ color: TEXT, fontWeight: 700 }}>
-              ugly-studio + GLM-5.1
+              Ugly Code
             </strong>{' '}
-            (or your model of choice) vs. Claude Code + Sonnet, at{' '}
+            is an AI coding agent with 35 tools wired in — GLM-5.1 (or your model
+            of choice) vs. Claude Code + Sonnet, at{' '}
             <span style={{ color: BRAND, fontWeight: 700 }}>
               less than 20% of the cost
             </span>
-            . Same eval. Same bar. The bill is on screen.
+            . It runs inside{' '}
+            <strong style={{ color: TEXT, fontWeight: 700 }}>Ugly Studio</strong>,
+            the free desktop app. The bill is on screen.
           </p>
         </ScrollAnimatedView>
 
@@ -1830,9 +1833,11 @@ function InstallDeep({
   return (
     <LayerWrap id="install" num="05" lbl="Install" isDesktop={isDesktop}>
       <LayerHeading isDesktop={isDesktop}>
-        Pick a binary. <span style={{ color: BRAND }}>Open it</span>. Start a project.
+        Install Ugly Studio. <span style={{ color: BRAND }}>Open it</span>. Start coding.
       </LayerHeading>
-      <LayerPromise>Mac · Windows · Linux</LayerPromise>
+      <LayerPromise>
+        Ugly Code runs inside Ugly Studio · Mac · Windows · Linux
+      </LayerPromise>
 
       <div
         style={{
@@ -1924,7 +1929,8 @@ function InstallDeep({
           lineHeight: 1.7,
         }}
       >
-        After install: open Ugly Studio, sign in to ugly.bot, start a project.
+        After install: open Ugly Studio, sign in to ugly.bot, and it drops you
+        straight into Ugly Code.
       </div>
     </LayerWrap>
   );
