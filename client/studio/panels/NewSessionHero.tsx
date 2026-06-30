@@ -118,7 +118,7 @@ export function NewSessionHero({
     useStudioUserSetting<PermissionAxisValue>(PERMISSION_SETTING_KEY, 'edit');
   const [modelMode, setModelMode] = useStudioUserSetting<ModelAxisValue>(
     MODEL_MODE_SETTING_KEY,
-    { kind: 'single', model: 'deepseek_v4_flash' },
+    { kind: 'single', model: 'deepseek_v4_pro' },
   );
   const [patternMode, setPatternMode] = useStudioUserSetting<PatternAxisValue>(
     PATTERN_SETTING_KEY,

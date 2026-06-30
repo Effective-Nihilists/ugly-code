@@ -576,6 +576,8 @@ const BACKEND = {
    * without depending on having received the granular events.
    */
   getSnapshot: 'getCodingAgentSnapshot',
+  // Listen-only attach to a session's live task stream (cross-device sync).
+  chatAttach: 'codingAgentChatAttach',
   eventType: 'codingAgent:event',
   exitType: 'codingAgent:exit',
 } as const;
@@ -1205,7 +1207,13 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     parallelBranches?: string[];
     at: number;
   } | null>(null);
-  const isResumed = !!initialSessionId;
+  // Capture resume-ness at mount, not live. The chat pane is no longer
+  // remounted when it creates its OWN session (StudioProjectPage keys the
+  // pane on chatKey only), so after a self-create the `initialSessionId`
+  // prop flips undefined→newId on the SAME instance. A live `!!initialSessionId`
+  // would then turn a brand-new session into a "resumed" one (showing the
+  // ResumeBanner). Whether this instance resumed history is fixed at mount.
+  const [isResumed] = useState(() => !!initialSessionId);
   // True from mount until the `chatListMessages` backfill completes (or
   // errors) on a resumed session. Lets the panel hold the empty-state
   // UI back while history is still in flight — otherwise the user sees
@@ -2607,6 +2615,21 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           return;
         }
         setSessionId(newId);
+        // Cross-device live sync: attach (listen-only) to this session's live
+        // task stream so a message sent on ANOTHER device streams here live.
+        // Never starts a task. Poll-retry because the host may not have spun
+        // the task up yet (the sender's first turn creates it). The
+        // `knownMessageIds` dedup + `acceptedSessionId` filter prevent any
+        // double-render against the history backfill below.
+        void (async () => {
+          for (let attempt = 0; attempt < 10 && !cancelled; attempt++) {
+            const res = await agentApi(backend.chatAttach, { sessionId: newId }).catch(
+              () => ({ attached: false }),
+            );
+            if ((res as { attached?: boolean })?.attached) break;
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+        })();
         // Adopt the per-session model + reasoning effort from disk.
         // The client's initial state was seeded from the global
         // localStorage default (or `initialModel` prop) — that's only

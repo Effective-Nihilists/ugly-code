@@ -201,4 +201,4 @@ Guidelines:
 - All paths are relative to the workspace root. Be concise in your prose.`;
 
 /** Default model for the agent (strong at coding; routed via ugly.bot). */
-export const AGENT_DEFAULT_MODEL = 'claude_sonnet_4_6' as const;
+export const AGENT_DEFAULT_MODEL = 'deepseek_v4_pro' as const;

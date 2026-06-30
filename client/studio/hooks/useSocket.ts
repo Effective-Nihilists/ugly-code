@@ -135,13 +135,41 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
   // and throws "unknown task method". A reused, already-running task passes on the first check.
   await waitForTaskRunning(id, () => native.task.enum() as Promise<{ id: string; status: string }[]>);
   sessionTaskIds.set(sessionId, id);
-  if (!listenedTaskIds.has(id)) {
-    listenedTaskIds.add(id);
-    native.task.listen(id, (_event, data) =>
-      emitCustom(data as { type: string; [k: string]: unknown }),
-    );
-  }
+  wireTaskListener(id);
   return id;
+}
+/** Wire a task's emitCustom-shaped frames back onto the local bus, once per task id. */
+function wireTaskListener(id: string): void {
+  if (listenedTaskIds.has(id)) return;
+  listenedTaskIds.add(id);
+  native.task.listen(id, (_event, data) =>
+    emitCustom(data as { type: string; [k: string]: unknown }),
+  );
+}
+/**
+ * Attach (listen-only) to an ALREADY-RUNNING session task without ever starting
+ * one. A client that merely OPENS/views a session must register on the same
+ * `task.listen` stream as the sender — local and remote alike — so a message
+ * sent on another device streams here live. It must NEVER spawn an idle agent:
+ * only `ensureCodingTask` (driven by send/stop/clear) starts tasks. Returns true
+ * if attached (or already attached), false if the host has no live task yet, in
+ * which case the caller poll-retries until the sender's first turn creates it.
+ */
+async function attachCodingTask(sessionId: string): Promise<boolean> {
+  if (!sessionId) return false;
+  const id = 'coding:' + sessionId;
+  if (listenedTaskIds.has(id)) { sessionTaskIds.set(sessionId, id); return true; }
+  let live = false;
+  try {
+    const existing = (await native.task.enum()).find((t) => t.id === id);
+    // Attach to whatever live task the host has (no buildId pin — a viewer must
+    // not stop/replace the sender's task; events are shape-stable frames).
+    live = !!existing && existing.status !== 'exited' && existing.status !== 'error';
+  } catch { /* host unreachable — caller retries */ }
+  if (!live) return false;
+  sessionTaskIds.set(sessionId, id);
+  wireTaskListener(id);
+  return true;
 }
 function emitAgentError(sessionId: string, e: unknown): void {
   console.error('[codingAgentChatSend] turn failed', e);
@@ -602,6 +630,14 @@ const handlers: Record<string, Handler> = {
       messageCount: 0,
     });
     return Promise.resolve({ snapshot });
+  },
+  // Cross-device live sync: attach (listen-only) to this session's live coding
+  // task so events from a sender on ANOTHER device stream to this viewer. Never
+  // starts a task. `attached:false` means the host has no live task yet — the
+  // caller poll-retries until the sender's first turn creates it.
+  codingAgentChatAttach: async (i) => {
+    const sessionId = String(i.compositeId ?? i.sessionId ?? '');
+    return { attached: await attachCodingTask(sessionId) };
   },
   // Honor resumeSessionId (return it unchanged → no "resume mismatch"); mint a
   // fresh compositeId for a new session. Persistence is deferred to the first

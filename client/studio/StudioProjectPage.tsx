@@ -236,12 +236,16 @@ export default function StudioProjectPage({
   const archiveSession = React.useCallback((id: string) => {
     setStored((prev) => prev.filter((s) => s.compositeId !== id));
     setActiveSessionId((cur) => (cur === id ? null : cur));
+    // Archiving the session currently mounted in the chat pane must drop its
+    // view back to the new-session hero. The pane is keyed on chatKey only
+    // (not activeSessionId), so bump chatKey to force that remount.
+    if (id === activeSessionId) setChatKey((k) => k + 1);
     // Persist the archive + tear down the session's worktree (best-effort).
     if (id !== MAIN_PLACEHOLDER) {
       void sessionApi.archive({ sessionId: id });
       void import('./agent/sessionWorkspace').then((m) => m.removeSessionWorkspace(id, projectPath ?? null));
     }
-  }, [projectPath]);
+  }, [projectPath, activeSessionId]);
 
   // Synthetic "Main session" row when none has been started yet — clicking it
   // opens the new-session hero, and the first session created becomes main.
@@ -343,7 +347,15 @@ export default function StudioProjectPage({
               key bumps on session switch so the chat reloads the selected session. */}
           <div style={{ ...S.pane, display: tab === 'chat' ? 'flex' : 'none' }}>
             <CodingAgentChat
-              key={`${chatKey}:${activeSessionId ?? 'new'}`}
+              // Key on chatKey ONLY — never on activeSessionId. When the chat
+              // creates its own session, recordSession sets activeSessionId,
+              // which previously flipped this key and destroyed the live
+              // instance mid-create — the fresh instance then re-fetched the
+              // just-created session before its message + setting RPCs had
+              // persisted, so the model/plan/initial message only appeared
+              // after a manual reload. Explicit session switches (select/new/
+              // archive-active) bump chatKey to force the remount they need.
+              key={`chat-${chatKey}`}
               {...(activeSessionId ? { initialSessionId: activeSessionId } : {})}
               onSessionCreated={recordSession}
               onResumeMissing={archiveSession}
