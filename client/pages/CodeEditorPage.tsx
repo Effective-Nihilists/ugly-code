@@ -203,7 +203,7 @@ export default function CodeEditorPage(): React.ReactElement {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  root: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#0c0b0a', color: '#efe9e1' },
+  root: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#0c0b0a', color: '#efe9e1', paddingTop: 'var(--safe-area-inset-top)', paddingLeft: 'var(--safe-area-inset-left)', paddingRight: 'var(--safe-area-inset-right)' },
   header: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderBottom: '1px solid #2c2620' },
   cwd: { fontFamily: 'monospace', fontSize: 12, color: '#988e80' },
   tag: { fontFamily: 'monospace', fontSize: 11, color: '#ff6a1f', border: '1px solid #d44e0a', borderRadius: 6, padding: '2px 7px' },
@@ -214,7 +214,7 @@ const S: Record<string, React.CSSProperties> = {
   main: { flex: 1, minWidth: 0, display: 'flex' },
   editor: { flex: 1, background: '#0b0907', color: '#efe9e1', border: 'none', outline: 'none', fontFamily: 'monospace', fontSize: 13, padding: 16, resize: 'none' },
   empty: { margin: 'auto', color: '#5f574c', fontFamily: 'monospace' },
-  terminal: { borderTop: '1px solid #2c2620', background: '#0b0907', maxHeight: 220, display: 'flex', flexDirection: 'column' },
+  terminal: { borderTop: '1px solid #2c2620', background: '#0b0907', maxHeight: 220, display: 'flex', flexDirection: 'column', paddingBottom: 'var(--safe-area-inset-bottom)' },
   termBar: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px' },
   cmdInput: { flex: 1, background: '#141210', color: '#efe9e1', border: '1px solid #2c2620', borderRadius: 6, fontFamily: 'monospace', fontSize: 13, padding: '6px 10px', outline: 'none' },
   run: { fontFamily: 'monospace', fontSize: 12, background: '#ff6a1f', color: '#1a0e06', border: 'none', borderRadius: 7, padding: '6px 14px', cursor: 'pointer' },
