@@ -7,6 +7,7 @@
 import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
 import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, type AgentSelection } from './clientAgent';
+import { installTaskErrorLog } from './taskErrorLog';
 
 const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
 
@@ -51,6 +52,10 @@ if (origin) {
     return realFetch(input, init);
   }) as typeof fetch;
 }
+
+// Route this background task's console.error/warn to the app's own errorLog
+// (this Node child installs no browser Logger, so its errors were invisible).
+installTaskErrorLog({ origin, sessionId });
 
 defineTask({
   onCall: {
