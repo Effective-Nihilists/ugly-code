@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
 import { SessionSnapshotSchema } from '../shared/api';
+import { spliceMissingUserRows } from '../agent/messageBackfill';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { onCustomMessage } from './useSocket';
 
@@ -2574,35 +2575,20 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       } catch {
         return;
       }
-      const histIds = history.map((m) => m.id);
-      setMessages((prev) => {
-        const have = new Set(prev.map((m) => m.id));
-        let out = prev;
-        for (let hi = 0; hi < history.length; hi++) {
-          const hm = history[hi]!;
-          if (hm.role !== 'user' || have.has(hm.id)) continue;
-          const text = (hm.parts ?? [])
-            .filter((p) => p.type === 'text')
-            .map((p) => p.data?.text ?? '')
-            .join('');
-          if (!text) continue;
-          let insertAt = out.length;
-          for (let ri = 0; ri < out.length; ri++) {
-            const pos = histIds.indexOf(out[ri]!.id);
-            if (pos === -1 || pos > hi) {
-              insertAt = ri;
-              break;
-            }
-          }
-          out = [
-            ...out.slice(0, insertAt),
-            { id: hm.id, role: 'user' as const, content: text, toolUses: [], isStreaming: false },
-            ...out.slice(insertAt),
-          ];
-          have.add(hm.id);
-        }
-        return out;
-      });
+      const rows = history.map((m) => ({
+        id: m.id,
+        role: m.role,
+        text: (m.parts ?? []).filter((p) => p.type === 'text').map((p) => p.data?.text ?? '').join(''),
+      }));
+      setMessages((prev) =>
+        spliceMissingUserRows(prev, rows, (id, content) => ({
+          id,
+          role: 'user',
+          content,
+          toolUses: [],
+          isStreaming: false,
+        })),
+      );
     },
     [backend],
   );
