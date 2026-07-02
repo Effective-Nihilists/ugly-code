@@ -3,7 +3,6 @@ import {
   pgQuery,
   emailSend,
   flushPerf,
-  pushSend,
   recordFeedback,
   recordPerf,
   uglyBotRequest,
@@ -11,6 +10,7 @@ import {
   type InboundEmail,
   type RequestHandlers,
   type TypedDB,
+  type TypedPushSendInput,
 } from 'ugly-app';
 import { nanoid } from 'nanoid';
 import { enableConversations } from 'ugly-app/conversation/server';
@@ -50,7 +50,9 @@ const getDb = (): TypedDB => {
 };
 
 const app = createApp(
-  { requests, messages },
+  // `pages` in the registry lets `app.pushSend` infer the route table for
+  // compile-time route/query checking.
+  { requests, messages, pages },
   {
     // Standardized client-driven agent turn (ugly-app/agent) — the studio path.
     agentTurn: agentTurnHandler({ tools: AGENT_TOOLS, systemPrompt: AGENT_SYSTEM_PROMPT }),
@@ -126,9 +128,16 @@ const app = createApp(
       return { ok: true };
     },
 
-    sendPush: async (_userId, { targetUserId, title, body, path, query, imageUrl }) => {
+    sendPush: async (_userId, { targetUserId, title, body, page, query, imageUrl }): Promise<{ sent: boolean }> => {
       try {
-        const result = await pushSend({ targetUserId, title, body, path, ...(query ? { query } : {}), ...(imageUrl ? { imageUrl } : {}) });
+        const result = await app.pushSend({
+          targetUserId,
+          title,
+          body,
+          page,
+          query: query ?? {},
+          ...(imageUrl ? { imageUrl } : {}),
+        } as TypedPushSendInput<typeof pages, keyof typeof pages & string>);
         return { sent: result.sent };
       } catch (e) {
         console.error(e);

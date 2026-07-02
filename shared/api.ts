@@ -68,7 +68,7 @@ export const requests = defineRequests({
       targetUserId: z.string(),
       title: z.string().min(1).max(200),
       body: z.string().max(500),
-      path: z.string(),
+      page: z.string(),
       query: z.record(z.string(), z.string()).optional(),
       imageUrl: z.string().optional(),
     }),
