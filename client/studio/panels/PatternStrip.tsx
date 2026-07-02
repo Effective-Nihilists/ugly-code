@@ -150,7 +150,6 @@ export const PatternStrip: FC<PatternStripProps> = ({
   if (!pattern) return null;
 
   const layout = PATTERN_LAYOUTS[pattern];
-  if (!layout) return null;
   return (
     <div className="pattern-strip" data-id="pattern-strip">
       <div className="pattern-strip-row">

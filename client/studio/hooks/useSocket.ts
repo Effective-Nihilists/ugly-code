@@ -77,6 +77,14 @@ async function spawnForPath(cmd: string): Promise<string> {
 
 type Input = Record<string, unknown>;
 type Handler = (input: Input) => Promise<unknown>;
+
+/** Honest stringify of an `unknown` handler-input field. Behaviourally identical
+ *  to `String(v)` (objects → '[object Object]', etc.), but its `string` return
+ *  type keeps `no-base-to-string` satisfied at every call site — these fields are
+ *  all string-typed inputs coming across the untyped bridge. */
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : String(v);
+}
 type CustomMessageHandler = (msg: { type: string; [key: string]: unknown }) => void;
 
 const customMessageHandlers = new Set<CustomMessageHandler>();
@@ -273,7 +281,7 @@ const gradeDeps: GradeDeps = {
         proc.onError((e) => { resolve({ out: `${out}\n${e}`, code: 1 }); });
         proc.onExit((code) => { resolve({ out, code }); });
       } catch (e) {
-        resolve({ out: String((e as Error).message), code: 1 });
+        resolve({ out: (e as Error).message, code: 1 });
       }
     }),
   readFile: (p) => native.fs.readFile(p),
@@ -344,6 +352,7 @@ function runCli(cmd: string): Promise<{ _id: string; created: number; data: Reco
               return null;
             }
           })
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `data` is `as`-cast as always-present, but parsed NDJSON may genuinely omit it
           .filter((d): d is { _id: string; created: number; data: Record<string, unknown> } => !!d && !!d.data);
         resolve(docs);
       });
@@ -383,11 +392,11 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
             reject(new Error('DB query: unparseable output: ' + stdout.slice(0, 200)));
           }
         } else {
-          reject(new Error(stderr.trim() || 'node exited ' + code));
+          reject(new Error(stderr.trim() || `node exited ${String(code)}`));
         }
       });
     } catch (e) {
-      reject(e);
+      reject(e instanceof Error ? e : new Error(String(e)));
     }
   });
 }
@@ -420,23 +429,23 @@ const handlers: Record<string, Handler> = {
   },
   // ── Database panel: run queries against the project's PG (dev) or Neon (prod)
   // via a node+pg script over native.process. ──
-  dbCollections: (i) => runDbScript('collections', String(i.mode ?? 'dev'), {}),
+  dbCollections: (i) => runDbScript('collections', str(i.mode ?? 'dev'), {}),
   dbGetDoc: (i) =>
-    runDbScript('getDoc', String(i.mode ?? 'dev'), { collection: i.collection, id: i.id }),
+    runDbScript('getDoc', str(i.mode ?? 'dev'), { collection: i.collection, id: i.id }),
   dbGetQuery: (i) =>
-    runDbScript('getQuery', String(i.mode ?? 'dev'), {
+    runDbScript('getQuery', str(i.mode ?? 'dev'), {
       collection: i.collection,
       filters: i.filters,
       sort: i.sort,
       limit: i.limit,
       skip: i.skip,
     }),
-  dbCount: (i) => runDbScript('count', String(i.mode ?? 'dev'), { collection: i.collection }),
-  dbSchema: (i) => runDbScript('schema', String(i.mode ?? 'dev'), { collection: i.collection }),
+  dbCount: (i) => runDbScript('count', str(i.mode ?? 'dev'), { collection: i.collection }),
+  dbSchema: (i) => runDbScript('schema', str(i.mode ?? 'dev'), { collection: i.collection }),
   // Raw SQL console. Writes require allowWrite; DROP/TRUNCATE/ALTER + WHERE-less
   // UPDATE/DELETE require force; UPDATE/DELETE support dryRun (txn + ROLLBACK).
   dbExec: (i) =>
-    runDbScript('exec', String(i.mode ?? 'dev'), {
+    runDbScript('exec', str(i.mode ?? 'dev'), {
       sql: i.sql,
       params: i.params,
       allowWrite: i.allowWrite,
@@ -445,7 +454,7 @@ const handlers: Record<string, Handler> = {
     }),
   // Structured insert/update/delete of a single doc (via the doc's JSONB).
   dbMutate: (i) =>
-    runDbScript('mutate', String(i.mode ?? 'dev'), {
+    runDbScript('mutate', str(i.mode ?? 'dev'), {
       collection: i.collection,
       action: i.action,
       id: i.id,
@@ -459,10 +468,10 @@ const handlers: Record<string, Handler> = {
       errors: docs.map((d) => ({
         id: d._id,
         created: d.created,
-        source: String(d.data.source ?? ''),
-        type: String(d.data.type ?? ''),
-        level: String(d.data.level ?? 'error'),
-        message: String(d.data.message ?? ''),
+        source: str(d.data.source ?? ''),
+        type: str(d.data.type ?? ''),
+        level: str(d.data.level ?? 'error'),
+        message: str(d.data.message ?? ''),
         stack: d.data.stack as string | undefined,
         userId: (d.data.userId ?? null) as string | null,
         hash: '',
@@ -474,7 +483,7 @@ const handlers: Record<string, Handler> = {
     const docs = await runCli('errors');
     const map = new Map<string, { message: string; count: number; lastSeen: number; latestErrorId: string }>();
     for (const d of docs) {
-      const msg = String(d.data.message ?? '');
+      const msg = str(d.data.message ?? '');
       const e = map.get(msg);
       if (e) {
         e.count++;
@@ -494,9 +503,9 @@ const handlers: Record<string, Handler> = {
       events: docs.map((d) => ({
         id: d._id,
         created: d.created,
-        eventName: String(d.data.eventName ?? ''),
+        eventName: str(d.data.eventName ?? ''),
         userId: (d.data.userId ?? null) as string | null,
-        sessionId: String(d.data.sessionId ?? ''),
+        sessionId: str(d.data.sessionId ?? ''),
         properties: (d.data.properties ?? {}) as Record<string, unknown>,
       })),
     };
@@ -505,7 +514,7 @@ const handlers: Record<string, Handler> = {
     const docs = await runCli('events');
     const counts = new Map<string, number>();
     for (const d of docs) {
-      const n = String(d.data.eventName ?? '');
+      const n = str(d.data.eventName ?? '');
       counts.set(n, (counts.get(n) ?? 0) + 1);
     }
     return {
@@ -530,7 +539,7 @@ const handlers: Record<string, Handler> = {
     let m: RegExpExecArray | null;
     while ((m = re.exec(src)) !== null) {
       const name = m[1];
-      const body = m[2] ?? '';
+      const body = m[2];
       const schedule = /schedule\s*:\s*['"]([^'"]*)['"]/.exec(body)?.[1];
       const description = /description\s*:\s*['"]([^'"]*)['"]/.exec(body)?.[1];
       workers.push({ name, ...(schedule ? { schedule } : {}), ...(description ? { description } : {}), defaultInput: {} });
@@ -547,11 +556,11 @@ const handlers: Record<string, Handler> = {
     return {
       runs: filtered.map((d) => ({
         runId: d._id,
-        name: String(d.data.name ?? ''),
+        name: str(d.data.name ?? ''),
         startedAt: d.created,
         status: mapWorkerStatus(d.data.status),
         durationMs: (d.data.durationMs ?? null) as number | null,
-        source: String(d.data.source ?? ''),
+        source: str(d.data.source ?? ''),
         error: d.data.error as string | undefined,
       })),
     };
@@ -563,11 +572,11 @@ const handlers: Record<string, Handler> = {
       run: d
         ? {
             runId: d._id,
-            name: String(d.data.name ?? ''),
+            name: str(d.data.name ?? ''),
             startedAt: d.created,
             status: mapWorkerStatus(d.data.status),
             durationMs: (d.data.durationMs ?? null) as number | null,
-            source: String(d.data.source ?? ''),
+            source: str(d.data.source ?? ''),
             error: d.data.error as string | undefined,
             logs: [],
           }
@@ -605,12 +614,12 @@ const handlers: Record<string, Handler> = {
   },
   gitStatus: () => Promise.resolve({ branch: 'main', remote: null, files: [] }),
   deleteCodingAgentSession: async (i) => {
-    await sessionApi.archive({ sessionId: String(i.sessionId ?? '') });
+    await sessionApi.archive({ sessionId: str(i.sessionId ?? '') });
     return {};
   },
   // ── coding-agent session protocol — server-backed persistence ──
   codingAgentChatListMessages: async (i) => {
-    const sessionId = String(i.sessionId ?? '');
+    const sessionId = str(i.sessionId ?? '');
     const limit = typeof i.limit === 'number' ? i.limit : 200;
     const data = await sessionApi.listMessages({ sessionId, limit });
     const rows = data?.messages ?? [];
@@ -623,7 +632,7 @@ const handlers: Record<string, Handler> = {
   // (codebase readiness, tokens, worktree) fill in from the running task's live
   // session_state stream once a turn starts.
   getCodingAgentSnapshot: (i) => {
-    const sessionId = String(i.compositeId ?? i.sessionId ?? '');
+    const sessionId = str(i.compositeId ?? i.sessionId ?? '');
     if (!sessionId) return Promise.resolve({ snapshot: null });
     const axes = sessionAxes.get(sessionId) ?? {};
     const model = getSessionModel(sessionId) ?? 'auto';
@@ -651,7 +660,7 @@ const handlers: Record<string, Handler> = {
   // starts a task. `attached:false` means the host has no live task yet — the
   // caller poll-retries until the sender's first turn creates it.
   codingAgentChatAttach: async (i) => {
-    const sessionId = String(i.compositeId ?? i.sessionId ?? '');
+    const sessionId = str(i.compositeId ?? i.sessionId ?? '');
     return { attached: await attachCodingTask(sessionId) };
   },
   // Honor resumeSessionId (return it unchanged → no "resume mismatch"); mint a
@@ -659,15 +668,15 @@ const handlers: Record<string, Handler> = {
   // turn (clientAgent upserts), so we don't create empty session rows.
   codingAgentChatCreate: (i) => {
     const sessionId = i.resumeSessionId
-      ? String(i.resumeSessionId)
+      ? str(i.resumeSessionId)
       : 'cs:' + Math.random().toString(36).slice(2, 11);
-    if (i.model) setSessionModel(sessionId, String(i.model));
+    if (i.model) setSessionModel(sessionId, str(i.model));
     // Seed the session's axes from create-time picks so the first turn's
     // snapshot echoes them (the per-axis set* RPCs no-op while sessionId is
     // null, so a new-session hero pre-pick only arrives here). `mode` is the
     // legacy permission axis ('edit' | 'yolo').
-    if (i.mode) patchSessionAxes(sessionId, { permissionMode: String(i.mode) });
-    if (i.patternMode) patchSessionAxes(sessionId, { patternMode: String(i.patternMode) });
+    if (i.mode) patchSessionAxes(sessionId, { permissionMode: str(i.mode) });
+    if (i.patternMode) patchSessionAxes(sessionId, { patternMode: str(i.patternMode) });
     if (i.modelMode) {
       patchSessionAxes(sessionId, { modelMode: i.modelMode });
       const mm = i.modelMode as { kind?: string; model?: string };
@@ -676,14 +685,14 @@ const handlers: Record<string, Handler> = {
     return Promise.resolve({ sessionId });
   },
   codingAgentChatSend: (i) => {
-    const sessionId = String(i.sessionId ?? '');
-    const message = String(i.message ?? '');
+    const sessionId = str(i.sessionId ?? '');
+    const message = str(i.message ?? '');
     const model = getSessionModel(sessionId);
     // 1. Local Claude CLI model → in-renderer CLI runner (unchanged).
     if (isClaudeCliModel(model)) {
       void import('../agent/claudeCliAgent')
         .then((m) => m.runClaudeCliTurn(sessionId, message, model!, emitCustom))
-        .catch((e) => { emitAgentError(sessionId, e); });
+        .catch((e: unknown) => { emitAgentError(sessionId, e); });
       return Promise.resolve({});
     }
     // 2. Run the session as a background task (Studio desktop, or mobile via the Ugly
@@ -700,14 +709,14 @@ const handlers: Record<string, Handler> = {
     return Promise.resolve({});
   },
   codingAgentChatStop: (i) => {
-    const sessionId = String(i.sessionId ?? '');
+    const sessionId = str(i.sessionId ?? '');
     if (isClaudeCliModel(getSessionModel(sessionId))) {
       void import('../agent/claudeCliAgent').then((m) => { m.abortClaudeCli(sessionId); });
       return Promise.resolve({});
     }
     const taskId = sessionTaskIds.get(sessionId);
     // We run the session as a task → interrupt it there (no-op if no turn is in flight).
-    if (taskId) void native.task.call(taskId, 'interrupt').catch(() => {});
+    if (taskId) void native.task.call(taskId, 'interrupt').catch(() => {/* noop */});
     return Promise.resolve({});
   },
   // `/clear`: wipe the conversation in place. Reset the running task's in-memory
@@ -716,31 +725,31 @@ const handlers: Record<string, Handler> = {
   // hook's clearMessages proceeds to empty the UI. Previously this returned `{}`,
   // so clearMessages bailed on `!ok` and `/clear` did nothing.
   codingAgentChatClearMessages: (i) => {
-    const sessionId = String(i.sessionId ?? '');
+    const sessionId = str(i.sessionId ?? '');
     const taskId = sessionTaskIds.get(sessionId);
-    if (taskId) void native.task.call(taskId, 'clear').catch(() => {});
-    void sessionApi.clearMessages({ sessionId }).catch(() => {});
+    if (taskId) void native.task.call(taskId, 'clear').catch(() => {/* noop */});
+    void sessionApi.clearMessages({ sessionId }).catch(() => {/* noop */});
     return Promise.resolve({ ok: true });
   },
   codingAgentToolStop: () => Promise.resolve({}),
   codingAgentChatSetModel: (i) => {
-    setSessionModel(String(i.sessionId ?? ''), String(i.model ?? ''));
+    setSessionModel(str(i.sessionId ?? ''), str(i.model ?? ''));
     return Promise.resolve({});
   },
   // The four set* RPCs below record the user's pick per session so the next
   // turn's snapshot echoes it (they were no-ops, which is why picks reverted).
   codingAgentSetReasoningEffort: (i) => {
-    patchSessionAxes(String(i.sessionId ?? ''), { reasoningEffort: String(i.effort ?? '') });
+    patchSessionAxes(str(i.sessionId ?? ''), { reasoningEffort: str(i.effort ?? '') });
     return Promise.resolve({});
   },
   codingAgentGrantPermission: () => Promise.resolve({}),
   codingAgentSkipPermissions: () => Promise.resolve({}),
   codingAgentSetPermissionMode: (i) => {
-    patchSessionAxes(String(i.sessionId ?? ''), { permissionMode: String(i.permissionMode ?? '') });
+    patchSessionAxes(str(i.sessionId ?? ''), { permissionMode: str(i.permissionMode ?? '') });
     return Promise.resolve({});
   },
   codingAgentSetModelMode: (i) => {
-    const sessionId = String(i.sessionId ?? '');
+    const sessionId = str(i.sessionId ?? '');
     patchSessionAxes(sessionId, { modelMode: i.modelMode });
     // A concrete single-model pick must also update the routed model (the run +
     // the CLI-vs-ugly.bot routing both read getSessionModel) — without this a
@@ -750,7 +759,7 @@ const handlers: Record<string, Handler> = {
     return Promise.resolve({});
   },
   codingAgentSetPatternMode: (i) => {
-    patchSessionAxes(String(i.sessionId ?? ''), { patternMode: String(i.patternMode ?? '') });
+    patchSessionAxes(str(i.sessionId ?? ''), { patternMode: str(i.patternMode ?? '') });
     return Promise.resolve({});
   },
   markSessionViewed: () => Promise.resolve({}),
@@ -768,11 +777,11 @@ const handlers: Record<string, Handler> = {
   // buggy code + tests; then re-init git for a clean baseline diff. The few
   // fixture-less tasks (write-from-scratch) get an empty seeded project.
   evalCreateProject: async (i) => {
-    const taskName = String(i.taskName ?? '');
+    const taskName = str(i.taskName ?? '');
     const task = getEvalTask(taskName);
     if (!task) throw new Error(`Unknown eval task: ${taskName}`);
     const safe = taskName.replace(/[^a-zA-Z0-9_.-]/g, '_');
-    const stamp = String(i.taskId ?? Date.now()).replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const stamp = str(i.taskId ?? Date.now()).replace(/[^a-zA-Z0-9_.-]/g, '_');
     // `$HOME` (not `~`) — a leading `~` is NOT expanded inside the double quotes.
     const base = `$HOME/.ugly-studio/eval-projects/${safe}-${stamp}`;
     const seedGit =
@@ -786,6 +795,7 @@ const handlers: Record<string, Handler> = {
         `printf '{"name":"%s","version":"0.0.0","private":true}\\n' "${safe}" > package.json && ` +
         `${seedGit} && pwd`;
     const projectPath = await spawnForPath(cmd);
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty trailing segment must also fall back to `safe`, not just undefined
     const projectName = projectPath.split('/').pop() || safe;
     return { projectPath, projectName, firstTurnPrompt: firstTurnPrompt(task) };
   },
@@ -796,7 +806,7 @@ const handlers: Record<string, Handler> = {
   evalGradeSession: async (i) => {
     const projectPath = getActiveProjectPath();
     if (!projectPath) throw new Error('No project open to grade');
-    const taskName = String((i as { taskName?: string }).taskName ?? '');
+    const taskName = (i as { taskName?: string }).taskName ?? '';
     const task = taskName ? getEvalTask(taskName) : null;
     return gradeProject(
       {
@@ -815,10 +825,10 @@ const handlers: Record<string, Handler> = {
   // resolves on the login PATH (the desktop daemon bundles bash). The trailing
   // `pwd` prints the created project's absolute path as the last stdout line.
   initProject: async (i) => {
-    const name = String(i.name ?? '').trim();
+    const name = str(i.name ?? '').trim();
     // A leading `~` is NOT expanded inside the double quotes below — map it to
     // `$HOME`, which is.
-    const parentDir = (String(i.parentDir ?? '').trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
+    const parentDir = (str(i.parentDir ?? '').trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
     if (!name) throw new Error('Project name is required');
     const q = (s: string): string => s.replace(/"/g, '\\"');
     const cmd =
@@ -834,9 +844,10 @@ const handlers: Record<string, Handler> = {
   // `git clone` so the result is predictable. The trailing `pwd` prints the
   // clone's absolute path as the last stdout line.
   cloneProject: async (i) => {
-    const url = String(i.url ?? '').trim();
+    const url = str(i.url ?? '').trim();
     if (!url) throw new Error('Repository URL is required');
-    const parentDir = (String(i.parentDir ?? '').trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
+    const parentDir = (str(i.parentDir ?? '').trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty trailing segment must also fall back to 'repo', not just undefined
     const name = url.replace(/\/+$/, '').replace(/\.git$/, '').split(/[/:]/).pop() || 'repo';
     const q = (s: string): string => s.replace(/"/g, '\\"');
     const cmd =
@@ -846,7 +857,8 @@ const handlers: Record<string, Handler> = {
     return { name, path: path || `${parentDir}/${name}` };
   },
   openProject: (i) => {
-    const path = String(i.path ?? '').replace(/\/+$/, '');
+    const path = str(i.path ?? '').replace(/\/+$/, '');
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty segments must fall through to `path` then 'project', not just undefined
     const name = path.split('/').pop() || path || 'project';
     return Promise.resolve({ name, path });
   },
@@ -857,7 +869,7 @@ const handlers: Record<string, Handler> = {
   // ── filesystem subset over window.UglyNative (the Phase-1 keystone) ──
   readFile: async (i) => ({ content: await native.fs.readFile(String(i.path)) }),
   writeFile: async (i) => {
-    await native.fs.writeFile(String(i.path), String(i.content ?? ''));
+    await native.fs.writeFile(String(i.path), str(i.content ?? ''));
     return {};
   },
   deleteFile: async (i) => {
@@ -884,6 +896,7 @@ const handlers: Record<string, Handler> = {
  *  fetched `/api/*` directly (e.g. ProjectOnboarding's `apiRequest`). */
 export function nativeRequest(name: string, input?: unknown): Promise<unknown> {
   const h = handlers[name];
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- index access is typed non-optional, but an unwired name resolves to undefined at runtime (the "not yet wired" fallback)
   if (h) return h((input ?? {}) as Input);
   return Promise.reject(
     new Error(`[studio] '${name}' is not yet wired to window.UglyNative (Phase 1)`),
@@ -893,8 +906,8 @@ export function nativeRequest(name: string, input?: unknown): Promise<unknown> {
 const nativeSocket = {
   request: (name: string, input?: unknown) => nativeRequest(name, input),
   connect: (_token?: string) => Promise.resolve(),
-  send: () => {},
-  emit: () => {},
+  send: () => {/* noop */},
+  emit: () => {/* noop */},
 };
 
 export function useSocket(): AppSocket<AppRegistry> {

@@ -227,7 +227,7 @@ function readSeedFromUrl(): {
   projectPath: string;
   projectName: string;
 } | null {
-  if (typeof window === 'undefined' || !window.location) return null;
+  if (typeof window === 'undefined') return null;
   try {
     const params = new URLSearchParams(window.location.search);
     const projectPath = params.get('openProject');
@@ -444,7 +444,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           const matched = combined.find(
             (t) => t.projectPath === res.activePath,
           );
-          nextActive = matched?.tabId ?? combined[0]?.tabId ?? null;
+          nextActive = matched?.tabId ?? combined[0].tabId;
         } else {
           nextActive = combined[0]?.tabId ?? null;
         }
@@ -618,6 +618,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     let anyFresh = false;
     for (const [proj, agg] of Object.entries(aggregates)) {
       const before = prev[proj];
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `prev` (a Record) has no entry for a newly-seen project at runtime
       if (agg.thinkingDone && !before?.thinkingDone) {
         anyFresh = true;
         break;

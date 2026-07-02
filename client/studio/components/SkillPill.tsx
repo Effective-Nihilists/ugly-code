@@ -41,6 +41,7 @@ export function SkillPill({ name, onRemove }: Props) {
         /{name}
       </span>
       <button
+        data-id={`skill-pill-remove-${name}`}
         onClick={onRemove}
         title="Remove skill"
         style={{

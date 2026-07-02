@@ -26,7 +26,7 @@ export interface SessionCardData {
 
 export interface SessionCardProps {
   session: SessionCardData;
-  onClick(): void;
+  onClick: () => void;
 }
 
 export function SessionCard({
@@ -35,6 +35,7 @@ export function SessionCard({
 }: SessionCardProps): React.ReactElement {
   return (
     <button
+      data-id="session-card"
       type="button"
       onClick={onClick}
       style={{

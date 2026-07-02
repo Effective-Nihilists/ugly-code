@@ -196,7 +196,7 @@ export function FilePanel(): React.ReactElement {
 
       {isMobile && treeOpen && (
         <>
-          <div style={S.backdrop} onClick={() => { setTreeOpen(false); }} />
+          <div style={S.backdrop} data-id="file-tree-backdrop" onClick={() => { setTreeOpen(false); }} />
           <div style={S.treeDrawer} data-id="file-tree-drawer">
             <div style={S.drawerHeader}>
               <span>Files</span>

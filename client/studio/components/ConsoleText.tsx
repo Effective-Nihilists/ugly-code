@@ -86,6 +86,7 @@ function chunkStyle(
   if (fg) style.color = fg;
   else if (errorTone) style.color = 'var(--error)';
   if (bg) style.backgroundColor = bg;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- older anser builds omit `decorations` at runtime despite the type
   const decorations = chunk.decorations ?? [];
   if (decorations.includes('bold')) style.fontWeight = 600;
   if (decorations.includes('italic')) style.fontStyle = 'italic';

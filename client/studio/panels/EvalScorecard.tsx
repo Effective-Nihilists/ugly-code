@@ -260,6 +260,7 @@ function Header({
         {onClose && (
           <button
             type="button"
+            data-id="eval-scorecard-close"
             onClick={onClose}
             aria-label="Close scoreboard"
             style={{

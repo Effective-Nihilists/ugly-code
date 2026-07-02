@@ -30,8 +30,8 @@ export function startCodebasePoll(
     try {
       const r = (await inv('codebase.status', { projectPath: cwd })) as CodebaseReadiness;
       onReadiness(r);
-      const idx = r?.indexer?.status;
-      const arch = r?.architecture?.status;
+      const idx = r.indexer?.status;
+      const arch = r.architecture?.status;
       const idxDone = idx === 'ready' || idx === 'error';
       const archDone = !arch || arch === 'ready' || arch === 'failed';
       if (idxDone && archDone) stopCodebasePoll(sessionId);
@@ -58,7 +58,7 @@ export async function fetchArchitectureDoc(cwd: string): Promise<string | null> 
   if (!cwd) return null;
   try {
     const path = `${cwd.replace(/\/+$/, '')}/.ugly-studio/ARCHITECTURE.md`;
-    const res = (await inv('fs.readFile', { path })) as { content?: string };
+    const res = (await inv('fs.readFile', { path })) as { content?: string } | undefined;
     const content = res?.content;
     return content?.trim() ? content : null;
   } catch {

@@ -365,7 +365,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
   // multi-select keeps the menu open so the user can toggle several rows.
   const isSingle = props.mode === 'single';
   const selectedSet = !isSingle
-    ? new Set((props.values ?? []).map((m) => m.id))
+    ? new Set(props.values.map((m) => m.id))
     : null;
 
   const selectModel = (model: CodingAgentModel, close: () => void) => {
@@ -430,7 +430,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
   const triggerCss = triggerStyle === 'row' ? rowTrigger : chipTrigger;
 
   const trigger = (
-    <button type="button" disabled={disabled} style={triggerCss}>
+    <button type="button" data-id="model-picker-trigger" disabled={disabled} style={triggerCss}>
       {icon}
       <span
         style={{
@@ -462,6 +462,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
         key={model.id}
         type="button"
         role="menuitem"
+        data-id={`model-picker-row-${model.id}`}
         onClick={() => { selectModel(model, close); }}
         style={{
           display: 'flex',
@@ -483,6 +484,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
         {props.mode === 'multi' && (
           <input
             type="checkbox"
+            data-id={`model-picker-checkbox-${model.id}`}
             checked={selected}
             readOnly
             style={{ pointerEvents: 'none', flexShrink: 0 }}
@@ -521,6 +523,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
       key={mode}
       type="button"
       role="menuitem"
+      data-id={`model-picker-auto-${mode}`}
       onClick={() => { selectAuto(mode, close); }}
       style={{
         display: 'flex',
@@ -640,6 +643,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
           {hasHidden && (
             <button
               type="button"
+              data-id="model-picker-toggle-hidden"
               onClick={() => { setUglyBotExpanded((v) => !v); }}
               style={{
                 display: 'block',
@@ -678,7 +682,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
       maxHeight={560}
       disabled={disabled}
     >
-      {({ close }) => renderPopupContent(close)}
+      {(ctx) => renderPopupContent(() => { ctx.close(); })}
     </Popover>
   );
 

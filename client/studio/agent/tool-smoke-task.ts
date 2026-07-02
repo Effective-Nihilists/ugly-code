@@ -31,6 +31,7 @@ defineTask({
           ]);
           results[label] = { ok: true, out: out.slice(0, 300) };
         } catch (e) {
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a thrown value can be null/undefined despite the `as Error` cast
           results[label] = { ok: false, out: (e as Error)?.message ?? String(e) };
         }
       };

@@ -182,6 +182,7 @@ export function AxisDropdown<T extends string>({
 
   const trigger = (
     <button
+      data-id="agent-axis-trigger"
       type="button"
       disabled={disabled}
       aria-label={`${axisLabel}: ${triggerLabel}`}
@@ -229,17 +230,18 @@ export function AxisDropdown<T extends string>({
       minWidth={240}
       disabled={disabled}
     >
-      {({ close }) =>
+      {(ctx) =>
         options.map((o) => {
           const isSelected = o.value === value;
           return (
             <button
               key={o.value}
+              data-id={`agent-axis-option-${o.value}`}
               role="menuitem"
               type="button"
               onClick={() => {
                 onChange(o.value);
-                close();
+                ctx.close();
               }}
               style={{
                 display: 'flex',

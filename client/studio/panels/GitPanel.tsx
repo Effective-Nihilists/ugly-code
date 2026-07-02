@@ -162,14 +162,14 @@ export function GitPanel(): React.ReactElement {
     <div data-id="git-panel" style={S.root}>
       <div style={S.bar}>
         <span style={S.branch}>⎇ {branch || '—'}</span>
-        <button style={tabStyle(view === 'changes')} onClick={() => { setView('changes'); }}>
+        <button data-id="git-tab-changes" style={tabStyle(view === 'changes')} onClick={() => { setView('changes'); }}>
           Changes{files.length ? ` (${files.length})` : ''}
         </button>
-        <button style={tabStyle(view === 'history')} onClick={() => { setView('history'); }}>
+        <button data-id="git-tab-history" style={tabStyle(view === 'history')} onClick={() => { setView('history'); }}>
           History
         </button>
         <span style={{ flex: 1 }} />
-        <button style={S.btn} onClick={() => void refresh()}>
+        <button data-id="git-refresh" style={S.btn} onClick={() => void refresh()}>
           Refresh
         </button>
       </div>
@@ -182,8 +182,8 @@ export function GitPanel(): React.ReactElement {
             ) : (
               files.map((f) => (
                 <div key={f.path} style={{ ...S.row, ...(active === f.path ? S.rowActive : {}) }}>
-                  <input type="checkbox" checked={isChecked(f.path)} onChange={() => { toggle(f.path); }} style={S.check} />
-                  <button style={S.rowBtn} onClick={() => void openFile(f)} title={f.path}>
+                  <input type="checkbox" data-id={`git-file-check-${f.path}`} checked={isChecked(f.path)} onChange={() => { toggle(f.path); }} style={S.check} />
+                  <button data-id={`git-file-open-${f.path}`} style={S.rowBtn} onClick={() => void openFile(f)} title={f.path}>
                     <span style={badgeStyle(f.label)}>{f.label}</span>
                     <span style={S.rowPath}>{f.path}</span>
                   </button>
@@ -192,7 +192,7 @@ export function GitPanel(): React.ReactElement {
             )
           ) : (
             commits.map((c) => (
-              <button key={c.hash} style={{ ...S.commitRow, ...(active === c.hash ? S.rowActive : {}) }} onClick={() => void openCommit(c.hash)}>
+              <button key={c.hash} data-id={`git-commit-row-${c.hash}`} style={{ ...S.commitRow, ...(active === c.hash ? S.rowActive : {}) }} onClick={() => void openCommit(c.hash)}>
                 <span style={S.commitMsg}>{c.message}</span>
                 <span style={S.commitMeta}>
                   {c.hash.slice(0, 7)} · {c.author} · {new Date(c.date).toLocaleDateString()}
@@ -203,8 +203,8 @@ export function GitPanel(): React.ReactElement {
 
           {view === 'changes' && files.length > 0 && (
             <div style={S.commitBox}>
-              <textarea value={commitMsg} onChange={(e) => { setCommitMsg(e.target.value); }} placeholder="Commit message" rows={2} style={S.msg} />
-              <button style={S.commitBtn} disabled={busy || !commitMsg.trim() || checkedCount === 0} onClick={() => void commit()}>
+              <textarea data-id="git-commit-message" value={commitMsg} onChange={(e) => { setCommitMsg(e.target.value); }} placeholder="Commit message" rows={2} style={S.msg} />
+              <button data-id="git-commit-submit" style={S.commitBtn} disabled={busy || !commitMsg.trim() || checkedCount === 0} onClick={() => void commit()}>
                 {busy ? 'Committing…' : `Commit ${checkedCount} file${checkedCount === 1 ? '' : 's'}`}
               </button>
               {notice && <span style={S.notice}>{notice}</span>}

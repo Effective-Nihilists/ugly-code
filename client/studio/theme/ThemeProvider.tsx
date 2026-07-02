@@ -41,6 +41,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function getSystemMode(): ThemeMode {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- jsdom/non-browser runtimes can lack `matchMedia` despite the DOM type
   if (typeof window === 'undefined' || !window.matchMedia) return 'light';
   return window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'
@@ -66,6 +67,7 @@ export function ThemeProvider({
   const [systemMode, setSystemMode] = useState<ThemeMode>(getSystemMode);
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- jsdom/non-browser runtimes can lack `matchMedia` despite the DOM type
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = (e: MediaQueryListEvent): void => {

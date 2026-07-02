@@ -89,6 +89,7 @@ function wireCrossTab(): void {
  * with a default at the call site, or use `useStudioUserSetting`
  * which re-renders once hydration lands.
  */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- T is a caller-supplied cast for the untyped settings cache (e.g. `<boolean>`); part of the public API and used by external call sites.
 export function getStudioUserSettingSync<T = SettingValue>(
   key: string,
 ): T | undefined {
@@ -104,9 +105,9 @@ export function getStudioUserSettingSync<T = SettingValue>(
 export function setStudioUserSetting(
   socket: ReturnType<typeof useSocket>,
   key: string,
-  value: SettingValue | null | undefined,
+  value: SettingValue,
 ): void {
-  if (!cache) cache = new Map();
+  cache ??= new Map();
   if (value === undefined || value === null) cache.delete(key);
   else cache.set(key, value);
   notify();

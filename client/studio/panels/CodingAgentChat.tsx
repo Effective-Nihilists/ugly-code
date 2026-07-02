@@ -140,6 +140,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
   const isCopied = copied === 'self';
   return (
     <button
+      data-id="copy-button"
       type="button"
       style={copyButtonStyle}
       onClick={(e) => {
@@ -171,6 +172,7 @@ function CopySessionIdButton({ compositeId }: { compositeId: string }) {
     : `Copy session id\n${compositeId}`;
   return (
     <button
+      data-id="copy-session-id"
       type="button"
       onClick={(e) => {
         e.stopPropagation();
@@ -254,6 +256,7 @@ function ToolCardShell({
       }}
     >
       <div
+        data-id="tool-result-toggle"
         onClick={() => { setExpanded(!expanded); }}
         style={{
           display: 'flex',
@@ -399,7 +402,7 @@ function firstLine(s: string, max = 200): string {
 
 function formatToolInput(name: string, input: string, cwd = ''): string {
   try {
-    const parsed = JSON.parse(input);
+    const parsed = JSON.parse(input) as ToolInput;
     // Single-task / prompt-style tools — show the task text, not JSON.
     if (typeof parsed.task === 'string') return firstLine(parsed.task);
     if (typeof parsed.prompt === 'string') return firstLine(parsed.prompt);
@@ -416,12 +419,12 @@ function formatToolInput(name: string, input: string, cwd = ''): string {
         parsed.offset != null || parsed.limit != null
           ? ` (${parsed.offset ?? 0}+${parsed.limit ?? '?'})`
           : '';
-      return `${relativizePath(String(parsed.file_path), cwd)}${range}`;
+      return `${relativizePath(parsed.file_path, cwd)}${range}`;
     }
     if (parsed.command) return parsed.command;
     if (parsed.pattern) return parsed.pattern;
     if (parsed.query) return parsed.query;
-    if (parsed.path) return relativizePath(String(parsed.path), cwd);
+    if (parsed.path) return relativizePath(parsed.path, cwd);
     if (parsed.sql) return parsed.sql;
     return input.length > 200 ? input.slice(0, 200) + '...' : input;
   } catch {
@@ -489,7 +492,7 @@ function CodeView({ text, language }: { text: string; language: 'python' }) {
 
   useEffect(() => {
     if (!hostRef.current) return;
-    const langExt = language === 'python' ? python() : python();
+    const langExt = python();
     const view = new EditorView({
       state: EditorState.create({
         doc: text,
@@ -599,6 +602,7 @@ function ToolInputView({ tool }: { tool: ToolUse }) {
         <>
           <SectionLabel>URL</SectionLabel>
           <a
+            data-id="tool-input-url-link"
             href={parsed.url}
             target="_blank"
             rel="noreferrer"
@@ -662,7 +666,13 @@ function ToolOutputView({ tool }: { tool: ToolUse }) {
 
   // delegate_parallel — result is a JSON array of child summaries.
   if (!isError && name === 'delegate_parallel') {
-    const arr = safeParse<any[]>(tool.result);
+    let arr: DelegateSummary[] | null = null;
+    try {
+      const raw: unknown = JSON.parse(tool.result);
+      if (Array.isArray(raw)) arr = raw as DelegateSummary[];
+    } catch {
+      arr = null;
+    }
     if (Array.isArray(arr)) {
       return (
         <>
@@ -776,14 +786,33 @@ interface TodoItem {
   successCriteria?: TodoSuccessCriteria;
 }
 
+interface RawFileCheck {
+  path?: unknown;
+  needle?: unknown;
+}
+interface RawSuccessCriteria {
+  description?: unknown;
+  command?: unknown;
+  file_contains?: RawFileCheck;
+  file_not_contains?: RawFileCheck;
+}
+interface RawTodo {
+  content?: unknown;
+  status?: unknown;
+  activeForm?: unknown;
+  active_form?: unknown;
+  success_criteria?: RawSuccessCriteria;
+  successCriteria?: RawSuccessCriteria;
+}
+
 function parseTodos(input: string): TodoItem[] | null {
   try {
-    const parsed = JSON.parse(input);
-    const todos = parsed?.todos;
+    const parsed = JSON.parse(input) as { todos?: unknown };
+    const todos = parsed.todos;
     if (!Array.isArray(todos) || todos.length === 0) return null;
-    return todos
-      .filter((t: any) => t && typeof t.content === 'string')
-      .map((t: any) => {
+    return (todos as RawTodo[])
+      .filter((t) => typeof t.content === 'string')
+      .map((t): TodoItem => {
         const sc = t.success_criteria ?? t.successCriteria;
         const criteria: TodoSuccessCriteria | undefined =
           sc && typeof sc.description === 'string'
@@ -815,9 +844,9 @@ function parseTodos(input: string): TodoItem[] | null {
               }
             : undefined;
         return {
-          content: t.content,
-          status: t.status,
-          activeForm: t.activeForm ?? t.active_form,
+          content: t.content as string,
+          status: t.status as TodoItem['status'],
+          activeForm: (t.activeForm ?? t.active_form) as string | undefined,
           ...(criteria ? { successCriteria: criteria } : {}),
         };
       });
@@ -839,9 +868,11 @@ function findTurnTodos(
   if (from < 0) from = 0;
   for (let i = to; i >= from; i--) {
     const msg = messages[i];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access can be undefined at runtime (noUncheckedIndexedAccess is off)
     if (!msg?.toolUses || msg.toolUses.length === 0) continue;
     for (let j = msg.toolUses.length - 1; j >= 0; j--) {
       const tool = msg.toolUses[j];
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access can be undefined at runtime (noUncheckedIndexedAccess is off)
       if (!tool) continue;
       const lower = tool.name.toLowerCase();
       if (lower === 'todos' || lower === 'todowrite') {
@@ -1089,6 +1120,7 @@ function PinnedTodos({
       }}
     >
       <div
+        data-id="diff-block-toggle"
         onClick={() => { setCollapsed((c) => !c); }}
         style={{
           cursor: 'pointer',
@@ -1149,15 +1181,92 @@ function PinnedTodos({
 
 // ── Edit / Write / MultiEdit Card ──────────────────────────────────
 
-function safeParse<T = any>(raw: string): T | null {
+/** One entry in an agent session's scratchpad (server-persisted). */
+interface ScratchpadEntry {
+  key: string;
+  value: string;
+  mergeToMemory: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Loosely-typed shape of a tool call's `metadata` (server-parsed). */
+interface ToolMetadata {
+  // Numeric fields are coerced via Number() at call sites because the
+  // server may serialize them as strings; keep the union so those
+  // defensive conversions stay meaningful.
+  additions?: number | string;
+  removals?: number | string;
+  edits?: number | string;
+  edits_applied?: number | string;
+  count?: number;
+  diff?: string;
+  new_content?: string;
+  old_content?: string;
+  number_of_matches?: number | string;
+  start_time?: number | string;
+  end_time?: number | string;
+  truncated?: boolean;
+}
+
+/** One child summary from a `delegate_parallel` tool result. */
+interface DelegateSummary {
+  task_index?: number;
+  iterations_used?: number;
+  aborted?: boolean;
+  error?: string;
+  summary?: string;
+}
+
+/** One entry in a `multiedit` / `edit` tool call's parsed input. */
+interface ToolInputEdit {
+  old_string?: string;
+  new_string?: string;
+  new_content?: string;
+  anchor?: string;
+  insert_after?: string | number;
+  range?: string;
+  replace_all?: boolean;
+}
+
+/**
+ * Loosely-typed shape of a tool call's parsed JSON input. Every field is
+ * optional — the agent emits different keys per tool. Access is safe
+ * because reads are guarded (`typeof x === 'string'`) or defaulted.
+ */
+interface ToolInput {
+  task?: string;
+  prompt?: string;
+  tasks?: string[];
+  code?: string;
+  url?: string;
+  file_path?: string;
+  offset?: number;
+  limit?: number;
+  command?: string;
+  pattern?: string;
+  query?: string;
+  sql?: string;
+  path?: string;
+  old_string?: string;
+  new_string?: string;
+  new_content?: string;
+  edits?: ToolInputEdit[];
+  thought?: string;
+  filter?: string;
+  timeout_ms?: number;
+  include?: string;
+}
+
+function safeParse(raw: string): ToolInput | null {
   try {
-    return JSON.parse(raw) as T;
+    return JSON.parse(raw) as ToolInput;
   } catch {
     return null;
   }
 }
 
-function describeEditTarget(e: Record<string, any>): string | undefined {
+function describeEditTarget(e: ToolInputEdit): string | undefined {
   if (typeof e.old_string === 'string') {
     const oneLine = e.old_string.replace(/\n/g, ' ⏎ ');
     return oneLine.length > 80
@@ -1173,7 +1282,7 @@ function describeEditTarget(e: Record<string, any>): string | undefined {
 function EditCard({ tool }: { tool: ToolUse }) {
   const cwd = useChatCwd();
   const input = safeParse(tool.input) ?? {};
-  const meta = (tool.metadata ?? {}) as Record<string, any>;
+  const meta = (tool.metadata ?? {}) as ToolMetadata;
   const filePath: string = input.file_path ?? '(unknown path)';
   const isWrite = tool.name.toLowerCase() === 'write';
   const isMulti = tool.name.toLowerCase() === 'multiedit';
@@ -1189,6 +1298,10 @@ function EditCard({ tool }: { tool: ToolUse }) {
     meta.new_content ?? input.new_string ?? input.new_content;
   const targetDescription = !isMulti ? describeEditTarget(input) : undefined;
   const diffText: string | undefined = meta.diff;
+  // Capture the multi-edit array once: TS loses the `Array.isArray` narrowing on
+  // `input.edits` inside the .map() closure below (property narrowing doesn't
+  // survive a callback boundary even though `input` is const), so hoist it.
+  const multiEdits = isMulti && Array.isArray(input.edits) ? input.edits : [];
 
   // Display the cwd-relative form when the file lives inside the
   // session worktree (the typical case). Falls back to the absolute
@@ -1286,15 +1399,15 @@ function EditCard({ tool }: { tool: ToolUse }) {
               <LinkifiedText text={newContent} />
             </pre>
           </>
-        ) : isMulti && Array.isArray(input.edits) && input.edits.length > 0 ? (
+        ) : multiEdits.length > 0 ? (
           <>
-            {input.edits.map((e: any, i: number) => {
+            {multiEdits.map((e, i: number) => {
               const target = describeEditTarget(e);
               const newStr = e.new_string ?? e.new_content;
               return (
                 <div
                   key={i}
-                  style={{ marginBottom: i < input.edits.length - 1 ? 12 : 0 }}
+                  style={{ marginBottom: i < multiEdits.length - 1 ? 12 : 0 }}
                 >
                   <div
                     style={{
@@ -1306,7 +1419,7 @@ function EditCard({ tool }: { tool: ToolUse }) {
                       fontFamily: 'Inter, sans-serif',
                     }}
                   >
-                    Edit {i + 1} / {input.edits.length}
+                    Edit {i + 1} / {multiEdits.length}
                     {e.replace_all ? ' · replace all' : ''}
                     {target ? (
                       <span
@@ -1525,7 +1638,7 @@ function DiffBlock({ text }: { text: string }) {
 function ThinkCard({ tool }: { tool: ToolUse }) {
   const input = safeParse(tool.input) ?? {};
   const thought: string =
-    typeof input.thought === 'string' ? input.thought : tool.input ?? '';
+    typeof input.thought === 'string' ? input.thought : tool.input;
   return (
     <div
       style={{
@@ -1582,7 +1695,7 @@ function BashCard({
     typeof input.filter === 'string' && input.filter.length > 0
       ? input.filter
       : undefined;
-  const meta = (tool.metadata ?? {}) as Record<string, any>;
+  const meta = (tool.metadata ?? {}) as ToolMetadata;
   const command: string = input.command ?? tool.input;
   // While the tool is still executing, show the streamed `liveOutput`.
   // Once the final `tool_result` lands, `result` takes over — which may
@@ -1613,6 +1726,7 @@ function BashCard({
     // clocks the actual subprocess launch, not the LLM→executor
     // handoff). Fall back to local Date.now when meta hasn't landed
     // yet so the timer doesn't sit at zero.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- `!x` also re-seeds on a 0 timestamp; `??=` would not
     if (!startRef.current) startRef.current = tool.startedAt ?? Date.now();
     const t = setInterval(() => {
       setLiveElapsed(Date.now() - (startRef.current ?? Date.now()));
@@ -1681,6 +1795,7 @@ function BashCard({
           )}
           {running && tool.status === 'executing' && onStop && (
             <button
+              data-id="edit-card-toggle"
               onClick={(e) => {
                 e.stopPropagation();
                 onStop(tool.id);
@@ -1912,6 +2027,7 @@ function DevServerCard({
       setLiveElapsed(0);
       return;
     }
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- `!x` also re-seeds on a 0 timestamp; `??=` would not
     if (!startRef.current) startRef.current = tool.startedAt ?? Date.now();
     const t = setInterval(() => {
       setLiveElapsed(Date.now() - (startRef.current ?? Date.now()));
@@ -1963,6 +2079,7 @@ function DevServerCard({
           )}
           {running && tool.status === 'executing' && onStop && (
             <button
+              data-id="dev-server-toggle"
               onClick={(e) => {
                 e.stopPropagation();
                 onStop(tool.id);
@@ -2117,7 +2234,7 @@ function GlobCard({ tool }: { tool: ToolUse }) {
 function GrepCard({ tool }: { tool: ToolUse }) {
   const cwd = useChatCwd();
   const input = safeParse(tool.input) ?? {};
-  const meta = (tool.metadata ?? {}) as Record<string, any>;
+  const meta = (tool.metadata ?? {}) as ToolMetadata;
   const pattern: string = input.pattern ?? '';
   const path: string = relativizePath(input.path ?? '.', cwd);
   const include: string = input.include ?? '';
@@ -2397,6 +2514,7 @@ function PermissionCard({
           · {shortcut('Shift', 'A')} allow all
         </span>
         <button
+          data-id="permission-approve-all"
           onClick={onApproveAll}
           style={{
             background: 'transparent',
@@ -2411,6 +2529,7 @@ function PermissionCard({
           Always Allow
         </button>
         <button
+          data-id="permission-approve"
           onClick={onApprove}
           style={{
             background: 'var(--accent)',
@@ -2550,7 +2669,7 @@ function SessionReadout({
     ? `Actual upstream cost so far: ${formatCurrency(
         totalCost,
       )}${peerCaveat}${billedCaveat}`
-    : showEstimate && estimate
+    : showEstimate
     ? [
         `Estimated cost at standard rates: ${formatCurrency(estimate.total)}`,
         '',
@@ -2671,7 +2790,7 @@ function SessionReadout({
         <span className="cost-cell" data-us-tooltip={costTitle}>
           {formatCurrency(totalCost)}
         </span>
-      ) : showEstimate && estimate ? (
+      ) : showEstimate ? (
         <span className="cost-cell" data-us-tooltip={costTitle}>
           ~{formatCurrency(estimate.total)}
         </span>
@@ -2707,6 +2826,7 @@ function ContextMeter({ info, model, disabled, onClick }: ContextMeterProps) {
   const title = `${tokens.toLocaleString()} / ${budget.toLocaleString()} tokens (${pct}% of compaction budget${windowLabel} for ${model}). Click to compact now — drops middle messages to ~50% of the model window.`;
   return (
     <button
+      data-id="tool-shell-header-button"
       type="button"
       onClick={onClick}
       disabled={disabled}
@@ -2906,6 +3026,7 @@ function LinkedPath({
     : `${path}${lineSuffix}`;
   return (
     <a
+      data-id="chat-inline-link"
       href={uri}
       onClick={(e) => {
         e.preventDefault();
@@ -2923,7 +3044,7 @@ function autolinkChatMarkdown(text: string): string {
   const out: string[] = [];
   let last = 0;
   for (const m of text.matchAll(SKIP_TOKEN_RE)) {
-    const idx = m.index ?? 0;
+    const idx = m.index;
     if (idx > last) out.push(linkifyProse(text.slice(last, idx)));
     out.push(m[0]);
     last = idx + m[0].length;
@@ -3009,7 +3130,9 @@ function parseCritique(content: string): {
   const nextMatch =
     /Do this next:\s*([\s\S]*?)(?=\n\s*If you genuinely|$)/.exec(stripped);
   return {
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty trimmed string must fall back to undefined
     reason: reasonMatch?.[1]?.trim() || undefined,
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty trimmed string must fall back to undefined
     nextAction: nextMatch?.[1]?.trim() || undefined,
     raw: stripped,
   };
@@ -3026,10 +3149,10 @@ function parseTerminated(content: string): {
   const optMatch = TERMINATE_OPTIONS_RE.exec(content);
   if (optMatch?.[1]) {
     try {
-      const parsed = JSON.parse(optMatch[1]);
+      const parsed: unknown = JSON.parse(optMatch[1]);
       if (
         Array.isArray(parsed) &&
-        parsed.every((x) => typeof x === 'string' && x.trim().length > 0)
+        parsed.every((x): x is string => typeof x === 'string' && x.trim().length > 0)
       ) {
         options = parsed.map((s) => s.trim()).slice(0, 4);
       }
@@ -3045,6 +3168,7 @@ function parseTerminated(content: string): {
     stripped,
   );
   return {
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty trimmed string must fall back to undefined
     reason: reasonMatch?.[1]?.trim() || undefined,
     raw: stripped,
     ...(options !== undefined ? { options } : {}),
@@ -3061,6 +3185,7 @@ function JudgeNudgeCard({
   total: number;
 }) {
   const parsed = parseCritique(msg.content);
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string reason should not count as a present field
   const hasFields = parsed.reason || parsed.nextAction;
   return (
     <div
@@ -3171,6 +3296,7 @@ function JudgeCard({ msg }: { msg: ChatMessage }) {
         }}
       >
         <div
+          data-id="skill-card-toggle"
           onClick={() => { setExpanded((e) => !e); }}
           style={{
             display: 'flex',
@@ -3455,6 +3581,7 @@ function DoneCard({
       {wt.changedFiles.length > 0 && (
         <div>
           <div
+            data-id="finish-files-toggle"
             onClick={() => { setFilesExpanded((v) => !v); }}
             style={{
               cursor: 'pointer',
@@ -3538,7 +3665,7 @@ function DoneCard({
           <button
             type="button"
             data-id="done-entry-finish"
-            onClick={controls.onRunFinish}
+            onClick={() => { controls.onRunFinish(); }}
             style={{
               background: 'var(--accent)',
               color: '#fff',
@@ -3635,6 +3762,7 @@ function DoneCard({
                     s.name === 'lint' ||
                     s.name === 'tests') && (
                     <button
+                      data-id="stop-stage"
                       onClick={() =>
                         { controls.onStopStage(s.name as 'tsc' | 'lint' | 'tests'); }
                       }
@@ -3835,7 +3963,7 @@ function DoneCard({
             </button>
             <button
               data-id="done-entry-review-reject"
-              onClick={controls.onRejectReview}
+              onClick={() => { controls.onRejectReview(); }}
               style={{
                 background: 'transparent',
                 color: 'var(--text-secondary)',
@@ -3935,7 +4063,7 @@ function DoneCard({
             )}
             <button
               data-id="done-entry-failure-close"
-              onClick={controls.onCloseFailure}
+              onClick={() => { controls.onCloseFailure(); }}
               style={{
                 background: 'transparent',
                 color: 'var(--text-muted)',
@@ -3991,7 +4119,7 @@ function DoneCard({
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               data-id="done-entry-archive-confirm"
-              onClick={controls.onArchive}
+              onClick={() => { controls.onArchive(); }}
               style={{
                 background: 'var(--accent)',
                 color: '#fff',
@@ -4006,7 +4134,7 @@ function DoneCard({
             </button>
             <button
               data-id="done-entry-archive-dismiss"
-              onClick={controls.onDismissArchive}
+              onClick={() => { controls.onDismissArchive(); }}
               style={{
                 background: 'transparent',
                 color: 'var(--text-secondary)',
@@ -4129,12 +4257,14 @@ function JudgeTerminatedCard({
           <span>Agent gave up — pick a direction</span>
         </div>
         <div style={{ color: 'var(--text-primary)', marginBottom: 8 }}>
+          {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty reason should show the default copy */}
           {parsed.reason || 'Agent was flagged as hopelessly stuck.'}
         </div>
         {parsed.options && parsed.options.length > 0 && onPickOption ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {parsed.options.map((opt, idx) => (
               <button
+                data-id="critique-option-pick"
                 key={idx}
                 type="button"
                 onClick={() => { onPickOption(opt); }}
@@ -4347,7 +4477,6 @@ function AssistantMessage({
   checkpointsEnabled,
   onRestoreCheckpoint,
   onStopTool,
-  sessionIsStreaming,
 }: {
   msg: ChatMessage;
   checkpointsEnabled?: boolean;
@@ -4403,6 +4532,7 @@ function AssistantMessage({
           }}
         >
           {msg.content && <div>{renderAssistantContent(msg.content)}</div>}
+          {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- boolean render guard: empty model string should not force the footer */}
           {(msg.model || (checkpointsEnabled && onRestoreCheckpoint)) && (
             <div
               style={{
@@ -4415,6 +4545,7 @@ function AssistantMessage({
             >
               {checkpointsEnabled && onRestoreCheckpoint ? (
                 <RestoreCheckpointAction
+                  data-id="restore-checkpoint-action"
                   state={restoreState}
                   onClick={() => void handleRestoreClick()}
                   onCancel={() => { setRestoreState('idle'); }}
@@ -4510,6 +4641,7 @@ function RestoreCheckpointAction({
       }}
     >
       <button
+        data-id="restore-confirm"
         onClick={onClick}
         disabled={state === 'working' || state === 'done'}
         style={{
@@ -4531,6 +4663,7 @@ function RestoreCheckpointAction({
       </button>
       {state === 'confirming' && (
         <button
+          data-id="restore-cancel"
           onClick={onCancel}
           style={{
             background: 'transparent',
@@ -4662,6 +4795,7 @@ function AskUserCard({
         >
           {pending.options.map((opt, i) => (
             <button
+              data-id="ask-user-option"
               key={i}
               onClick={() => {
                 void submit(opt.label);
@@ -4686,6 +4820,7 @@ function AskUserCard({
       )}
       <div style={{ display: 'flex', gap: 6 }}>
         <input
+          data-id="ask-user-other-input"
           type="text"
           placeholder="Other…"
           value={otherText}
@@ -4707,6 +4842,7 @@ function AskUserCard({
           }}
         />
         <button
+          data-id="ask-user-submit"
           onClick={() => {
             if (otherText.trim() && !submitting) {
               void submit(`Other: ${otherText.trim()}`);
@@ -4965,6 +5101,7 @@ function SubagentChildCard({ child }: { child: SubagentChild }) {
       }}
     >
       <div
+        data-id="subagent-toggle"
         onClick={() => { setExpanded((v) => !v); }}
         style={{
           display: 'flex',
@@ -5076,6 +5213,7 @@ function AutoRouteHint({ routing }: AutoRouteHintProps) {
   if (routing.nudgeClaimer) {
     tooltipParts.push(`nudge: ${routing.nudgeClaimer}`);
   }
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty join / empty reason must fall back to the next value
   const tooltip = tooltipParts.join(' · ') || routing.reason || routing.modelId;
   return (
     <div
@@ -5156,7 +5294,7 @@ function MaxModePeerPills({
   peerStuckState,
   onSelectPeer,
 }: MaxModePeerPillsProps) {
-  if (!peers || peers.length === 0) return null;
+  if (peers.length === 0) return null;
   const pillBase: React.CSSProperties = {
     background: 'var(--bg-secondary)',
     border: '1px solid var(--border)',
@@ -5277,11 +5415,12 @@ function PeerLiveStrip({
   peerLspState,
   peerStuckState,
 }: PeerLiveStripProps) {
-  if (!peers || peers.length === 0) return null;
+  if (peers.length === 0) return null;
   const chips = peers.map((p) => {
     const tp = peerToolProgress[p.model];
     const lsp = peerLspState[p.model];
     const stuck = peerStuckState?.[p.model];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- record index access can be undefined at runtime (noUncheckedIndexedAccess is off)
     const live = tp && Date.now() - tp.updatedAt < 10_000 ? tp : null;
     const liveSnippet = live
       ? (
@@ -5295,12 +5434,15 @@ function PeerLiveStrip({
       peer: p,
       live,
       liveSnippet,
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- record index access can be undefined at runtime (noUncheckedIndexedAccess is off)
       errCount: lsp?.totalErrors ?? 0,
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- record index access can be undefined at runtime (noUncheckedIndexedAccess is off)
       warnCount: lsp?.totalWarnings ?? 0,
       stuckMs: stuck?.stuckMs ?? 0,
     };
   });
   const hasContent = chips.some(
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- boolean OR over predicates, not a nullish fallback
     (c) => c.live || c.errCount > 0 || c.warnCount > 0 || c.stuckMs > 0,
   );
   if (!hasContent) return null;
@@ -5571,6 +5713,7 @@ function ScratchpadPanel({
 }) {
   return (
     <div
+      data-id="finish-modal-overlay"
       style={{
         position: 'absolute',
         inset: 0,
@@ -5618,6 +5761,7 @@ function ScratchpadPanel({
           </span>
           <div style={{ flex: 1 }} />
           <button
+            data-id="finish-modal-close"
             onClick={onClose}
             style={{
               background: 'none',
@@ -5804,7 +5948,6 @@ CodingAgentChatProps = {}) {
     sendMessage,
     stopGeneration,
     stopTool,
-    startNewChat,
     clearMessages,
     model,
     reasoningEffort,
@@ -5833,7 +5976,6 @@ CodingAgentChatProps = {}) {
     worktreeStatus,
     worktreeBehind,
     checkWorktreeBehind,
-    worktreeAheadCount,
     finishPipeline,
     finishSession,
     mergeFinishedSession,
@@ -5877,6 +6019,7 @@ CodingAgentChatProps = {}) {
   // had written a full spec. `sessionInfo.specId` comes from every
   // `session` event (see emitSession in session.ts) and is the
   // authoritative per-session binding.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- keep the side-effectful useActiveSpec() subscription wired; consumer JSX pending
   const activeSpec: ActiveSpec | null = sessionInfo?.specId
     ? { id: sessionInfo.specId, title: sessionInfo.title ?? '' }
     : globalActiveSpec;
@@ -6222,7 +6365,8 @@ CodingAgentChatProps = {}) {
       openFailurePopup(
         res.stage === 'conflict'
           ? 'conflict'
-          : (res.stage as FinishFailureInfo['stage']) ?? 'merge_squash',
+          : (res.stage as FinishFailureInfo['stage'] | undefined) ??
+            'merge_squash',
         res,
       );
     },
@@ -6265,7 +6409,9 @@ CodingAgentChatProps = {}) {
   // agent hasn't modified anything yet, Finish is a no-op and just
   // adds noise. Scoped to `worktree.path` so it reflects the
   // session's branch, not the main repo.
-  const { changedCount } = useGitStatus(3000, worktree?.path ?? undefined);
+  // Keep the git-status poll wired (worktree branch/changes) even though
+  // this consumer doesn't read the count directly.
+  useGitStatus(3000, worktree?.path ?? undefined);
 
   // Backfill peer message history when the parent session resumes
   // mid- or post-max-mode. Live `peer_event`s only deliver new
@@ -6300,6 +6446,7 @@ CodingAgentChatProps = {}) {
     let cancelled = false;
     void (async () => {
       for (const peer of peerSessions) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- set true by cleanup across the await; flow analysis can't see the async gap
         if (cancelled) return;
         if (fetchedPeersRef.current.has(peer.compositeId)) continue;
         try {
@@ -6311,7 +6458,10 @@ CodingAgentChatProps = {}) {
               input: { sessionId: peer.compositeId, limit: 200 },
             }),
           });
-          const json = await res.json();
+          const json = (await res.json()) as {
+            result?: { messages?: unknown };
+            messages?: unknown;
+          };
           const list = (json.result?.messages ?? json.messages) as
             | {
                 id?: string;
@@ -6320,6 +6470,7 @@ CodingAgentChatProps = {}) {
                 created_at?: number;
               }[]
             | undefined;
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- set true by cleanup across the await; flow analysis can't see the async gap
           if (cancelled) return;
           if (!Array.isArray(list)) continue;
           const tagged: PeerMessage[] = list
@@ -6331,6 +6482,7 @@ CodingAgentChatProps = {}) {
                 role: string;
                 parts: unknown[];
                 created_at?: number;
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- untrusted JSON: array entries may be null at runtime
               } => typeof m?.id === 'string' && typeof m?.role === 'string',
             )
             .map((m) => ({
@@ -6476,7 +6628,7 @@ CodingAgentChatProps = {}) {
       isConflict &&
       !prevRefreshConflictRef.current &&
       !isStreaming &&
-      worktreeStatus?.conflicts &&
+      worktreeStatus.conflicts &&
       worktreeStatus.conflicts.length > 0
     ) {
       autoResolveWorktreeConflict();
@@ -6516,13 +6668,7 @@ CodingAgentChatProps = {}) {
   ]);
 
   const [scratchpadEntries, setScratchpadEntries] = useState<
-    {
-      key: string;
-      value: string;
-      mergeToMemory: boolean;
-      createdAt: number;
-      updatedAt: number;
-    }[]
+    ScratchpadEntry[]
   >([]);
   // Fetch scratchpad entries on session mount, after each AI turn ends,
   // and whenever the panel is opened. Drives the count badge so the
@@ -6537,9 +6683,10 @@ CodingAgentChatProps = {}) {
       body: JSON.stringify({ input: { sessionId } }),
     })
       .then((r) => r.json())
-      .then((json: any) => {
+      .then((json: { result?: { entries?: unknown }; entries?: unknown }) => {
         const entries = json.result?.entries ?? json.entries;
-        if (entries) setScratchpadEntries(entries);
+        if (Array.isArray(entries))
+          setScratchpadEntries(entries as ScratchpadEntry[]);
       })
       .catch(() => {
         /* ignore */
@@ -6600,8 +6747,10 @@ CodingAgentChatProps = {}) {
         const res = await socket.request('evalGetTask', {
           taskName: evalTaskName,
         });
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- set true by cleanup across the await; flow analysis can't see the async gap
         if (!cancelled) setEvalTaskTurns(res.turns);
       } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- set true by cleanup across the await; flow analysis can't see the async gap
         if (!cancelled)
           console.warn('[eval] evalGetTask failed:', (err as Error).message);
       }
@@ -6657,7 +6806,9 @@ CodingAgentChatProps = {}) {
           sessionId,
           nextTurnIndex: evalState.currentTurnIndex,
         })
-        .catch(() => {});
+        .catch(() => {
+          /* noop */
+        });
       return;
     }
     // Falling edge — turn finished. Bump the server-side turn index
@@ -6669,7 +6820,9 @@ CodingAgentChatProps = {}) {
       const nextIndex = justFinishedIndex + 1;
       void socket
         .request('evalAdvanceTurn', { sessionId, nextTurnIndex: nextIndex })
-        .catch(() => {});
+        .catch(() => {
+          /* noop */
+        });
       // Auto-fire the next turn if any remain.
       if (nextIndex < evalTaskTurns.length) {
         const nextTurn = evalTaskTurns[nextIndex];
@@ -6691,6 +6844,7 @@ CodingAgentChatProps = {}) {
       );
       setEvalLocalGrade(result);
     } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a non-Error throw makes .message undefined at runtime despite the cast
       setEvalGradeError((err as Error).message ?? 'grading failed');
     } finally {
       setEvalGrading(false);
@@ -6749,8 +6903,8 @@ CodingAgentChatProps = {}) {
   // Critique-group counters. Lifted out of the render loop into a
   // memo so per-row rendering is O(1).
   const { critiqueGroupIndex, critiqueGroupTotal } = useMemo(() => {
-    const idx: number[] = new Array(messages.length).fill(0);
-    const total: number[] = new Array(messages.length).fill(0);
+    const idx: number[] = new Array<number>(messages.length).fill(0);
+    const total: number[] = new Array<number>(messages.length).fill(0);
     let groupStart = 0;
     let seenInGroup = 0;
     const finalizeGroup = (endExclusive: number) => {
@@ -6788,6 +6942,7 @@ CodingAgentChatProps = {}) {
   const latestStatusId = useMemo<string | null>(() => {
     for (let i = displayMessages.length - 1; i >= 0; i--) {
       const m = displayMessages[i];
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access can be undefined at runtime (noUncheckedIndexedAccess is off)
       if (m?.role === 'status') return m.id;
     }
     return null;
@@ -7020,6 +7175,7 @@ CodingAgentChatProps = {}) {
       if (e.key === 'Enter') {
         e.preventDefault();
         const next = pendingPermissions[0];
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access can be undefined at runtime (noUncheckedIndexedAccess is off)
         if (next) void approvePermission(next, e.shiftKey);
       } else if (e.shiftKey && (e.key === 'a' || e.key === 'A')) {
         e.preventDefault();
@@ -7080,6 +7236,7 @@ CodingAgentChatProps = {}) {
   // Server-composed dropdown label for the model axis. Empty string
   // for snapshots emitted before the field landed → falls back to the
   // ModelSelector's catalog-driven label.
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty label string must fall back to undefined
   const modelDisplayLabel = sessionInfo?.modelDisplayLabel || undefined;
 
   const renderAxisSelector = (): React.ReactNode =>
@@ -7147,6 +7304,7 @@ CodingAgentChatProps = {}) {
           <div style={{ flex: 1 }} />
           {sessionInfo && (
             <ContextMeter
+              data-id="context-meter-empty"
               info={sessionInfo}
               model={model}
               disabled={isStreaming}
@@ -7158,7 +7316,9 @@ CodingAgentChatProps = {}) {
           {sessionId && <ReportSessionIssueButton compositeId={sessionId} />}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
+              data-id="archive-session-empty"
               onClick={() => void handleArchiveSession()}
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isStreaming is narrowed false in the empty-session block; kept identical to the active toolbar's button
               disabled={isStreaming || finishPipeline.running}
               style={{
                 background: 'transparent',
@@ -7167,6 +7327,7 @@ CodingAgentChatProps = {}) {
                 borderRadius: 4,
                 padding: '2px 6px',
                 cursor:
+                  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isStreaming is narrowed false in the empty-session block; kept identical to the active toolbar's button
                   isStreaming || finishPipeline.running
                     ? 'not-allowed'
                     : 'pointer',
@@ -7274,6 +7435,7 @@ CodingAgentChatProps = {}) {
                 : `Pull from ${parentBranch}`;
               return (
                 <button
+                  data-id="pull-parent"
                   type="button"
                   onClick={() => void onPullParent()}
                   disabled={disabled}
@@ -7307,6 +7469,7 @@ CodingAgentChatProps = {}) {
             })()}
           {sessionInfo && (
             <ContextMeter
+              data-id="context-meter-active"
               info={sessionInfo}
               model={model}
               disabled={isStreaming}
@@ -7318,6 +7481,7 @@ CodingAgentChatProps = {}) {
           {sessionId && <ReportSessionIssueButton compositeId={sessionId} />}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
+              data-id="archive-session"
               onClick={() => void handleArchiveSession()}
               disabled={isStreaming || finishPipeline.running}
               style={{
@@ -7342,6 +7506,7 @@ CodingAgentChatProps = {}) {
           )}
           {pendingPermissions.length > 0 && (
             <button
+              data-id="skip-all-permissions"
               onClick={() => void skipAllPermissions()}
               style={{
                 background: 'transparent',
@@ -7430,6 +7595,7 @@ CodingAgentChatProps = {}) {
             </span>
             {onOpenSession && (
               <button
+                data-id="open-parent-session"
                 onClick={() =>
                   { onOpenSession(sessionInfo.parentSessionId!); }
                 }
@@ -7489,6 +7655,7 @@ CodingAgentChatProps = {}) {
                     )}
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
+                      data-id="refresh-worktree"
                       onClick={() => void refreshWorktreeNow()}
                       style={{
                         background: 'transparent',
@@ -7565,6 +7732,7 @@ CodingAgentChatProps = {}) {
             {virtualizer.getVirtualItems().map((vRow) => {
               const i = vRow.index;
               const msg = displayMessages[i];
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access can be undefined at runtime (noUncheckedIndexedAccess is off)
               if (!msg) return null;
               // Turn-end / todo snapshot logic is parent-only (peer
               // turns are run by the orchestrator, not the user) — gate
@@ -7796,6 +7964,7 @@ CodingAgentChatProps = {}) {
         {pendingAskUsers.length > 0 &&
           (() => {
             const head = pendingAskUsers[0];
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access can be undefined at runtime (noUncheckedIndexedAccess is off)
             if (!head) return null;
             const isPeer = head.sessionId !== sessionId;
             const peerModel = isPeer
@@ -7821,6 +7990,7 @@ CodingAgentChatProps = {}) {
         {pendingStepReviews.length > 0 &&
           (() => {
             const head = pendingStepReviews[0];
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access can be undefined at runtime (noUncheckedIndexedAccess is off)
             if (!head) return null;
             return (
               <div style={{ flexShrink: 0 }}>
@@ -8136,7 +8306,7 @@ function CodingAgentInputArea({
     const el = inputRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+    el.style.height = String(Math.min(el.scrollHeight, 200)) + 'px';
   }, [input, inputRef]);
 
   const handleChange = useCallback(
@@ -8198,7 +8368,9 @@ function CodingAgentInputArea({
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- clipboardData can be null at runtime despite React's non-null type
       const files = e.clipboardData?.files;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- files may be undefined when clipboardData was null
       if (files && files.length > 0) {
         const hasImage = Array.from(files).some((f) =>
           f.type.startsWith('image/'),
@@ -8214,7 +8386,9 @@ function CodingAgentInputArea({
 
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- dataTransfer can be null at runtime despite React's non-null type
       const files = e.dataTransfer?.files;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- files may be undefined when dataTransfer was null
       if (files && files.length > 0) {
         const hasImage = Array.from(files).some((f) =>
           f.type.startsWith('image/'),
@@ -8231,7 +8405,9 @@ function CodingAgentInputArea({
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     // Only intercept image drags so the rest of the IDE's drag-drop
     // behavior stays unchanged.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- dataTransfer can be null at runtime despite React's non-null type
     const types = e.dataTransfer?.types;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- types may be undefined when dataTransfer was null
     if (types && Array.from(types).includes('Files')) {
       e.preventDefault();
     }
@@ -8311,6 +8487,7 @@ function CodingAgentInputArea({
         <div style={{ flex: 1 }} />
         {scratchpadCount > 0 && onToggleScratchpad && (
           <button
+            data-id="toggle-scratchpad"
             onClick={onToggleScratchpad}
             style={{
               background: 'none',
@@ -8409,6 +8586,7 @@ function CodingAgentInputArea({
                     }}
                   />
                   <button
+                    data-id="remove-attachment"
                     onClick={() => { removeAttachment(i); }}
                     title="Remove"
                     style={{
@@ -8457,6 +8635,7 @@ function CodingAgentInputArea({
               />
             )}
             <input
+              data-id="file-input"
               ref={fileInputRef}
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
@@ -8469,6 +8648,7 @@ function CodingAgentInputArea({
               }}
             />
             <button
+              data-id="attach-file"
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={awaitingAskUser || attachments.length >= 5}
@@ -8539,6 +8719,7 @@ function CodingAgentInputArea({
               if (showStop) {
                 return (
                   <button
+                    data-id="stop-generation"
                     onClick={onStop}
                     title="Stop"
                     style={{
@@ -8618,6 +8799,7 @@ function EvalScorecardModal({
   }, [onClose]);
   return (
     <div
+      data-id="popup-overlay"
       onClick={onClose}
       style={{
         position: 'fixed',
@@ -8633,6 +8815,7 @@ function EvalScorecardModal({
       }}
     >
       <div
+        data-id="popup-content"
         onClick={(e) => { e.stopPropagation(); }}
         style={{
           width: 'min(720px, 100%)',
@@ -8737,6 +8920,7 @@ function SandboxStatusPill({
 
   return (
     <button
+      data-id="init-session"
       onClick={() => void onInit()}
       disabled={working}
       title="bash and python_exec currently run without OS-level sandboxing. Click to create a per-project sandbox user (one-time admin prompt)."

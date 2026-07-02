@@ -79,6 +79,12 @@ function useCountUp(target: number, durationMs: number): number {
  *   - Clone from Git → `git clone <url>` using the connected GitHub
  */
 
+// The single default parent folder shared by all three onboarding actions —
+// new-project's parent, clone-into target, and the folder-picker's start dir.
+// Keeping them in sync means a repo you clone lands next to the projects you
+// create (previously clone defaulted to `~` and open/clone browsed from `~`).
+const DEFAULT_PARENT_DIR = '~/Documents/Ugly Studio';
+
 interface ProjectOnboardingProps {
   /**
    * Fires when a project has been opened (picked, created, or cloned).
@@ -103,12 +109,28 @@ interface ProjectOnboardingProps {
 type ConnectionStatus = 'checking' | 'connected' | 'error';
 type ActionTab = 'new' | 'open' | 'clone';
 
+// Shape of the `openProject` / `cloneProject` responses — the opened
+// project's display name + absolute root path.
+interface OpenedProject {
+  name: string;
+  path: string;
+}
+
+// Shape of the `evalCreateProject` response — the carved one-off eval
+// project plus the seed prompt for its first coding-agent turn.
+interface EvalCreatedProject {
+  projectName: string;
+  projectPath: string;
+  firstTurnPrompt: string;
+}
+
 // Phase 1: what used to be a sidecar `/api/*` fetch now routes through the
-// native transport shim (window.UglyNative).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function apiRequest(method: string, input: object): Promise<any> {
+// native transport shim (window.UglyNative). The native bridge returns an
+// untyped payload; each caller supplies the expected response shape via `T`
+// and we narrow with a single boundary cast.
+async function apiRequest<T>(method: string, input: object): Promise<T> {
   const { nativeRequest } = await import('../hooks/useSocket');
-  return nativeRequest(method, input);
+  return (await nativeRequest(method, input)) as T;
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -122,7 +144,7 @@ export function ProjectOnboarding({
   // now persistent at the Editor root and reads platform from
   // ChromeContext directly, so this prop is no longer needed here.
   platform: _platform,
-  onOpenSettings,
+  onOpenSettings: _onOpenSettings,
   leaving,
 }: ProjectOnboardingProps): React.ReactElement {
   // Top bar intentionally stays neutral — no per-view content. The
@@ -143,10 +165,10 @@ export function ProjectOnboarding({
   const app = useAppOptional();
   const [activeAction, setActiveAction] = useState<ActionTab>('new');
   const [newName, setNewName] = useState('');
-  const [newParentDir, setNewParentDir] = useState('~/Documents/Ugly Studio');
+  const [newParentDir, setNewParentDir] = useState(DEFAULT_PARENT_DIR);
   const [openPath, setOpenPath] = useState('');
   const [cloneUrl, setCloneUrl] = useState('');
-  const [cloneDir, setCloneDir] = useState('');
+  const [cloneDir, setCloneDir] = useState(DEFAULT_PARENT_DIR);
   const [picker, setPicker] = useState<{ startPath: string; onPick: (p: string) => void } | null>(null);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -171,10 +193,13 @@ export function ProjectOnboarding({
       const taskId = generateTaskId();
       evalTaskIdRef.current = taskId;
       try {
-        const created = await apiRequest('evalCreateProject', {
-          taskName,
-          taskId,
-        });
+        const created = await apiRequest<EvalCreatedProject>(
+          'evalCreateProject',
+          {
+            taskName,
+            taskId,
+          },
+        );
         // Hand off to ProjectHome via sessionStorage. ProjectHome
         // reads `eval-pending-task` on mount, pre-fills the prompt
         // input with the first turn, and seeds the session AFTER the
@@ -185,16 +210,13 @@ export function ProjectOnboarding({
           'eval-pending-task',
           JSON.stringify({
             taskName,
-            firstTurnPrompt: created.firstTurnPrompt as string,
+            firstTurnPrompt: created.firstTurnPrompt,
           }),
         );
         setShowEvalPicker(false);
-        onProjectOpen(
-          created.projectName as string,
-          created.projectPath as string,
-        );
+        onProjectOpen(created.projectName, created.projectPath);
       } catch (err) {
-        setEvalError((err as Error).message ?? 'failed to create eval task');
+        setEvalError((err as Error).message);
       } finally {
         setEvalSubmitting(false);
         evalTaskIdRef.current = null;
@@ -209,14 +231,14 @@ export function ProjectOnboarding({
       setEvalSubmitting(true);
       setEvalError(null);
       try {
-        const result = await apiRequest('openProject', { path: projectPath });
+        const result = await apiRequest<OpenedProject>('openProject', {
+          path: projectPath,
+        });
         sessionStorage.setItem('eval-pending-session-id', sessionId);
         setShowEvalPicker(false);
-        onProjectOpen((result.name ?? projectName) as string, result.path);
+        onProjectOpen(result.name, result.path);
       } catch (err) {
-        setEvalError(
-          `Failed to open prior run: ${(err as Error).message ?? 'unknown'}`,
-        );
+        setEvalError(`Failed to open prior run: ${(err as Error).message}`);
       } finally {
         setEvalSubmitting(false);
       }
@@ -229,11 +251,16 @@ export function ProjectOnboarding({
   const hasElectronAPI = isNativeAvailable();
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    // AbortController doubles as the fetch timeout *and* the unmount guard:
+    // aborting on cleanup makes the in-flight fetch reject, and
+    // `signal.aborted` (which the type system can't prove constant) gates the
+    // post-await setState so we never touch state after unmount.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => { controller.abort(); }, 5000);
+    void (async () => {
       try {
-        const res = await fetch('/', { signal: AbortSignal.timeout(5000) });
-        if (cancelled) return;
+        const res = await fetch('/', { signal: controller.signal });
+        if (controller.signal.aborted) return;
         if (!res.ok) {
           setConnectionStatus('error');
           return;
@@ -241,11 +268,12 @@ export function ProjectOnboarding({
         setConnectionStatus('connected');
         // Recent projects now arrive via the synced trackDocs hook above.
       } catch {
-        if (!cancelled) setConnectionStatus('error');
+        if (!controller.signal.aborted) setConnectionStatus('error');
       }
     })();
     return () => {
-      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
     };
   }, []);
 
@@ -290,7 +318,7 @@ export function ProjectOnboarding({
     // Custom in-app folder picker — works over the Ugly Proxy (it navigates via
     // native.fs.readdir), unlike the native fs.pickDirectory dialog which would open on
     // the desktop and be invisible on a phone. '~' resolves to home on the host.
-    setPicker({ startPath: current.trim() || '~', onPick: setter });
+    setPicker({ startPath: current.trim() || DEFAULT_PARENT_DIR, onPick: setter });
   }, []);
 
   const handleOpenRecent = useCallback(
@@ -304,7 +332,9 @@ export function ProjectOnboarding({
         connectToHost(project.deviceId, project.deviceLabel);
       }
       try {
-        const result = await apiRequest('openProject', { path: project.path });
+        const result = await apiRequest<OpenedProject>('openProject', {
+          path: project.path,
+        });
         onProjectOpen(result.name, result.path);
       } catch (err) {
         const msg = (err as Error).message;
@@ -343,7 +373,7 @@ export function ProjectOnboarding({
     setLoading(true);
     setError(null);
     try {
-      const result = await apiRequest('openProject', {
+      const result = await apiRequest<OpenedProject>('openProject', {
         path: openPath.trim(),
       });
       onProjectOpen(result.name, result.path);
@@ -363,7 +393,7 @@ export function ProjectOnboarding({
         url: cloneUrl.trim(),
       };
       if (cloneDir.trim()) input.parentDir = cloneDir.trim();
-      const result = await apiRequest('cloneProject', input);
+      const result = await apiRequest<OpenedProject>('cloneProject', input);
       onProjectOpen(result.name, result.path);
     } catch (err) {
       setError(`Failed to clone repository: ${(err as Error).message}`);
@@ -420,6 +450,7 @@ export function ProjectOnboarding({
             </div>
             <button
               type="button"
+              data-id="onboarding-retry-connection"
               onClick={() => { window.location.reload(); }}
               style={primaryButtonStyle}
             >
@@ -579,6 +610,7 @@ export function ProjectOnboarding({
             >
               <ActionRow
                 kind="new"
+                data-id="onboarding-action-new"
                 active={activeAction === 'new'}
                 onClick={() => { setActiveAction('new'); }}
                 delayMs={760}
@@ -601,6 +633,7 @@ export function ProjectOnboarding({
                   />
                   <button
                     type="button"
+                    data-id="onboarding-create-project"
                     onClick={() => { handleNewProject(); }}
                     disabled={loading || !newName.trim()}
                     style={primaryButtonStyle}
@@ -612,6 +645,7 @@ export function ProjectOnboarding({
 
               <ActionRow
                 kind="open"
+                data-id="onboarding-action-open"
                 active={activeAction === 'open'}
                 onClick={() => { setActiveAction('open'); }}
                 delayMs={860}
@@ -624,7 +658,7 @@ export function ProjectOnboarding({
                     onChange={setOpenPath}
                     placeholder={
                       hasElectronAPI
-                        ? '~/Documents/GitHub/project'
+                        ? `${DEFAULT_PARENT_DIR}/project`
                         : '/path/to/project'
                     }
                     browsable={hasElectronAPI}
@@ -633,6 +667,7 @@ export function ProjectOnboarding({
                   />
                   <button
                     type="button"
+                    data-id="onboarding-open-folder"
                     onClick={() => void handleOpenFolder()}
                     disabled={loading || !openPath.trim()}
                     style={primaryButtonStyle}
@@ -644,6 +679,7 @@ export function ProjectOnboarding({
 
               <ActionRow
                 kind="clone"
+                data-id="onboarding-action-clone"
                 active={activeAction === 'clone'}
                 onClick={() => { setActiveAction('clone'); }}
                 delayMs={960}
@@ -661,12 +697,13 @@ export function ProjectOnboarding({
                     label="Clone into (optional)"
                     value={cloneDir}
                     onChange={setCloneDir}
-                    placeholder={hasElectronAPI ? '~' : ''}
+                    placeholder={hasElectronAPI ? DEFAULT_PARENT_DIR : ''}
                     browsable={hasElectronAPI}
                     onBrowse={() => { handleBrowse(setCloneDir, cloneDir); }}
                   />
                   <button
                     type="button"
+                    data-id="onboarding-clone-repo"
                     onClick={() => void handleClone()}
                     disabled={loading || !cloneUrl.trim()}
                     style={primaryButtonStyle}
@@ -778,6 +815,7 @@ export function ProjectOnboarding({
                   <line x1={21} y1={21} x2={16.65} y2={16.65} />
                 </svg>
                 <input
+                  data-id="onboarding-recents-filter"
                   value={search}
                   onChange={(e) => { setSearch(e.currentTarget.value); }}
                   placeholder="Filter by name or path…"
@@ -939,6 +977,7 @@ export function ProjectOnboarding({
           <div style={{ color: 'var(--text-secondary)' }}>{evalError}</div>
           <button
             type="button"
+            data-id="onboarding-eval-error-dismiss"
             onClick={() => { setEvalError(null); }}
             style={{
               marginTop: 6,
@@ -1057,17 +1096,20 @@ function ActionRow({
   active,
   onClick,
   delayMs,
+  'data-id': dataId,
 }: {
   kind: ActionTab;
   active: boolean;
   onClick: () => void;
   delayMs?: number;
+  'data-id'?: string;
 }): React.ReactElement {
   const meta = ACTION_META[kind];
   const isPrimary = kind === 'new';
   return (
     <button
       type="button"
+      data-id={dataId}
       onClick={onClick}
       className="us-slide-r"
       style={{
@@ -1234,6 +1276,7 @@ function LabelInput({
         }}
       >
         <input
+          data-id={`onboarding-input-${label}`}
           value={value}
           onChange={(e) => { onChange(e.currentTarget.value); }}
           placeholder={placeholder}
@@ -1253,6 +1296,7 @@ function LabelInput({
         {browsable && (
           <button
             type="button"
+            data-id={`onboarding-browse-${label}`}
             onClick={onBrowse}
             style={{
               fontFamily: 'var(--font-label)',
@@ -1287,8 +1331,8 @@ function ProjectRow({
   index: number;
   project: RecentProject;
   isThisDevice: boolean;
-  onOpen(): void;
-  onDelete(): void;
+  onOpen: () => void;
+  onDelete: () => void;
   delayMs?: number;
 }): React.ReactElement {
   const indexDelay = delayMs != null ? delayMs + 100 : undefined;

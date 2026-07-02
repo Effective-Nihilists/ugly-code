@@ -17,11 +17,12 @@ const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage
 g.UglyNative = createNodeUglyNative();
 
 // sessionWorkspace persists worktree prefs to localStorage; give it an in-memory shim.
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- DOM lib types localStorage as always-present, but this runs in a Node task child where it is genuinely undefined.
 if (!g.localStorage) {
   const mem = new Map<string, string>();
   g.localStorage = {
     getItem: (k: string) => (mem.has(k) ? (mem.get(k)!) : null),
-    setItem: (k: string, v: string) => { mem.set(k, String(v)); },
+    setItem: (k: string, v: string) => { mem.set(k, v); },
     removeItem: (k: string) => { mem.delete(k); },
     clear: () => { mem.clear(); },
     key: (i: number) => [...mem.keys()][i] ?? null,
@@ -30,17 +31,17 @@ if (!g.localStorage) {
 }
 
 const t = taskContext<{ projectPath?: string; sessionId?: string; origin?: string; authToken?: string }>();
-setActiveProjectPath(t.params?.projectPath ?? null);
-const sessionId = t.params?.sessionId ?? t.id ?? 'cs:task';
+setActiveProjectPath(t.params.projectPath ?? null);
+const sessionId = t.params.sessionId ?? t.id ?? 'cs:task';
 
 // 3. The agent loop fetches the project's /api/* with relative URLs + cookie creds — both
 //    unavailable in a Node child. Absolutize against the app origin and carry the session
 //    token as a Cookie so /api/agentTurn authenticates. Prefer the host-injected token
 //    (UGLY_AUTH_TOKEN — read from the cookie host-side, works even when HttpOnly + over the
 //    mobile proxy); fall back to the token the renderer forwarded in params.
-const origin = t.params?.origin ?? '';
+const origin = t.params.origin ?? '';
 const authToken = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.UGLY_AUTH_TOKEN
-  ?? t.params?.authToken ?? '';
+  ?? t.params.authToken ?? '';
 if (origin) {
   const realFetch = globalThis.fetch.bind(globalThis);
   (globalThis as { fetch: typeof fetch }).fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
@@ -66,13 +67,16 @@ defineTask({
       return { ok: true };
     },
     // Interrupt the running turn (chatStop → task.call('interrupt')).
+    // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
     interrupt: async () => { abortClientAgent(sessionId); return { ok: true }; },
     // `/clear`: drop the in-memory agent context (keeps the worktree); the renderer
     // wipes the persisted transcript separately so the next turn starts empty.
+    // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
     clear: async () => { clearClientAgentSession(sessionId); return { ok: true }; },
     // Identity/state for a freshly-attached UI (history itself is read from the server
     // via codingSessionListMessages, same as before).
-    getState: async () => ({ sessionId, projectPath: t.params?.projectPath ?? null }),
+    // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
+    getState: async () => ({ sessionId, projectPath: t.params.projectPath ?? null }),
   },
 });
 

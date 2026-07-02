@@ -16,7 +16,7 @@ export default function SearchPage(): React.ReactElement {
     <PageLayout
       header={
         <div>
-          <a href="/">← Home</a>
+          <a href="/" data-id="search-home">← Home</a>
         </div>
       }
     >
@@ -27,6 +27,7 @@ export default function SearchPage(): React.ReactElement {
         <div>
           <Input
             label="Search query"
+            data-id="search-query-input"
             value={query}
             onChange={handleQueryChange}
             placeholder="Search..."

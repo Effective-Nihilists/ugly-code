@@ -54,7 +54,20 @@ export function parseJudge(text: string, max: number): { points: number; verdict
     try {
       const o = JSON.parse(m[0]) as { points?: unknown; verdict?: unknown };
       const pts = Math.max(0, Math.min(max, Math.round(Number(o.points) || 0)));
-      return { points: pts, verdict: String(o.verdict ?? '').slice(0, 600) || 'no verdict' };
+      const v = o.verdict;
+      const verdictRaw =
+        typeof v === 'string'
+          ? v
+          : v == null
+            ? ''
+            : typeof v === 'object'
+              ? JSON.stringify(v)
+              : typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint'
+                ? v.toString()
+                : typeof v === 'symbol'
+                  ? v.toString()
+                  : (v as (...args: unknown[]) => unknown).toString();
+      return { points: pts, verdict: verdictRaw.slice(0, 600) || 'no verdict' };
     } catch {
       /* fall through */
     }
@@ -75,7 +88,7 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
   // Run + cache `tsc` / `vitest` once even if referenced by multiple gates.
   let tscRun: { out: string; code: number | null } | null = null;
   const tsc = async (): Promise<{ out: string; code: number | null }> => {
-    if (!tscRun) tscRun = await deps.run('npx', ['tsc', '--noEmit'], input.projectPath);
+    tscRun ??= await deps.run('npx', ['tsc', '--noEmit'], input.projectPath);
     return tscRun;
   };
 
@@ -83,7 +96,7 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
 
   for (const gate of gates) {
     const kind = gate.kind;
-    const pts = gate.points ?? 0;
+    const pts = gate.points;
 
     if (kind === 'tsc') {
       const r = await tsc();
@@ -210,6 +223,6 @@ function joinPath(base: string, rel: string): string {
 /** The agent's working-tree diff (capped) — evidence for the LLM judge. */
 async function collectDiff(projectPath: string, deps: GradeDeps): Promise<string> {
   const r = await deps.run('git', ['diff', '--no-color'], projectPath);
-  const out = r.out ?? '';
+  const out = r.out;
   return out.length > 20_000 ? out.slice(0, 20_000) + '\n…(diff truncated)' : out;
 }

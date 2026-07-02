@@ -72,7 +72,9 @@ export function splitLineSuffix(s: string): {
   const m = /^(.+?)(?::(\d+)(?:-(\d+))?)?$/.exec(s);
   if (!m) return { path: s };
   return {
-    path: m[1] ?? s,
+    // Group 1 (`.+?`) always participates when `m` matched, so it is a
+    // guaranteed string here.
+    path: m[1],
     ...(m[2] ? { line: m[2] } : {}),
     ...(m[3] ? { endLine: m[3] } : {}),
   };
@@ -95,7 +97,15 @@ export function quotedPathLinkifyable(inner: string): boolean {
 export function linkifyProse(prose: string): string {
   return prose.replace(
     newLinkifyRe(),
-    (match, url, dqInner, sqInner, barePath, line, endLine) => {
+    (
+      match: string,
+      url: string | undefined,
+      dqInner: string | undefined,
+      sqInner: string | undefined,
+      barePath: string | undefined,
+      line: string | undefined,
+      endLine: string | undefined,
+    ) => {
       if (typeof url === 'string' && url.length > 0) {
         // Strip trailing sentence punctuation so "see https://x.com."
         // doesn't swallow the period into the link.
@@ -157,6 +167,7 @@ export function LinkifiedText({ text }: { text: string }): ReactElement {
     parts.push(
       <a
         key={key}
+        data-id={`linkified-path-${key}`}
         href={uri}
         onClick={(e) => {
           e.preventDefault();
@@ -187,6 +198,7 @@ export function LinkifiedText({ text }: { text: string }): ReactElement {
       parts.push(
         <a
           key={key}
+          data-id={`linkified-url-${key}`}
           href={clean}
           onClick={(e) => {
             e.preventDefault();

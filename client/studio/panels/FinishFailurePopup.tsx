@@ -246,6 +246,7 @@ export function FinishFailurePopup({
         >
           <button
             type="button"
+            data-id="finish-failure-close"
             onClick={onClose}
             style={{
               background: 'transparent',
@@ -263,6 +264,7 @@ export function FinishFailurePopup({
           {skippable && onSkipGate && (
             <button
               type="button"
+              data-id="finish-failure-skip-gate"
               onClick={() => { onSkipGate(info.stage as 'tsc' | 'lint' | 'tests'); }}
               style={{
                 background: 'transparent',
@@ -281,6 +283,7 @@ export function FinishFailurePopup({
           {onRetry && (
             <button
               type="button"
+              data-id="finish-failure-retry"
               onClick={onRetry}
               style={{
                 background: 'var(--accent)',

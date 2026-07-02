@@ -18,7 +18,6 @@ import {
   emptyTelemetryTotals,
   type AgentController,
   type AgentMessage,
-  type ContentPart,
   type MsgTelemetry,
   type RunAgentSocket,
 } from 'ugly-app/agent/client';
@@ -37,7 +36,6 @@ import {
   planCompaction,
   reconstructResumeContext,
   type ActiveRow,
-  type StoredMessageRow,
   type StoredRole,
   type ToolResultPayload,
   type ToolRowPayload,
@@ -136,7 +134,7 @@ const fetchSocket: RunAgentSocket = {
     }
     return result;
   },
-  trackDocs: () => () => {},
+  trackDocs: () => () => {/* noop */},
 };
 
 // Per-session tool handlers. They resolve the session's workspace at CALL time:
@@ -573,7 +571,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     onTurn: (turn, telemetry) => {
       const content = Array.isArray(turn.content)
         ? turn.content
-        : [{ type: 'text' as const, text: String(turn.content) }];
+        : [{ type: 'text' as const, text: turn.content }];
       // The model that produced this turn — drives the per-message badge.
       const model = telemetry?.model;
       const modelOpt = model ? { model } : {};

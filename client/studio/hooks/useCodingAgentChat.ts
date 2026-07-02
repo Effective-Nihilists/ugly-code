@@ -502,7 +502,7 @@ export interface PendingStepReview {
   createdAt: number;
 }
 
-async function rawAgentApi(method: string, input: object): Promise<any> {
+async function rawAgentApi(method: string, input: object): Promise<unknown> {
   // Phase 3b: the coding-agent RPCs route through the native transport shim
   // (window.UglyNative) instead of a sidecar `/api/*` fetch. The shim runs the
   // agent loop client-side for chatSend.
@@ -607,6 +607,92 @@ export interface RawAgentMessage {
   role: string;
   parts?: RawMessagePart[];
   created_at?: number;
+  /** Model id stamped on assistant messages, when known. */
+  model?: string;
+}
+
+/**
+ * Shape of the `data` blob on a raw message part. Every field is
+ * optional because the wire is untyped (the host's coding.js task can
+ * lag the SPA build); consumers read defensively and fall back to
+ * defaults. One typed cast (`partData()` / `as MessagePartData`) at the
+ * boundary lets the rest of the processing functions stay type-safe.
+ */
+interface MessagePartData {
+  text?: string;
+  thinking?: string;
+  id?: string;
+  name?: string;
+  input?: string;
+  finished?: boolean;
+  tool_call_id?: string;
+  content?: string;
+  is_error?: boolean;
+  metadata?: unknown;
+}
+
+/** A raw wire message with typed parts (parts carry `MessagePartData`). */
+interface WireMessage {
+  id: string;
+  role: string;
+  model?: string;
+  parts?: { type: string; data?: MessagePartData }[];
+  created_at?: number;
+}
+
+/**
+ * Envelope of a single agent event as it arrives inside
+ * `msg.event`. `payload` is deliberately loose — each event `type`
+ * carries a different payload shape, narrowed per-branch below.
+ */
+interface AgentEventEnvelope {
+  type?: string;
+  payload?: AgentEventPayload;
+  /** error/stderr events carry text on the envelope itself. */
+  text?: string;
+  message?: string;
+}
+
+/**
+ * Nested `payload` on an `AgentEventEnvelope`. The double-`payload`
+ * nesting mirrors the server's event bus wrapping (outer = sub-type,
+ * inner = the actual body). Every field optional — narrowed per branch.
+ */
+interface AgentEventPayload {
+  type?: string;
+  payload?: unknown;
+}
+
+/**
+ * Inner event envelope carried on a `subagent_event`. Its
+ * `payload.payload` is either a raw message (`role` + `parts`) for a
+ * 'message' event, or an agent-event body (`type`) for 'agent_event'.
+ * Both shapes are covered loosely and narrowed per branch below.
+ */
+interface ChildEvent {
+  type?: string;
+  payload?: {
+    type?: string;
+    payload?: {
+      role?: string;
+      parts?: { type: string; data?: MessagePartData }[];
+      type?: string;
+    };
+  };
+}
+
+/** Response shape of `chatListMessages`. */
+interface ListMessagesResponse {
+  messages?: RawAgentMessage[];
+  hasMore?: boolean;
+}
+
+/** Response shape of `chatCreate` (fresh create or resume). */
+interface ChatCreateResponse {
+  sessionId: string;
+  specId?: string;
+  model?: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
 /**
@@ -806,7 +892,7 @@ function mergeToolResultsIntoChatMessages(
       const metaRaw = d.metadata;
       if (typeof metaRaw === 'string' && metaRaw.length > 0) {
         try {
-          metadata = JSON.parse(metaRaw);
+          metadata = JSON.parse(metaRaw) as Record<string, unknown>;
         } catch {
           /* ignore */
         }
@@ -840,6 +926,7 @@ function mergeToolResultsIntoChatMessages(
         status: r.status,
       };
     });
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `touched` is mutated inside the .map callback above; TS control-flow can't see the closure write and narrows it to always-false.
     return touched ? { ...cm, toolUses: nextTools } : cm;
   });
 }
@@ -1273,7 +1360,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       setResolvedPattern(snap.resolvedPattern);
       setCurrentStepId(snap.currentStepId);
       setCurrentStepIter(snap.currentStepIter);
-      setCurrentStepFinished(snap.currentStepFinished ?? false);
+      setCurrentStepFinished(snap.currentStepFinished);
       setWorktree(snap.worktree);
       setWorktreeBlocked(snap.worktreeBlocked);
       setWorktreeStatus(
@@ -1335,6 +1422,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       setFinishPipeline((prev) => {
         // A snapshot without a finishPipeline (e.g. the client-side agent, or a
         // legacy projection) must not crash the panel — keep the prior state.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- schema types finishPipeline as required, but the mount-fetch path casts a raw snapshot that may omit it (older host build).
         if (!snap.finishPipeline) return prev;
         const prevByName = new Map(prev.stages.map((s) => [s.name, s]));
         return {
@@ -1422,6 +1510,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       }
       // Only when present — the mount snapshot omits it, and the indexer poll streams it in
       // separate session_state events; an unconditional set would clobber live readiness.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- schema types codebaseReadiness as required, but the mount snapshot / cast path can omit it.
       if (snap.codebaseReadiness !== undefined) setCodebaseReadiness(snap.codebaseReadiness);
       if (snap.title && snap.title !== 'New session') {
         onTitleChanged?.(snap.title);
@@ -1452,6 +1541,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         const res = (await agentApi(backend.getSnapshot, {
           compositeId: sessionId,
         })) as { snapshot: SessionSnapshot | null } | null;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write and narrows it to always-false.
         if (cancelled || !res?.snapshot) return;
         applySnapshot(res.snapshot);
       } catch (err) {
@@ -1535,10 +1625,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // every few seconds; a stuck one goes silent.
       setLastEventAt(Date.now());
 
-      const event = msg.event as any;
+      const event = msg.event as AgentEventEnvelope | undefined;
       if (!event) return;
 
-      const eventType = event.type as string;
+      const eventType = event.type;
       const payload = event.payload;
 
       console.debug('[CodingAgentChat] Event: type=%s', eventType);
@@ -1550,15 +1640,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // messages.jsonl; jumpToTail re-fetches when the user returns
         // to the bottom.
         if (!tailFollowingRef.current) return;
-        const subType = payload?.type as string; // 'created' | 'updated' | 'deleted'
-        const message = payload?.payload;
+        const subType = payload?.type ?? ''; // 'created' | 'updated' | 'deleted'
+        const message = payload?.payload as WireMessage | undefined;
         if (!message) return;
 
         console.debug(
           '[CodingAgentChat] Message event: sub=%s role=%s id=%s',
           subType,
           message.role,
-          message.id?.slice(0, 8),
+          message.id.slice(0, 8),
         );
 
         // Only process assistant and tool messages
@@ -1699,8 +1789,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // Any fresh peer event clears the stuck state — the watchdog's
         // re-warn cycle on the server will surface a new event if the
         // peer stalls again.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Record index access is typed non-undefined (noUncheckedIndexedAccess off), but the key may genuinely be absent at runtime.
         if (peerStuckStateRef.current[peerModelId]) {
           setPeerStuckState((prev) => {
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- same: prev[peerModelId] can be absent at runtime despite the non-undefined index type.
             if (!prev[peerModelId]) return prev;
             const { [peerModelId]: _drop, ...rest } = prev;
             return rest;
@@ -1813,13 +1905,18 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           | undefined;
         if (p?.kind !== 'stage_output') return;
         if (!p.stage || typeof p.chunk !== 'string') return;
+        // Hoist the narrowed values into consts so the narrowing survives
+        // into the setState callback closure below.
+        const stageName = p.stage;
+        const chunk = p.chunk;
         setFinishPipeline((prev) => {
           const stages = prev.stages.slice();
-          const idx = stages.findIndex((s) => s.name === p.stage);
+          const idx = stages.findIndex((s) => s.name === stageName);
           if (idx === -1) return prev;
           const curr = stages[idx];
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access is typed non-undefined (noUncheckedIndexedAccess off), but idx could be stale.
           if (!curr) return prev;
-          stages[idx] = { ...curr, output: curr.output + p.chunk };
+          stages[idx] = { ...curr, output: curr.output + chunk };
           return { ...prev, stages };
         });
         return;
@@ -1848,13 +1945,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // `meta` events carry timeout + start-time setup; `stdout` /
         // `stderr` carry chunk text. Handle them separately so the
         // countdown info isn't discarded when text is empty.
-        if (p?.stream === 'meta') {
+        if (p.stream === 'meta') {
           setMessages((prev) =>
             prev.map((m) => {
               if (m.role !== 'assistant') return m;
               const idx = m.toolUses.findIndex((tu) => tu.id === tcid);
               if (idx === -1) return m;
               const prevTool = m.toolUses[idx];
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access is typed non-undefined (noUncheckedIndexedAccess off), guard is real.
               if (!prevTool) return m;
               const next = m.toolUses.slice();
               next[idx] = {
@@ -1872,7 +1970,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           setLastEventAt(Date.now());
           return;
         }
-        const text = p?.text;
+        const text = p.text;
         if (typeof text !== 'string' || text.length === 0) return;
         setMessages((prev) =>
           prev.map((m) => {
@@ -1880,6 +1978,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             const idx = m.toolUses.findIndex((tu) => tu.id === tcid);
             if (idx === -1) return m;
             const prevTool = m.toolUses[idx];
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access is typed non-undefined (noUncheckedIndexedAccess off), guard is real.
             if (!prevTool) return m;
             const next = m.toolUses.slice();
             next[idx] = {
@@ -1915,9 +2014,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // final assistant message with no finish part at all — which
       // would leave the spinner hanging forever.
       if (eventType === 'agent_event') {
-        const innerType = (payload?.payload?.type ?? payload?.type) as
-          | string
-          | undefined;
+        const innerBody = payload?.payload as { type?: string } | undefined;
+        const innerType = innerBody?.type ?? payload?.type;
         console.debug('[CodingAgentChat] Agent event: innerType=%s', innerType);
         // subagent_event envelopes are produced by the session for
         // every event a delegate child emits. The shape is
@@ -1930,8 +2028,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             child_session_id?: string;
             child_index?: number;
             depth?: number;
-            event?: any;
-          };
+            event?: ChildEvent;
+          } | undefined;
           if (inner?.child_session_id != null && inner.event) {
             applySubagentEvent({
               childSessionId: inner.child_session_id,
@@ -1964,7 +2062,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             parallelBranches?: string[];
             nudgeClaimer?: string;
           };
-          if (routing?.source) {
+          if (routing.source) {
             const profileSummary = routing.profile
               ? `kind=${routing.profile.kind ?? '?'} ${
                   routing.profile.breadthNeeded ?? '?'
@@ -1993,9 +2091,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             reason?: string;
           };
           if (
-            verdict?.kind === 'critique' ||
-            verdict?.kind === 'terminated' ||
-            verdict?.kind === 'replan_restart'
+            verdict.kind === 'critique' ||
+            verdict.kind === 'terminated' ||
+            verdict.kind === 'replan_restart'
           ) {
             setLastJudgeVerdict({
               kind: verdict.kind,
@@ -2021,7 +2119,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           // case where only the agent_event carries the message.
           if (innerType === 'error') {
             const errMsg = (payload?.payload as { errorMessage?: string })
-              ?.errorMessage;
+              .errorMessage;
             if (errMsg) setError(errMsg);
           }
         }
@@ -2033,8 +2131,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   }, [sessionId, initialSessionId, backend.eventType, backend.exitType]);
 
   /** Pull a plain-text body out of a user message's parts array. */
-  function extractUserText(message: any): string {
-    const parts = message.parts as { type: string; data: any }[] | undefined;
+  function extractUserText(message: WireMessage): string {
+    const parts = message.parts;
     if (!parts) return '';
     let text = '';
     for (const p of parts) {
@@ -2047,8 +2145,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
    * Process an assistant message from the agent.
    * Messages have typed parts: text, reasoning, tool_call, tool_result, finish.
    */
-  function processAssistantMessage(message: any, _subType: string) {
-    const parts = message.parts as { type: string; data: any }[] | undefined;
+  function processAssistantMessage(message: WireMessage, _subType: string) {
+    const parts = message.parts;
     if (!parts) return;
 
     const isNew = !knownMessageIds.current.has(message.id);
@@ -2173,7 +2271,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     childSessionId: string;
     childIndex: number;
     depth: number;
-    childEvent: any;
+    childEvent: ChildEvent;
   }) {
     const { childSessionId, childIndex, depth, childEvent } = args;
     setMessages((prev) => {
@@ -2242,9 +2340,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           }
           // Apply the inner event onto the child's state.
           const inner = childEvent;
-          const innerType = inner?.type as string | undefined;
+          const innerType = inner.type;
           if (innerType === 'message') {
-            const sub = inner?.payload?.payload;
+            const sub = inner.payload?.payload;
             if (sub?.role === 'assistant' && Array.isArray(sub.parts)) {
               let text = '';
               const tools: ToolUse[] = [];
@@ -2289,14 +2387,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
                 const raw = p.data?.metadata;
                 if (typeof raw === 'string' && raw.length > 0) {
                   try {
-                    metadata = JSON.parse(raw);
+                    metadata = JSON.parse(raw) as Record<string, unknown>;
                   } catch {
                     /* ignore */
                   }
                 } else if (raw && typeof raw === 'object') {
-                  metadata = raw;
+                  metadata = raw as Record<string, unknown>;
                 }
                 const prevTool = newToolUses[idx];
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access is typed non-undefined (noUncheckedIndexedAccess off), guard is real.
                 if (!prevTool) continue;
                 newToolUses[idx] = {
                   ...prevTool,
@@ -2308,8 +2407,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
               child = { ...child, toolUses: newToolUses };
             }
           } else if (innerType === 'agent_event') {
-            const at = (inner?.payload?.payload?.type ??
-              inner?.payload?.type) as string | undefined;
+            const at = inner.payload?.payload?.type ?? inner.payload?.type;
             if (at === 'agent_finished' || at === 'error') {
               child = { ...child, isStreaming: false };
             }
@@ -2322,6 +2420,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           if (childIdx >= 0) existing[childIdx] = child;
           return { ...tu, children: existing };
         });
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `touched` is mutated inside the .map callback above; TS control-flow can't see the closure write.
         return touched ? { ...m, toolUses: nextTools } : m;
       });
     });
@@ -2330,8 +2429,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   /**
    * Process tool result messages — update the matching tool use in the last assistant message.
    */
-  function processToolMessage(message: any) {
-    const parts = message.parts as { type: string; data: any }[] | undefined;
+  function processToolMessage(message: WireMessage) {
+    const parts = message.parts;
     if (!parts) return;
 
     for (const part of parts) {
@@ -2356,12 +2455,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       let metadata: Record<string, unknown> | null = null;
       if (typeof metadataRaw === 'string' && metadataRaw.length > 0) {
         try {
-          metadata = JSON.parse(metadataRaw);
+          metadata = JSON.parse(metadataRaw) as Record<string, unknown>;
         } catch {
           /* ignore */
         }
       } else if (metadataRaw && typeof metadataRaw === 'object') {
-        metadata = metadataRaw;
+        metadata = metadataRaw as Record<string, unknown>;
       }
 
       // Truncate very long results for display
@@ -2398,12 +2497,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
    * UI can render it inline. Idempotent — repeated calls with the same
    * message id are no-ops (replay during history backfill is safe).
    */
-  function processJudgeMessage(message: any) {
-    const parts = message.parts as { type: string; data: any }[] | undefined;
+  function processJudgeMessage(message: WireMessage) {
+    const parts = message.parts;
     if (!parts) return;
     const judgePart = parts.find((p) => p.type === 'judge_call');
     if (!judgePart?.data) return;
-    const snap = judgePart.data as JudgeCallSnapshot;
+    const snap = judgePart.data as unknown as JudgeCallSnapshot;
     setMessages((prev) => {
       if (prev.some((m) => m.id === message.id)) return prev;
       const summaryLine = `${snap.kind} · ${snap.model} · ${
@@ -2431,12 +2530,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
    * `finishOutcome`) replaces the existing entry in place so the chat
    * panel re-renders the persisted outcome line without scrolling.
    */
-  function processStatusMessage(message: any) {
-    const parts = message.parts as { type: string; data: any }[] | undefined;
+  function processStatusMessage(message: WireMessage) {
+    const parts = message.parts;
     if (!parts) return;
     const donePart = parts.find((p) => p.type === 'done_state');
     if (!donePart?.data) return;
-    const snap = donePart.data as DoneStateSnapshot;
+    const snap = donePart.data as unknown as DoneStateSnapshot;
     const wt = snap.worktree;
     const summary =
       `${wt.changedCount} file${wt.changedCount === 1 ? '' : 's'} changed` +
@@ -2477,7 +2576,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const clearMessages = useCallback(async () => {
     if (!sessionId) return false;
     try {
-      const { ok } = await agentApi(backend.chatClearMessages, { sessionId });
+      const { ok } = (await agentApi(backend.chatClearMessages, {
+        sessionId,
+      })) as { ok?: boolean };
       if (!ok) return false;
       setMessages([]);
       setError(null);
@@ -2497,7 +2598,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const startNewChat = useCallback(async () => {
     // Stop existing session
     if (sessionId) {
-      agentApi(backend.chatStop, { sessionId }).catch(() => {});
+      agentApi(backend.chatStop, { sessionId }).catch(() => {/* noop */});
     }
     setMessages([]);
     setError(null);
@@ -2536,12 +2637,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // there's no sessionId, so a new-session hero pre-pick (e.g. patternMode
       // "none" or a modelMode set before the first message) would otherwise be
       // lost until the session existed. chatCreate seeds them up-front.
-      const { sessionId: newId } = await agentApi(backend.chatCreate, {
+      const { sessionId: newId } = (await agentApi(backend.chatCreate, {
         model: createModel,
         mode: serverMode,
         patternMode,
         modelMode,
-      });
+      })) as ChatCreateResponse;
       console.debug('[CodingAgentChat] Session created: %s', newId);
       setSessionId(newId);
       onSessionCreatedRef.current?.(newId);
@@ -2552,12 +2653,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       agentApi(backend.skipPermissions, {
         sessionId: newId,
         skip: true,
-      }).catch(() => {});
+      }).catch(() => {/* noop */});
       if (reasoningEffort !== 'off') {
         agentApi(backend.chatSetReasoningEffort, {
           sessionId: newId,
           effort: reasoningEffort,
-        }).catch(() => {});
+        }).catch(() => {/* noop */});
       }
       return newId;
     } catch (err) {
@@ -2577,9 +2678,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // newer, so the prompt lands just before the in-flight reply.
   const backfillMissingUserMessages = useCallback(
     async (sid: string): Promise<void> => {
-      let history: { id: string; role: string; parts?: { type: string; data?: { text?: string } }[] }[];
+      let history: RawAgentMessage[];
       try {
-        const res = await agentApi(backend.chatListMessages, { sessionId: sid, limit: PAGE_SIZE });
+        const res = (await agentApi(backend.chatListMessages, {
+          sessionId: sid,
+          limit: PAGE_SIZE,
+        })) as ListMessagesResponse | null;
         if (!Array.isArray(res?.messages)) return;
         history = res.messages;
       } catch {
@@ -2588,7 +2692,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       const rows = history.map((m) => ({
         id: m.id,
         role: m.role,
-        text: (m.parts ?? []).filter((p) => p.type === 'text').map((p) => p.data?.text ?? '').join(''),
+        text: (m.parts ?? [])
+          .filter((p) => p.type === 'text')
+          .map((p) => (p.data as MessagePartData | undefined)?.text ?? '')
+          .join(''),
       }));
       setMessages((prev) =>
         spliceMissingUserRows(prev, rows, (id, content) => ({
@@ -2644,18 +2751,19 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           specId: resolvedSpecId,
           model: resolvedModel,
           reasoningEffort: resolvedReasoningEffort,
-        } = await agentApi(backend.chatCreate, {
+        } = (await agentApi(backend.chatCreate, {
           model,
           mode: serverMode,
           ...(initialSessionId ? { resumeSessionId: initialSessionId } : {}),
           ...(specId ? { specId } : {}),
-        });
+        })) as ChatCreateResponse;
         console.log(
           `[session-origin] useCodingAgentChat.mountEffect chatCreate → ${newId.slice(
             0,
             24,
-          )} (initialSessionId was ${initialSessionId ?? '(none)'})`,
+          )} (initialSessionId was ${initialSessionId})`,
         );
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
         if (cancelled) return;
         // Resume sanity check (defense-in-depth). The server-side
         // codingAgentChatCreate now refuses to silently fresh-create
@@ -2688,11 +2796,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // `acceptedSessionId` filter prevent any double-render vs the backfill.
         void (async () => {
           let attempt = 0;
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
           while (!cancelled) {
-            const res = await agentApi(backend.chatAttach, { sessionId: newId }).catch(
-              () => ({ attached: false }),
-            );
-            if ((res as { attached?: boolean })?.attached) {
+            const res = await agentApi(backend.chatAttach, {
+              sessionId: newId,
+            }).catch(() => ({ attached: false }));
+            if ((res as { attached?: boolean }).attached) {
               // We attached, but the sender emits the USER prompt at turn start — a viewer
               // that attaches a beat later (esp. right after the task is (re)started) misses
               // it, and the task snapshot carries no messages, so the reply shows with no
@@ -2752,14 +2861,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         agentApi(backend.skipPermissions, {
           sessionId: newId,
           skip: true,
-        }).catch(() => {});
+        }).catch(() => {/* noop */});
 
         if (initialSessionId) {
           try {
-            const { messages: history, hasMore } = await agentApi(
+            const { messages: history, hasMore } = (await agentApi(
               backend.chatListMessages,
               { sessionId: newId, limit: PAGE_SIZE },
-            );
+            )) as { messages?: WireMessage[]; hasMore?: boolean };
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
             if (cancelled || !Array.isArray(history)) return;
             setHasMoreOlder(Boolean(hasMore));
             setHasMoreNewer(false);
@@ -2814,10 +2924,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
               (err as Error).message,
             );
           } finally {
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
             if (!cancelled) setIsLoadingHistory(false);
           }
         }
       } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
         if (!cancelled) {
           const message = (err as Error).message;
           // Recovery path: when the server rejects a resume because no
@@ -2857,17 +2969,18 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     if (!sessionId) return;
     if (isLoadingOlder || !hasMoreOlder) return;
     const oldest = messages[0];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access is typed non-undefined (noUncheckedIndexedAccess off), but messages can be empty.
     if (!oldest) return;
     setIsLoadingOlder(true);
     try {
-      const { messages: older, hasMore } = await agentApi(
+      const { messages: older, hasMore } = (await agentApi(
         backend.chatListMessages,
         { sessionId, limit: PAGE_SIZE, beforeId: oldest.id },
-      );
+      )) as ListMessagesResponse;
       if (!Array.isArray(older)) return;
       setMessages((prev) => {
         const seen = new Set(prev.map((m) => m.id));
-        const unseenRaw = older.filter((r: RawAgentMessage) => !seen.has(r.id));
+        const unseenRaw = older.filter((r) => !seen.has(r.id));
         const fresh = projectAgentMessagesToChat(unseenRaw);
         let next = [...fresh, ...prev];
         if (next.length > WINDOW_MAX) {
@@ -2899,17 +3012,18 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     if (!sessionId) return;
     if (isLoadingNewer || !hasMoreNewer) return;
     const newest = messages[messages.length - 1];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- array index access is typed non-undefined (noUncheckedIndexedAccess off), but messages can be empty.
     if (!newest) return;
     setIsLoadingNewer(true);
     try {
-      const { messages: newer, hasMore } = await agentApi(
+      const { messages: newer, hasMore } = (await agentApi(
         backend.chatListMessages,
         { sessionId, limit: PAGE_SIZE, afterId: newest.id },
-      );
+      )) as ListMessagesResponse;
       if (!Array.isArray(newer)) return;
       setMessages((prev) => {
         const seen = new Set(prev.map((m) => m.id));
-        const unseenRaw = newer.filter((r: RawAgentMessage) => !seen.has(r.id));
+        const unseenRaw = newer.filter((r) => !seen.has(r.id));
         const fresh = projectAgentMessagesToChat(unseenRaw);
         let next = [...prev, ...fresh];
         if (next.length > WINDOW_MAX) {
@@ -2940,12 +3054,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const jumpToTail = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const { messages: tail, hasMore } = await agentApi(
+      const { messages: tail, hasMore } = (await agentApi(
         backend.chatListMessages,
         { sessionId, limit: PAGE_SIZE },
-      );
+      )) as ListMessagesResponse;
       if (!Array.isArray(tail)) return;
-      const fresh = projectAgentMessagesToChat(tail as RawAgentMessage[]);
+      const fresh = projectAgentMessagesToChat(tail);
       setMessages(fresh);
       setHasMoreOlder(Boolean(hasMore));
       setHasMoreNewer(false);
@@ -3013,30 +3127,30 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       }
       if (!sessionId) return;
       try {
-        const res = await agentApi(backend.setModelMode, {
+        const res = (await agentApi(backend.setModelMode, {
           sessionId,
           modelMode: next,
-        });
-        if (res?.needsFamilySwitchConfirm && next.kind === 'single') {
+        })) as { needsFamilySwitchConfirm?: boolean; ok?: boolean; sessionId?: string };
+        if (res.needsFamilySwitchConfirm && next.kind === 'single') {
           const confirmed =
             typeof window !== 'undefined' &&
             window.confirm(
               "Switching between Claude Code and ugly.bot models resets this chat's history and telemetry. Your worktree and files are kept. Continue?",
             );
           if (!confirmed) return; // leave the model as-is on the server
-          const conv = await agentApi(backend.chatSetModel, {
+          const conv = (await agentApi(backend.chatSetModel, {
             sessionId,
             model: next.model,
             resetForFamilySwitch: true,
-          });
-          if (conv?.ok) applyFamilyConvertLocally(next.model);
+          })) as { ok?: boolean };
+          if (conv.ok) applyFamilyConvertLocally(next.model);
           return;
         }
         // The server echoes `sessionId` ONLY when it actually converted the
         // backend (a silent empty-session family switch). Within-family
         // changes return `{ ok }` with no sessionId — never wipe history for
         // those. Mirror locally only on a real convert.
-        if (res?.ok && res.sessionId && next.kind === 'single') {
+        if (res.ok && res.sessionId && next.kind === 'single') {
           applyFamilyConvertLocally(next.model);
         }
       } catch (err) {
@@ -3156,7 +3270,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         '[CodingAgentChat] Stopping generation: %s',
         sessionId.slice(0, 16),
       );
-      agentApi(backend.chatStop, { sessionId }).catch(() => {});
+      agentApi(backend.chatStop, { sessionId }).catch(() => {/* noop */});
     }
     setIsStreaming(false);
     setStreamStartedAt(null);
@@ -3185,7 +3299,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         sessionId.slice(0, 16),
         toolCallId.slice(0, 16),
       );
-      agentApi(backend.toolStop, { sessionId, toolCallId }).catch(() => {});
+      agentApi(backend.toolStop, { sessionId, toolCallId }).catch(() => {/* noop */});
     },
     [sessionId, backend.toolStop],
   );
@@ -3203,7 +3317,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     let cancelled = false;
     void (async () => {
       try {
-        const settings = await agentApi('getUserSettings', {});
+        const settings = (await agentApi('getUserSettings', {})) as {
+          codingAgent?: ServerCodingAgent;
+        } | null;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
         if (cancelled) return;
         if (settings?.codingAgent) {
           setFeatures(serverToFeatures(settings.codingAgent));
@@ -3338,12 +3455,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       const dropEntry = (prev: PendingAskUser[]): PendingAskUser[] =>
         prev.filter((p) => p.toolCallId !== toolCallId);
       try {
-        const res = await agentApi('codingAgentAnswerAskUser', {
+        const res = (await agentApi('codingAgentAnswerAskUser', {
           sessionId: sid,
           toolCallId,
           value,
-        });
-        if (res?.ok === false) {
+        })) as { ok?: boolean; error?: string };
+        if (res.ok === false) {
           // Phantom card — the broker no longer has a pending entry
           // for this toolCallId. Most likely the sidecar restarted
           // since the card was rendered, so the underlying ask_user
@@ -3407,18 +3524,18 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       const dropEntry = (prev: PendingStepReview[]): PendingStepReview[] =>
         prev.filter((p) => p.id !== id);
       try {
-        const res = await agentApi('codingAgentAnswerStepReview', {
+        const res = (await agentApi('codingAgentAnswerStepReview', {
           sessionId: sid,
           id,
           action,
           ...(feedback !== undefined ? { feedback } : {}),
-        });
+        })) as { ok?: boolean; outcome?: string; error?: string };
         // Always drop the local card — the server's snapshot will
         // re-add it if the broker still has a live entry (it won't
         // for any non-ok outcome).
         setPendingStepReviews(dropEntry);
-        if (res?.ok === true) return true;
-        const outcome = res?.outcome as string | undefined;
+        if (res.ok === true) return true;
+        const outcome = res.outcome;
         // Benign duplicates / abort races: clear the card without
         // pestering the user. The agent already moved on.
         if (outcome === 'already_answered' || outcome === 'aborted') {
@@ -3432,7 +3549,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // unknown / no_session / other: the user needs to know they
         // have to send a fresh message.
         const message =
-          (typeof res?.error === 'string' && res.error) ||
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string error must fall through to the default message, which `??` (nullish-only) would not do.
+          (typeof res.error === 'string' && res.error) ||
           'No pending review found — the agent sidecar may have restarted. Send a new message to continue.';
         setError(message);
         console.warn(
@@ -3481,8 +3599,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     if (!sessionId || isStreaming) return;
     console.debug('[CodingAgentChat] Force-compact requested');
     try {
-      const res = await agentApi('codingAgentCompactNow', { sessionId });
-      if (res?.ok === false && res.error) {
+      const res = (await agentApi('codingAgentCompactNow', { sessionId })) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (res.ok === false && res.error) {
         setError(`Compact failed: ${res.error}`);
       }
     } catch (err) {
@@ -3502,14 +3623,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     async (msgId: string): Promise<boolean> => {
       if (!sessionId || isStreaming) return false;
       try {
-        const res = await agentApi('codingAgentRestoreCheckpoint', {
+        const res = (await agentApi('codingAgentRestoreCheckpoint', {
           sessionId,
           msgId,
-        });
-        if (res?.ok === false && res.error) {
+        })) as { ok?: boolean; error?: string };
+        if (res.ok === false && res.error) {
           setError(`Restore failed: ${res.error}`);
         }
-        return !!res?.ok;
+        return !!res.ok;
       } catch (err) {
         setError(`Restore failed: ${(err as Error).message}`);
         return false;
@@ -3644,7 +3765,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           sessionId,
           stage,
         })) as { ok: boolean };
-        return !!res?.ok;
+        return res.ok;
       } catch {
         return false;
       }
@@ -3664,7 +3785,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         error?: string;
       };
       if (!res.ok && res.error) setError(`Abandon failed: ${res.error}`);
-      return !!res.ok;
+      return res.ok;
     } catch (err) {
       setError(`Abandon failed: ${(err as Error).message}`);
       return false;
@@ -3683,7 +3804,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       const res = (await agentApi(backend.archive, {
         compositeId: sessionId,
       })) as { ok: boolean };
-      return !!res.ok;
+      return res.ok;
     } catch (err) {
       setError(`Archive failed: ${(err as Error).message}`);
       return false;

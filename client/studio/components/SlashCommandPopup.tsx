@@ -66,6 +66,7 @@ export function SlashCommandPopup({
         return (
           <div
             key={`${skill.scope}:${skill.name}`}
+            data-id={`slash-command-${skill.scope}-${skill.name}`}
             className="us-interactive"
             onMouseEnter={() => { onHover(idx); }}
             onClick={() => { onSelect(skill); }}

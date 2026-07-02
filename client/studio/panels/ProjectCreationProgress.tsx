@@ -63,6 +63,7 @@ export function ProjectCreationProgress({
     await permissions
       .request({ fs: 'full', process: [...SCAFFOLD_TOOLS] } as unknown as GrantReq)
       .catch(() => undefined);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the effect cleanup can flip `settled` during this await (TS can't see the closure mutation)
     if (settled) return;
     try {
       const proc = native.process.spawn('bash', ['-lc', cmd], {});

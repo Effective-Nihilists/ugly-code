@@ -3885,7 +3885,7 @@ export const requests = defineRequests({
   // managed by env vars (read-only).
   setAnthropicProvider: req({
     input: z.object({
-      baseUrl: z.string().url().max(2048),
+      baseUrl: z.url().max(2048),
       apiKey: z.string().min(1).max(2048),
       model: z.string().max(256).optional(),
       maxTokens: z.number().int().positive().max(2_000_000).optional(),

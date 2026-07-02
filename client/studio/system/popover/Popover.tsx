@@ -243,8 +243,8 @@ export function Popover({
               {...getFloatingProps()}
               style={{
                 position: 'fixed',
-                top: y ?? 0,
-                left: x ?? 0,
+                top: y,
+                left: x,
                 // Must outrank StudioTopBar (z-index 10000) — the topbar
                 // deliberately sits above modals (z-index 1000-9999) so its
                 // drag region / window controls / feedback button stay

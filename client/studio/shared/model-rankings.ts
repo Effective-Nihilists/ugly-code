@@ -135,6 +135,7 @@ export function agenticPriceIndex(
   fallbackInputPerM: number,
 ): number {
   const r = STANDARD_MODEL_RATES[id];
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Record<string, …> index yields undefined for an unknown model id at runtime
   if (!r) return fallbackInputPerM;
   const cacheRead = r.cacheReadPerM ?? r.inputPerM;
   const cacheWrite = r.cacheWritePerM ?? r.inputPerM;

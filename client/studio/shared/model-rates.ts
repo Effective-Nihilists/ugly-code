@@ -128,6 +128,7 @@ export function estimateCost(
   usage: UsageBreakdown,
 ): CostEstimate | null {
   const rates = STANDARD_MODEL_RATES[modelId];
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Record<string, …> index yields undefined for an unknown model id at runtime
   if (!rates) return null;
   const cacheReadRate = rates.cacheReadPerM ?? rates.inputPerM;
   const cacheWriteRate = rates.cacheWritePerM ?? rates.inputPerM;

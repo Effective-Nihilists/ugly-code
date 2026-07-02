@@ -209,6 +209,7 @@ export function useSlashCommands(opts: {
           e.preventDefault();
           e.stopPropagation();
           const choice = filtered[selectedIdx] ?? filtered[0];
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- both index accesses yield undefined when `filtered` is empty
           if (choice) applySelection(choice);
           return true;
         }

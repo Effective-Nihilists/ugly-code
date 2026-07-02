@@ -18,7 +18,7 @@ export type ModalAnchor = 'center' | 'top';
 interface ModalProps {
   open: boolean;
   /** Called whenever the modal should close — Escape, backdrop click, or X. */
-  onClose(): void;
+  onClose: () => void;
 
   /**
    * Width preset. `'sm'`=480, `'md'`=640, `'lg'`=860, `'xl'`=1100, `'full'`
@@ -50,7 +50,7 @@ interface ModalProps {
    * Element to focus when the modal opens. If omitted, focus goes to the first
    * focusable child (FloatingFocusManager default).
    */
-  initialFocus?: React.MutableRefObject<HTMLElement | null>;
+  initialFocus?: React.RefObject<HTMLElement | null>;
 
   /** Extra style applied to the modal card. */
   cardStyle?: React.CSSProperties;
@@ -231,7 +231,9 @@ export function Modal({
 // Internal contexts — let `<Modal.Header>` reach the auto-generated aria-
 // labelledby id and the onClose handler without prop-drilling.
 const ModalLabelIdContext = React.createContext<string>('');
-const ModalCloseContext = React.createContext<() => void>(() => {});
+const ModalCloseContext = React.createContext<() => void>(() => {
+  /* noop */
+});
 
 /**
  * Sticky header. Sets the dialog's `aria-labelledby` to its own id so screen
@@ -279,6 +281,7 @@ function ModalHeader({
       </div>
       {!hideClose && (
         <button
+          data-id="modal-header-close"
           type="button"
           onClick={onClose}
           aria-label="Close dialog"

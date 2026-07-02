@@ -161,7 +161,7 @@ export function SessionDeletionProvider({
       activeWorkersRef.current += 1;
       void (async () => {
         try {
-          while (true) {
+          for (;;) {
             const item = queueRef.current.shift();
             if (!item) return;
             let ok = false;

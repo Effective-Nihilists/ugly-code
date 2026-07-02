@@ -92,7 +92,7 @@ function detectMacArch(): MacArch {
   if (typeof document === 'undefined') return 'arm64';
   try {
     const canvas = document.createElement('canvas');
-    const gl = (canvas.getContext('webgl') ||
+    const gl = (canvas.getContext('webgl') ??
       canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
     if (gl) {
       const dbg = gl.getExtension('WEBGL_debug_renderer_info');
@@ -199,7 +199,9 @@ export default function StudioLandingPage(): React.ReactElement {
       .then((data: ReleaseInfo | null) => {
         if (data) setRelease(data);
       })
-      .catch(() => {});
+      .catch(() => {
+        /* noop */
+      });
   }, []);
 
   return (
@@ -264,6 +266,7 @@ function MacArchToggle({
           <button
             key={a}
             type="button"
+            data-id={`landing-mac-arch-${a}`}
             onClick={() => { setMacArch(a); }}
             style={{
               padding: '6px 12px',
@@ -317,6 +320,7 @@ function NavBar() {
         >
           <a
             href="/"
+            data-id="landing-nav-home"
             style={{
               fontFamily: FONT_DISPLAY,
               fontWeight: 800,
@@ -370,6 +374,7 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
     <a
       className="ugly-link"
       href={href}
+      data-id={`landing-navlink-${href}`}
       style={{ color: TEXT_MUTED, textDecoration: 'none', transition: 'color 160ms ease' }}
     >
       {children}
@@ -554,6 +559,7 @@ function HeroInstall({
               className="ugly-cta"
               href={primary?.url ?? '#install'}
               onClick={onPrimaryClick}
+              data-id="landing-download-primary"
               style={primaryButtonStyle(!!primary)}
             >
               Download for {osLabels[userOS]}
@@ -573,6 +579,7 @@ function HeroInstall({
               <a
                 className="ugly-cta"
                 href="#install"
+                data-id="landing-download-windows"
                 style={ghostButtonStyle()}
               >
                 Windows
@@ -582,6 +589,7 @@ function HeroInstall({
               <a
                 className="ugly-cta"
                 href="#install"
+                data-id="landing-download-linux"
                 style={ghostButtonStyle()}
               >
                 Linux
@@ -601,10 +609,10 @@ function HeroInstall({
               flexWrap: 'wrap',
             }}
           >
-            <a href="#install" className="ugly-link" style={navMetaStyle()}>
+            <a href="#install" className="ugly-link" data-id="landing-system-requirements" style={navMetaStyle()}>
               System requirements
             </a>
-            <a href="#install" className="ugly-link" style={navMetaStyle()}>
+            <a href="#install" className="ugly-link" data-id="landing-changelog" style={navMetaStyle()}>
               Changelog
             </a>
           </div>
@@ -1906,6 +1914,7 @@ function InstallDeep({
           href="https://apps.apple.com/us/app/ugly-bot/id6752114252"
           target="_blank"
           rel="noopener noreferrer"
+          data-id="landing-mobile-ios"
           style={mobileStoreBtn}
         >
           Ugly Browser for iOS <span style={{ color: BRAND }}>↗</span>
@@ -1914,6 +1923,7 @@ function InstallDeep({
           href="https://play.google.com/store/apps/details?id=bot.ugly.app"
           target="_blank"
           rel="noopener noreferrer"
+          data-id="landing-mobile-android"
           style={mobileStoreBtn}
         >
           Ugly Browser for Android <span style={{ color: BRAND }}>↗</span>
@@ -2006,6 +2016,7 @@ function InstallCard({
       {archToggle && <div style={{ alignSelf: 'flex-start' }}>{archToggle}</div>}
       <a
         href={info?.url ?? '#'}
+        data-id={`landing-install-download-${fileLabel}`}
         style={{
           ...primaryButtonStyle(!!info),
           alignSelf: 'flex-start',
@@ -2017,6 +2028,7 @@ function InstallCard({
       {info?.deb && (
         <a
           href={info.deb.url}
+          data-id="landing-install-download-deb"
           style={{
             fontFamily: FONT_MONO,
             fontSize: 11,
@@ -2100,6 +2112,7 @@ function ShowEnd({ isDesktop }: { isDesktop: boolean }) {
           href="https://www.youtube.com/@ugly.bot_app"
           target="_blank"
           rel="noreferrer"
+          data-id="landing-youtube-embed"
           style={{
             aspectRatio: '16 / 9',
             background: BG_ELEV,
@@ -2190,6 +2203,7 @@ function ShowEnd({ isDesktop }: { isDesktop: boolean }) {
             target="_blank"
             rel="noreferrer"
             className="ugly-cta"
+            data-id="landing-watch-youtube"
             style={primaryButtonStyle(true)}
           >
             Watch on YouTube →
@@ -2301,6 +2315,7 @@ function FooterLink({
       href={href}
       target={external ? '_blank' : undefined}
       rel={external ? 'noreferrer' : undefined}
+      data-id={`landing-footer-link-${href}`}
       style={{
         color: TEXT_MUTED,
         textDecoration: 'none',
@@ -2507,6 +2522,7 @@ function WindowsTrustModal({
     <>
       <div
         onClick={onClose}
+        data-id="landing-modal-backdrop"
         style={{
           position: 'fixed',
           inset: 0,
@@ -2528,6 +2544,7 @@ function WindowsTrustModal({
       >
         <div
           onClick={(e) => { e.stopPropagation(); }}
+          data-id="landing-modal-content"
           style={{
             pointerEvents: 'auto',
             maxWidth: 520,
@@ -2598,6 +2615,7 @@ function WindowsTrustModal({
           >
             <button
               onClick={onClose}
+              data-id="landing-modal-cancel"
               style={{
                 border: `1px solid ${BORDER_STRONG}`,
                 backgroundColor: 'transparent',
@@ -2615,6 +2633,7 @@ function WindowsTrustModal({
             </button>
             <button
               onClick={proceed}
+              data-id="landing-modal-proceed"
               style={{
                 border: 'none',
                 background: BRAND_GRAD,

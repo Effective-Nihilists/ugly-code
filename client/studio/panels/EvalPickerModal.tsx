@@ -48,9 +48,9 @@ export function EvalPickerModal({
   onPick,
   onOpenRun,
 }: {
-  onCancel(): void;
-  onPick(taskName: string): void;
-  onOpenRun(projectName: string, projectPath: string, sessionId: string): void;
+  onCancel: () => void;
+  onPick: (taskName: string) => void;
+  onOpenRun: (projectName: string, projectPath: string, sessionId: string) => void;
 }): React.ReactElement {
   const socket = useSocket();
   const [tasks, setTasks] = useState<TaskListItem[] | null>(null);
@@ -67,12 +67,16 @@ export function EvalPickerModal({
           socket.request('evalListTasks', {}),
           socket.request('evalListHistory', {}),
         ]);
+        // `cancelled` flips in the effect cleanup; TS control-flow can't
+        // see that async write, so it treats the guard as dead. It isn't.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (cancelled) return;
         setTasks(tasksRes.tasks);
         setHistory(historyRes.runs);
       } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (cancelled) return;
-        setError((err as Error).message ?? 'failed to load tasks');
+        setError(err instanceof Error ? err.message : 'failed to load tasks');
       }
     })();
     return () => {
@@ -85,7 +89,7 @@ export function EvalPickerModal({
       await socket.request('evalDeleteRun', { projectName });
       setHistory((prev) => prev.filter((r) => r.projectName !== projectName));
     } catch (err) {
-      setError((err as Error).message ?? 'failed to delete run');
+      setError(err instanceof Error ? err.message : 'failed to delete run');
     }
   };
 
@@ -176,6 +180,7 @@ export function EvalPickerModal({
         </div>
 
         <input
+          data-id="eval-task-filter"
           type="text"
           value={query}
           onChange={(e) => { setQuery(e.target.value); }}
@@ -245,6 +250,7 @@ export function EvalPickerModal({
         >
           <button
             type="button"
+            data-id="eval-picker-cancel"
             onClick={onCancel}
             disabled={submittingFor !== null}
             style={{
@@ -281,9 +287,9 @@ function TaskRow({
   history: HistoryRun[];
   disabled: boolean;
   isSubmitting: boolean;
-  onPick(): void;
-  onOpenRun(projectName: string, projectPath: string, sessionId: string): void;
-  onDeleteRun(projectName: string): void;
+  onPick: () => void;
+  onOpenRun: (projectName: string, projectPath: string, sessionId: string) => void;
+  onDeleteRun: (projectName: string) => void;
 }): React.ReactElement {
   const isSbpro = task.tags?.includes('swe-bench-pro') ?? false;
   return (
@@ -297,6 +303,7 @@ function TaskRow({
     >
       <button
         type="button"
+        data-id="eval-task-pick"
         onClick={onPick}
         disabled={disabled || isSubmitting}
         style={{
@@ -414,8 +421,8 @@ function HistoryRunRow({
   onDelete,
 }: {
   run: HistoryRun;
-  onOpen(): void;
-  onDelete(): void;
+  onOpen: () => void;
+  onDelete: () => void;
 }): React.ReactElement {
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -453,6 +460,7 @@ function HistoryRunRow({
     >
       <button
         type="button"
+        data-id="eval-run-open"
         onClick={onOpen}
         title={`Open session ${run.sessionId} (${run.projectName})`}
         style={{
@@ -502,6 +510,7 @@ function HistoryRunRow({
       </div>
       <button
         type="button"
+        data-id="eval-run-copy-id"
         onClick={handleCopy}
         title="Copy session id"
         style={{
@@ -521,6 +530,7 @@ function HistoryRunRow({
       </button>
       <button
         type="button"
+        data-id="eval-run-delete"
         onClick={() => {
           if (confirming) {
             onDelete();

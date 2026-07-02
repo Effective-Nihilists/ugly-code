@@ -22,6 +22,15 @@ export interface ToolContext {
   databaseUrl?: string;
 }
 
+/** Coerce an `unknown` tool-input value to a string. Strings pass through;
+ *  objects are JSON-encoded (instead of the useless `[object Object]`); other
+ *  primitives use their default string form. */
+function str(v: unknown): string {
+  if (typeof v === 'string') return v;
+  if (v !== null && typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
 /** Resolve a model-supplied (workspace-relative) path. Absolute paths pass
  *  through; relative paths are rooted at `workspaceDir` when set (worktree). */
 function resolvePath(ctx: ToolContext | undefined, path: string): string {
@@ -37,7 +46,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
   const p = (input ?? {}) as Record<string, unknown>;
   switch (name as AgentToolName) {
     case 'list_dir': {
-      const items = await native.fs.readdir(resolvePath(ctx, String(p.path ?? '.')));
+      const items = await native.fs.readdir(resolvePath(ctx, str(p.path ?? '.')));
       items.sort((a, b) =>
         a.isDirectory === b.isDirectory ? a.name.localeCompare(b.name) : a.isDirectory ? -1 : 1,
       );
@@ -53,13 +62,13 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       if (!projectPath) return 'codebase_search unavailable: no project is open.';
       const res = (await installUglyNative().invoke('codebase.search' as never, {
         projectPath,
-        query: String(p.query ?? ''),
+        query: str(p.query ?? ''),
         limit: typeof p.limit === 'number' ? p.limit : 10,
         ...(ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : {}),
       } as never)) as {
         results?: { file_path: string; start_line: number; end_line: number; content: string; score: number }[];
       };
-      const results = res?.results ?? [];
+      const results = res.results ?? [];
       if (!results.length) {
         return 'No semantic matches (the index may still be building — fall back to list_dir/read_file or run_command rg).';
       }
@@ -68,13 +77,13 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
         .join('\n\n---\n\n');
     }
     case 'write_file':
-      await native.fs.writeFile(resolvePath(ctx, String(p.path)), String(p.content ?? ''));
+      await native.fs.writeFile(resolvePath(ctx, String(p.path)), str(p.content ?? ''));
       return `Wrote ${String(p.path)}`;
     case 'edit_file': {
       const rawPath = String(p.path);
       const path = resolvePath(ctx, rawPath);
       const oldStr = String(p.old);
-      const newStr = String(p.new ?? '');
+      const newStr = str(p.new ?? '');
       const cur = await native.fs.readFile(path);
       const idx = cur.indexOf(oldStr);
       if (idx === -1) throw new Error(`edit_file: \`old\` text not found in ${rawPath}`);
@@ -86,14 +95,14 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
     case 'run_command':
       return runCommand(String(p.cmd), Array.isArray(p.args) ? p.args.map(String) : [], await sandboxOptFor(ctx), ctx?.port, ctx?.databaseUrl);
     case 'db_query':
-      return runDb(ctx, 'exec', { sql: String(p.sql ?? ''), allowWrite: false });
+      return runDb(ctx, 'exec', { sql: str(p.sql ?? ''), allowWrite: false });
     case 'db_get':
       return runDb(ctx, 'getDoc', { collection: String(p.collection), id: String(p.id) });
     case 'db_set':
       return runDb(ctx, 'mutate', {
         collection: String(p.collection),
         action: String(p.action),
-        id: p.id == null ? undefined : String(p.id),
+        id: p.id == null ? undefined : str(p.id),
         doc: (p.doc ?? {}),
         allowWrite: true,
       });
@@ -124,7 +133,7 @@ function runDb(ctx: ToolContext | undefined, op: string, input: Record<string, u
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (out += c));
       proc.onError((e) => { resolve(`[error: ${e}]`); });
-      proc.onExit((code) => { resolve(code === 0 ? truncate(out.trim()) : `[error: ${out.trim().slice(-400) || 'node exited ' + code}]`); });
+      proc.onExit((code) => { resolve(code === 0 ? truncate(out.trim()) : `[error: ${out.trim().slice(-400) || 'node exited ' + String(code)}]`); });
     } catch (e) {
       resolve(`[error: ${(e as Error).message}]`);
     }

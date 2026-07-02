@@ -76,7 +76,7 @@ export function WorkersPanel({
   );
   const mode: Mode = forceProd ? 'prod' : forceDev ? 'dev' : storedMode;
   const setMode = setStoredMode;
-  const modePinned = forceProd || forceDev;
+  const modePinned = Boolean(forceProd) || Boolean(forceDev);
   const [workers, setWorkers] = useState<WorkerManifestItem[]>([]);
   const [unavailableReason, setUnavailableReason] = useState<string | null>(
     null,
@@ -758,7 +758,7 @@ function RunDetailView({ run }: { run: WorkerRunDetail }) {
           {run.error}
         </pre>
       )}
-      {run.logs && run.logs.length > 0 && (
+      {run.logs.length > 0 && (
         <details open>
           <summary
             style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}

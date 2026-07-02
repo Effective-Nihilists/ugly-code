@@ -62,7 +62,7 @@ const app = createApp(
     // blocks included) for the client loop to dispatch.
     agentStep: async (_userId, { messages: history, model }) => {
       const data = await uglyBotRequest('textGen', {
-        model: (model as TextGenModel) ?? AGENT_DEFAULT_MODEL,
+        model: model ? (model as TextGenModel) : AGENT_DEFAULT_MODEL,
         messages: [
           { role: 'system', content: AGENT_SYSTEM_PROMPT },
           ...history,
@@ -137,7 +137,7 @@ const app = createApp(
           page,
           query: query ?? {},
           ...(imageUrl ? { imageUrl } : {}),
-        } as TypedPushSendInput<typeof pages, keyof typeof pages & string>);
+        } as TypedPushSendInput<typeof pages, keyof typeof pages>);
         return { sent: result.sent };
       } catch (e) {
         console.error(e);

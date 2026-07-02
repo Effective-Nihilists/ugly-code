@@ -70,7 +70,7 @@ function AuthDemoAuthenticated(): React.ReactElement {
     <PageLayout
       header={
         <div>
-          <a href="/">← Home</a>
+          <a href="/" data-id="auth-demo-home-authed">← Home</a>
         </div>
       }
     >
@@ -89,7 +89,7 @@ function AuthDemoAuthenticated(): React.ReactElement {
               2,
             )}
           </pre>
-          <Button variant="secondary" onClick={() => { void handleLogout(); }}>
+          <Button variant="secondary" data-id="auth-demo-logout" onClick={() => { void handleLogout(); }}>
             Logout
           </Button>
         </Card>
@@ -130,7 +130,7 @@ function AuthDemoUnauthenticated(): React.ReactElement {
     <PageLayout
       header={
         <div>
-          <a href="/">← Home</a>
+          <a href="/" data-id="auth-demo-home-loggedout">← Home</a>
         </div>
       }
     >
@@ -144,7 +144,7 @@ function AuthDemoUnauthenticated(): React.ReactElement {
         <Card>
           <Text>You are not logged in.</Text>
           <div style={{ marginTop: 12 }}>
-            <Button variant="primary" onClick={handleCtaClick}>
+            <Button variant="primary" data-id="auth-demo-cta" onClick={handleCtaClick}>
               {ctaLabel}
             </Button>
           </div>

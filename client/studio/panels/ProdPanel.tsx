@@ -117,7 +117,7 @@ export function ProdPanel(): React.ReactElement {
         <div style={S.targetCol}>
           {liveUrl ? (
             <>
-              <a href={liveUrl} target="_blank" rel="noreferrer" style={S.url} onClick={(e) => { e.preventDefault(); void native.system.openExternal({ url: liveUrl }); }}>
+              <a href={liveUrl} target="_blank" rel="noreferrer" data-id="prod-live-url" style={S.url} onClick={(e) => { e.preventDefault(); void native.system.openExternal({ url: liveUrl }); }}>
                 {liveUrl}
               </a>
               {target?.lastDeployedAt && (

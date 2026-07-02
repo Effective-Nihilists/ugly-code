@@ -18,10 +18,10 @@ export type { RecentProject };
 // reach them through this narrow interface rather than fighting the registry type.
 interface RecentSocket {
   request(name: string, input: unknown): Promise<unknown>;
-  trackDocs<T>(
+  trackDocs(
     collection: string,
     params: { keys?: Record<string, string> },
-    cb: (docs: T[]) => void,
+    cb: (docs: unknown[]) => void,
   ): () => void;
 }
 
@@ -32,7 +32,12 @@ async function selfDevice(): Promise<{ deviceId: string; deviceLabel: string } |
     // proxy.self rides the low-level UglyNative protocol (not the high-level
     // facade). Cast the invoke: the channel may predate the installed ugly-app's
     // typed contract, and resolves to null off a desktop host anyway.
-    const invoke = installUglyNative().invoke as (channel: string, payload?: unknown) => Promise<unknown>;
+    const native = installUglyNative();
+    const invoke = (channel: string, payload?: unknown): Promise<unknown> =>
+      (native.invoke as (channel: string, payload?: unknown) => Promise<unknown>)(
+        channel,
+        payload,
+      );
     const r = await invoke('proxy.self');
     if (r && typeof r === 'object') {
       const o = r as { deviceId?: unknown; deviceLabel?: unknown };
@@ -109,10 +114,13 @@ export function useRecentProjects(): RecentProject[] {
   useEffect(() => {
     if (!app) return;
     const { socket, userId } = app;
-    const unsub = (socket as unknown as RecentSocket).trackDocs<RecentProject>(
+    const unsub = (socket as unknown as RecentSocket).trackDocs(
       'recentProject',
       { keys: { userId } },
-      (docs) => { setProjects([...docs].sort((a, b) => b.lastOpened - a.lastOpened)); },
+      (docs) => {
+        const rows = docs as RecentProject[];
+        setProjects([...rows].sort((a, b) => b.lastOpened - a.lastOpened));
+      },
     );
     return unsub;
   }, [app]);

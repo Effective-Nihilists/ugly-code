@@ -69,9 +69,7 @@ function useTransitionList<T extends { compositeId: string }>(
         const carried = prevDelayById.get(item.compositeId);
         const delayMs = firstBatch
           ? baseDelayMs + idx * staggerMs
-          : carried !== undefined
-          ? carried
-          : 0;
+          : carried ?? 0;
         return { item, phase: 'visible' as const, delayMs };
       });
 
@@ -230,16 +228,16 @@ export interface SidebarNavItem {
   active: boolean;
   disabled?: boolean;
   badgeCount?: number;
-  onClick(): void;
+  onClick: () => void;
 }
 
 export interface SessionListSidebarProps {
   sessions: SessionListSidebarSession[];
   activeCompositeId: string | null;
-  onSelect(compositeId: string): void;
-  onNewSession(): void;
-  onArchiveSession(compositeId: string): void;
-  timeAgo(ts: number): string;
+  onSelect: (compositeId: string) => void;
+  onNewSession: () => void;
+  onArchiveSession: (compositeId: string) => void;
+  timeAgo: (ts: number) => string;
   footerNav?: SidebarNavItem[];
   /**
    * Current branch of the project root, displayed in the Repository
@@ -252,14 +250,14 @@ export interface SessionListSidebarProps {
    * (lazy replacement: a fresh main is provisioned on next access).
    * Hidden when undefined.
    */
-  onResetMainSession?(compositeId: string): void;
+  onResetMainSession?: (compositeId: string) => void;
   /**
    * Count of archived sessions for this project. When > 0, an
    * "Archived (N)" pill appears above the footer nav; clicking it
    * fires `onShowArchived` which opens the ArchivedSessionsModal.
    */
   archivedCount?: number;
-  onShowArchived?(): void;
+  onShowArchived?: () => void;
   /**
    * The per-session views (Agent/Preview/File/Git/Database). Rendered as an
    * indented sub-list directly beneath the active session row — collapsed for
@@ -349,6 +347,7 @@ export function SessionListSidebar({
           // is always the first row, directly under the Sessions header.
           <React.Fragment>
             <RepositoryRow
+              data-id="repository-row"
               session={mainSession}
               branch={repoBranch}
               active={mainSession.compositeId === activeCompositeId}
@@ -374,6 +373,7 @@ export function SessionListSidebar({
             a quiet, low-key action, not a prominent CTA. */}
         <button
           type="button"
+          data-id="sidebar-new-session"
           onClick={onNewSession}
           style={{
             width: '100%',
@@ -452,6 +452,7 @@ export function SessionListSidebar({
           {footerNav.map((item, i) => (
             <SidebarFooterButton
               key={item.id}
+              data-id={`sidebar-footer-${item.id}`}
               label={item.label}
               active={item.active}
               {...(item.disabled ? { disabled: true } : {})}
@@ -492,12 +493,14 @@ function RepositoryRow({
   active,
   onClick,
   onReset,
+  'data-id': dataId,
 }: {
   session: SessionListSidebarSession;
   branch?: string;
   active: boolean;
-  onClick(): void;
-  onReset?(): void;
+  onClick: () => void;
+  onReset?: () => void;
+  'data-id'?: string;
 }): React.ReactElement {
   const [hovered, setHovered] = React.useState(false);
   // Cyan stays on the REPO badge as a brand identifier (so the row
@@ -508,6 +511,7 @@ function RepositoryRow({
   const labelAccent = '#22D3EE';
   return (
     <div
+      data-id={dataId ?? 'repository-row'}
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -599,6 +603,7 @@ function RepositoryRow({
         {onReset && (
           <button
             type="button"
+            data-id="repository-reset"
             title="Archive this session and start a fresh one. The repository session always exists."
             aria-label="Reset main session"
             onClick={(e) => {
@@ -692,20 +697,23 @@ function SidebarFooterButton({
   divider,
   icon,
   badgeCount,
+  'data-id': dataId,
 }: {
   label: string;
   active?: boolean;
   disabled?: boolean;
-  onClick(): void;
+  onClick: () => void;
   divider?: boolean;
   icon: React.ReactNode;
   /** Optional accent-colored count shown after the label. Right-aligned
    *  via a flex spacer. Hidden when 0 / undefined. */
   badgeCount?: number;
+  'data-id'?: string;
 }): React.ReactElement {
   return (
     <button
       type="button"
+      data-id={dataId ?? 'sidebar-footer-button'}
       onClick={onClick}
       disabled={disabled}
       style={{
@@ -879,9 +887,9 @@ function SessionRowList({
 }: {
   regularSessions: SessionListSidebarSession[];
   activeCompositeId: string | null;
-  onSelect(compositeId: string): void;
-  onArchiveSession(compositeId: string): void;
-  timeAgo(ts: number): string;
+  onSelect: (compositeId: string) => void;
+  onArchiveSession: (compositeId: string) => void;
+  timeAgo: (ts: number) => string;
   sessionViews?: SidebarNavItem[];
 }): React.ReactElement {
   // Build the rendered order (parents with peers indented underneath)
@@ -932,7 +940,7 @@ function SessionRowList({
   // on the picker→project flow; on warm starts the workspace mounts
   // directly and that 480ms was dead air before any row appeared.
   const entries = useTransitionList(flat, ROW_TRANSITION_MS, 50, 0);
-  const { isDeleting } = useSessionDeletion();
+  const sessionDeletion = useSessionDeletion();
   const firstRowDomLoggedRef = React.useRef(false);
   React.useEffect(() => {
     if (firstRowDomLoggedRef.current) return;
@@ -949,9 +957,9 @@ function SessionRowList({
       {entries.map(({ item, phase, delayMs }) => {
         const { s, isChild } = item;
         const leaving = phase === 'leaving';
-        const deleting = isDeleting(s.compositeId);
+        const deleting = sessionDeletion.isDeleting(s.compositeId);
         const showViews =
-          !leaving && sessionViews && s.compositeId === activeCompositeId;
+          !leaving && s.compositeId === activeCompositeId;
         return (
           <React.Fragment key={s.compositeId}>
           <AnimatedRow
@@ -959,6 +967,9 @@ function SessionRowList({
             isChild={isChild}
             delayMs={delayMs}
           >
+            {/* SessionRow tags its own interactive root (role="button")
+                internally; it exposes no data-id prop to forward here. */}
+            {/* eslint-disable-next-line ugly-app/require-data-id */}
             <SessionRow
               session={{
                 compositeId: s.compositeId,

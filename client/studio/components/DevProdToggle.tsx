@@ -25,12 +25,14 @@ export function DevProdToggle({
       }}
     >
       <ToggleButton
+        data-id="devprod-toggle-dev"
         label="Dev"
         active={mode === 'dev'}
         onClick={() => { onModeChange('dev'); }}
         disabled={disabled}
       />
       <ToggleButton
+        data-id="devprod-toggle-prod"
         label="Prod"
         active={mode === 'prod'}
         onClick={() => { onModeChange('prod'); }}
@@ -45,15 +47,17 @@ function ToggleButton({
   active,
   onClick,
   disabled,
+  'data-id': dataId,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
   disabled?: boolean;
+  'data-id'?: string;
 }) {
   return (
     <button
-      data-id={`toggle-${label.toLowerCase()}`}
+      data-id={dataId ?? `toggle-${label.toLowerCase()}`}
       onClick={onClick}
       disabled={disabled}
       style={{

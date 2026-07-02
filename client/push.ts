@@ -15,7 +15,7 @@
  *   if (!registered) await requestPushPermission();
  */
 
-const _UGLY_BOT = (window as unknown as Record<string, string>).__UGLY_BOT_URL__ ?? 'https://ugly.bot';
+const _UGLY_BOT = (window as unknown as { __UGLY_BOT_URL__?: string }).__UGLY_BOT_URL__ ?? 'https://ugly.bot';
 const PUSH_FRAME_URL = `${_UGLY_BOT}/push-frame`;
 const PUSH_FRAME_ORIGIN = _UGLY_BOT;
 

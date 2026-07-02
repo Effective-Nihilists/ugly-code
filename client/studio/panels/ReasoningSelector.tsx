@@ -66,6 +66,7 @@ export function ReasoningSelector({
 
   const trigger = (
     <button
+      data-id="reasoning-selector-trigger"
       ref={triggerRef}
       type="button"
       disabled={disabled}
@@ -120,17 +121,18 @@ export function ReasoningSelector({
       minWidth={260}
       disabled={disabled}
     >
-      {({ close }) =>
+      {(ctx) =>
         OPTIONS.map((opt) => {
           const isSelected = opt.value === value;
           return (
             <button
               key={opt.value}
+              data-id={`reasoning-selector-option-${opt.value}`}
               role="menuitem"
               type="button"
               onClick={() => {
                 onChange(opt.value);
-                close();
+                ctx.close();
               }}
               style={{
                 display: 'flex',

@@ -93,13 +93,13 @@ export interface NewSessionHeroProps {
   /** Captures the form values and hands them to SessionLayout, which
    *  owns the in-flight RPC + progress UI. The hero unmounts
    *  immediately after — `pendingSessions` keeps the progress visible. */
-  onStartCreation(params: NewSessionStartParams): void;
+  onStartCreation: (params: NewSessionStartParams) => void;
   /** Resume handoff for eval-mode (sessionStorage bridge) — the
    *  picker wrote a sessionId and the user wants to jump straight in. */
-  onResumeSession?(sessionId: string): void;
+  onResumeSession?: (sessionId: string) => void;
   /** Opens the settings modal. When `provider` is set the modal
    * scrolls to that subscription's key-setup section. */
-  onOpenSettings(provider?: SubscriptionProvider): void;
+  onOpenSettings: (provider?: SubscriptionProvider) => void;
 }
 
 export function NewSessionHero({
@@ -197,7 +197,7 @@ export function NewSessionHero({
   }, [pendingEvalTask]);
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    (e: React.SyntheticEvent) => {
       e.preventDefault();
       // Wire-level `model` is the seed; for auto/cheap/max the server
       // resolves the concrete id at turn time, so we leave it as
@@ -361,6 +361,7 @@ export function NewSessionHero({
                 </div>
               </div>
               <button
+                data-id="new-session-hero-cancel-eval-task"
                 type="button"
                 onClick={() => { setPendingEvalTask(null); }}
                 title="Cancel eval task — start a regular session instead"

@@ -108,7 +108,7 @@ export function ReportSessionIssueButton({
         ref={buttonRef}
         type="button"
         data-id="report-session-issue-button"
-        onClick={() => { open ? setOpen(false) : openPopover(); }}
+        onClick={() => { if (open) { setOpen(false); } else { openPopover(); } }}
         aria-label="Report issue with session logs"
         data-us-tooltip="Report issue with full session logs"
         style={{
@@ -187,6 +187,7 @@ export function ReportSessionIssueButton({
                 {(['bug', 'feature', 'design'] as IssueType[]).map((t) => (
                   <button
                     key={t}
+                    data-id={`report-session-issue-type-${t}`}
                     onClick={() => { setType(t); }}
                     style={{
                       flex: 1,
@@ -212,6 +213,7 @@ export function ReportSessionIssueButton({
                 ))}
               </div>
               <textarea
+                data-id="report-session-issue-message"
                 autoFocus
                 value={message}
                 onChange={(e) => { setMessage(e.target.value); }}
@@ -245,6 +247,7 @@ export function ReportSessionIssueButton({
               )}
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <button
+                  data-id="report-session-issue-cancel"
                   type="button"
                   onClick={() => { setOpen(false); }}
                   style={{
@@ -261,6 +264,7 @@ export function ReportSessionIssueButton({
                   Cancel
                 </button>
                 <button
+                  data-id="report-session-issue-submit"
                   type="button"
                   onClick={() => void handleSubmit()}
                   disabled={submitting || !message.trim()}

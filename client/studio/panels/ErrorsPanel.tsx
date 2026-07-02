@@ -81,7 +81,7 @@ export function ErrorsPanel({
     ? 'dev'
     : storedMode;
   const setMode = setStoredMode;
-  const modePinned = forceProd || forceDev;
+  const modePinned = Boolean(forceProd) || Boolean(forceDev);
   const [summary, setSummary] = useState<ErrorSummary[]>([]);
   const [errors, setErrors] = useState<ErrorLogItem[]>([]);
   const [loading, setLoading] = useState(true);

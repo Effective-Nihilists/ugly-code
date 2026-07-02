@@ -51,9 +51,9 @@ export interface SessionRowData {
 export interface SessionRowProps {
   session: SessionRowData;
   active: boolean;
-  onClick(): void;
+  onClick: () => void;
   /** Optional — when set, hover shows an archive button. */
-  onArchive?(): void;
+  onArchive?: () => void;
   /**
    * When true, render a slim single-line variant (no `thinking/idle`
    * + token/cost meta rows). Used for max-mode peer rows under their
@@ -185,6 +185,7 @@ export function SessionRow({
         ) : (
           onArchive && (
             <button
+              data-id="session-row-archive"
               type="button"
               title="Archive session"
               aria-label="Archive session"

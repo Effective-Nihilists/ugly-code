@@ -11,7 +11,12 @@ interface ResultsTableProps {
 function cellValue(v: unknown): string {
   if (v === null || v === undefined) return 'NULL';
   if (typeof v === 'object') return JSON.stringify(v);
-  return String(v);
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint')
+    return v.toString();
+  if (typeof v === 'symbol') return v.toString();
+  // function — no meaningful table cell; render its source form.
+  return (v as (...args: unknown[]) => unknown).toString();
 }
 
 export function ResultsTable({ columns, rows }: ResultsTableProps) {

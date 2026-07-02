@@ -80,6 +80,7 @@ export function installTaskErrorLog(opts: { origin: string; sessionId: string; s
       timer = null;
       void flush();
     }, FLUSH_MS);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- setTimeout returns a bare number (no unref) in browser-like task runtimes
     timer.unref?.();
   };
 
@@ -122,10 +123,12 @@ export function installTaskErrorLog(opts: { origin: string; sessionId: string; s
   (['log', 'info', 'debug', 'warn', 'error'] as const).forEach(wrap);
 
   const proc = (globalThis as { process?: NodeJS.Process }).process;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a browser-shimmed `process` may expose no `.on`
   proc?.on?.('uncaughtException', (err: Error) => {
     record('error', [`[coding-task] uncaughtException: ${err.message}`, err]);
     void flush();
   });
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a browser-shimmed `process` may expose no `.on`
   proc?.on?.('unhandledRejection', (reason: unknown) => {
     record('error', [
       `[coding-task] unhandledRejection: ${reason instanceof Error ? reason.message : String(reason)}`,

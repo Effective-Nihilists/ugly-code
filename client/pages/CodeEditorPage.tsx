@@ -74,7 +74,7 @@ export default function CodeEditorPage(): React.ReactElement {
   // On mount: request fs, then list the home directory.
   React.useEffect(() => {
     if (!available) return;
-    (async () => {
+    void (async () => {
       try {
         await permissions.request({ fs: 'full' });
         await list('/');
@@ -138,14 +138,14 @@ export default function CodeEditorPage(): React.ReactElement {
         <span data-id="cwd" style={S.cwd}>{cwd}</span>
         <span data-id="platform" style={S.tag}>{platform}</span>
         <span style={{ flex: 1 }} />
-        <button data-id="save-btn" onClick={save} disabled={!openFile || !dirty} style={S.save}>
+        <button data-id="save-btn" onClick={() => { void save(); }} disabled={!openFile || !dirty} style={S.save}>
           {dirty ? 'Save ●' : 'Saved'}
         </button>
       </header>
       <div style={S.body}>
         <nav data-id="file-tree" style={S.tree}>
           {cwd !== '/' && (
-            <div data-id="up-dir" style={S.entry} onClick={() => list(parentOf(cwd))}>
+            <div data-id="up-dir" style={S.entry} onClick={() => { void list(parentOf(cwd)); }}>
               ⬆ ..
             </div>
           )}
@@ -156,7 +156,7 @@ export default function CodeEditorPage(): React.ReactElement {
               data-name={e.name}
               data-dir={e.isDirectory ? '1' : '0'}
               style={S.entry}
-              onClick={() => openEntry(e)}
+              onClick={() => { void openEntry(e); }}
             >
               {e.isDirectory ? '📁' : '📄'} {e.name}
             </div>
@@ -187,7 +187,7 @@ export default function CodeEditorPage(): React.ReactElement {
             data-id="cmd-input"
             value={cmd}
             onChange={(e) => { setCmd(e.target.value); }}
-            onKeyDown={(e) => e.key === 'Enter' && !running && runCommand()}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !running) runCommand(); }}
             spellCheck={false}
             style={S.cmdInput}
           />
