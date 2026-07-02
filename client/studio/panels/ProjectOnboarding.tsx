@@ -436,7 +436,7 @@ export function ProjectOnboarding({
                 marginBottom: 10,
               }}
             >
-              Can&rsquo;t reach ugly.bot
+              Can&rsquo;t reach code.ugly.bot
             </div>
             <div
               style={{

@@ -2252,7 +2252,7 @@ function FooterSection() {
                 marginBottom: 8,
               }}
             >
-              ugly<span style={{ color: BRAND }}>.</span>bot
+              code.ugly<span style={{ color: BRAND }}>.</span>bot
             </div>
             <div
               style={{
