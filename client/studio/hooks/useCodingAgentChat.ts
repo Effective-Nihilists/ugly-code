@@ -2617,17 +2617,23 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         setSessionId(newId);
         // Cross-device live sync: attach (listen-only) to this session's live
         // task stream so a message sent on ANOTHER device streams here live.
-        // Never starts a task. Poll-retry because the host may not have spun
-        // the task up yet (the sender's first turn creates it). The
-        // `knownMessageIds` dedup + `acceptedSessionId` filter prevent any
-        // double-render against the history backfill below.
+        // Never starts a task. Keep retrying for as long as this session is open
+        // (until `cancelled` on unmount): the host may not have spun the task up
+        // yet (the SENDER's first turn creates it, which can be long after this
+        // viewer opened) AND on mobile the desktop proxy may still be connecting.
+        // A bounded poll gave up after ~10s, so a message later sent on the
+        // desktop never streamed in — the "mobile doesn't update" report. Back
+        // off after the initial fast attempts. `knownMessageIds` dedup +
+        // `acceptedSessionId` filter prevent any double-render vs the backfill.
         void (async () => {
-          for (let attempt = 0; attempt < 10 && !cancelled; attempt++) {
+          let attempt = 0;
+          while (!cancelled) {
             const res = await agentApi(backend.chatAttach, { sessionId: newId }).catch(
               () => ({ attached: false }),
             );
             if ((res as { attached?: boolean })?.attached) break;
-            await new Promise((r) => setTimeout(r, 1000));
+            attempt += 1;
+            await new Promise((r) => setTimeout(r, attempt < 10 ? 1000 : 3000));
           }
         })();
         // Adopt the per-session model + reasoning effort from disk.
