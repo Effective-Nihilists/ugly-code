@@ -292,10 +292,12 @@ function emitMessage(
 // ── Server persistence helpers (all best-effort; never break the loop) ───────
 
 /** Append one transcript row + track its seq/id for the compaction window. */
-function persistRow(s: SessionAgentState, sessionId: string, role: StoredRole, payload: unknown): void {
+function persistRow(s: SessionAgentState, sessionId: string, role: StoredRole, payload: unknown): string {
   const seq = s.seq++;
-  s.activeRows.push({ seq, id: `${sessionId}:${seq}` });
+  const id = `${sessionId}:${seq}`;
+  s.activeRows.push({ seq, id });
   void sessionApi.appendMessage({ sessionId, seq, role, content: JSON.stringify(payload) });
+  return id;
 }
 
 /**
@@ -669,7 +671,15 @@ export async function runClientAgentTurn(
     state.title = userText.slice(0, 120);
     state.titleSet = true;
   }
-  persistRow(state, sessionId, 'user', userText);
+  const userMsgId = persistRow(state, sessionId, 'user', userText);
+  // Emit the user prompt as a task event so OTHER devices viewing this session render it
+  // live. Only assistant + tool messages were emitted, so a remote viewer saw the replies
+  // with no prompt above them. Uses the persisted row id, so a later history reload dedupes;
+  // the sender already shows an optimistic bubble and its reconciliation adopts this id.
+  emitMessage(emit, sessionId, 'user', [{ type: 'text', data: { text: userText } }], {
+    id: userMsgId,
+    action: 'created',
+  });
   persistMeta(state, sessionId, 'running');
   await state.controller.send(userText);
 }
