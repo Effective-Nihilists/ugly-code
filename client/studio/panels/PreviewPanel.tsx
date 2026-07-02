@@ -18,15 +18,61 @@ interface DevServer {
   running: boolean;
   port: number;
   log: string;
+  // cloudflared quick tunnel exposing localhost:port at a public https URL, so the MOBILE
+  // preview can reach the host's dev server. `tunnelUrl` is the trycloudflare.com URL once
+  // cloudflared prints it (null until then, or if cloudflared is unavailable → localhost).
+  tunnelProc: { kill: (sig?: string) => void } | null;
+  tunnelUrl: string | null;
   subs: Set<() => void>;
 }
 const devServers = new Map<string, DevServer>();
 function getDev(key: string, port: number): DevServer {
   let d = devServers.get(key);
-  if (!d) { d = { proc: null, running: false, port, log: '', subs: new Set() }; devServers.set(key, d); }
+  if (!d) { d = { proc: null, running: false, port, log: '', tunnelProc: null, tunnelUrl: null, subs: new Set() }; devServers.set(key, d); }
   return d;
 }
 function notify(d: DevServer): void { for (const fn of d.subs) fn(); }
+
+const TUNNEL_RE = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
+
+/** Expose localhost:port at a public https URL via a cloudflared quick tunnel (no CF account),
+ *  so the mobile preview can reach the host's dev server. Best-effort — if cloudflared isn't
+ *  present the preview just stays on localhost (works on the desktop host). */
+function startTunnel(d: DevServer, projectPath: string, port: number): void {
+  if (d.tunnelProc) { try { d.tunnelProc.kill(); } catch { /* already gone */ } }
+  d.tunnelUrl = null;
+  try {
+    const t = native.process.spawn(
+      'cloudflared',
+      [
+        'tunnel',
+        '--url', `http://localhost:${port}`,
+        // Rewrite the origin Host to localhost — Vite (`pnpm dev`) 403s "Blocked request"
+        // for the trycloudflare hostname otherwise (server.allowedHosts). Applies to the HMR
+        // websocket too, so live reload keeps working over the tunnel.
+        '--http-host-header', `localhost:${port}`,
+        '--no-autoupdate',
+      ],
+      { cwd: projectPath },
+    );
+    d.tunnelProc = t;
+    const onOut = (c: string) => {
+      d.log = (d.log + c).slice(-12000);
+      if (!d.tunnelUrl) {
+        const m = TUNNEL_RE.exec(c);
+        if (m) { d.tunnelUrl = m[0]; d.log = (d.log + `\n[tunnel: ${m[0]}]\n`).slice(-12000); }
+      }
+      notify(d);
+    };
+    t.onStdout(onOut);
+    t.onStderr(onOut); // cloudflared prints the quick-tunnel URL to stderr
+    t.onError((e) => { d.log = (d.log + `\n[tunnel unavailable: ${e}]\n`).slice(-12000); d.tunnelProc = null; notify(d); });
+    t.onExit(() => { d.tunnelProc = null; notify(d); });
+  } catch (e) {
+    d.log = (d.log + `[tunnel unavailable: ${(e as Error).message}]\n`).slice(-12000);
+    notify(d);
+  }
+}
 
 function startDev(key: string, projectPath: string, port: number): void {
   const d = getDev(key, port);
@@ -44,6 +90,8 @@ function startDev(key: string, projectPath: string, port: number): void {
     p.onStderr((c) => { d.log = (d.log + c).slice(-12000); notify(d); });
     p.onError((e) => { d.log = (d.log + `\n[error: ${e}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d); });
     p.onExit((code) => { d.log = (d.log + `\n[dev server exited ${code ?? ''}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d); });
+    // Publish it to a public https URL so the mobile preview can reach it.
+    startTunnel(d, projectPath, port);
   } catch (e) {
     d.log += `[error: ${(e as Error).message}]\n`;
     d.running = false;
@@ -54,8 +102,11 @@ function stopDev(key: string): void {
   const d = devServers.get(key);
   if (!d) return;
   if (d.proc) { try { d.proc.kill(); } catch { /* already gone */ } }
+  if (d.tunnelProc) { try { d.tunnelProc.kill(); } catch { /* already gone */ } }
   d.running = false;
   d.proc = null;
+  d.tunnelProc = null;
+  d.tunnelUrl = null;
   notify(d);
 }
 
@@ -85,6 +136,19 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
       if (saved) { setUrl(saved); setCommitted(saved); }
     } catch { /* ignore */ }
   }, [sessionId]);
+
+  // Once the cloudflared tunnel is up, point the preview at its public https URL so it works
+  // on mobile (localhost only resolves on the desktop host). Reload the iframe onto it.
+  React.useEffect(() => {
+    const t = dev.tunnelUrl;
+    if (t && t !== committed) {
+      setUrl(t);
+      setCommitted(t);
+      setReloadKey((k) => k + 1);
+      try { localStorage.setItem(keyFor(sessionId ?? null), t); } catch { /* ignore */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dev.tunnelUrl]);
 
   const commit = React.useCallback(() => {
     const u = url.trim();
