@@ -2557,6 +2557,56 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     }
   }, [sessionId, model, permissionMode, patternMode, modelMode, reasoningEffort, backend]);
 
+  // Splice in any USER prompts we're missing — a viewer that attached AFTER the sender
+  // emitted the prompt at turn start (common right after the host task is (re)started).
+  // Idempotent + dedups on the stable `${sessionId}:${seq}` user id (same live + persisted).
+  // Assistant rows use a random live id and stream fine, so we do NOT replay them here (that
+  // would double-render). Each missing prompt is positioned by history order relative to
+  // what's rendered; a rendered row absent from history (a live-streaming reply) counts as
+  // newer, so the prompt lands just before the in-flight reply.
+  const backfillMissingUserMessages = useCallback(
+    async (sid: string): Promise<void> => {
+      let history: Array<{ id: string; role: string; parts?: { type: string; data?: { text?: string } }[] }>;
+      try {
+        const res = await agentApi(backend.chatListMessages, { sessionId: sid, limit: PAGE_SIZE });
+        if (!Array.isArray(res?.messages)) return;
+        history = res.messages;
+      } catch {
+        return;
+      }
+      const histIds = history.map((m) => m.id);
+      setMessages((prev) => {
+        const have = new Set(prev.map((m) => m.id));
+        let out = prev;
+        for (let hi = 0; hi < history.length; hi++) {
+          const hm = history[hi]!;
+          if (hm.role !== 'user' || have.has(hm.id)) continue;
+          const text = (hm.parts ?? [])
+            .filter((p) => p.type === 'text')
+            .map((p) => p.data?.text ?? '')
+            .join('');
+          if (!text) continue;
+          let insertAt = out.length;
+          for (let ri = 0; ri < out.length; ri++) {
+            const pos = histIds.indexOf(out[ri]!.id);
+            if (pos === -1 || pos > hi) {
+              insertAt = ri;
+              break;
+            }
+          }
+          out = [
+            ...out.slice(0, insertAt),
+            { id: hm.id, role: 'user' as const, content: text, toolUses: [], isStreaming: false },
+            ...out.slice(insertAt),
+          ];
+          have.add(hm.id);
+        }
+        return out;
+      });
+    },
+    [backend],
+  );
+
   // Resume the agent session on mount when `initialSessionId` is set:
   // attach to the existing composite ID and backfill the rendered
   // message array via codingAgentChatListMessages. History is replayed
@@ -2646,7 +2696,17 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             const res = await agentApi(backend.chatAttach, { sessionId: newId }).catch(
               () => ({ attached: false }),
             );
-            if ((res as { attached?: boolean })?.attached) break;
+            if ((res as { attached?: boolean })?.attached) {
+              // We attached, but the sender emits the USER prompt at turn start — a viewer
+              // that attaches a beat later (esp. right after the task is (re)started) misses
+              // it, and the task snapshot carries no messages, so the reply shows with no
+              // prompt above it. Re-pull history and splice in any user rows we don't have.
+              // User rows have stable `${sessionId}:${seq}` ids (live + persisted), so this
+              // dedups; assistant rows use a random live id and stream fine, so we DON'T
+              // replay them here (that would double-render).
+              await backfillMissingUserMessages(newId);
+              break;
+            }
             attempt += 1;
             await new Promise((r) => setTimeout(r, attempt < 10 ? 1000 : 3000));
           }
