@@ -10,6 +10,7 @@ import { useSocket } from '../hooks/useSocket';
 import {
   setStudioUserSetting,
   useStudioUserSetting,
+  useStudioUserSettingsHydrated,
 } from '../hooks/useStudioUserSetting';
 import { shortcut } from '../utils/platform';
 import { type SubscriptionProvider } from './ModelSelector';
@@ -110,6 +111,12 @@ export function NewSessionHero({
   const socket = useSocket();
   const isMobile = useIsMobile();
   const [prompt, setPrompt] = useState('');
+  // The axis defaults below hydrate async (default → persisted). Hold the intro
+  // until that lands so the fade-up plays ONCE with the real values — otherwise
+  // the late re-render flips the model-dependent ReasoningSelector on/off and
+  // swaps axis values mid/post-transition, which reads as a blink. ensureHydration
+  // always resolves fast (empty cache even on failure), so this never hangs.
+  const settingsHydrated = useStudioUserSettingsHydrated();
 
   // Persisted per-user axis defaults — survive restarts and are what
   // every NEW session inherits. Fresh sessions apply them via
@@ -235,6 +242,12 @@ export function NewSessionHero({
       pendingEvalTask,
     ],
   );
+
+  // Hold a matching-background placeholder until settings hydrate, then mount the
+  // hero so its intro animations run a single time against the persisted values.
+  if (!settingsHydrated) {
+    return <div style={{ flex: 1, minHeight: 0, background: 'var(--bg-primary)' }} />;
+  }
 
   return (
     <div
