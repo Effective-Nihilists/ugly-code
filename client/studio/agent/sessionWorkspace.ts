@@ -204,7 +204,17 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
           tail = (tail + c).split('\n').slice(-12).join('\n');
           onProgress?.('installing', tail);
         } });
-        if (r2.code !== 0) onProgress?.('error', `Install exited ${r2.code} — the agent will still run, but commands needing deps may fail.`);
+        if (r2.code !== 0) {
+          // Ship to error telemetry (browser Logger → errorLog). A failed install was
+          // previously only shown in the in-session progress line and never logged, so
+          // remote "it failed on install" reports had no manager/exit-code/output to go
+          // on. `r2.out` also carries a `NativeUnavailable: process.spawn` when the host
+          // shell wasn't reachable — captured here WITH the command context.
+          console.error('[sessionWorkspace:install-failed]', JSON.stringify({
+            manager: inst[0], args: inst[1], cwd: dir, code: r2.code, output: r2.out.slice(-2000),
+          }));
+          onProgress?.('error', `Install exited ${r2.code} — the agent will still run, but commands needing deps may fail.`);
+        }
       }
     }
     onProgress?.('ready', 'Workspace ready.');
@@ -213,7 +223,11 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
     try { localStorage.setItem(wsKey(sessionId), JSON.stringify(ws)); } catch { /* ignore */ }
     return ws;
   } catch (e) {
-    console.error('[sessionWorkspace] provision failed; using project dir', e);
+    // Tag with sessionId/projectPath so a remote provision failure is filterable in
+    // errorLog (which command failed is in the message: git worktree add / install).
+    console.error('[sessionWorkspace] provision failed; using project dir', JSON.stringify({
+      sessionId, projectPath, dir, error: e instanceof Error ? e.message : String(e),
+    }));
     onProgress?.('error', 'Could not create an isolated worktree — running in the project directory.');
     return fallback();
   }

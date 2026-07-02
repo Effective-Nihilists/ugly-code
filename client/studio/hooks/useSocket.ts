@@ -37,25 +37,40 @@ async function spawnForPath(cmd: string): Promise<string> {
   type GrantReq = Parameters<typeof permissions.request>[0];
   await permissions
     .request({ fs: 'full', process: ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'] } as unknown as GrantReq)
-    .catch(() => undefined);
+    // A grant failure is a leading indicator of the spawn NativeUnavailable that
+    // usually follows (the process facade pre-checks permissions over the same
+    // channel) — surface it to telemetry instead of swallowing it silently.
+    .catch((e: unknown) => { console.warn('[studio:spawn] permission grant failed', e); });
   return new Promise<string>((resolve, reject) => {
     let out = '';
     let err = '';
+    // Ship spawn/exec failures to the error telemetry (the browser Logger patches
+    // console.error → POST /api/errorLogCaptureNoAuth → errorLog). Without this,
+    // clone/init/scaffold failures were invisible remotely: you'd see a bare
+    // `NativeUnavailable: process.spawn` with no hint of WHICH command failed, or —
+    // for a non-zero exit — nothing at all (the caller only setError()s in the UI).
+    // Always tag with the full cmd so remote reports are actionable.
+    const fail = (reason: string, detail: string): Error => {
+      console.error('[studio:spawn-failed]', JSON.stringify({ cmd, reason, detail: detail.slice(-2000) }));
+      return new Error(`${reason}\n${detail}`.trim());
+    };
     try {
       const proc = native.process.spawn('bash', ['-lc', cmd], {});
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (err += c));
-      proc.onError((e) => reject(new Error(e)));
+      proc.onError((e) => { reject(fail('spawn error', e)); });
       proc.onExit((code) => {
         if (code !== 0) {
-          reject(new Error(`command failed (exit ${code ?? 'null'})\n${(err || out).trim()}`));
+          reject(fail(`command failed (exit ${code ?? 'null'})`, (err || out).trim()));
           return;
         }
         const lines = out.trim().split('\n').map((l) => l.trim()).filter(Boolean);
         resolve(lines[lines.length - 1] ?? '');
       });
     } catch (e) {
-      reject(e as Error);
+      // Synchronous throw — e.g. `NativeUnavailable: process.spawn` when no native
+      // shell/host is wired. Log WITH the cmd so it's not an anonymous facade error.
+      reject(fail('spawn threw (native shell unavailable?)', e instanceof Error ? e.message : String(e)));
     }
   });
 }
@@ -809,6 +824,24 @@ const handlers: Record<string, Handler> = {
     const cmd =
       `mkdir -p "${q(parentDir)}" && cd "${q(parentDir)}" && ` +
       `npx -y ugly-app@latest init "${q(name)}" && cd "${q(name)}" && pwd`;
+    const path = await spawnForPath(cmd);
+    return { name, path: path || `${parentDir}/${name}` };
+  },
+  // Git-clone an existing remote into `parentDir` (defaults to ~), then resolve
+  // the cloned directory's absolute path so the caller can open it. Mirrors
+  // `initProject` but for an existing repo. The folder name is derived from the
+  // URL (last path segment, `.git` stripped) and passed explicitly to
+  // `git clone` so the result is predictable. The trailing `pwd` prints the
+  // clone's absolute path as the last stdout line.
+  cloneProject: async (i) => {
+    const url = String(i.url ?? '').trim();
+    if (!url) throw new Error('Repository URL is required');
+    const parentDir = (String(i.parentDir ?? '').trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
+    const name = url.replace(/\/+$/, '').replace(/\.git$/, '').split(/[/:]/).pop() || 'repo';
+    const q = (s: string): string => s.replace(/"/g, '\\"');
+    const cmd =
+      `mkdir -p "${q(parentDir)}" && cd "${q(parentDir)}" && ` +
+      `git clone "${q(url)}" "${q(name)}" && cd "${q(name)}" && pwd`;
     const path = await spawnForPath(cmd);
     return { name, path: path || `${parentDir}/${name}` };
   },
