@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
+import { SessionSnapshotSchema } from '../shared/api';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { onCustomMessage } from './useSocket';
 
@@ -1383,7 +1384,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         })),
       );
       setPendingAskUsers(
-        (snap.pendingAskUsers ?? []).map((p) => ({
+        snap.pendingAskUsers.map((p) => ({
           id: p.id,
           sessionId: p.sessionId,
           toolCallId: p.toolCallId,
@@ -1393,7 +1394,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         })),
       );
       setPendingStepReviews(
-        (snap.pendingStepReviews ?? []).map((p) => ({
+        snap.pendingStepReviews.map((p) => ({
           id: p.id,
           sessionId: p.sessionId,
           stepId: p.stepId,
@@ -1403,15 +1404,20 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           createdAt: p.createdAt,
         })),
       );
-      setLspStatus({
-        state: snap.lspStatus.state,
-        errors: snap.lspStatus.errors,
-        warnings: snap.lspStatus.warnings,
-        lastUpdatedAt: snap.lspStatus.lastUpdatedAt,
-        ...(snap.lspStatus.lastMessage !== undefined && {
-          lastMessage: snap.lspStatus.lastMessage,
-        }),
-      });
+      // Guarded like the pending* fields above: an older host build's snapshot may
+      // omit lspStatus entirely — don't let it abort the whole snapshot apply (which
+      // would drop the conversation and fall back to granular-events-only).
+      if (snap.lspStatus) {
+        setLspStatus({
+          state: snap.lspStatus.state,
+          errors: snap.lspStatus.errors,
+          warnings: snap.lspStatus.warnings,
+          lastUpdatedAt: snap.lspStatus.lastUpdatedAt,
+          ...(snap.lspStatus.lastMessage !== undefined && {
+            lastMessage: snap.lspStatus.lastMessage,
+          }),
+        });
+      }
       // Only when present — the mount snapshot omits it, and the indexer poll streams it in
       // separate session_state events; an unconditional set would clobber live readiness.
       if (snap.codebaseReadiness !== undefined) setCodebaseReadiness(snap.codebaseReadiness);
@@ -1627,8 +1633,17 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // The legacy granular events still go out (other consumers
       // may rely on them) — the client just no longer reduces them.
       if (eventType === 'session_state') {
-        const snap = payload?.payload as SessionSnapshot | undefined;
-        if (!snap || snap.compositeId !== sessionId) return;
+        // VALIDATE, don't cast: this snapshot is untyped wire data primed by the host's
+        // coding.js task (whose build can lag the SPA). A bare `as SessionSnapshot` is the
+        // lie that let `pendingPermissions.map` crash — parse it so the type is real. safeParse
+        // also fills the schema defaults, so an older host's partial snapshot still applies.
+        const parsed = SessionSnapshotSchema.safeParse(payload?.payload);
+        if (!parsed.success) {
+          console.warn('[CodingAgentChat] dropping malformed session_state snapshot', parsed.error.issues);
+          return;
+        }
+        const snap = parsed.data;
+        if (snap.compositeId !== sessionId) return;
         applySnapshot(snap);
         return;
       }

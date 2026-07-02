@@ -566,25 +566,33 @@ export const SessionSnapshotSchema = z.object({
   // permission / ask_user prompt cards in the chat panel. Driven
   // by the permission + ask-user brokers via emitSnapshot
   // triggers in their request listeners.
-  pendingPermissions: z.array(PermissionRequestSnapshotSchema),
+  // `.default([])` because these Phase-3 projections are absent from snapshots produced by
+  // an older host `coding.js` bundle; without a default the wire snapshot omits the key, a
+  // consumer reads `undefined`, and `.map` throws. The default keeps the inferred type an
+  // honest (non-optional) array while tolerating version skew — validate the wire payload
+  // (SessionSnapshotSchema.safeParse) instead of casting, and the field is always present.
+  pendingPermissions: z.array(PermissionRequestSnapshotSchema).default([]),
   // List of outstanding ask_user prompts. Each entry carries the
   // originating session's compositeId on `sessionId` — for max-mode
   // parents this includes prompts raised by peer sessions, so the
   // user sees one unified queue. Sorted oldest-first by tool_call
   // arrival; the chat UI shows only the head until it's answered.
-  pendingAskUsers: z.array(PendingAskUserSnapshotSchema),
+  pendingAskUsers: z.array(PendingAskUserSnapshotSchema).default([]),
   // List of outstanding step-review gates (between SPEC/DIAGNOSE and
   // the next step). Each entry is one paused driver. The chat panel
   // renders a small approve/iterate strip per entry; `pendingStepReviews`
   // also drives the BLOCKED pill in session lists.
-  pendingStepReviews: z.array(PendingStepReviewSnapshotSchema),
+  pendingStepReviews: z.array(PendingStepReviewSnapshotSchema).default([]),
 
   // LSP indicator state (Phase 3). Drives the chat-header
   // initializing/ready/error chip and the error-count badge.
   // Updated via the LSP client's lifecycle events; both the
   // event handler and the snapshot projection read from the
   // same per-session LspClient.
-  lspStatus: LspStatusSnapshotSchema,
+  // `.optional()` (not defaulted — there's no meaningful empty LSP status): an older host may
+  // omit it, so the inferred type is `LspStatus | undefined` and the COMPILER now forces every
+  // reader to guard it — which is exactly the check that was missing when this crashed.
+  lspStatus: LspStatusSnapshotSchema.optional(),
 
   // Codebase-analysis readiness — architecture doc + semantic
   // indexer state for the session's project. Pushed via
