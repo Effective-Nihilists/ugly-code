@@ -16,6 +16,9 @@ const keyFor = (sid: string | null): string => `ugly-studio:previewUrl:${sid ?? 
 interface DevServer {
   proc: { kill: (sig?: string) => void } | null;
   running: boolean;
+  // Set right before an intentional stopDev()/kill so the proc's onExit can tell a
+  // user-requested shutdown from a real crash and not log the former to telemetry.
+  stopping: boolean;
   port: number;
   log: string;
   // cloudflared quick tunnel exposing localhost:port at a public https URL, so the MOBILE
@@ -28,7 +31,7 @@ interface DevServer {
 const devServers = new Map<string, DevServer>();
 function getDev(key: string, port: number): DevServer {
   let d = devServers.get(key);
-  if (!d) { d = { proc: null, running: false, port, log: '', tunnelProc: null, tunnelUrl: null, subs: new Set() }; devServers.set(key, d); }
+  if (!d) { d = { proc: null, running: false, stopping: false, port, log: '', tunnelProc: null, tunnelUrl: null, subs: new Set() }; devServers.set(key, d); }
   return d;
 }
 function notify(d: DevServer): void { for (const fn of d.subs) fn(); }
@@ -76,23 +79,43 @@ function startTunnel(d: DevServer, projectPath: string, port: number): void {
 
 function startDev(key: string, projectPath: string, port: number): void {
   const d = getDev(key, port);
+  d.stopping = true; // killing any prior proc below is intentional, not a crash
   if (d.proc) { try { d.proc.kill(); } catch { /* already gone */ } }
   d.log = '';
   d.running = true;
   d.port = port;
   notify(d);
   d.log = `$ pnpm dev  (PORT=${port})\n`;
+  d.stopping = false;
+  const spec = devServerSpawn(port);
+  const cmdStr = `${spec.cmd} ${spec.args.join(' ')}`;
   try {
-    const spec = devServerSpawn(port);
     const p = native.process.spawn(spec.cmd, spec.args, { cwd: projectPath, env: spec.env });
     d.proc = p;
     p.onStdout((c) => { d.log = (d.log + c).slice(-12000); notify(d); });
     p.onStderr((c) => { d.log = (d.log + c).slice(-12000); notify(d); });
-    p.onError((e) => { d.log = (d.log + `\n[error: ${e}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d); });
-    p.onExit((code) => { d.log = (d.log + `\n[dev server exited ${code ?? ''}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d); });
+    p.onError((e) => {
+      if (d.proc !== p) return; // superseded by a restart — ignore the stale proc
+      // Ship spawn failures to the error telemetry (browser Logger → errorLog); the
+      // in-panel log alone isn't visible when the host is a remote/other machine.
+      console.error('[PreviewPanel:dev-server-error]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, error: String(e) }));
+      d.log = (d.log + `\n[error: ${e}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d);
+    });
+    p.onExit((code) => {
+      if (d.proc !== p) return; // superseded by a restart — ignore the stale proc
+      // A non-zero exit we didn't ask for is a real failure — e.g. 127 = `pnpm:
+      // command not found` when the host lacks pnpm on PATH. Log it WITH the boot-log
+      // tail (carries the shell's error text) so it's debuggable from another machine.
+      if (!d.stopping && code !== 0 && code != null) {
+        console.error('[PreviewPanel:dev-server-exit]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, code, logTail: d.log.slice(-1500) }));
+      }
+      d.log = (d.log + `\n[dev server exited ${code ?? ''}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d);
+    });
     // Publish it to a public https URL so the mobile preview can reach it.
     startTunnel(d, projectPath, port);
   } catch (e) {
+    // Synchronous throw — e.g. NativeUnavailable when no host shell is wired.
+    console.error('[PreviewPanel:dev-server-threw]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, error: e instanceof Error ? e.message : String(e) }));
     d.log += `[error: ${(e as Error).message}]\n`;
     d.running = false;
     notify(d);
@@ -101,6 +124,7 @@ function startDev(key: string, projectPath: string, port: number): void {
 function stopDev(key: string): void {
   const d = devServers.get(key);
   if (!d) return;
+  d.stopping = true; // user-requested shutdown — suppress the onExit failure log
   if (d.proc) { try { d.proc.kill(); } catch { /* already gone */ } }
   if (d.tunnelProc) { try { d.tunnelProc.kill(); } catch { /* already gone */ } }
   d.running = false;

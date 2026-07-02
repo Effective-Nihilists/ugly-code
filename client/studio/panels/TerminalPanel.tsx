@@ -11,6 +11,7 @@ export function TerminalPanel(): React.ReactElement {
   const [busy, setBusy] = React.useState(false);
   const [history, setHistory] = React.useState<string[]>([]);
   const histIdx = React.useRef<number>(-1);
+  const procRef = React.useRef<{ kill: (signal?: string) => void } | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -33,13 +34,16 @@ export function TerminalPanel(): React.ReactElement {
     setBusy(true);
     try {
       const p = native.process.spawn('bash', ['-lc', c], { cwd });
+      procRef.current = p;
       p.onStdout((chunk) => { setLog((l) => l + chunk); });
       p.onStderr((chunk) => { setLog((l) => l + chunk); });
       p.onError((e) => {
+        procRef.current = null;
         setLog((l) => `${l}[error: ${e}]\n`);
         setBusy(false);
       });
       p.onExit((code) => {
+        procRef.current = null;
         setLog((l) => `${l}${code === 0 ? '' : `[exit ${code ?? 'null'}]\n`}`);
         setBusy(false);
         inputRef.current?.focus();
@@ -50,8 +54,60 @@ export function TerminalPanel(): React.ReactElement {
     }
   }, [cmd, busy]);
 
+  // Tab: complete the last token as a filesystem path against the project dir.
+  // The runner is one-shot `bash -lc` with no PTY, so real shell/command
+  // completion isn't available — this covers the common "finish a filename" case
+  // (single match completes fully; multiple share their longest common prefix).
+  const complete = React.useCallback(async () => {
+    const cwd = getActiveProjectPath();
+    if (!cwd) return;
+    const tokens = cmd.split(/(\s+)/); // keep separators so we can rejoin verbatim
+    const lastIdx = tokens.length - 1;
+    const last = tokens[lastIdx] ?? '';
+    if (!last || /\s/.test(last)) return;
+    const slash = last.lastIndexOf('/');
+    const dirPart = slash >= 0 ? last.slice(0, slash + 1) : '';
+    const partial = slash >= 0 ? last.slice(slash + 1) : last;
+    const abs = dirPart.startsWith('/') || dirPart.startsWith('~');
+    const baseDir = (abs ? dirPart : `${cwd}/${dirPart}`).replace(/\/+$/, '') || '/';
+    try {
+      const entries = await native.fs.readdir(baseDir);
+      const matches = entries.filter((en) => en.name.startsWith(partial));
+      if (matches.length === 0) return;
+      let completedTok: string;
+      if (matches.length === 1) {
+        completedTok = dirPart + matches[0].name + (matches[0].isDirectory ? '/' : ' ');
+      } else {
+        const lcp = matches.reduce((pre, m) => {
+          let i = 0;
+          while (i < pre.length && i < m.name.length && pre[i] === m.name[i]) i++;
+          return pre.slice(0, i);
+        }, matches[0].name);
+        if (lcp.length <= partial.length) return; // nothing unambiguous to add
+        completedTok = dirPart + lcp;
+      }
+      tokens[lastIdx] = completedTok;
+      setCmd(tokens.join(''));
+    } catch { /* dir unreadable — nothing to complete */ }
+  }, [cmd]);
+
   // Up/down arrows walk shell history (standard CLI behavior).
   const onKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key === 'Tab') { e.preventDefault(); void complete(); return; }
+    // Ctrl+C: interrupt the running command (real SIGINT), else clear the line —
+    // matching a shell. Without this the one-shot runner had no way to stop a
+    // hung command.
+    if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault();
+      if (busy && procRef.current) {
+        try { procRef.current.kill('SIGINT'); } catch { /* already exited */ }
+        setLog((l) => `${l}^C\n`);
+      } else if (cmd) {
+        setCmd('');
+        setLog((l) => `${l}^C\n`);
+      }
+      return;
+    }
     if (e.key === 'Enter') { submit(); return; }
     if (e.key === 'ArrowUp' && history.length > 0) {
       e.preventDefault();
