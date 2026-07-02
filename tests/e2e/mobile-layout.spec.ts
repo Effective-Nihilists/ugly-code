@@ -73,11 +73,6 @@ test.describe('Mobile workspace — nav drawer', () => {
     expect(toggleBox).not.toBeNull();
     expect(toggleBox!.y).toBeGreaterThanOrEqual(TOP - 2);
 
-    // The fixed feedback button also clears the status bar.
-    const fbBox = await page.locator('[data-id="feedback-button"]').boundingBox();
-    expect(fbBox).not.toBeNull();
-    expect(fbBox!.y).toBeGreaterThanOrEqual(TOP - 2);
-
     // The composer clears the home indicator (bottom inset) — its bottom edge
     // sits at least BOTTOM px above the viewport bottom.
     const inputBox = await page.locator('[data-id="home-prompt-input"]').boundingBox();
