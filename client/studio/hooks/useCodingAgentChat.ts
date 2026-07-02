@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'r
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
 import { SessionSnapshotSchema } from '../shared/api';
 import { spliceMissingUserRows } from '../agent/messageBackfill';
+import { parseCodebaseReadinessEvent } from '../agent/codebaseReadinessEvent';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { onCustomMessage } from './useSocket';
 
@@ -1633,6 +1634,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // `permission_request` / `ask_user_request` / `lsp_event`.
       // The legacy granular events still go out (other consumers
       // may rely on them) — the client just no longer reduces them.
+      if (eventType === 'codebase_readiness') {
+        // Standalone readiness push (host indexer poll). Updates ONLY the header pill — no full
+        // snapshot — so it fills in before the first turn without clobbering telemetry. Reaching
+        // here already means the event passed the acceptedSessionId gate above, so it's ours.
+        const readiness = parseCodebaseReadinessEvent(payload);
+        if (readiness) setCodebaseReadiness(readiness);
+        return;
+      }
+
       if (eventType === 'session_state') {
         // VALIDATE, don't cast: this snapshot is untyped wire data primed by the host's
         // coding.js task (whose build can lag the SPA). A bare `as SessionSnapshot` is the

@@ -200,13 +200,15 @@ interface SessionAgentState {
   permissionMode: SessionSnapshot['permissionMode'];
   modelMode: SessionSnapshot['modelMode'];
   patternMode: SessionSnapshot['patternMode'];
-  // Live codebase-analysis readiness (semantic index + architecture), polled from the host
-  // via codebase.status and echoed in every session_state so the header pill tracks it.
-  codebaseReadiness?: SessionSnapshot['codebaseReadiness'];
-  // The host-generated ARCHITECTURE.md, fetched once it's ready and injected into the
-  // system prompt (live getter) so the agent has a codebase map without reading files.
-  architectureDoc?: string;
 }
+
+// Codebase analysis (semantic index + architecture doc) runs per SESSION, decoupled from the
+// agent controller, so the header pill tracks indexing the moment the session task BOOTS — not
+// on the first turn (the old coupling left a freshly-opened session's pill stuck on "loading"
+// until the user sent a message, which never happens if they're waiting for it to be "ready").
+// Keyed by sessionId; lives for the task process. See `ensureCodebaseAnalysis`.
+const codebaseReadinessBySession = new Map<string, SessionSnapshot['codebaseReadiness']>();
+const architectureDocBySession = new Map<string, string>();
 
 /** Fold a (partial) user selection onto the session state. Called on create and
  *  on every subsequent turn so a mid-session model/mode swap takes effect. */
@@ -440,13 +442,45 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
     perModel: [...s.perModel.values()],
     messageCount: s.messageCount,
   });
-  // Fold in the latest codebase readiness (the indexer poll updates s.codebaseReadiness and
-  // re-emits) so every session_state carries it — applySnapshot only reads what's present.
-  if (s.codebaseReadiness !== undefined) snap['codebaseReadiness'] = s.codebaseReadiness;
+  // Fold in the latest codebase readiness (the indexer poll updates the per-session map and
+  // re-emits) so every session_state carries it too — applySnapshot only reads what's present.
+  const readiness = codebaseReadinessBySession.get(sessionId);
+  if (readiness !== undefined) snap['codebaseReadiness'] = readiness;
   safeEmit(s.emitRef.current, {
     type: 'codingAgent:event',
     sessionId,
     event: { type: 'session_state', payload: { payload: snap } },
+  });
+}
+
+/**
+ * Start (idempotently) the host's semantic index + architecture analysis for this session's
+ * project and stream readiness to the viewer as a standalone `codebase_readiness` event.
+ *
+ * Called BOTH at task boot (coding-task) and from getOrCreate, so the header's codebase pill
+ * tracks indexing whether or not the user has sent a turn yet. `startCodebasePoll` is keyed by
+ * sessionId and no-ops if already running, so the two call sites can't double-poll.
+ *
+ * The event carries ONLY readiness (never a full session_state snapshot): a boot-time snapshot
+ * would zero-out cost/tokens and clobber a resumed session's live telemetry header while the
+ * indexer runs. session_state still folds readiness in during turns (emitTelemetry) for the
+ * mount-snapshot path.
+ */
+export function ensureCodebaseAnalysis(sessionId: string, emit: Emit): void {
+  const cwd = getActiveProjectPath() ?? '';
+  startCodebasePoll(sessionId, cwd, (r) => {
+    codebaseReadinessBySession.set(sessionId, r as SessionSnapshot['codebaseReadiness']);
+    safeEmit(emit, {
+      type: 'codingAgent:event',
+      sessionId,
+      event: { type: 'codebase_readiness', payload: { payload: r } },
+    });
+    // Once the architecture doc is ready, fetch it once (injected via the systemPrompt getter).
+    if (!architectureDocBySession.has(sessionId) && r.architecture?.status === 'ready') {
+      void fetchArchitectureDoc(cwd).then((doc) => {
+        if (doc) architectureDocBySession.set(sessionId, doc);
+      });
+    }
   });
 }
 
@@ -489,18 +523,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
   applySelection(state, selection);
   state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: state.model });
 
-  // Kick off the host's semantic index + architecture doc for this project and stream their
-  // readiness into session_state (drives the chat header's codebase pill: indexing → ready).
-  startCodebasePoll(sessionId, getActiveProjectPath() ?? '', (r) => {
-    state.codebaseReadiness = r as SessionSnapshot['codebaseReadiness'];
-    emitTelemetry(state, sessionId);
-    // Once the architecture doc is ready, fetch it once and inject (via the systemPrompt getter).
-    if (!state.architectureDoc && r?.architecture?.status === 'ready') {
-      void fetchArchitectureDoc(getActiveProjectPath() ?? '').then((doc) => {
-        if (doc) state.architectureDoc = doc;
-      });
-    }
-  });
+  // Kick off (idempotently) the host's semantic index + architecture doc and stream readiness
+  // to the header pill. Also runs at task boot (coding-task) so the pill fills in BEFORE the
+  // first turn — see ensureCodebaseAnalysis.
+  ensureCodebaseAnalysis(sessionId, emitRef.current);
 
   state.controller = runAgent({
     socket: fetchSocket,
@@ -516,8 +542,9 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     // ready we fetch ARCHITECTURE.md and append it as a codebase map, so the agent gets
     // structural context up front without spending turns reading files.
     get systemPrompt() {
-      return state.architectureDoc
-        ? `${AGENT_SYSTEM_PROMPT}\n\n# Project architecture (auto-generated map — exports, types, inheritance)\n\n${state.architectureDoc}`
+      const architectureDoc = architectureDocBySession.get(sessionId);
+      return architectureDoc
+        ? `${AGENT_SYSTEM_PROMPT}\n\n# Project architecture (auto-generated map — exports, types, inheritance)\n\n${architectureDoc}`
         : AGENT_SYSTEM_PROMPT;
     },
     tools: AGENT_TOOLS,
@@ -699,10 +726,13 @@ export function abortClientAgent(sessionId: string): void {
  * worktree re-provision on the next message.
  */
 export function clearClientAgentSession(sessionId: string): void {
+  // Stop the poll first — it can be running from a boot-time ensureCodebaseAnalysis even when
+  // no turn (and so no session state) exists yet. The readiness/architecture maps are kept:
+  // the project is unchanged, so the pill stays accurate and the next turn reuses them.
+  stopCodebasePoll(sessionId);
   const s = sessions.get(sessionId);
   if (!s) return;
   try { s.controller.abort(); } catch { /* no in-flight turn */ }
   try { s.controller.dispose(); } catch { /* already torn down */ }
-  stopCodebasePoll(sessionId);
   sessions.delete(sessionId);
 }

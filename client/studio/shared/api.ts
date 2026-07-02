@@ -286,6 +286,28 @@ export const SessionEvalStateSchema = z.object({
 export type SessionEvalState = z.infer<typeof SessionEvalStateSchema>;
 
 /**
+ * Codebase-analysis readiness — architecture doc + semantic indexer state for a
+ * session's project. Extracted so the standalone `codebase_readiness` event (which
+ * updates ONLY the header pill, without a full session_state snapshot) can validate
+ * the same shape the snapshot embeds. See `parseCodebaseReadinessEvent`.
+ */
+export const CodebaseReadinessSchema = z.object({
+  architecture: z.object({
+    status: z.enum(['idle', 'building', 'ready', 'failed']),
+    filesAnalyzed: z.number().optional(),
+    filesTotal: z.number().optional(),
+    lastWrittenAt: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  indexer: z.object({
+    status: z.enum(['idle', 'indexing', 'ready', 'error']),
+    indexedChunks: z.number().optional(),
+    totalChunks: z.number().optional(),
+    totalFiles: z.number().optional(),
+  }),
+});
+
+/**
  * The single source of truth for a session's UI-visible state.
  * Returned from `getCodingAgentSnapshot` on mount + reconnect, and
  * re-broadcast as a `session_state` event whenever any field
@@ -597,22 +619,10 @@ export const SessionSnapshotSchema = z.object({
   // Codebase-analysis readiness — architecture doc + semantic
   // indexer state for the session's project. Pushed via
   // `session_state` whenever the indexer manager broadcasts a
-  // change. Replaces the old `getCodebaseReadiness` polling.
-  codebaseReadiness: z.object({
-    architecture: z.object({
-      status: z.enum(['idle', 'building', 'ready', 'failed']),
-      filesAnalyzed: z.number().optional(),
-      filesTotal: z.number().optional(),
-      lastWrittenAt: z.number().optional(),
-      error: z.string().optional(),
-    }),
-    indexer: z.object({
-      status: z.enum(['idle', 'indexing', 'ready', 'error']),
-      indexedChunks: z.number().optional(),
-      totalChunks: z.number().optional(),
-      totalFiles: z.number().optional(),
-    }),
-  }),
+  // change (and, pre-first-turn, via the standalone
+  // `codebase_readiness` event). Replaces the old
+  // `getCodebaseReadiness` polling.
+  codebaseReadiness: CodebaseReadinessSchema,
 
   /**
    * Eval-mode binding when this session was created from the interactive

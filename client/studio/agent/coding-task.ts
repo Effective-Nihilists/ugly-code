@@ -6,7 +6,7 @@
 // its emitCustom-style events become task events (task.event:<id>) via uglyTask.emit.
 import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
-import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, type AgentSelection } from './clientAgent';
+import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, ensureCodebaseAnalysis, type AgentSelection } from './clientAgent';
 import { installTaskErrorLog } from './taskErrorLog';
 
 const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
@@ -77,3 +77,12 @@ defineTask({
 });
 
 t.setSnapshot({ turn: 'idle', sessionId });
+
+// Kick the host's semantic index + architecture analysis at BOOT (not on the first turn) so the
+// chat header's codebase pill tracks indexing the moment the session opens. Without this the pill
+// sat on "Codebase: loading…" until the user sent a message — a deadlock when they were waiting
+// for it to go "ready" before typing. Readiness streams as standalone `codebase_readiness` events
+// (see ensureCodebaseAnalysis); the poll self-stops once the index settles.
+if (t.params.projectPath) {
+  ensureCodebaseAnalysis(sessionId, (msg) => { t.emit('msg', msg); });
+}
