@@ -17,7 +17,7 @@ export interface PickEntry {
  * defaults to the host home. The picker falls back to '~' then '/' if a path can't be read.
  */
 export function resolveStart(startPath?: string): string {
-  return startPath && startPath.trim() ? startPath : '~';
+  return startPath?.trim() ? startPath : '~';
 }
 
 /** Go up one directory, preserving a leading '~' or '/'. Root paths return themselves. */

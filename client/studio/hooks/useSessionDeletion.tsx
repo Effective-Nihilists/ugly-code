@@ -46,7 +46,7 @@ export interface SessionDeletionEntry {
 
 export interface SessionDeletionAPI {
   enqueue(
-    items: ReadonlyArray<{ compositeId: string; title: string }>,
+    items: readonly { compositeId: string; title: string }[],
     onComplete?: () => void,
   ): void;
   /** True while a delete for this id is in flight. Used by rows to
@@ -56,7 +56,7 @@ export interface SessionDeletionAPI {
   isDeleting(compositeId: string): boolean;
   /** All tracked entries (pending + recently errored), ordered by
    *  insertion. The top-bar badge reads this. */
-  entries: ReadonlyArray<SessionDeletionEntry>;
+  entries: readonly SessionDeletionEntry[];
   /** Dismiss an errored entry from the badge popover. */
   dismiss(compositeId: string): void;
 }

@@ -177,9 +177,9 @@ function useIsDesktop(): boolean {
     typeof window === 'undefined' ? true : window.innerWidth >= 900,
   );
   useEffect(() => {
-    const onResize = () => setIsDesktop(window.innerWidth >= 900);
+    const onResize = () => { setIsDesktop(window.innerWidth >= 900); };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => { window.removeEventListener('resize', onResize); };
   }, []);
   return isDesktop;
 }
@@ -264,7 +264,7 @@ function MacArchToggle({
           <button
             key={a}
             type="button"
-            onClick={() => setMacArch(a)}
+            onClick={() => { setMacArch(a); }}
             style={{
               padding: '6px 12px',
               background: active ? BRAND_GLOW : 'transparent',
@@ -613,7 +613,7 @@ function HeroInstall({
 
       <WindowsTrustModal
         url={winPromptUrl}
-        onClose={() => setWinPromptUrl(null)}
+        onClose={() => { setWinPromptUrl(null); }}
       />
     </div>
   );
@@ -2527,7 +2527,7 @@ function WindowsTrustModal({
         }}
       >
         <div
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); }}
           style={{
             pointerEvents: 'auto',
             maxWidth: 520,

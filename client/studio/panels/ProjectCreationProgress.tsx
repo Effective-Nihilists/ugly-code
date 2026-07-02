@@ -124,7 +124,7 @@ export function ProjectCreationProgress({
         <span style={S.sub}>npx ugly-app init · pnpm install</span>
         <span style={{ flex: 1 }} />
         {status === 'error' && (
-          <button data-id="creation-retry" onClick={() => setAttempt((a) => a + 1)} style={S.btn}>
+          <button data-id="creation-retry" onClick={() => { setAttempt((a) => a + 1); }} style={S.btn}>
             Retry
           </button>
         )}

@@ -38,13 +38,13 @@ export function spliceMissingUserRows<M extends OrderableRow>(
   const have = new Set(current.map((m) => m.id));
   let out = current;
   for (let hi = 0; hi < history.length; hi++) {
-    const hm = history[hi]!;
+    const hm = history[hi];
     if (hm.role !== 'user' || have.has(hm.id) || !hm.text) continue;
     // Insert before the first rendered row that appears AFTER this prompt in history; a
     // rendered row not in history (live-streaming) counts as after → prompt goes before it.
     let insertAt = out.length;
     for (let ri = 0; ri < out.length; ri++) {
-      const pos = histIds.indexOf(out[ri]!.id);
+      const pos = histIds.indexOf(out[ri].id);
       if (pos === -1 || pos > hi) {
         insertAt = ri;
         break;

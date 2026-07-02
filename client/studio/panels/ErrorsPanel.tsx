@@ -108,8 +108,8 @@ export function ErrorsPanel({
         setSummary(sRes.aggregations);
         setErrors(lRes.errors);
       })
-      .catch((e: unknown) => console.error('[ErrorsPanel]', e))
-      .finally(() => setLoading(false));
+      .catch((e: unknown) => { console.error('[ErrorsPanel]', e); })
+      .finally(() => { setLoading(false); });
   }, [mode, studioSessionId]);
 
   return (
@@ -208,7 +208,7 @@ export function ErrorsPanel({
                     data-id="error-item"
                     style={card}
                     onClick={() =>
-                      setExpandedId(expandedId === e.id ? null : e.id)
+                      { setExpandedId(expandedId === e.id ? null : e.id); }
                     }
                   >
                     <div

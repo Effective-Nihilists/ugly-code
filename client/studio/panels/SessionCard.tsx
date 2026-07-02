@@ -64,11 +64,11 @@ export function SessionCard({
         minWidth: 0,
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background =
+        (e.currentTarget).style.background =
           'var(--bg-secondary)';
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background =
+        (e.currentTarget).style.background =
           session.running ? 'var(--bg-secondary)' : 'var(--bg-panel)';
       }}
     >

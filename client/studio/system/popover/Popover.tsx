@@ -119,7 +119,7 @@ export function Popover({
   // Refs for arrow-key navigation through descendant role=menuitem children.
   // floating-ui needs the array reference itself stable — we rebuild contents
   // on every render via callback refs in the rendered list items.
-  const listRef = useRef<Array<HTMLElement | null>>([]);
+  const listRef = useRef<(HTMLElement | null)[]>([]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const labelId = useId();
@@ -204,7 +204,7 @@ export function Popover({
     if (!isValidElement(trigger)) {
       throw new Error('<Popover> requires a single ReactElement trigger');
     }
-    type TriggerProps = { ref?: React.Ref<HTMLElement> };
+    interface TriggerProps { ref?: React.Ref<HTMLElement> }
     const triggerWithRef = trigger as ReactElement<TriggerProps>;
     return cloneElement(triggerWithRef, {
       ref: refs.setReference,
@@ -221,7 +221,7 @@ export function Popover({
   }, [trigger, refs.setReference, getReferenceProps, role, open, labelId]);
 
   // Render-prop form gives children a close() handle.
-  const close = (): void => setOpen(false);
+  const close = (): void => { setOpen(false); };
   const renderedContent =
     typeof children === 'function'
       ? (children as (ctx: PopoverRenderContext) => React.ReactNode)({ close })

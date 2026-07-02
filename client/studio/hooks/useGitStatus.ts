@@ -44,7 +44,7 @@ export function useGitStatus(pollIntervalMs = 5000, cwd?: string) {
     if (!isTabActive) return;
     void refresh();
     const interval = setInterval(refresh, pollIntervalMs);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); };
   }, [refresh, pollIntervalMs, isTabActive]);
 
   return { branch, remote, files, changedCount: files.length, refresh };

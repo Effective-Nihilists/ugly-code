@@ -89,7 +89,7 @@ export function useVirtualizer<
 
   // Pre-render update (synchronous layout measurement)
   useLayoutEffect(() => {
-    return instance._willUpdate();
+    instance._willUpdate();
   });
 
   return instance;

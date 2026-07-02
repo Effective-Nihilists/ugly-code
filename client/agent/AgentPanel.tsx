@@ -30,7 +30,7 @@ export default function AgentPanel(): React.ReactElement {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [items]);
 
-  const push = (it: TranscriptItem): void => setItems((prev) => [...prev, it]);
+  const push = (it: TranscriptItem): void => { setItems((prev) => [...prev, it]); };
 
   const onEvent = (e: AgentEvent): void => {
     if (e.type === 'assistant') push({ kind: 'assistant', text: e.text });
@@ -111,7 +111,7 @@ export default function AgentPanel(): React.ReactElement {
         <textarea
           data-id="agent-input"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { setInput(e.target.value); }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();

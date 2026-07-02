@@ -178,7 +178,7 @@ export function EvalPickerModal({
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); }}
           placeholder="Filter by name or success criteria…"
           autoFocus
           style={{
@@ -224,7 +224,7 @@ export function EvalPickerModal({
                   history={historyByTask.get(t.name) ?? []}
                   disabled={submittingFor !== null && submittingFor !== t.name}
                   isSubmitting={submittingFor === t.name}
-                  onPick={() => handlePick(t.name)}
+                  onPick={() => { handlePick(t.name); }}
                   onOpenRun={onOpenRun}
                   onDeleteRun={(p) => void handleDeleteRun(p)}
                 />
@@ -397,9 +397,9 @@ function TaskRow({
               key={run.sessionId}
               run={run}
               onOpen={() =>
-                onOpenRun(run.projectName, run.projectPath, run.sessionId)
+                { onOpenRun(run.projectName, run.projectPath, run.sessionId); }
               }
-              onDelete={() => onDeleteRun(run.projectName)}
+              onDelete={() => { onDeleteRun(run.projectName); }}
             />
           ))}
         </div>
@@ -437,7 +437,7 @@ function HistoryRunRow({
     void navigator.clipboard.writeText(run.sessionId).then(
       () => {
         setCopied(true);
-        setTimeout(() => setCopied(false), 1200);
+        setTimeout(() => { setCopied(false); }, 1200);
       },
       () => undefined,
     );
@@ -527,7 +527,7 @@ function HistoryRunRow({
             setConfirming(false);
           } else {
             setConfirming(true);
-            setTimeout(() => setConfirming(false), 2500);
+            setTimeout(() => { setConfirming(false); }, 2500);
           }
         }}
         title={confirming ? 'Click again to confirm delete' : 'Delete this run'}

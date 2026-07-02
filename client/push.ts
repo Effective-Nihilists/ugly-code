@@ -58,7 +58,7 @@ function ensureIframe(): Promise<void> {
       const func = data.func as string;
       const idx = pendingResolvers.findIndex((r) => r.func === func);
       if (idx >= 0) {
-        pendingResolvers[idx]!.resolve(data);
+        pendingResolvers[idx].resolve(data);
         pendingResolvers.splice(idx, 1);
       }
     });

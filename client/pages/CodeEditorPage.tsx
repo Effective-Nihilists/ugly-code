@@ -43,9 +43,9 @@ export default function CodeEditorPage(): React.ReactElement {
     setRunning(true);
     try {
       const proc = native.process.spawn(bin, args, { cwd });
-      proc.onStdout((chunk) => setOutput((o) => o + chunk));
-      proc.onStderr((chunk) => setOutput((o) => o + chunk));
-      proc.onError((err) => setOutput((o) => o + `error: ${err}\n`));
+      proc.onStdout((chunk) => { setOutput((o) => o + chunk); });
+      proc.onStderr((chunk) => { setOutput((o) => o + chunk); });
+      proc.onError((err) => { setOutput((o) => o + `error: ${err}\n`); });
       proc.onExit((code) => {
         setOutput((o) => o + `\n[exit ${code}]\n`);
         setRunning(false);
@@ -186,7 +186,7 @@ export default function CodeEditorPage(): React.ReactElement {
           <input
             data-id="cmd-input"
             value={cmd}
-            onChange={(e) => setCmd(e.target.value)}
+            onChange={(e) => { setCmd(e.target.value); }}
             onKeyDown={(e) => e.key === 'Enter' && !running && runCommand()}
             spellCheck={false}
             style={S.cmdInput}

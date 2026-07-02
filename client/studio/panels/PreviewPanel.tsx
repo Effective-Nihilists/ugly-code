@@ -168,7 +168,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
     setUrl(target);
     setCommitted(target);
     try { localStorage.setItem(keyFor(sessionId ?? null), target); } catch { /* ignore */ }
-    setTimeout(() => setReloadKey((k) => k + 1), 2500);
+    setTimeout(() => { setReloadKey((k) => k + 1); }, 2500);
   }, [devKey, port, sessionId]);
 
   return (
@@ -183,7 +183,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
           {dev.running ? '⟳ Restart app' : '▶ Start app'}
         </button>
         {dev.running && (
-          <button data-id="preview-stop" style={S.iconBtn} title="Stop the dev server" onClick={() => stopDev(devKey)}>■</button>
+          <button data-id="preview-stop" style={S.iconBtn} title="Stop the dev server" onClick={() => { stopDev(devKey); }}>■</button>
         )}
         <span style={{ ...S.dot, background: dev.running ? 'var(--accent-success, #10b981)' : 'var(--text-muted)' }} title={dev.running ? `running on :${dev.port}` : 'stopped'} />
         <button data-id="preview-reload" style={S.iconBtn} title="Reload preview" onClick={() => { setReloadKey((k) => k + 1); }}>↻</button>
@@ -197,7 +197,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
           spellCheck={false}
         />
         <button data-id="preview-go" style={S.goBtn} onClick={commit}>Go</button>
-        <button data-id="preview-logs" style={{ ...S.iconBtn, ...(showLog ? S.iconBtnActive : {}) }} title="Dev server logs" onClick={() => setShowLog((s) => !s)}>⌗</button>
+        <button data-id="preview-logs" style={{ ...S.iconBtn, ...(showLog ? S.iconBtnActive : {}) }} title="Dev server logs" onClick={() => { setShowLog((s) => !s); }}>⌗</button>
         <a data-id="preview-open" style={S.openBtn} href={committed} target="_blank" rel="noreferrer" title="Open in new tab">↗</a>
       </div>
       {showLog && (

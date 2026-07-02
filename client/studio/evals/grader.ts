@@ -22,7 +22,7 @@ export interface GradeDeps {
   judge?(system: string, user: string): Promise<string>;
 }
 
-type Check = { name: string; passed: boolean; detail?: string };
+interface Check { name: string; passed: boolean; detail?: string }
 type Judge = NonNullable<EvalGradeResult['judgeResults']>[number];
 
 const COUNT_TS_ERRORS = /error TS\d+:/g;
@@ -49,7 +49,7 @@ export interface GradeInput {
 /** Parse the judge's `{"points": n, "verdict": "..."}` reply, tolerant of
  *  code fences / prose around the JSON. */
 export function parseJudge(text: string, max: number): { points: number; verdict: string } {
-  const m = text.match(/\{[\s\S]*\}/);
+  const m = /\{[\s\S]*\}/.exec(text);
   if (m) {
     try {
       const o = JSON.parse(m[0]) as { points?: unknown; verdict?: unknown };

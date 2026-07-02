@@ -263,7 +263,7 @@ export function FinishFailurePopup({
           {skippable && onSkipGate && (
             <button
               type="button"
-              onClick={() => onSkipGate(info.stage as 'tsc' | 'lint' | 'tests')}
+              onClick={() => { onSkipGate(info.stage as 'tsc' | 'lint' | 'tests'); }}
               style={{
                 background: 'transparent',
                 color: 'var(--text-primary)',

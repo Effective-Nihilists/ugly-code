@@ -75,8 +75,8 @@ function wireCrossTab(): void {
   crossTabWired = true;
   onCustomMessage((msg) => {
     if (msg.type !== 'studioUserSettings:changed') return;
-    const key = msg['key'] as string | undefined;
-    const value = msg['value'];
+    const key = msg.key as string | undefined;
+    const value = msg.value;
     if (!cache || typeof key !== 'string') return;
     if (value === null || value === undefined) cache.delete(key);
     else cache.set(key, value);
@@ -146,7 +146,7 @@ export function useStudioUserSetting<T extends SettingValue>(
   const value = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const set = useCallback(
     (next: T) => {
-      setStudioUserSetting(socket, key, next as SettingValue);
+      setStudioUserSetting(socket, key, next);
     },
     [key, socket],
   );

@@ -114,7 +114,7 @@ function useCopyButton(): [string | null, (key: string, text: string) => void] {
     try {
       void navigator.clipboard.writeText(text);
       setCopied(key);
-      setTimeout(() => setCopied((c) => (c === key ? null : c)), 1200);
+      setTimeout(() => { setCopied((c) => (c === key ? null : c)); }, 1200);
     } catch {
       /* ignore */
     }
@@ -236,8 +236,8 @@ function ToolCardShell({
   const [showRunning, setShowRunning] = useState(false);
   useEffect(() => {
     if (status === 'running' || status === 'executing') {
-      const t = setTimeout(() => setShowRunning(true), 500);
-      return () => clearTimeout(t);
+      const t = setTimeout(() => { setShowRunning(true); }, 500);
+      return () => { clearTimeout(t); };
     }
     setShowRunning(false);
   }, [status]);
@@ -254,7 +254,7 @@ function ToolCardShell({
       }}
     >
       <div
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => { setExpanded(!expanded); }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -1089,7 +1089,7 @@ function PinnedTodos({
       }}
     >
       <div
-        onClick={() => setCollapsed((c) => !c)}
+        onClick={() => { setCollapsed((c) => !c); }}
         style={{
           cursor: 'pointer',
           display: 'flex',
@@ -1617,7 +1617,7 @@ function BashCard({
     const t = setInterval(() => {
       setLiveElapsed(Date.now() - (startRef.current ?? Date.now()));
     }, 1000);
-    return () => clearInterval(t);
+    return () => { clearInterval(t); };
   }, [running, tool.startedAt]);
   // Remaining time until the executor's timeout fires. Surfaced via
   // tool_progress `meta` event when the bash tool starts. Undefined
@@ -1916,7 +1916,7 @@ function DevServerCard({
     const t = setInterval(() => {
       setLiveElapsed(Date.now() - (startRef.current ?? Date.now()));
     }, 1000);
-    return () => clearInterval(t);
+    return () => { clearInterval(t); };
   }, [running, tool.startedAt]);
   const remainingMs =
     tool.timeoutMs != null && running
@@ -2272,8 +2272,8 @@ function GrepCard({ tool }: { tool: ToolUse }) {
 function ToolUseCard({ tool }: { tool: ToolUse }) {
   const cwd = useChatCwd();
   const subAgentModel =
-    tool.metadata && typeof tool.metadata['subAgentModel'] === 'string'
-      ? tool.metadata['subAgentModel']
+    tool.metadata && typeof tool.metadata.subAgentModel === 'string'
+      ? tool.metadata.subAgentModel
       : null;
   return (
     <ToolCardShell
@@ -2946,7 +2946,7 @@ function ChatMarkdown({ text }: { text: string }) {
       for (const e of entries) setWidth(Math.max(200, e.contentRect.width));
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); };
   }, []);
   const { mode } = useTheme();
   const isDark = mode === 'dark';
@@ -3171,7 +3171,7 @@ function JudgeCard({ msg }: { msg: ChatMessage }) {
         }}
       >
         <div
-          onClick={() => setExpanded((e) => !e)}
+          onClick={() => { setExpanded((e) => !e); }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -3455,7 +3455,7 @@ function DoneCard({
       {wt.changedFiles.length > 0 && (
         <div>
           <div
-            onClick={() => setFilesExpanded((v) => !v)}
+            onClick={() => { setFilesExpanded((v) => !v); }}
             style={{
               cursor: 'pointer',
               fontSize: 11,
@@ -3636,7 +3636,7 @@ function DoneCard({
                     s.name === 'tests') && (
                     <button
                       onClick={() =>
-                        controls.onStopStage(s.name as 'tsc' | 'lint' | 'tests')
+                        { controls.onStopStage(s.name as 'tsc' | 'lint' | 'tests'); }
                       }
                       style={{
                         background: 'transparent',
@@ -3751,7 +3751,7 @@ function DoneCard({
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               data-id="done-entry-dirty-main-commit"
-              onClick={() => controls.onResolveDirtyMain(true)}
+              onClick={() => { controls.onResolveDirtyMain(true); }}
               style={{
                 background: 'var(--accent)',
                 color: '#fff',
@@ -3766,7 +3766,7 @@ function DoneCard({
             </button>
             <button
               data-id="done-entry-dirty-main-cancel"
-              onClick={() => controls.onResolveDirtyMain(false)}
+              onClick={() => { controls.onResolveDirtyMain(false); }}
               style={{
                 background: 'transparent',
                 color: 'var(--text-secondary)',
@@ -3804,7 +3804,7 @@ function DoneCard({
           <textarea
             data-id="done-entry-review-message"
             value={reviewMessage}
-            onChange={(e) => setReviewMessage(e.target.value)}
+            onChange={(e) => { setReviewMessage(e.target.value); }}
             rows={4}
             style={{
               width: '100%',
@@ -3820,7 +3820,7 @@ function DoneCard({
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               data-id="done-entry-review-accept"
-              onClick={() => controls.onAcceptReview(reviewMessage)}
+              onClick={() => { controls.onAcceptReview(reviewMessage); }}
               style={{
                 background: 'var(--accent)',
                 color: '#fff',
@@ -3916,9 +3916,9 @@ function DoneCard({
               <button
                 data-id="done-entry-failure-skip"
                 onClick={() =>
-                  controls.onSkipGate(
+                  { controls.onSkipGate(
                     controls.failurePopup!.stage as 'tsc' | 'lint' | 'tests',
-                  )
+                  ); }
                 }
                 style={{
                   background: 'transparent',
@@ -4137,7 +4137,7 @@ function JudgeTerminatedCard({
               <button
                 key={idx}
                 type="button"
-                onClick={() => onPickOption(opt)}
+                onClick={() => { onPickOption(opt); }}
                 style={{
                   textAlign: 'left',
                   padding: '7px 10px',
@@ -4373,7 +4373,7 @@ function AssistantMessage({
       setRestoreState('working');
       const ok = await onRestoreCheckpoint(msg.id);
       setRestoreState(ok ? 'done' : 'failed');
-      setTimeout(() => setRestoreState('idle'), 3000);
+      setTimeout(() => { setRestoreState('idle'); }, 3000);
     }
   };
 
@@ -4417,7 +4417,7 @@ function AssistantMessage({
                 <RestoreCheckpointAction
                   state={restoreState}
                   onClick={() => void handleRestoreClick()}
-                  onCancel={() => setRestoreState('idle')}
+                  onCancel={() => { setRestoreState('idle'); }}
                 />
               ) : (
                 <span />
@@ -4689,7 +4689,7 @@ function AskUserCard({
           type="text"
           placeholder="Other…"
           value={otherText}
-          onChange={(e) => setOtherText(e.target.value)}
+          onChange={(e) => { setOtherText(e.target.value); }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && otherText.trim() && !submitting) {
               void submit(`Other: ${otherText.trim()}`);
@@ -4827,7 +4827,7 @@ function StepReviewCard({
       <textarea
         data-id="step-review-feedback"
         value={feedback}
-        onChange={(e) => setFeedback(e.target.value)}
+        onChange={(e) => { setFeedback(e.target.value); }}
         onKeyDown={(e) => {
           if (
             e.key === 'Enter' &&
@@ -4965,7 +4965,7 @@ function SubagentChildCard({ child }: { child: SubagentChild }) {
       }}
     >
       <div
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => { setExpanded((v) => !v); }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -5918,7 +5918,7 @@ CodingAgentChatProps = {}) {
       await setModelMode(params.modelMode);
       void setPermissionMode(params.permissionMode);
       void setPatternMode(params.patternMode);
-      void switchReasoningEffort(params.reasoningEffort);
+      switchReasoningEffort(params.reasoningEffort);
       const trimmed = params.prompt.trim();
       if (trimmed) await sendMessage(trimmed);
     },
@@ -6984,7 +6984,7 @@ CodingAgentChatProps = {}) {
     // model picks it up on its very next LLM round instead of waiting
     // for the whole turn to finish.
     if (hasMoreNewer) {
-      void jumpToTail().then(() => pinToBottom());
+      void jumpToTail().then(() => { pinToBottom(); });
     }
     void sendMessage(trimmed, hasAttachments ? attachments : undefined);
     setInput('');
@@ -7027,7 +7027,7 @@ CodingAgentChatProps = {}) {
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); };
   }, [pendingPermissions, approvePermission, skipAllPermissions]);
 
   const handleKeyDown = useCallback(
@@ -7191,7 +7191,7 @@ CodingAgentChatProps = {}) {
         {showScratchpad && (
           <ScratchpadPanel
             entries={scratchpadEntries}
-            onClose={() => setShowScratchpad(false)}
+            onClose={() => { setShowScratchpad(false); }}
           />
         )}
         {error && (
@@ -7228,7 +7228,7 @@ CodingAgentChatProps = {}) {
       {evalScorecardModalOpen && evalScorecardResult && (
         <EvalScorecardModal
           result={evalScorecardResult}
-          onClose={() => setEvalScorecardModalOpen(false)}
+          onClose={() => { setEvalScorecardModalOpen(false); }}
         />
       )}
       <div
@@ -7247,7 +7247,7 @@ CodingAgentChatProps = {}) {
         {showScratchpad && (
           <ScratchpadPanel
             entries={scratchpadEntries}
-            onClose={() => setShowScratchpad(false)}
+            onClose={() => { setShowScratchpad(false); }}
           />
         )}
         {/* Header strip — tokens + cost on the left, compaction +
@@ -7431,7 +7431,7 @@ CodingAgentChatProps = {}) {
             {onOpenSession && (
               <button
                 onClick={() =>
-                  onOpenSession(sessionInfo.parentSessionId as string)
+                  { onOpenSession(sessionInfo.parentSessionId!); }
                 }
                 style={{
                   background: 'transparent',
@@ -7607,10 +7607,10 @@ CodingAgentChatProps = {}) {
                       onResolveDirtyMain: resolveDirtyMainPrompt,
                       onAcceptReview: (cm) => void handleReviewAccept(cm),
                       onRejectReview: handleReviewReject,
-                      onCloseFailure: () => setFailurePopup(null),
+                      onCloseFailure: () => { setFailurePopup(null); },
                       onSkipGate: skipFailedStage,
                       onArchive: () => void handleArchiveSession(),
-                      onDismissArchive: () => setShowArchivePrompt(false),
+                      onDismissArchive: () => { setShowArchivePrompt(false); },
                     }}
                   />
                 );
@@ -7899,7 +7899,7 @@ CodingAgentChatProps = {}) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setEvalScorecardModalOpen(true)}
+                  onClick={() => { setEvalScorecardModalOpen(true); }}
                   data-id="eval-show-scoreboard-button"
                   style={{
                     fontFamily: 'var(--font-label)',
@@ -8020,7 +8020,7 @@ CodingAgentChatProps = {}) {
             scratchpadCount={scratchpadEntries.length}
             showScratchpad={showScratchpad}
             onToggleScratchpad={
-              sessionId ? () => setShowScratchpad((v) => !v) : undefined
+              sessionId ? () => { setShowScratchpad((v) => !v); } : undefined
             }
             readiness={codebaseReadiness}
           />
@@ -8184,11 +8184,7 @@ function CodingAgentInputArea({
         }
         accepted.push({
           kind: 'image',
-          mediaType: mt as
-            | 'image/png'
-            | 'image/jpeg'
-            | 'image/webp'
-            | 'image/gif',
+          mediaType: mt,
           base64: btoa(binary),
           filename: f.name || undefined,
         });
@@ -8413,7 +8409,7 @@ function CodingAgentInputArea({
                     }}
                   />
                   <button
-                    onClick={() => removeAttachment(i)}
+                    onClick={() => { removeAttachment(i); }}
                     title="Remove"
                     style={{
                       position: 'absolute',
@@ -8449,7 +8445,7 @@ function CodingAgentInputArea({
             {pendingSkill && (
               <SkillPill
                 name={pendingSkill}
-                onRemove={() => onPendingSkillChange(null)}
+                onRemove={() => { onPendingSkillChange(null); }}
               />
             )}
             {isStreaming && (
@@ -8618,7 +8614,7 @@ function EvalScorecardModal({
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); };
   }, [onClose]);
   return (
     <div
@@ -8637,7 +8633,7 @@ function EvalScorecardModal({
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); }}
         style={{
           width: 'min(720px, 100%)',
           maxHeight: '90vh',

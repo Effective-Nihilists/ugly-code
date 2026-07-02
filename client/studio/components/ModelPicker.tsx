@@ -312,7 +312,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
         });
     };
     fetchList();
-    const onChangeEvent = () => fetchList();
+    const onChangeEvent = () => { fetchList(); };
     window.addEventListener('zai-subscription-changed', onChangeEvent);
     window.addEventListener('kimi-subscription-changed', onChangeEvent);
     window.addEventListener('minimax-subscription-changed', onChangeEvent);
@@ -356,7 +356,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
     }
     // multi
     if (props.values.length === 0) return 'default (none)';
-    if (props.values.length === 1) return props.values[0]!.name;
+    if (props.values.length === 1) return props.values[0].name;
     return `${props.values.length} selected`;
   }, [displayLabel, props]);
 
@@ -462,7 +462,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
         key={model.id}
         type="button"
         role="menuitem"
-        onClick={() => selectModel(model, close)}
+        onClick={() => { selectModel(model, close); }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -521,7 +521,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
       key={mode}
       type="button"
       role="menuitem"
-      onClick={() => selectAuto(mode, close)}
+      onClick={() => { selectAuto(mode, close); }}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -566,7 +566,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
         ? []
         : showAutoOptions === true
         ? VISIBLE_AUTO_MODES
-        : (showAutoOptions as AutoMode[]).filter((m) => m !== 'auto:cheap');
+        : (showAutoOptions).filter((m) => m !== 'auto:cheap');
 
     const sections = SUBSCRIPTION_ORDER.filter((key) => {
       if (!familyAllows(family, key)) return false;
@@ -640,7 +640,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
           {hasHidden && (
             <button
               type="button"
-              onClick={() => setUglyBotExpanded((v) => !v)}
+              onClick={() => { setUglyBotExpanded((v) => !v); }}
               style={{
                 display: 'block',
                 width: '100%',

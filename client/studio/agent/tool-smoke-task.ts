@@ -12,7 +12,7 @@ import { dispatchTool, type ToolContext } from '../../agent/tools';
 
 const t = taskContext<{ dir?: string }>();
 
-type ToolResult = { ok: boolean; out: string };
+interface ToolResult { ok: boolean; out: string }
 
 defineTask({
   onCall: {
@@ -27,7 +27,7 @@ defineTask({
           // whole run (a timeout still implies node spawned — the env/binary point).
           const out = await Promise.race<string>([
             fn(),
-            new Promise<string>((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 8000)),
+            new Promise<string>((_, rej) => setTimeout(() => { rej(new Error('TIMEOUT')); }, 8000)),
           ]);
           results[label] = { ok: true, out: out.slice(0, 300) };
         } catch (e) {

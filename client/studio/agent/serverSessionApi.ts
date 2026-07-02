@@ -211,7 +211,7 @@ export function reconstructResumeContext(rows: StoredMessageRow[], sessionId: st
     messages.push(rowToMessage(r));
   }
   const tail = messages[messages.length - 1];
-  if (tail && tail.role === 'assistant' && Array.isArray(tail.content)) {
+  if (tail?.role === 'assistant' && Array.isArray(tail.content)) {
     const uses = tail.content.filter(
       (b): b is { type: 'tool_use'; id: string; name: string; input: unknown } => b.type === 'tool_use',
     );

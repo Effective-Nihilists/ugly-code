@@ -75,9 +75,9 @@ export default function StudioShell(): React.ReactElement {
 
   // Browser Back/Forward → re-derive the open project from the URL.
   React.useEffect(() => {
-    const onPop = (): void => setOpen(projectFromUrl());
+    const onPop = (): void => { setOpen(projectFromUrl()); };
     window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    return () => { window.removeEventListener('popstate', onPop); };
   }, []);
 
   let body: React.ReactNode;
@@ -86,8 +86,8 @@ export default function StudioShell(): React.ReactElement {
       <ProjectCreationProgress
         name={creating.name}
         parentDir={creating.parentDir}
-        onDone={(name, path) => openProject(name, path)}
-        onCancel={() => setCreating(null)}
+        onDone={(name, path) => { openProject(name, path); }}
+        onCancel={() => { setCreating(null); }}
       />
     );
   } else if (open) {
@@ -102,8 +102,8 @@ export default function StudioShell(): React.ReactElement {
     body = (
       <ProjectsProvider>
         <ProjectOnboarding
-          onProjectOpen={(name, path) => openProject(name, path)}
-          onBeginCreate={(name, parentDir) => setCreating({ name, parentDir })}
+          onProjectOpen={(name, path) => { openProject(name, path); }}
+          onBeginCreate={(name, parentDir) => { setCreating({ name, parentDir }); }}
           platform={null}
           onOpenSettings={() => undefined}
           leaving={false}

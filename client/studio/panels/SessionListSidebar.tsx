@@ -24,12 +24,12 @@ const ROW_TRANSITION_MS = 200;
  * index they previously occupied so neighbours don't suddenly shift.
  */
 function useTransitionList<T extends { compositeId: string }>(
-  items: ReadonlyArray<T>,
+  items: readonly T[],
   duration: number,
   staggerMs = 50,
   baseDelayMs = 0,
-): Array<{ item: T; phase: 'visible' | 'leaving'; delayMs: number }> {
-  type Entry = {
+): { item: T; phase: 'visible' | 'leaving'; delayMs: number }[] {
+  interface Entry {
     item: T;
     phase: 'visible' | 'leaving';
     /** Per-row enter-animation delay. > 0 only on the first non-empty
@@ -37,7 +37,7 @@ function useTransitionList<T extends { compositeId: string }>(
      *  (single new row animating with a stagger delay would feel
      *  laggy). */
     delayMs: number;
-  };
+  }
   // True until the first non-empty batch lands. After that, every new
   // entry enters with `delayMs: 0` so add/remove deltas play instantly.
   const isFirstBatchRef = React.useRef<boolean>(items.length === 0);
@@ -77,7 +77,7 @@ function useTransitionList<T extends { compositeId: string }>(
 
       // Collect entries that are exiting (were visible, now gone) and
       // entries already mid-leave (carry them forward).
-      const leaving: Array<{ entry: Entry; prevIdx: number }> = [];
+      const leaving: { entry: Entry; prevIdx: number }[] = [];
       prev.forEach((e, idx) => {
         if (e.phase === 'leaving') {
           if (!incomingIds.has(e.item.compositeId)) {
@@ -129,7 +129,7 @@ function useTransitionList<T extends { compositeId: string }>(
     const t = setTimeout(() => {
       setEntries((curr) => curr.filter((e) => e.phase !== 'leaving'));
     }, duration);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); };
   }, [entries, duration]);
 
   return entries;
@@ -352,9 +352,9 @@ export function SessionListSidebar({
               session={mainSession}
               branch={repoBranch}
               active={mainSession.compositeId === activeCompositeId}
-              onClick={() => onSelect(mainSession.compositeId)}
+              onClick={() => { onSelect(mainSession.compositeId); }}
               {...(onResetMainSession
-                ? { onReset: () => onResetMainSession(mainSession.compositeId) }
+                ? { onReset: () => { onResetMainSession(mainSession.compositeId); } }
                 : {})}
             />
             {sessionViews && mainSession.compositeId === activeCompositeId && (
@@ -514,8 +514,8 @@ function RepositoryRow({
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') onClick();
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => { setHovered(true); }}
+      onMouseLeave={() => { setHovered(false); }}
       style={{
         position: 'relative',
         padding: '12px 14px 12px 16px',
@@ -896,7 +896,7 @@ function SessionRowList({
       childrenByParent.set(s.parentSessionId, list);
     }
     const visibleParentIds = new Set(regularSessions.map((s) => s.compositeId));
-    const out: Array<{ s: SessionListSidebarSession; isChild: boolean }> = [];
+    const out: { s: SessionListSidebarSession; isChild: boolean }[] = [];
     for (const s of regularSessions) {
       if (s.parentSessionId && visibleParentIds.has(s.parentSessionId)) {
         continue;
@@ -987,7 +987,7 @@ function SessionRowList({
               // the center pane.
               {...(isChild || s.creating
                 ? {}
-                : { onArchive: () => onArchiveSession(s.compositeId) })}
+                : { onArchive: () => { onArchiveSession(s.compositeId); } })}
               compact={isChild}
               deleting={deleting}
             />

@@ -315,7 +315,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     setOpenTabs((prev) => {
       if (prev.length > 0) return prev;
       const tabId = makeTabId();
-      queueMicrotask(() => setActiveTabId(tabId));
+      queueMicrotask(() => { setActiveTabId(tabId); });
       return [
         {
           tabId,
@@ -452,7 +452,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           // Defer to a microtask so React schedules it after this
           // setOpenTabs commit rather than batching them into one
           // render with mismatched (old tabs, new active) state.
-          queueMicrotask(() => setActiveTabId(nextActive));
+          queueMicrotask(() => { setActiveTabId(nextActive); });
         }
         return combined;
       });
@@ -713,7 +713,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       let promotedTabId: string | null = null;
       setOpenTabs((prev) => {
         const active = prev.find((t) => t.tabId === activeTabIdRef.current);
-        if (active && active.projectPath === null && !active.creating) {
+        if (active?.projectPath === null && !active.creating) {
           promotedTabId = active.tabId;
           return prev.map((t) =>
             t.tabId === active.tabId
@@ -727,7 +727,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         // the floating button while another project tab is focused.
         const newTabId = makeTabId();
         promotedTabId = newTabId;
-        queueMicrotask(() => setActiveTabId(newTabId));
+        queueMicrotask(() => { setActiveTabId(newTabId); });
         return [
           ...prev,
           {

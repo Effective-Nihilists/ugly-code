@@ -224,7 +224,7 @@ export function useSlashCommands(opts: {
     [popupOpen, filtered, selectedIdx, applySelection],
   );
 
-  const close = useCallback(() => setPopupOpen(false), []);
+  const close = useCallback(() => { setPopupOpen(false); }, []);
 
   return {
     popupOpen: popupOpen && (filtered.length > 0 || query !== null),

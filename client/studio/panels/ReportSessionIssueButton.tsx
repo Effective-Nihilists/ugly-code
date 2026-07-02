@@ -94,7 +94,7 @@ export function ReportSessionIssueButton({
       };
       const reportId = payload.result?.reportId ?? payload.reportId ?? '?';
       setDone(reportId);
-      setTimeout(() => setOpen(false), 1800);
+      setTimeout(() => { setOpen(false); }, 1800);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -108,7 +108,7 @@ export function ReportSessionIssueButton({
         ref={buttonRef}
         type="button"
         data-id="report-session-issue-button"
-        onClick={() => (open ? setOpen(false) : openPopover())}
+        onClick={() => { open ? setOpen(false) : openPopover(); }}
         aria-label="Report issue with session logs"
         data-us-tooltip="Report issue with full session logs"
         style={{
@@ -187,7 +187,7 @@ export function ReportSessionIssueButton({
                 {(['bug', 'feature', 'design'] as IssueType[]).map((t) => (
                   <button
                     key={t}
-                    onClick={() => setType(t)}
+                    onClick={() => { setType(t); }}
                     style={{
                       flex: 1,
                       padding: '5px 8px',
@@ -214,7 +214,7 @@ export function ReportSessionIssueButton({
               <textarea
                 autoFocus
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => { setMessage(e.target.value); }}
                 placeholder="What went wrong in this session?"
                 rows={5}
                 maxLength={5000}
@@ -246,7 +246,7 @@ export function ReportSessionIssueButton({
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={() => { setOpen(false); }}
                   style={{
                     flex: 1,
                     padding: '6px 10px',

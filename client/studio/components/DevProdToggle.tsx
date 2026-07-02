@@ -27,13 +27,13 @@ export function DevProdToggle({
       <ToggleButton
         label="Dev"
         active={mode === 'dev'}
-        onClick={() => onModeChange('dev')}
+        onClick={() => { onModeChange('dev'); }}
         disabled={disabled}
       />
       <ToggleButton
         label="Prod"
         active={mode === 'prod'}
-        onClick={() => onModeChange('prod')}
+        onClick={() => { onModeChange('prod'); }}
         disabled={disabled}
       />
     </div>

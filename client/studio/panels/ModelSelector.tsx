@@ -89,7 +89,7 @@ export function ModelSelector(props: ModelSelectorProps): React.ReactElement {
         });
     };
     fetchList();
-    const onChange = () => fetchList();
+    const onChange = () => { fetchList(); };
     window.addEventListener('zai-subscription-changed', onChange);
     window.addEventListener('kimi-subscription-changed', onChange);
     window.addEventListener('minimax-subscription-changed', onChange);

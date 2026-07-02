@@ -316,7 +316,7 @@ export function WorkersPanel({
             workers.map((w) => (
               <button
                 key={w.name}
-                onClick={() => setSelectedName(w.name)}
+                onClick={() => { setSelectedName(w.name); }}
                 data-id={`worker-item-${w.name}`}
                 style={{
                   width: '100%',

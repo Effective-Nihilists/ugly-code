@@ -112,7 +112,7 @@ export function useRecentProjects(): RecentProject[] {
     const unsub = (socket as unknown as RecentSocket).trackDocs<RecentProject>(
       'recentProject',
       { keys: { userId } },
-      (docs) => setProjects([...docs].sort((a, b) => b.lastOpened - a.lastOpened)),
+      (docs) => { setProjects([...docs].sort((a, b) => b.lastOpened - a.lastOpened)); },
     );
     return unsub;
   }, [app]);

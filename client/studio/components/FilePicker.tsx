@@ -72,10 +72,10 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
       ? 'Use this folder'
       : 'Select';
   const primaryDisabled = selectedFile ? false : !canSelectFolder;
-  const confirm = (): void => onResult(selectedFile ?? (canSelectFolder ? path : null));
+  const confirm = (): void => { onResult(selectedFile ?? (canSelectFolder ? path : null)); };
 
   return (
-    <Modal open onClose={() => onResult(null)} size={560} ariaLabel="File picker" cardStyle={{ padding: 0, gap: 0 }}>
+    <Modal open onClose={() => { onResult(null); }} size={560} ariaLabel="File picker" cardStyle={{ padding: 0, gap: 0 }}>
       <div style={{ padding: '16px 18px 10px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ fontFamily: 'var(--font-label)', fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
           {title ?? (mode === 'file' ? 'Select a file' : 'Select a folder')}
@@ -126,10 +126,10 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', marginRight: 'auto' }}>
-          <input data-id="file-picker-hidden" type="checkbox" checked={showHidden} onChange={(ev) => setShowHidden(ev.target.checked)} />
+          <input data-id="file-picker-hidden" type="checkbox" checked={showHidden} onChange={(ev) => { setShowHidden(ev.target.checked); }} />
           Hidden
         </label>
-        <button data-id="file-picker-cancel" onClick={() => onResult(null)} style={btnSecondary}>Cancel</button>
+        <button data-id="file-picker-cancel" onClick={() => { onResult(null); }} style={btnSecondary}>Cancel</button>
         <button data-id="file-picker-confirm" onClick={confirm} disabled={primaryDisabled} style={{ ...btnPrimary, opacity: primaryDisabled ? 0.5 : 1, cursor: primaryDisabled ? 'default' : 'pointer' }}>
           {primaryLabel}
         </button>

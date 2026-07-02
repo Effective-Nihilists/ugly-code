@@ -14,7 +14,7 @@ export type ThemeChoice = 'auto' | 'light' | 'dark' | 'cosmic-latte' | 'vim';
 export type ResolvedTheme = 'light' | 'dark' | 'cosmic-latte' | 'vim';
 export type ThemeMode = 'light' | 'dark';
 
-export const THEME_OPTIONS: Array<{ value: ThemeChoice; label: string }> = [
+export const THEME_OPTIONS: { value: ThemeChoice; label: string }[] = [
   { value: 'auto', label: 'Auto' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
@@ -72,7 +72,7 @@ export function ThemeProvider({
       setSystemMode(e.matches ? 'dark' : 'light');
     };
     mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+    return () => { mq.removeEventListener('change', handler); };
   }, []);
 
   const resolved: ResolvedTheme = useMemo(() => {

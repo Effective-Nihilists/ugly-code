@@ -20,10 +20,10 @@ g.UglyNative = createNodeUglyNative();
 if (!g.localStorage) {
   const mem = new Map<string, string>();
   g.localStorage = {
-    getItem: (k: string) => (mem.has(k) ? (mem.get(k) as string) : null),
+    getItem: (k: string) => (mem.has(k) ? (mem.get(k)!) : null),
     setItem: (k: string, v: string) => { mem.set(k, String(v)); },
     removeItem: (k: string) => { mem.delete(k); },
-    clear: () => mem.clear(),
+    clear: () => { mem.clear(); },
     key: (i: number) => [...mem.keys()][i] ?? null,
     get length() { return mem.size; },
   };
@@ -50,7 +50,7 @@ if (origin) {
       return realFetch(origin + input, { ...init, headers });
     }
     return realFetch(input, init);
-  }) as typeof fetch;
+  });
 }
 
 // Route this background task's console.error/warn to the app's own errorLog
@@ -62,7 +62,7 @@ defineTask({
     // Run one agent turn. The loop's emitCustom-shaped frames stream to listeners as the
     // 'msg' task event; the UI adapter feeds them to its existing onCustomMessage handler.
     send: async (p: { text: string; selection?: AgentSelection }) => {
-      await runClientAgentTurn(sessionId, p.text, (msg) => t.emit('msg', msg), p.selection);
+      await runClientAgentTurn(sessionId, p.text, (msg) => { t.emit('msg', msg); }, p.selection);
       return { ok: true };
     },
     // Interrupt the running turn (chatStop → task.call('interrupt')).

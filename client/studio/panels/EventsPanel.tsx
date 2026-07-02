@@ -48,10 +48,10 @@ export function EventsPanel({ hideHeader }: EventsPanelProps = {}) {
     ])
       .then(([topRes, listRes]) => {
         setTopEvents(topRes.events);
-        setRecentEvents(listRes.events as unknown as EventItem[]);
+        setRecentEvents(listRes.events);
       })
-      .catch((e: unknown) => console.error('[EventsPanel]', e))
-      .finally(() => setLoading(false));
+      .catch((e: unknown) => { console.error('[EventsPanel]', e); })
+      .finally(() => { setLoading(false); });
   }, []);
 
   return (

@@ -148,7 +148,7 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
   // `ready`) before returning. task.start resolves when the child is SPAWNED, but the runner
   // then fetches + imports the bundle over https — calling a method before that races the load
   // and throws "unknown task method". A reused, already-running task passes on the first check.
-  await waitForTaskRunning(id, () => native.task.enum() as Promise<{ id: string; status: string }[]>);
+  await waitForTaskRunning(id, () => native.task.enum());
   sessionTaskIds.set(sessionId, id);
   wireTaskListener(id);
   return id;
@@ -158,7 +158,7 @@ function wireTaskListener(id: string): void {
   if (listenedTaskIds.has(id)) return;
   listenedTaskIds.add(id);
   native.task.listen(id, (_event, data) =>
-    emitCustom(data as { type: string; [k: string]: unknown }),
+    { emitCustom(data as { type: string; [k: string]: unknown }); },
   );
 }
 /**
@@ -270,8 +270,8 @@ const gradeDeps: GradeDeps = {
         const proc = native.process.spawn(cmd, args, { cwd });
         proc.onStdout((c) => (out += c));
         proc.onStderr((c) => (out += c));
-        proc.onError((e) => resolve({ out: `${out}\n${e}`, code: 1 }));
-        proc.onExit((code) => resolve({ out, code }));
+        proc.onError((e) => { resolve({ out: `${out}\n${e}`, code: 1 }); });
+        proc.onExit((code) => { resolve({ out, code }); });
       } catch (e) {
         resolve({ out: String((e as Error).message), code: 1 });
       }
@@ -331,7 +331,7 @@ function runCli(cmd: string): Promise<{ _id: string; created: number; data: Reco
         { cwd: proj },
       );
       proc.onStdout((c) => (stdout += c));
-      proc.onError(() => resolve([]));
+      proc.onError(() => { resolve([]); });
       proc.onExit(() => {
         const docs = stdout
           .split('\n')
@@ -374,7 +374,7 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
       });
       proc.onStdout((c) => (stdout += c));
       proc.onStderr((c) => (stderr += c));
-      proc.onError((e) => reject(new Error(e)));
+      proc.onError((e) => { reject(new Error(e)); });
       proc.onExit((code) => {
         if (code === 0) {
           try {
@@ -387,7 +387,7 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
         }
       });
     } catch (e) {
-      reject(e as Error);
+      reject(e);
     }
   });
 }
@@ -683,7 +683,7 @@ const handlers: Record<string, Handler> = {
     if (isClaudeCliModel(model)) {
       void import('../agent/claudeCliAgent')
         .then((m) => m.runClaudeCliTurn(sessionId, message, model!, emitCustom))
-        .catch((e) => emitAgentError(sessionId, e));
+        .catch((e) => { emitAgentError(sessionId, e); });
       return Promise.resolve({});
     }
     // 2. Run the session as a background task (Studio desktop, or mobile via the Ugly
@@ -702,7 +702,7 @@ const handlers: Record<string, Handler> = {
   codingAgentChatStop: (i) => {
     const sessionId = String(i.sessionId ?? '');
     if (isClaudeCliModel(getSessionModel(sessionId))) {
-      void import('../agent/claudeCliAgent').then((m) => m.abortClaudeCli(sessionId));
+      void import('../agent/claudeCliAgent').then((m) => { m.abortClaudeCli(sessionId); });
       return Promise.resolve({});
     }
     const taskId = sessionTaskIds.get(sessionId);

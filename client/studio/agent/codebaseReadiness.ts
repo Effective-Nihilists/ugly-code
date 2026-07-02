@@ -6,17 +6,17 @@
 import { installUglyNative } from 'ugly-app/native';
 
 /** SessionSnapshot.codebaseReadiness shape (kept loose to avoid a cross-package type dep). */
-export type CodebaseReadiness = {
+export interface CodebaseReadiness {
   indexer?: { status?: string; indexedChunks?: number; totalChunks?: number; totalFiles?: number };
   architecture?: { status?: string; filesAnalyzed?: number; filesTotal?: number };
-};
+}
 
 const pollers = new Map<string, ReturnType<typeof setInterval>>();
 
 // The raw UglyNative (with .invoke) — the facade exposes typed namespaces but no generic
 // invoke, and `codebase.*` is a host-only channel with no facade method.
 const inv = (channel: string, payload: unknown): Promise<unknown> =>
-  installUglyNative().invoke(channel as never, payload as never) as Promise<unknown>;
+  installUglyNative().invoke(channel as never, payload as never);
 
 /** Kick off indexing + poll readiness every 1.5s until both surfaces settle. */
 export function startCodebasePoll(
@@ -60,7 +60,7 @@ export async function fetchArchitectureDoc(cwd: string): Promise<string | null> 
     const path = `${cwd.replace(/\/+$/, '')}/.ugly-studio/ARCHITECTURE.md`;
     const res = (await inv('fs.readFile', { path })) as { content?: string };
     const content = res?.content;
-    return content && content.trim() ? content : null;
+    return content?.trim() ? content : null;
   } catch {
     return null;
   }

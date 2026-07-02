@@ -129,7 +129,7 @@ const DEFAULT_FEATURES: CodingAgentFeatures = {
   expensiveParallel: false,
 };
 
-type ServerCodingAgent = {
+interface ServerCodingAgent {
   memory?: { read?: boolean; write?: boolean };
   multiAgent?: { enabled?: boolean };
   autoLint?: boolean;
@@ -142,7 +142,7 @@ type ServerCodingAgent = {
   pureJudgeMode?: boolean;
   expensiveParallel?: boolean;
   temperatureOverride?: number;
-};
+}
 
 /** Map a `getUserSettings` / `updateUserSettings` response onto the local feature state. */
 function serverToFeatures(ca: ServerCodingAgent): CodingAgentFeatures {
@@ -202,7 +202,7 @@ export interface CodingAgentSessionInfo {
    * by a single model's rate. Sorted by descending cost. Empty for
    * sessions with no recorded turns.
    */
-  perModel: Array<{
+  perModel: {
     model: string;
     inputTokens: number;
     outputTokens: number;
@@ -210,7 +210,7 @@ export interface CodingAgentSessionInfo {
     cacheCreationTokens: number;
     cost: number;
     turnCount: number;
-  }>;
+  }[];
   /**
    * Sum of every max-mode peer's cost / tokens / per-model breakdown.
    * Set on max-mode parents only (the parent itself runs no LLM in
@@ -225,7 +225,7 @@ export interface CodingAgentSessionInfo {
     completionTokens: number;
     cacheReadTokens: number;
     cacheCreationTokens: number;
-    perModel: Array<{
+    perModel: {
       model: string;
       inputTokens: number;
       outputTokens: number;
@@ -233,7 +233,7 @@ export interface CodingAgentSessionInfo {
       cacheCreationTokens: number;
       cost: number;
       turnCount: number;
-    }>;
+    }[];
     peerCount: number;
   };
   messageCount: number;
@@ -341,16 +341,16 @@ export interface DoneStateSnapshot {
     worktreePath: string;
     changedCount: number;
     aheadCount: number | null;
-    changedFiles: ReadonlyArray<{
+    changedFiles: readonly {
       path: string;
       status: 'A' | 'M' | 'D' | 'R' | '?';
-    }>;
+    }[];
   };
   finishOutcome?: {
     ok: boolean;
     squashSha?: string;
     message?: string;
-    stages: ReadonlyArray<{
+    stages: readonly {
       name:
         | 'precheck_dirty_main'
         | 'merge_parent'
@@ -368,7 +368,7 @@ export interface DoneStateSnapshot {
         | 'stopped';
       exitCode?: number;
       command?: string;
-    }>;
+    }[];
   };
 }
 
@@ -663,7 +663,7 @@ function agentMessageToChatMessage(
     let text = '';
     for (const p of parts) {
       if (p.type === 'text')
-        text += (partData(p)['text'] as string | undefined) ?? '';
+        text += (partData(p).text as string | undefined) ?? '';
     }
     if (!text) return null;
     return {
@@ -684,19 +684,19 @@ function agentMessageToChatMessage(
       const d = partData(part);
       switch (part.type) {
         case 'text':
-          textContent += (d['text'] as string | undefined) ?? '';
+          textContent += (d.text as string | undefined) ?? '';
           break;
         case 'reasoning':
-          thinkingContent += (d['thinking'] as string | undefined) ?? '';
+          thinkingContent += (d.thinking as string | undefined) ?? '';
           break;
         case 'tool_call':
           toolUses.push({
             id:
-              (d['id'] as string | undefined) ??
+              (d.id as string | undefined) ??
               Math.random().toString(36).slice(2),
-            name: (d['name'] as string | undefined) ?? 'tool',
-            input: (d['input'] as string | undefined) ?? '',
-            status: d['finished'] ? 'executing' : 'running',
+            name: (d.name as string | undefined) ?? 'tool',
+            input: (d.input as string | undefined) ?? '',
+            status: d.finished ? 'executing' : 'running',
           });
           break;
         case 'finish':
@@ -716,7 +716,7 @@ function agentMessageToChatMessage(
   }
   if (message.role === 'judge') {
     const judgePart = parts.find((p) => p.type === 'judge_call');
-    if (!judgePart || !judgePart.data) return null;
+    if (!judgePart?.data) return null;
     const snap = judgePart.data as JudgeCallSnapshot;
     const summaryLine = `${snap.kind} · ${snap.model} · ${snap.output.verdict}${
       snap.output.intervention ? `/${snap.output.intervention.kind}` : ''
@@ -733,7 +733,7 @@ function agentMessageToChatMessage(
   }
   if (message.role === 'status') {
     const donePart = parts.find((p) => p.type === 'done_state');
-    if (!donePart || !donePart.data) return null;
+    if (!donePart?.data) return null;
     const snap = donePart.data as DoneStateSnapshot;
     const wt = snap.worktree;
     const summary =
@@ -1599,7 +1599,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           setMessages((prev) => {
             if (prev.some((m) => m.id === message.id)) return prev;
             for (let i = prev.length - 1; i >= 0; i--) {
-              const m = prev[i]!;
+              const m = prev[i];
               if (m.role !== 'user') continue;
               const isServerId =
                 typeof m.id === 'string' && m.id.startsWith('msg_');
@@ -1674,8 +1674,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         if (!stuck?.peerModelId || typeof stuck.stuckMs !== 'number') return;
         setPeerStuckState((prev) => ({
           ...prev,
-          [stuck.peerModelId as string]: {
-            stuckMs: stuck.stuckMs as number,
+          [stuck.peerModelId!]: {
+            stuckMs: stuck.stuckMs!,
             updatedAt: Date.now(),
           },
         }));
@@ -1709,7 +1709,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
 
         // Peer message → append/replace in the per-peer transcript.
         if (original.type === 'message') {
-          const subType = original.payload?.type as string | undefined;
+          const subType = original.payload?.type;
           const message = original.payload?.payload as
             | RawAgentMessage
             | undefined;
@@ -2402,7 +2402,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     const parts = message.parts as { type: string; data: any }[] | undefined;
     if (!parts) return;
     const judgePart = parts.find((p) => p.type === 'judge_call');
-    if (!judgePart || !judgePart.data) return;
+    if (!judgePart?.data) return;
     const snap = judgePart.data as JudgeCallSnapshot;
     setMessages((prev) => {
       if (prev.some((m) => m.id === message.id)) return prev;
@@ -2435,7 +2435,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     const parts = message.parts as { type: string; data: any }[] | undefined;
     if (!parts) return;
     const donePart = parts.find((p) => p.type === 'done_state');
-    if (!donePart || !donePart.data) return;
+    if (!donePart?.data) return;
     const snap = donePart.data as DoneStateSnapshot;
     const wt = snap.worktree;
     const summary =
@@ -2577,7 +2577,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // newer, so the prompt lands just before the in-flight reply.
   const backfillMissingUserMessages = useCallback(
     async (sid: string): Promise<void> => {
-      let history: Array<{ id: string; role: string; parts?: { type: string; data?: { text?: string } }[] }>;
+      let history: { id: string; role: string; parts?: { type: string; data?: { text?: string } }[] }[];
       try {
         const res = await agentApi(backend.chatListMessages, { sessionId: sid, limit: PAGE_SIZE });
         if (!Array.isArray(res?.messages)) return;

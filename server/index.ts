@@ -203,7 +203,7 @@ const app = createApp(
       defaultLang: stringsDef.defaultLang,
       langs: stringsDef.langs,
       criticalKeys: stringsDef.criticalKeys,
-      getTable: (lang) => tables[lang] ?? tables[stringsDef.defaultLang]!,
+      getTable: (lang) => tables[lang] ?? tables[stringsDef.defaultLang],
     });
     configurator.setWorkers(cronTasks, cronHandlers);
     configurator.setOnEmail(async (inbound: InboundEmail) => {

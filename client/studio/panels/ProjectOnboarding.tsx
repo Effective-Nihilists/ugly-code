@@ -60,7 +60,7 @@ function useCountUp(target: number, durationMs: number): number {
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); };
   }, [target, durationMs]);
   return value;
 }
@@ -269,7 +269,7 @@ export function ProjectOnboarding({
   useEffect(() => {
     if (keyboardHeight <= 0) return;
     const id = setTimeout(scrollActiveFieldIntoView, 60);
-    return () => clearTimeout(id);
+    return () => { clearTimeout(id); };
   }, [keyboardHeight, scrollActiveFieldIntoView]);
   useEffect(() => {
     const onFocusIn = (e: FocusEvent) => {
@@ -279,11 +279,11 @@ export function ProjectOnboarding({
         t instanceof HTMLElement &&
         (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')
       ) {
-        setTimeout(() => t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
+        setTimeout(() => { t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 60);
       }
     };
     document.addEventListener('focusin', onFocusIn);
-    return () => document.removeEventListener('focusin', onFocusIn);
+    return () => { document.removeEventListener('focusin', onFocusIn); };
   }, []);
 
   const handleBrowse = useCallback((setter: (val: string) => void, current: string) => {
@@ -420,7 +420,7 @@ export function ProjectOnboarding({
             </div>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => { window.location.reload(); }}
               style={primaryButtonStyle}
             >
               Retry connection
@@ -580,7 +580,7 @@ export function ProjectOnboarding({
               <ActionRow
                 kind="new"
                 active={activeAction === 'new'}
-                onClick={() => setActiveAction('new')}
+                onClick={() => { setActiveAction('new'); }}
                 delayMs={760}
               />
               {activeAction === 'new' && (
@@ -597,11 +597,11 @@ export function ProjectOnboarding({
                     value={newParentDir}
                     onChange={setNewParentDir}
                     browsable={hasElectronAPI}
-                    onBrowse={() => handleBrowse(setNewParentDir, newParentDir)}
+                    onBrowse={() => { handleBrowse(setNewParentDir, newParentDir); }}
                   />
                   <button
                     type="button"
-                    onClick={() => void handleNewProject()}
+                    onClick={() => { handleNewProject(); }}
                     disabled={loading || !newName.trim()}
                     style={primaryButtonStyle}
                   >
@@ -613,7 +613,7 @@ export function ProjectOnboarding({
               <ActionRow
                 kind="open"
                 active={activeAction === 'open'}
-                onClick={() => setActiveAction('open')}
+                onClick={() => { setActiveAction('open'); }}
                 delayMs={860}
               />
               {activeAction === 'open' && (
@@ -628,7 +628,7 @@ export function ProjectOnboarding({
                         : '/path/to/project'
                     }
                     browsable={hasElectronAPI}
-                    onBrowse={() => handleBrowse(setOpenPath, openPath)}
+                    onBrowse={() => { handleBrowse(setOpenPath, openPath); }}
                     autoFocus
                   />
                   <button
@@ -645,7 +645,7 @@ export function ProjectOnboarding({
               <ActionRow
                 kind="clone"
                 active={activeAction === 'clone'}
-                onClick={() => setActiveAction('clone')}
+                onClick={() => { setActiveAction('clone'); }}
                 delayMs={960}
               />
               {activeAction === 'clone' && (
@@ -663,7 +663,7 @@ export function ProjectOnboarding({
                     onChange={setCloneDir}
                     placeholder={hasElectronAPI ? '~' : ''}
                     browsable={hasElectronAPI}
-                    onBrowse={() => handleBrowse(setCloneDir, cloneDir)}
+                    onBrowse={() => { handleBrowse(setCloneDir, cloneDir); }}
                   />
                   <button
                     type="button"
@@ -779,7 +779,7 @@ export function ProjectOnboarding({
                 </svg>
                 <input
                   value={search}
-                  onChange={(e) => setSearch(e.currentTarget.value)}
+                  onChange={(e) => { setSearch(e.currentTarget.value); }}
                   placeholder="Filter by name or path…"
                   style={{
                     flex: 1,
@@ -870,7 +870,7 @@ export function ProjectOnboarding({
         chat with the prompt pre-filled. */}
       <button
         type="button"
-        onClick={() => setShowEvalPicker(true)}
+        onClick={() => { setShowEvalPicker(true); }}
         data-id="run-eval-button"
         disabled={evalSubmitting}
         title="Run an eval task interactively (pick → seed → watch → grade)"
@@ -908,7 +908,7 @@ export function ProjectOnboarding({
 
       {showEvalPicker && (
         <EvalPickerModal
-          onCancel={() => setShowEvalPicker(false)}
+          onCancel={() => { setShowEvalPicker(false); }}
           onPick={(name) => void handlePickEvalTask(name)}
           onOpenRun={(projectName, projectPath, sessionId) =>
             void handleOpenEvalRun(projectName, projectPath, sessionId)
@@ -939,7 +939,7 @@ export function ProjectOnboarding({
           <div style={{ color: 'var(--text-secondary)' }}>{evalError}</div>
           <button
             type="button"
-            onClick={() => setEvalError(null)}
+            onClick={() => { setEvalError(null); }}
             style={{
               marginTop: 6,
               fontFamily: 'var(--font-label)',
@@ -1235,7 +1235,7 @@ function LabelInput({
       >
         <input
           value={value}
-          onChange={(e) => onChange(e.currentTarget.value)}
+          onChange={(e) => { onChange(e.currentTarget.value); }}
           placeholder={placeholder}
           autoFocus={autoFocus}
           style={{

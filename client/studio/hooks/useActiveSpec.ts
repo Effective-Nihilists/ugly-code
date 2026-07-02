@@ -30,7 +30,7 @@ export function useActiveSpec(): ActiveSpec | null {
 
     const off = onCustomMessage((msg) => {
       if (msg.type !== 'activeSpec:changed') return;
-      const next = msg['spec'] as ActiveSpec | null | undefined;
+      const next = msg.spec as ActiveSpec | null | undefined;
       setSpec(next ?? null);
     });
 

@@ -28,7 +28,7 @@ export function useInputHistory(
   const lastRecalledRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const raw = getStudioUserSettingSync<unknown>(storageKey);
+    const raw = getStudioUserSettingSync(storageKey);
     if (Array.isArray(raw)) {
       historyRef.current = raw.filter((x) => typeof x === 'string');
     } else {

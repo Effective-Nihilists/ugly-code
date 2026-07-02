@@ -362,7 +362,7 @@ export function NewSessionHero({
               </div>
               <button
                 type="button"
-                onClick={() => setPendingEvalTask(null)}
+                onClick={() => { setPendingEvalTask(null); }}
                 title="Cancel eval task — start a regular session instead"
                 style={{
                   fontFamily: 'var(--font-label)',
@@ -386,7 +386,7 @@ export function NewSessionHero({
           <form
             className="us-fade-up"
             style={{ animationDuration: '480ms', animationDelay: '440ms' }}
-            onSubmit={(e) => void handleSubmit(e)}
+            onSubmit={(e) => { handleSubmit(e); }}
           >
             <div
               style={{
@@ -425,11 +425,11 @@ export function NewSessionHero({
                 data-id="home-prompt-input"
                 ref={promptRef}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => { setPrompt(e.target.value); }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
-                    void handleSubmit(e);
+                    handleSubmit(e);
                   }
                 }}
                 placeholder="Describe a change, a bug, or an experiment…"
@@ -533,7 +533,7 @@ export function NewSessionHero({
                 onPermissionChange={setPermissionMode}
                 onModelChange={handleModelModeChange}
                 onPatternChange={setPatternMode}
-                onModelNeedsKey={(provider) => onOpenSettings(provider)}
+                onModelNeedsKey={(provider) => { onOpenSettings(provider); }}
               />
               <ReasoningSelector
                 value={reasoningEffort}

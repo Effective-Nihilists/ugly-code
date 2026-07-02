@@ -86,7 +86,7 @@ export function DatabasePanel({ forceProd, forceDev }: DatabasePanelProps = {}) 
   const [tab, setTab] = useState<Tab>('browse');
   // Writes default ON for the throwaway local dev DB, OFF for prod (real data).
   const [writes, setWrites] = useState(mode === 'dev');
-  useEffect(() => setWrites(mode === 'dev'), [mode]);
+  useEffect(() => { setWrites(mode === 'dev'); }, [mode]);
 
   const handleModeChange = useCallback(
     (m: DbMode) => { if (!modePinned) setStoredMode(m); },
@@ -113,7 +113,7 @@ export function DatabasePanel({ forceProd, forceDev }: DatabasePanelProps = {}) 
             <button
               key={t}
               data-id={`db-tab-${t}`}
-              onClick={() => setTab(t)}
+              onClick={() => { setTab(t); }}
               style={{
                 ...btnStyle(tab === t ? 'primary' : 'default'),
                 textTransform: 'capitalize',
@@ -125,7 +125,7 @@ export function DatabasePanel({ forceProd, forceDev }: DatabasePanelProps = {}) 
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        <WriteToggle mode={mode} writes={writes} onEnable={enableWrites} onDisable={() => setWrites(false)} />
+        <WriteToggle mode={mode} writes={writes} onEnable={enableWrites} onDisable={() => { setWrites(false); }} />
         {!modePinned && <DevProdToggle mode={mode} onModeChange={handleModeChange} />}
       </div>
 
@@ -181,15 +181,15 @@ function BrowseView({ mode, writes }: { mode: DbMode; writes: boolean }) {
     setError(null);
     socket
       .request('dbCollections', { mode })
-      .then((res) => setCollections(res.collections))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
+      .then((res) => { setCollections(res.collections); })
+      .catch((e: unknown) => { setError(e instanceof Error ? e.message : String(e)); })
+      .finally(() => { setLoading(false); });
   }, [mode, socket]);
 
   useEffect(() => { setSelected(null); reload(); }, [reload]);
 
   if (selected) {
-    return <CollectionDetail mode={mode} writes={writes} collection={selected} onBack={() => setSelected(null)} />;
+    return <CollectionDetail mode={mode} writes={writes} collection={selected} onBack={() => { setSelected(null); }} />;
   }
   if (loading) return <Centered>Loading…</Centered>;
   if (error) return <div style={errorBoxStyle}>{error}</div>;
@@ -200,7 +200,7 @@ function BrowseView({ mode, writes }: { mode: DbMode; writes: boolean }) {
         <div
           key={c.name}
           data-id={`collection-item-${c.name}`}
-          onClick={() => setSelected(c.name)}
+          onClick={() => { setSelected(c.name); }}
           style={{
             padding: 12, background: 'var(--bg-secondary)', borderRadius: 4, border: '1px solid var(--border-primary)',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
@@ -261,7 +261,7 @@ function CollectionDetail({
   useEffect(() => {
     if (!autoRefresh) return;
     const id = setInterval(() => void run(page), 3000);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); };
   }, [autoRefresh, run, page]);
 
   const del = useCallback(
@@ -299,10 +299,10 @@ function CollectionDetail({
         <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{total.toLocaleString()} rows</span>
         <div style={{ flex: 1 }} />
         <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-          <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} /> Auto-refresh
+          <input type="checkbox" checked={autoRefresh} onChange={(e) => { setAutoRefresh(e.target.checked); }} /> Auto-refresh
         </label>
         {result && <ExportMenu collection={collection} columns={result.columns} rows={result.rows} />}
-        {writes && <button data-id="db-new-row" onClick={() => setEditing({ mode: 'insert', doc: {} })} style={btnStyle('primary')}>+ New row</button>}
+        {writes && <button data-id="db-new-row" onClick={() => { setEditing({ mode: 'insert', doc: {} }); }} style={btnStyle('primary')}>+ New row</button>}
       </div>
 
       {/* Filter builder */}
@@ -312,12 +312,12 @@ function CollectionDetail({
           <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <input
               data-id="filter-field" placeholder="field" value={f.field}
-              onChange={(e) => setFilters((fs) => fs.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))}
+              onChange={(e) => { setFilters((fs) => fs.map((x, j) => (j === i ? { ...x, field: e.target.value } : x))); }}
               style={{ ...inputStyle, width: 140 }}
             />
             <select
               value={f.op}
-              onChange={(e) => setFilters((fs) => fs.map((x, j) => (j === i ? { ...x, op: e.target.value as FilterOp } : x)))}
+              onChange={(e) => { setFilters((fs) => fs.map((x, j) => (j === i ? { ...x, op: e.target.value as FilterOp } : x))); }}
               style={{ ...inputStyle, width: 90 }}
             >
               {FILTER_OPS.map((op) => <option key={op} value={op}>{OP_LABEL[op]}</option>)}
@@ -325,19 +325,19 @@ function CollectionDetail({
             {f.op !== 'exists' && (
               <input
                 data-id="filter-value" placeholder="value" value={f.value}
-                onChange={(e) => setFilters((fs) => fs.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
+                onChange={(e) => { setFilters((fs) => fs.map((x, j) => (j === i ? { ...x, value: e.target.value } : x))); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') void run(0); }}
                 style={{ ...inputStyle, flex: 1 }}
               />
             )}
-            <button onClick={() => setFilters((fs) => fs.filter((_, j) => j !== i))} style={btnStyle('default')}>✕</button>
+            <button onClick={() => { setFilters((fs) => fs.filter((_, j) => j !== i)); }} style={btnStyle('default')}>✕</button>
           </div>
         ))}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button data-id="add-filter" onClick={() => setFilters((fs) => [...fs, { field: '', op: 'eq', value: '' }])} style={btnStyle('default')}>+ Filter</button>
+          <button data-id="add-filter" onClick={() => { setFilters((fs) => [...fs, { field: '', op: 'eq', value: '' }]); }} style={btnStyle('default')}>+ Filter</button>
           <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 6 }}>Sort</span>
-          <input value={sortField} onChange={(e) => setSortField(e.target.value)} style={{ ...inputStyle, width: 120 }} />
-          <select value={sortDir} onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')} style={{ ...inputStyle, width: 70 }}>
+          <input value={sortField} onChange={(e) => { setSortField(e.target.value); }} style={{ ...inputStyle, width: 120 }} />
+          <select value={sortDir} onChange={(e) => { setSortDir(e.target.value as 'asc' | 'desc'); }} style={{ ...inputStyle, width: 70 }}>
             <option value="desc">desc</option><option value="asc">asc</option>
           </select>
           <button data-id="run-query" onClick={() => void run(0)} disabled={loading} style={btnStyle('primary', loading)}>{loading ? 'Running…' : 'Apply'}</button>
@@ -358,19 +358,19 @@ function CollectionDetail({
           <RowGrid
             rows={result.rows} dataCols={dataCols} writes={writes}
             onExpand={setExpanded}
-            onEdit={(doc) => setEditing({ mode: 'edit', doc })}
+            onEdit={(doc) => { setEditing({ mode: 'edit', doc }); }}
             onDuplicate={(doc) => { const d = { ...doc }; delete d._id; delete d._created; delete d._updated; setEditing({ mode: 'insert', doc: d }); }}
             onDelete={(id) => void del(id)}
           />
         </>
       )}
 
-      {expanded && <JsonViewerModal title="Row" doc={expanded} onClose={() => setExpanded(null)} />}
+      {expanded && <JsonViewerModal title="Row" doc={expanded} onClose={() => { setExpanded(null); }} />}
       {editing && (
         <DocEditorModal
           title={editing.mode === 'insert' ? `Insert into ${collection}` : `Edit ${collection}`}
           initial={editing.doc}
-          onClose={() => setEditing(null)}
+          onClose={() => { setEditing(null); }}
           onSave={(doc) => saveDoc(doc, editing.mode === 'insert' ? 'insert' : 'update')}
         />
       )}
@@ -406,14 +406,14 @@ function RowGrid({
             const id = String(row._id ?? i);
             return (
               <tr key={id} style={{ cursor: 'pointer' }}>
-                <td style={tdStyle} onClick={() => onExpand(row)} title="Expand">{cell(row._id)}</td>
+                <td style={tdStyle} onClick={() => { onExpand(row); }} title="Expand">{cell(row._id)}</td>
                 {dataCols.map((c) => (
-                  <td key={c} style={{ ...tdStyle, color: row[c] == null ? 'var(--text-muted, #999)' : 'var(--text-primary)' }} onClick={() => onExpand(row)} title={cell(row[c])}>{cell(row[c])}</td>
+                  <td key={c} style={{ ...tdStyle, color: row[c] == null ? 'var(--text-muted, #999)' : 'var(--text-primary)' }} onClick={() => { onExpand(row); }} title={cell(row[c])}>{cell(row[c])}</td>
                 ))}
                 <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  {writes && <button onClick={() => onEdit(row)} style={iconBtn} title="Edit">✎</button>}
-                  {writes && <button onClick={() => onDuplicate(row)} style={iconBtn} title="Duplicate">⧉</button>}
-                  {writes && <button onClick={() => onDelete(id)} style={{ ...iconBtn, color: 'var(--error, #dc2626)' }} title="Delete">🗑</button>}
+                  {writes && <button onClick={() => { onEdit(row); }} style={iconBtn} title="Edit">✎</button>}
+                  {writes && <button onClick={() => { onDuplicate(row); }} style={iconBtn} title="Duplicate">⧉</button>}
+                  {writes && <button onClick={() => { onDelete(id); }} style={{ ...iconBtn, color: 'var(--error, #dc2626)' }} title="Delete">🗑</button>}
                 </td>
               </tr>
             );
@@ -544,7 +544,7 @@ function SqlConsole({ mode, writes, onWantWrites }: { mode: DbMode; writes: bool
         <button data-id="sql-dryrun" onClick={() => void exec(true)} disabled={loading} style={btnStyle('default', loading)} title="Run UPDATE/DELETE in a transaction and roll back — shows affected rows without committing">Dry-run</button>
         {!writes && <button onClick={onWantWrites} style={btnStyle('default')}>🔒 Enable writes…</button>}
         <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'inline-flex', gap: 4, alignItems: 'center' }} title="Allow DROP/TRUNCATE/ALTER and WHERE-less UPDATE/DELETE">
-          <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} /> Force destructive
+          <input type="checkbox" checked={force} onChange={(e) => { setForce(e.target.checked); }} /> Force destructive
         </label>
         {history.length > 0 && (
           <select
@@ -558,13 +558,13 @@ function SqlConsole({ mode, writes, onWantWrites }: { mode: DbMode; writes: bool
       </div>
 
       {error && <div style={errorBoxStyle}>{error}</div>}
-      {result && result.kind === 'read' && (
+      {result?.kind === 'read' && (
         <>
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{result.rowCount} row{result.rowCount === 1 ? '' : 's'} · {result.durationMs}ms</span>
           <ResultsTable columns={result.columns ?? []} rows={result.rows ?? []} />
         </>
       )}
-      {result && result.kind === 'write' && (
+      {result?.kind === 'write' && (
         <div style={{ padding: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 4, fontSize: 13, color: 'var(--text-primary)' }}>
           {result.dryRun ? '🧪 Dry-run (rolled back): ' : '✓ '}<b>{result.affected ?? 0}</b> row{result.affected === 1 ? '' : 's'} {result.dryRun ? 'would be affected' : 'affected'} · {result.durationMs}ms
         </div>
@@ -590,7 +590,7 @@ function SchemaView({ mode }: { mode: DbMode }) {
   useEffect(() => {
     socket.request('dbCollections', { mode })
       .then((res) => { setCollections(res.collections); if (!selected && res.collections[0]) setSelected(res.collections[0].name); })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => { setError(e instanceof Error ? e.message : String(e)); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
@@ -600,13 +600,13 @@ function SchemaView({ mode }: { mode: DbMode }) {
     setError(null);
     socket.request('dbSchema', { mode, collection: selected })
       .then(setSchema)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => { setError(e instanceof Error ? e.message : String(e)); });
     void loadTsInterface(selected).then(setTsType);
   }, [selected, mode, socket]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <select value={selected} onChange={(e) => setSelected(e.target.value)} style={{ ...inputStyle, maxWidth: 240 }}>
+      <select value={selected} onChange={(e) => { setSelected(e.target.value); }} style={{ ...inputStyle, maxWidth: 240 }}>
         {collections.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
       </select>
       {error && <div style={errorBoxStyle}>{error}</div>}
@@ -660,9 +660,9 @@ function ExportMenu({ collection, columns, rows }: { collection: string; columns
     a.href = url;
     a.download = filename;
     a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => { URL.revokeObjectURL(url); }, 1000);
   };
-  const asJson = (): void => download(`${collection}.json`, JSON.stringify(rows, null, 2), 'application/json');
+  const asJson = (): void => { download(`${collection}.json`, JSON.stringify(rows, null, 2), 'application/json'); };
   const asCsv = (): void => {
     const esc = (v: unknown): string => {
       const s = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);

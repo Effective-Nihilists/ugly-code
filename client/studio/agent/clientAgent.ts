@@ -241,7 +241,7 @@ function buildCompactionSummary(taskText: string, dropped: AgentMessage[]): stri
       } else if (b.type === 'tool_use') {
         const arg =
           typeof b.input === 'object' && b.input
-            ? (Object.values(b.input as Record<string, unknown>).find((v) => typeof v === 'string') as string | undefined)
+            ? (Object.values(b.input as Record<string, unknown>).find((v) => typeof v === 'string'))
             : undefined;
         trail.push(`• ran ${b.name}${arg ? `(${arg.slice(0, 80)})` : ''}`);
       }
@@ -445,7 +445,7 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
   // Fold in the latest codebase readiness (the indexer poll updates the per-session map and
   // re-emits) so every session_state carries it too — applySnapshot only reads what's present.
   const readiness = codebaseReadinessBySession.get(sessionId);
-  if (readiness !== undefined) snap['codebaseReadiness'] = readiness;
+  if (readiness !== undefined) snap.codebaseReadiness = readiness;
   safeEmit(s.emitRef.current, {
     type: 'codingAgent:event',
     sessionId,

@@ -29,7 +29,7 @@ function MarkdownView({ text }: { text: string }): React.ReactElement {
       for (const e of entries) setWidth(Math.max(200, e.contentRect.width));
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); };
   }, []);
   const handleOpenUri = React.useMemo(
     () => (openUri ? (uri: string): Promise<void> => { openUri(uri); return Promise.resolve(); } : undefined),
@@ -196,11 +196,11 @@ export function FilePanel(): React.ReactElement {
 
       {isMobile && treeOpen && (
         <>
-          <div style={S.backdrop} onClick={() => setTreeOpen(false)} />
+          <div style={S.backdrop} onClick={() => { setTreeOpen(false); }} />
           <div style={S.treeDrawer} data-id="file-tree-drawer">
             <div style={S.drawerHeader}>
               <span>Files</span>
-              <button data-id="file-tree-close" onClick={() => setTreeOpen(false)} style={S.drawerClose}>Done</button>
+              <button data-id="file-tree-close" onClick={() => { setTreeOpen(false); }} style={S.drawerClose}>Done</button>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{renderDir(root, 0)}</div>
           </div>
@@ -211,7 +211,7 @@ export function FilePanel(): React.ReactElement {
         {(isMobile || selected) && (
           <div style={S.viewerHeader}>
             {isMobile && (
-              <button data-id="file-tree-open" onClick={() => setTreeOpen(true)} style={S.filesBtn}>
+              <button data-id="file-tree-open" onClick={() => { setTreeOpen(true); }} style={S.filesBtn}>
                 <FileIcon />
                 Files
               </button>
@@ -225,8 +225,8 @@ export function FilePanel(): React.ReactElement {
             )}
             {selected && isMarkdown(selected) && !loadingFile && (
               <div style={S.segmented}>
-                <button data-id="md-view-rendered" onClick={() => setMdRaw(false)} style={{ ...S.seg, ...(mdRaw ? {} : S.segActive) }}>Preview</button>
-                <button data-id="md-view-raw" onClick={() => setMdRaw(true)} style={{ ...S.seg, ...(mdRaw ? S.segActive : {}) }}>Raw</button>
+                <button data-id="md-view-rendered" onClick={() => { setMdRaw(false); }} style={{ ...S.seg, ...(mdRaw ? {} : S.segActive) }}>Preview</button>
+                <button data-id="md-view-raw" onClick={() => { setMdRaw(true); }} style={{ ...S.seg, ...(mdRaw ? S.segActive : {}) }}>Raw</button>
               </div>
             )}
           </div>

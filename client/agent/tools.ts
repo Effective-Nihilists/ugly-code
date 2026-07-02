@@ -57,7 +57,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
         limit: typeof p.limit === 'number' ? p.limit : 10,
         ...(ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : {}),
       } as never)) as {
-        results?: Array<{ file_path: string; start_line: number; end_line: number; content: string; score: number }>;
+        results?: { file_path: string; start_line: number; end_line: number; content: string; score: number }[];
       };
       const results = res?.results ?? [];
       if (!results.length) {
@@ -78,7 +78,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       const cur = await native.fs.readFile(path);
       const idx = cur.indexOf(oldStr);
       if (idx === -1) throw new Error(`edit_file: \`old\` text not found in ${rawPath}`);
-      if (cur.indexOf(oldStr, idx + oldStr.length) !== -1)
+      if (cur.includes(oldStr, idx + oldStr.length))
         throw new Error(`edit_file: \`old\` text is not unique in ${rawPath} — include more surrounding context`);
       await native.fs.writeFile(path, cur.slice(0, idx) + newStr + cur.slice(idx + oldStr.length));
       return `Edited ${rawPath}`;
@@ -94,7 +94,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
         collection: String(p.collection),
         action: String(p.action),
         id: p.id == null ? undefined : String(p.id),
-        doc: (p.doc ?? {}) as Record<string, unknown>,
+        doc: (p.doc ?? {}),
         allowWrite: true,
       });
     default:
@@ -123,8 +123,8 @@ function runDb(ctx: ToolContext | undefined, op: string, input: Record<string, u
       });
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (out += c));
-      proc.onError((e) => resolve(`[error: ${e}]`));
-      proc.onExit((code) => resolve(code === 0 ? truncate(out.trim()) : `[error: ${out.trim().slice(-400) || 'node exited ' + code}]`));
+      proc.onError((e) => { resolve(`[error: ${e}]`); });
+      proc.onExit((code) => { resolve(code === 0 ? truncate(out.trim()) : `[error: ${out.trim().slice(-400) || 'node exited ' + code}]`); });
     } catch (e) {
       resolve(`[error: ${(e as Error).message}]`);
     }
@@ -191,8 +191,8 @@ function runCommand(
       const proc = native.process.spawn(cmd, args, opts);
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (out += c));
-      proc.onError((e) => resolve(`${out}\n[error: ${e}]`));
-      proc.onExit((code) => resolve(`${out.trimEnd()}\n[exit ${code ?? 'null'}]`));
+      proc.onError((e) => { resolve(`${out}\n[error: ${e}]`); });
+      proc.onExit((code) => { resolve(`${out.trimEnd()}\n[exit ${code ?? 'null'}]`); });
     } catch (e) {
       resolve(`[error: ${(e as Error).message}]`);
     }
