@@ -552,9 +552,14 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     // structural context up front without spending turns reading files.
     get systemPrompt() {
       const architectureDoc = architectureDocBySession.get(sessionId);
-      return architectureDoc
+      const base = architectureDoc
         ? `${AGENT_SYSTEM_PROMPT}\n\n# Project architecture (auto-generated map — exports, types, inheritance)\n\n${architectureDoc}`
         : AGENT_SYSTEM_PROMPT;
+      // Real per-turn <env> (replaces the monolith's hardcoded sample block).
+      const ws = getSessionWorkspace(sessionId);
+      const cwd = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? '(no project open)';
+      const env = `<env>\nWorking directory: ${cwd}\nToday's date: ${new Date().toISOString().slice(0, 10)}\n</env>`;
+      return `${base}\n\n${env}`;
     },
     // Dynamic per-session catalog: the model starts with the core tools and
     // activates others via tool_search/tool_request (read afresh each turn).

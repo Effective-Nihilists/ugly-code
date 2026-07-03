@@ -299,21 +299,11 @@ Match the existing codebase: read similar code for patterns, libraries, naming. 
 Plan → read → edit → verify → report. For "Fix the off-by-one in BahaiCalendar.ts line 42, make sure tests pass":
 
   todos([{content:"Read & confirm location", status:"in_progress"}, {content:"Apply fix"}, {content:"Run tests"}])
-  read(BahaiCalendar.ts, offset=35, limit=20)             // shows "42:a3|  if (year >= cutoff) {"
-  edit(BahaiCalendar.ts, anchor="42:a3", new_content="  if (year > cutoff) {")
+  read_file(BahaiCalendar.ts, offset=35, limit=20)        // shows "42:a3|  if (year >= cutoff) {"
+  edit_file(BahaiCalendar.ts, anchor="42:a3", new_content="  if (year > cutoff) {")
   run_command("npm test -- src/BahaiCalendar.test.ts")
   → "Fixed. Changed \`>=\` to \`>\` on line 42, tests pass."
 </example_turn>
-
-<env>
-Working directory: /
-Is directory a git repo: no
-Platform: darwin
-Today's date: 1/1/2026
-
-</env>
-
-
 
 <available_skills>
 </available_skills>
