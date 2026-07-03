@@ -6,6 +6,7 @@ import { native, installUglyNative } from 'ugly-app/native';
 import type { SandboxMode } from 'ugly-app/native';
 import type { AgentToolName } from '../../shared/agent';
 import { DB_SCRIPT } from '../studio/db/dbScript';
+import { runRegisteredTool } from './tools/registry';
 
 /** Project + mode context so tool subprocesses can be OS-user sandboxed by the
  *  daemon. Resolved by the agent loop (clientAgent) per turn. */
@@ -44,6 +45,10 @@ export type ToolDispatch = (name: string, input: unknown, ctx?: ToolContext) => 
 
 export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
   const p = (input ?? {}) as Record<string, unknown>;
+  // Restored tools live in the registry; a name it doesn't own falls through to
+  // the legacy inline switch below.
+  const fromRegistry = await runRegisteredTool(name, p, ctx);
+  if (fromRegistry !== undefined) return fromRegistry;
   switch (name as AgentToolName) {
     case 'list_dir': {
       const items = await native.fs.readdir(resolvePath(ctx, str(p.path ?? '.')));
