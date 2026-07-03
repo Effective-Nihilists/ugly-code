@@ -588,9 +588,10 @@ checklist.
 > from the monolith's registered set.
 >
 > **Net vs the monolith's registered tools:** ugly-code has all of them EXCEPT
-> `dev_server_screenshot` (dropped), PLUS two ugly-code-only extras —
-> `lsp_diagnostics` and `download` (the latter existed in the monolith tree but
-> was unregistered/removed there, so it counts as an extra here).
+> `dev_server_screenshot` (dropped). The former standalone `lsp_diagnostics` tool
+> was merged into `grep` as an `lsp-diagnostics` mode (alongside
+> `lsp-defs`/`lsp-refs`/`lsp-impls`). The one remaining non-monolith extra is
+> `download` (which the monolith tree had but left unregistered).
 
 | # | Divergence | Monolith (authoritative) | Current ugly-code |
 |---|---|---|---|

@@ -8,7 +8,6 @@ import type { AgentToolSpec, ToolName } from '../../../shared/agent';
 import type { ToolContext } from '../tools';
 import { grepTool } from './grep';
 import { globTool } from './glob';
-import { lspDiagnosticsTool } from './lspDiagnostics';
 import { multieditTool } from './multiedit';
 import { pythonExecTool } from './pythonExec';
 import { pythonLibrariesTool } from './pythonLibraries';
@@ -46,7 +45,7 @@ export interface ToolModule {
   ): Promise<string>;
 }
 
-export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, devServerStartTool, devServerStopTool, devServerErrorsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool, todosTool, scratchpadTool, memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool, askUserTool, delegateTool, delegateParallelTool, blackboardPostTool, toolSearchTool, toolRequestTool, specReadTool, specWriteTool, analyzeImageTool, inspectUxTool];
+export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, devServerStartTool, devServerStopTool, devServerErrorsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool, todosTool, scratchpadTool, memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool, askUserTool, delegateTool, delegateParallelTool, blackboardPostTool, toolSearchTool, toolRequestTool, specReadTool, specWriteTool, analyzeImageTool, inspectUxTool];
 
 /** Model-facing specs for every registered tool (appended to AGENT_TOOLS when
  *  assembling the per-turn tool list). */

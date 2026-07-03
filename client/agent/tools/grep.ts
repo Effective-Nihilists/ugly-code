@@ -18,7 +18,8 @@ export type GrepMode =
   | 'semantic'
   | 'lsp-defs'
   | 'lsp-refs'
-  | 'lsp-impls';
+  | 'lsp-impls'
+  | 'lsp-diagnostics';
 
 export interface GrepArgs {
   pattern: string;
@@ -174,6 +175,25 @@ function formatLspHits(
   return `Found ${hits.length} ${label} for ${JSON.stringify(symbol)}\n${lines.join('\n')}\n`;
 }
 
+/** `lsp-diagnostics` mode: TypeScript diagnostics from the language server —
+ *  authoritative for "does this compile". With a file (via `path`, or a
+ *  path-like `pattern`) returns that file's diagnostics; otherwise a
+ *  project-wide summary. Merged in from the former standalone lsp_diagnostics. */
+async function runDiagnostics(args: GrepArgs, ctx: ToolContext | undefined): Promise<string> {
+  const lsp = await lspForProject(ctx);
+  if (!lsp) return '(lsp not available — no project open or the TypeScript server failed to start)';
+  await lsp.ensureProjectLoaded();
+  const file = args.path ?? (/[/.]/.test(args.pattern) ? args.pattern : undefined);
+  if (file) {
+    const diags = lsp.getDiagnostics(file);
+    if (diags.length === 0) return `(no diagnostics for ${file})`;
+    return diags
+      .map((d) => `${file}:${d.line}:${d.column} ${d.severity}: ${d.message}${d.code !== undefined ? ` [${d.code}]` : ''}`)
+      .join('\n');
+  }
+  return lsp.formatSummary() || '(no diagnostics)';
+}
+
 /** LSP-mode grep: `symbol` is a name → workspaceSymbol → defs directly, or
  *  refs/impls dispatched from the first few declaration sites. Ported from the
  *  monolith `runLspMode`; `ctx.lsp` → `lspForProject(ctx)`. */
@@ -239,18 +259,20 @@ const SPEC: TextGenTool = {
     'codebase — pass a natural-language `pattern`, e.g. "where websocket reconnect ' +
     'backoff is handled"). mode "lsp-defs"/"lsp-refs"/"lsp-impls" takes a SYMBOL ' +
     'NAME and returns its definitions / references / implementations via the ' +
-    'language server. Plain identifier searches in auto mode also get an appended ' +
-    'LSP DEFINITIONS section.',
+    'language server. mode "lsp-diagnostics" returns TypeScript errors/warnings ' +
+    '(authoritative for "does this compile" — prefer over running tsc): pass a ' +
+    'file via `path` for one file, or omit for a project-wide summary. Plain ' +
+    'identifier searches in auto mode also get an appended LSP DEFINITIONS section.',
   parameters: {
     type: 'object',
     properties: {
-      pattern: { type: 'string', description: 'Regex (exact/auto), natural language (semantic), or symbol name (lsp-* modes).' },
-      path: { type: 'string', description: 'Optional file or directory to scope the search.' },
+      pattern: { type: 'string', description: 'Regex (exact/auto), natural language (semantic), symbol name (lsp-defs/refs/impls), or an optional file for lsp-diagnostics.' },
+      path: { type: 'string', description: 'Optional file or directory to scope the search (or the file for lsp-diagnostics).' },
       include: { type: 'string', description: 'Glob filter, e.g. "*.ts".' },
       literal_text: { type: 'boolean', description: 'Treat pattern as a literal string, not a regex.' },
       caseInsensitive: { type: 'boolean', description: 'Case-insensitive match.' },
       include_ignored: { type: 'boolean', description: 'Also search .gitignore-d files.' },
-      mode: { type: 'string', enum: ['auto', 'exact', 'semantic', 'lsp-defs', 'lsp-refs', 'lsp-impls'] },
+      mode: { type: 'string', enum: ['auto', 'exact', 'semantic', 'lsp-defs', 'lsp-refs', 'lsp-impls', 'lsp-diagnostics'] },
       output_mode: { type: 'string', enum: ['content', 'files_with_matches', 'count'] },
       head_limit: { type: 'number', description: 'Cap the number of exact-pass matches.' },
       before_lines: { type: 'number', description: 'Context lines before each match (content mode).' },
@@ -269,6 +291,9 @@ export const grepTool: ToolModule = {
     const args = input as unknown as GrepArgs;
     if (args.mode === 'semantic') {
       return runSemantic(args, ctx);
+    }
+    if (args.mode === 'lsp-diagnostics') {
+      return runDiagnostics(args, ctx);
     }
     if (
       args.mode === 'lsp-defs' ||

@@ -109,7 +109,6 @@ export type ToolName =
   | 'dev_server_errors'
   | 'inspect_ux'
   // ugly-code additions (not in the monolith)
-  | 'lsp_diagnostics'
   | 'download';
 
 /** A model-facing tool spec whose `name` is constrained to a known `ToolName`. */

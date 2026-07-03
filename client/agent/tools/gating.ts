@@ -8,11 +8,10 @@
 import type { AgentToolSpec, ToolName } from '../../../shared/agent';
 import { fullCatalog } from './catalog';
 
-/** COMMON — always available, both modes. (`lsp_diagnostics` is an ugly-code
- *  addition kept always-on as a core dev aid.) */
+/** COMMON — always available, both modes. */
 const COMMON_TOOLS: ToolName[] = [
   'read', 'write', 'edit', 'multiedit', 'glob', 'grep', 'bash', 'todos',
-  'python_exec', 'web_fetch', 'lsp_diagnostics',
+  'python_exec', 'web_fetch',
 ];
 
 /** Added only in single (default interactive) mode. (`download` is an ugly-code
