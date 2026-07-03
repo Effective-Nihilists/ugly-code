@@ -14,14 +14,13 @@ const COMMON_TOOLS: ToolName[] = [
   'python_exec', 'web_fetch',
 ];
 
-/** Added only in single (default interactive) mode. (`download` is an ugly-code
- *  addition slotted here.) */
+/** Added only in single (default interactive) mode. */
 const SINGLE_MODE_TOOLS: ToolName[] = [
   'spec_read', 'spec_write', 'scratchpad',
   'memory_read', 'memory_save', 'memory_list', 'memory_delete',
   'delegate', 'delegate_parallel', 'ask_user', 'web_search',
-  'analyze_image', 'dep_docs', 'python_libraries', 'tool_search', 'tool_request',
-  'download',
+  'analyze_image', 'dep_docs', 'python_libraries',
+  'tool_search', 'tool_request',
 ];
 
 /** Added only in group (multi-model) mode. */

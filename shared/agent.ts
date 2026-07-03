@@ -107,9 +107,7 @@ export type ToolName =
   | 'dev_server_stop'
   | 'dev_server_logs'
   | 'dev_server_errors'
-  | 'inspect_ux'
-  // ugly-code additions (not in the monolith)
-  | 'download';
+  | 'inspect_ux';
 
 /** A model-facing tool spec whose `name` is constrained to a known `ToolName`. */
 export type AgentToolSpec = Omit<TextGenTool, 'name'> & { name: ToolName };
@@ -130,7 +128,7 @@ export function isTool(name: string, tool: ToolName): boolean {
  * shell command (`sh -c`), so these are the tools reachable from within it
  * (surfaced to the model as guidance, mirroring the monolith's bundled-tool list).
  */
-export const AGENT_BINARIES = ['node', 'git', 'python', 'uv', 'rg', 'ffmpeg', 'imagemagick'] as const;
+export const AGENT_BINARIES = ['node', 'git', 'curl', 'python', 'uv', 'rg', 'ffmpeg', 'imagemagick'] as const;
 
 /** Tool specs sent to the model (OpenAI/Anthropic JSON-schema function shape).
  *  `name` is typed `ToolName` so these can't drift from the UI / registry. */

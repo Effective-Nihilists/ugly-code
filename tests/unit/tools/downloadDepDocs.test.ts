@@ -1,21 +1,7 @@
-// Task B3.3 download + B3.4 dep_docs (real uglyNativeMock).
-import { describe, it, expect, beforeEach } from 'vitest';
-import { resetMock, mockCalls } from '../../helpers/uglyNativeMock';
-import { downloadTool } from '../../../client/agent/tools/download';
+// Task B3.4 dep_docs (real uglyNativeMock).
+import { describe, it, expect } from 'vitest';
+import { resetMock } from '../../helpers/uglyNativeMock';
 import { depDocsTool } from '../../../client/agent/tools/depDocs';
-
-describe('download', () => {
-  beforeEach(() => resetMock({ proc: (cmd) => ({ stdout: cmd === 'node' ? 'downloaded 1234 bytes to out.bin' : '', code: 0 }) }));
-  it('spawns node to fetch + write the file', async () => {
-    const out = await downloadTool.run({ url: 'https://ex.com/f.bin', path: 'out.bin' }, { projectDir: '/proj' });
-    expect(out).toMatch(/downloaded 1234 bytes/);
-    const spawn = mockCalls().find((c) => c.channel === 'process.spawn');
-    expect((spawn?.payload as { cmd: string }).cmd).toBe('node');
-  });
-  it('rejects non-http URLs', async () => {
-    expect(await downloadTool.run({ url: 'ftp://x', path: 'a' }, undefined)).toMatch(/http/i);
-  });
-});
 
 describe('dep_docs', () => {
   it('reads a package README from node_modules', async () => {

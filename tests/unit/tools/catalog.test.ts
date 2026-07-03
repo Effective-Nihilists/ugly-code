@@ -75,7 +75,7 @@ describe('tool_request / tool_search utilities', () => {
   });
 
   it('tool_search ranks the catalog by intent', async () => {
-    const out = await toolSearchTool.run({ query: 'download a file from a url' }, undefined);
-    expect(out).toContain('download');
+    const out = await toolSearchTool.run({ query: 'fetch the contents of a web page url' }, undefined);
+    expect(out).toContain('web_fetch');
   });
 });

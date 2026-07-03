@@ -587,11 +587,12 @@ checklist.
 > monolith this tool does not exist here. This is the one deliberate divergence
 > from the monolith's registered set.
 >
-> **Net vs the monolith's registered tools:** ugly-code has all of them EXCEPT
-> `dev_server_screenshot` (dropped). The former standalone `lsp_diagnostics` tool
-> was merged into `grep` as an `lsp-diagnostics` mode (alongside
-> `lsp-defs`/`lsp-refs`/`lsp-impls`). The one remaining non-monolith extra is
-> `download` (which the monolith tree had but left unregistered).
+> **Net vs the monolith's registered tools:** an exact match of the monolith's
+> registered set EXCEPT `dev_server_screenshot` (intentionally dropped — no
+> Preview-capture surface). No extras remain: the former standalone
+> `lsp_diagnostics` was merged into `grep` as an `lsp-diagnostics` mode, and
+> `download` was dropped (covered by `bash curl -o` — `curl` is a bundled binary
+> on the sealed PATH).
 
 | # | Divergence | Monolith (authoritative) | Current ugly-code |
 |---|---|---|---|
