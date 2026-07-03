@@ -1,17 +1,15 @@
 /**
- * Header button in CodingAgentChat that lets a user file an issue
- * report for the current coding session. On submit, the sidecar
- * collects the session's on-disk artifacts (messages, telemetry,
- * finish events, Electron log tail, env fingerprint), redacts
- * secrets, uploads the gzipped tar to R2's temp bucket (7-day TTL),
- * and emails a Claude-Code-ready markdown report to the studio
- * maintainer.
+ * Header button in CodingAgentChat that lets a user file an issue report for the
+ * current coding session. On submit it writes ONE row to the app's errorLog D1 —
+ * the SAME sink as a normal error (POST /api/errorLogCaptureNoAuth) — but carrying
+ * the full session history (messages + settings) in `context`, so a session issue
+ * sits alongside the agent's own task-error rows and can be analyzed together by
+ * `compositeId`. (The old design bundled on-disk artifacts to R2 + emailed a
+ * maintainer; this replaces that with a queryable errorLog row.)
  *
- * No DB row is written — the email is the only sink.
- *
- * Modeled on `FeedbackToolbarButton` (same popover chrome) but lives
- * inside the coding-agent panel so the user is reporting "this
- * session" rather than "this app".
+ * The parent passes `getBundle()` — it owns the live session state (messages,
+ * model, reasoning/mode axes). We cap the serialized bundle so an enormous session
+ * doesn't blow past the D1 row limit (keep the most-recent turns).
  */
 import { Bug, Check } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -20,11 +18,30 @@ type IssueType = 'bug' | 'feature' | 'design';
 
 const BUTTON_SIZE_PX = 28;
 const POPUP_WIDTH = 340;
+// Keep the serialized session bundle under this — D1 rows have a size ceiling and
+// a report should stay a single row. Oldest turns are dropped first if it exceeds.
+const MAX_BUNDLE_BYTES = 700_000;
+
+/** Trim a bundle's `messages` (oldest-first) until the whole thing fits the cap. */
+function capBundle(bundle: Record<string, unknown>): Record<string, unknown> {
+  if (JSON.stringify(bundle).length <= MAX_BUNDLE_BYTES) return bundle;
+  const msgs = Array.isArray(bundle['messages']) ? [...(bundle['messages'] as unknown[])] : [];
+  const originalCount = msgs.length;
+  let kept = msgs;
+  while (kept.length > 1 &&
+    JSON.stringify({ ...bundle, messages: kept }).length > MAX_BUNDLE_BYTES) {
+    kept = kept.slice(Math.max(1, Math.ceil(kept.length / 10))); // drop oldest ~10%
+  }
+  return { ...bundle, messages: kept, _truncated: { originalCount, keptCount: kept.length } };
+}
 
 export function ReportSessionIssueButton({
   compositeId,
+  getBundle,
 }: {
   compositeId: string;
+  /** Returns the live session state to attach (messages + settings). */
+  getBundle?: () => Record<string, unknown>;
 }): ReactNode {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
@@ -68,31 +85,41 @@ export function ReportSessionIssueButton({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch('/api/submitSessionIssueReport', {
+      const reportId =
+        'sir_' + (globalThis.crypto?.randomUUID?.().slice(0, 8) ?? String(Date.now()).slice(-8));
+      const description = message.trim();
+      const bundle = capBundle({
+        compositeId,
+        issueType: type,
+        description,
+        reportId,
+        userAgent: navigator.userAgent,
+        ...(getBundle ? getBundle() : {}),
+      });
+      // Write to the SAME errorLog D1 as a normal error (framework Logger sink),
+      // with the whole session bundle in `context`. type='session-issue' so these
+      // rows are filterable apart from ordinary console errors.
+      const entry = {
+        level: 'error',
+        message: `[session-issue:${type}] ${description}`.slice(0, 8000),
+        url: typeof location !== 'undefined' ? location.href : '',
+        timestamp: Date.now(),
+        source: 'session-issue',
+        type: 'session-issue',
+        context: bundle,
+      };
+      const res = await fetch('/api/errorLogCaptureNoAuth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          input: {
-            compositeId,
-            description: message.trim(),
-            type,
-          },
-        }),
+        body: JSON.stringify({ input: { entries: [entry] } }),
       });
       if (!res.ok) {
         const body = await res.text().catch(() => '');
         throw new Error(
-          `submit failed: ${res.status}${
-            body ? ` — ${body.slice(0, 200)}` : ''
-          }`,
+          `submit failed: ${res.status}${body ? ` — ${body.slice(0, 200)}` : ''}`,
         );
       }
-      const payload = (await res.json()) as {
-        result?: { reportId?: string };
-        reportId?: string;
-      };
-      const reportId = payload.result?.reportId ?? payload.reportId ?? '?';
       setDone(reportId);
       setTimeout(() => { setOpen(false); }, 1800);
     } catch (e) {
@@ -179,9 +206,9 @@ export function ReportSessionIssueButton({
                   lineHeight: 1.4,
                 }}
               >
-                Bundles this session&apos;s logs (messages, telemetry, finish
-                events, app log tail) and emails the studio maintainer a link to
-                the bundle. Bundle auto-deletes after 7 days.
+                Logs this session&apos;s full history (all messages + settings) to
+                the error log so it can be analyzed alongside the session&apos;s
+                errors. Nothing leaves your error log.
               </div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
                 {(['bug', 'feature', 'design'] as IssueType[]).map((t) => (

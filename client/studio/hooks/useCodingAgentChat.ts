@@ -2658,6 +2658,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         mode: serverMode,
         patternMode,
         modelMode,
+        // Seed reasoning effort ON CREATE too (like patternMode/modelMode). The
+        // post-create chatSetReasoningEffort below is fire-and-forget, so a first
+        // turn that starts before it lands would otherwise run at the default —
+        // the "new session ignored my reasoning setting" bug.
+        reasoningEffort,
       })) as ChatCreateResponse;
       console.debug('[CodingAgentChat] Session created: %s', newId);
       setSessionId(newId);

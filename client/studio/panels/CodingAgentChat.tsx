@@ -7313,7 +7313,7 @@ CodingAgentChatProps = {}) {
           )}
           <CodebaseReadinessPill readiness={codebaseReadiness} />
           {sessionId && <CopySessionIdButton compositeId={sessionId} />}
-          {sessionId && <ReportSessionIssueButton compositeId={sessionId} />}
+          {sessionId && <ReportSessionIssueButton compositeId={sessionId} getBundle={() => ({ messages, model, reasoningEffort, modelMode, patternMode })} />}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
               data-id="archive-session-empty"
@@ -7478,7 +7478,7 @@ CodingAgentChatProps = {}) {
           )}
           <CodebaseReadinessPill readiness={codebaseReadiness} />
           {sessionId && <CopySessionIdButton compositeId={sessionId} />}
-          {sessionId && <ReportSessionIssueButton compositeId={sessionId} />}
+          {sessionId && <ReportSessionIssueButton compositeId={sessionId} getBundle={() => ({ messages, model, reasoningEffort, modelMode, patternMode })} />}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
               data-id="archive-session"
