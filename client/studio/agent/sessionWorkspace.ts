@@ -122,6 +122,35 @@ async function detectInstall(projectPath: string): Promise<[string, string[]] | 
   return null; // no node project — nothing to install
 }
 
+/**
+ * Run the project's package-manager install in `dir` (best-effort). With
+ * `onlyIfMissing`, skips when `node_modules` already exists (so opening the MAIN
+ * session doesn't reinstall every time). A non-zero exit is shipped to errorLog.
+ *
+ * WHY this exists as a shared helper: previously ONLY the worktree branch
+ * installed deps. A MAIN session (operating on the project dir directly) returned
+ * the project as-is with NO install — so a project whose `node_modules` was never
+ * created had `ugly-app: command not found` on `pnpm dev`/publish and missing `pg`
+ * in the Database panel. Now the main session installs too when deps are absent.
+ */
+async function ensureDeps(dir: string, onProgress: ProgressFn | undefined, onlyIfMissing: boolean): Promise<void> {
+  if (onlyIfMissing && (await exists(`${dir}/node_modules`))) return;
+  const inst = await detectInstall(dir);
+  if (!inst) return;
+  onProgress?.('installing', `Installing dependencies (${inst[0]} ${inst[1].join(' ')})…`);
+  let tail = '';
+  const r = await runProc(inst[0], inst[1], {
+    cwd: dir,
+    onChunk: (c) => { tail = (tail + c).split('\n').slice(-12).join('\n'); onProgress?.('installing', tail); },
+  });
+  if (r.code !== 0) {
+    console.error('[sessionWorkspace:install-failed]', JSON.stringify({
+      manager: inst[0], args: inst[1], cwd: dir, code: r.code, output: r.out.slice(-2000),
+    }));
+    onProgress?.('error', `Install exited ${r.code} — commands needing deps may fail.`);
+  }
+}
+
 /** Resolve (creating if needed) the workspace for a session. Idempotent + cached. */
 export async function ensureSessionWorkspace(sessionId: string, projectPath: string | null, onProgress?: ProgressFn): Promise<SessionWorkspace> {
   const cached = cache.get(sessionId);
@@ -172,7 +201,14 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
     const hasMain = stored.some((s) => s.kind === 'main');
     isMain = me ? me.kind === 'main' : !hasMain; // a brand-new session is main iff none exists yet
   } catch { /* default isMain=true on failure → safe */ }
-  if (isMain) return fallback();
+  if (isMain) {
+    // The main session runs against the project dir — ensure its deps are installed
+    // (only when node_modules is missing) so `pnpm dev` / publish / the DB panel's
+    // `pg` resolve. Without this a never-installed project fails all three.
+    await ensureDeps(projectPath, onProgress, true);
+    onProgress?.('ready', 'Workspace ready.');
+    return fallback();
+  }
 
   const safe = safeId(sessionId);
   const dir = `${projectPath}/.ugly-studio/worktrees/${safe}`;
@@ -195,27 +231,9 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
         }
       }
 
-      // Real install (reliable; supports the live dev server / Preview).
-      const inst = await detectInstall(projectPath);
-      if (inst) {
-        onProgress?.('installing', `Installing dependencies (${inst[0]} ${inst[1].join(' ')})…`);
-        let tail = '';
-        const r2 = await runProc(inst[0], inst[1], { cwd: dir, onChunk: (c) => {
-          tail = (tail + c).split('\n').slice(-12).join('\n');
-          onProgress?.('installing', tail);
-        } });
-        if (r2.code !== 0) {
-          // Ship to error telemetry (browser Logger → errorLog). A failed install was
-          // previously only shown in the in-session progress line and never logged, so
-          // remote "it failed on install" reports had no manager/exit-code/output to go
-          // on. `r2.out` also carries a `NativeUnavailable: process.spawn` when the host
-          // shell wasn't reachable — captured here WITH the command context.
-          console.error('[sessionWorkspace:install-failed]', JSON.stringify({
-            manager: inst[0], args: inst[1], cwd: dir, code: r2.code, output: r2.out.slice(-2000),
-          }));
-          onProgress?.('error', `Install exited ${r2.code} — the agent will still run, but commands needing deps may fail.`);
-        }
-      }
+      // Real install into the fresh worktree (reliable; supports the dev server /
+      // Preview). Same helper the main session uses; a fresh worktree always needs it.
+      await ensureDeps(dir, onProgress, false);
     }
     onProgress?.('ready', 'Workspace ready.');
     const ws: SessionWorkspace = { dir, port, isWorktree: true, branch, ...dbField };
