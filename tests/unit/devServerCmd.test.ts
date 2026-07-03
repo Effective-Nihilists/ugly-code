@@ -8,7 +8,12 @@ describe('devServerSpawn', () => {
   it('runs the dev script through a login bash on the given port', () => {
     const spec = devServerSpawn(4321);
     expect(spec.cmd).toBe('bash');
-    expect(spec.args).toEqual(['-lc', 'pnpm dev']);
+    expect(spec.args[0]).toBe('-lc');
+    // Ends in the dev script...
+    expect(spec.args[1]).toMatch(/pnpm dev$/);
+    // ...but installs deps first if node_modules is missing (never-set-up project).
+    expect(spec.args[1]).toContain('[ -d node_modules ]');
+    expect(spec.args[1]).toContain('pnpm install');
     expect(spec.env.PORT).toBe('4321');
   });
 
