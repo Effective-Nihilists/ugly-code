@@ -15,9 +15,18 @@ export function devServerSpawn(port: number): { cmd: string; args: string[]; env
     'if [ -f pnpm-lock.yaml ]; then pnpm install; ' +
     'elif [ -f yarn.lock ]; then yarn install; ' +
     'elif [ -f package.json ]; then npm install; fi; }';
+  // Free the port first: after a client reload the panel loses its handle to a
+  // still-running dev server (the process survives on the host), so a fresh start
+  // otherwise collides — `Port <n> is already in use` → the dev server exits and
+  // the preview blanks. Best-effort SIGTERM to whatever holds the port (lets
+  // ugly-app dev tear down its tunnel/vite children), then a beat for release.
+  // Guarded on lsof so it's a harmless no-op where lsof is absent (e.g. Windows).
+  const freePort =
+    `command -v lsof >/dev/null 2>&1 && ` +
+    `{ lsof -ti tcp:${port} 2>/dev/null | xargs -I{} kill {} 2>/dev/null; sleep 0.5; } || true`;
   return {
     cmd: 'bash',
-    args: ['-lc', `${ensureDeps}; pnpm dev`],
+    args: ['-lc', `${freePort}; ${ensureDeps}; pnpm dev`],
     env: { PORT: String(port), FORCE_COLOR: '0', NO_COLOR: '1' },
   };
 }

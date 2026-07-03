@@ -14,6 +14,9 @@ describe('devServerSpawn', () => {
     // ...but installs deps first if node_modules is missing (never-set-up project).
     expect(spec.args[1]).toContain('[ -d node_modules ]');
     expect(spec.args[1]).toContain('pnpm install');
+    // ...and frees the port first (orphaned dev server after a client reload).
+    expect(spec.args[1]).toContain('lsof -ti tcp:4321');
+    expect(spec.args[1]).toContain('kill');
     expect(spec.env.PORT).toBe('4321');
   });
 
