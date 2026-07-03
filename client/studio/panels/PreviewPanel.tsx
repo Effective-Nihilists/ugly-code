@@ -3,6 +3,7 @@ import { native } from 'ugly-app/native';
 import { sessionPort } from '../agent/sessionWorkspace';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { devServerSpawn } from './devServerCmd';
+import { persistDevLog, flushDevLog } from './devServerLog';
 
 // A live preview of the running dev server, in an iframe. Each session gets a
 // unique PORT (set in the env of its run_command spawns, so `pnpm dev` binds it),
@@ -92,14 +93,14 @@ function startDev(key: string, projectPath: string, port: number): void {
   try {
     const p = native.process.spawn(spec.cmd, spec.args, { cwd: projectPath, env: spec.env });
     d.proc = p;
-    p.onStdout((c) => { d.log = (d.log + c).slice(-12000); notify(d); });
-    p.onStderr((c) => { d.log = (d.log + c).slice(-12000); notify(d); });
+    p.onStdout((c) => { d.log = (d.log + c).slice(-12000); notify(d); void persistDevLog(projectPath, d.log); });
+    p.onStderr((c) => { d.log = (d.log + c).slice(-12000); notify(d); void persistDevLog(projectPath, d.log); });
     p.onError((e) => {
       if (d.proc !== p) return; // superseded by a restart — ignore the stale proc
       // Ship spawn failures to the error telemetry (browser Logger → errorLog); the
       // in-panel log alone isn't visible when the host is a remote/other machine.
       console.error('[PreviewPanel:dev-server-error]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, error: String(e) }));
-      d.log = (d.log + `\n[error: ${e}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d);
+      d.log = (d.log + `\n[error: ${e}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d); void flushDevLog(projectPath, d.log);
     });
     p.onExit((code) => {
       if (d.proc !== p) return; // superseded by a restart — ignore the stale proc

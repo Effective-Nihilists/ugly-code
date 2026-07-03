@@ -11,6 +11,7 @@ import { lspDiagnosticsTool } from './lspDiagnostics';
 import { multieditTool } from './multiedit';
 import { pythonExecTool } from './pythonExec';
 import { pythonLibrariesTool } from './pythonLibraries';
+import { devServerLogsTool } from './devServerLogs';
 
 export interface ToolModule {
   name: string;
@@ -23,7 +24,7 @@ export interface ToolModule {
   ): Promise<string>;
 }
 
-export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool];
+export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool];
 
 /** Model-facing specs for every registered tool (appended to AGENT_TOOLS when
  *  assembling the per-turn tool list). */
