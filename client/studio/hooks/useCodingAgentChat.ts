@@ -1559,7 +1559,19 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         })) as { snapshot: SessionSnapshot | null } | null;
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write and narrows it to always-false.
         if (cancelled || !res?.snapshot) return;
-        applySnapshot(res.snapshot);
+        // Parse (don't bare-cast) so zod fills `.default()` fields — a snapshot
+        // from a lagging coding-task build can omit pending arrays / eval, and
+        // applySnapshot maps them directly (undefined.map → crash). safeParse
+        // applies defaults; a genuinely malformed snapshot drops to granular events.
+        const parsed = SessionSnapshotSchema.safeParse(res.snapshot);
+        if (!parsed.success) {
+          console.warn(
+            '[CodingAgentChat] mount snapshot failed validation; falling back to granular events',
+            parsed.error.issues,
+          );
+          return;
+        }
+        applySnapshot(parsed.data);
       } catch (err) {
         console.warn(
           '[CodingAgentChat] Snapshot fetch failed; falling back to granular events',
