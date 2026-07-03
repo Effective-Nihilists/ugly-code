@@ -31,10 +31,7 @@
  * is a no-op. The agent runs without diagnostics; nothing breaks.
  */
 
-import { EventEmitter } from 'events';
-import fs from 'fs';
 import path from 'path';
-import url from 'url';
 import { native } from 'ugly-app/native';
 import type { UglyProcess } from 'ugly-app/native';
 
@@ -86,20 +83,68 @@ function log(msg: string, ...args: unknown[]) {
   console.log(`[coding-agent/lsp] ${msg}`, ...args);
 }
 
-const DEBUG = process.env['UGLY_LSP_DEBUG'] === '1';
+// Flip to true locally to trace tsserver's stderr + request lifecycle. Kept a
+// plain const (not process.env) because this client runs in the browser.
+const DEBUG = false;
 function debug(msg: string, ...args: unknown[]) {
   if (DEBUG) console.log(`[lsp:debug] ${msg}`, ...args);
 }
 
+/** Convert an absolute path to a `file://` URI without Node's `url` module.
+ *  POSIX paths get three slashes (`file:///Users/…`); Windows drive paths get
+ *  their leading slash (`file:///C:/…`). */
 function pathToFileUri(filePath: string): string {
-  return url.pathToFileURL(filePath).toString();
+  const p = filePath.replace(/\\/g, '/');
+  const withSlash = p.startsWith('/') ? p : `/${p}`;
+  return `file://${encodeURI(withSlash)}`;
 }
 
+/** Inverse of pathToFileUri — strip the scheme, decode, and drop the leading
+ *  slash ahead of a Windows drive letter. */
 function fileUriToPath(uri: string): string {
   try {
-    return url.fileURLToPath(uri);
+    let p = decodeURIComponent(uri.replace(/^file:\/\//, ''));
+    if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
+    return p;
   } catch {
     return uri;
+  }
+}
+
+/** The single event this client broadcasts: LSP lifecycle + diagnostic updates,
+ *  wire-compatible with the IDE's `lsp_event` envelope. */
+export interface LspEventEnvelope {
+  type: 'lsp_event';
+  payload: {
+    type: 'created' | 'updated' | 'deleted';
+    payload: {
+      state: LspState;
+      file?: string;
+      diagnostics?: LspDiagnostic[];
+      totalErrors?: number;
+      totalWarnings?: number;
+      message?: string;
+    };
+  };
+}
+
+/** Minimal browser-safe replacement for node:events — one event channel, a
+ *  Set of listeners, on()/off()/emit()/clear(). */
+class Emitter {
+  private readonly listeners = new Set<(event: LspEventEnvelope) => void>();
+  on(listener: (event: LspEventEnvelope) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  off(listener: (event: LspEventEnvelope) => void): void {
+    this.listeners.delete(listener);
+  }
+  emit(event: LspEventEnvelope): void {
+    // Snapshot so a listener that unsubscribes mid-emit doesn't skip peers.
+    for (const l of [...this.listeners]) l(event);
+  }
+  clear(): void {
+    this.listeners.clear();
   }
 }
 
@@ -108,33 +153,33 @@ function fileUriToPath(uri: string): string {
  * language pattern. Used to prime the LSP server with a project
  * context after init.
  */
-function findFirstSourceFile(
+async function findFirstSourceFile(
   dir: string,
   maxDepth: number,
   language: LspLanguage,
-): string | null {
+): Promise<string | null> {
   if (maxDepth < 0) return null;
   const matches = (name: string): boolean => {
     if (language === 'python') return name.endsWith('.py');
     return /\.(ts|tsx)$/.test(name) && !name.endsWith('.d.ts');
   };
-  let entries: fs.Dirent[];
+  let entries: Awaited<ReturnType<typeof native.fs.readdir>>;
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries = await native.fs.readdir(dir);
   } catch {
     return null;
   }
   for (const e of entries) {
     if (e.name.startsWith('.') || e.name === 'node_modules') continue;
     const full = path.join(dir, e.name);
-    if (e.isFile() && matches(e.name)) {
+    if (e.isFile && matches(e.name)) {
       return full;
     }
   }
   for (const e of entries) {
     if (e.name.startsWith('.') || e.name === 'node_modules') continue;
-    if (e.isDirectory()) {
-      const hit = findFirstSourceFile(
+    if (e.isDirectory) {
+      const hit = await findFirstSourceFile(
         path.join(dir, e.name),
         maxDepth - 1,
         language,
@@ -208,7 +253,7 @@ export function parseMessages(buffer: string): {
 }
 
 export class LspClient {
-  readonly events = new EventEmitter();
+  readonly events = new Emitter();
   private state: LspState = 'initializing';
   private proc: UglyProcess | null = null;
   private buffer = '';
@@ -255,24 +300,8 @@ export class LspClient {
    * `{ type: 'lsp_event', payload: { type, payload } }` envelope so
    * the session can forward it directly to the IDE broadcast.
    */
-  onEvent(
-    listener: (event: {
-      type: 'lsp_event';
-      payload: {
-        type: 'created' | 'updated' | 'deleted';
-        payload: {
-          state: LspState;
-          file?: string;
-          diagnostics?: LspDiagnostic[];
-          totalErrors?: number;
-          totalWarnings?: number;
-          message?: string;
-        };
-      };
-    }) => void,
-  ): () => void {
-    this.events.on('lsp_event', listener);
-    return () => this.events.off('lsp_event', listener);
+  onEvent(listener: (event: LspEventEnvelope) => void): () => void {
+    return this.events.on(listener);
   }
 
   private emitState(
@@ -284,7 +313,7 @@ export class LspClient {
     } = {},
   ): void {
     const totals = this.totals();
-    this.events.emit('lsp_event', {
+    this.events.emit({
       type: 'lsp_event',
       payload: {
         type: subType,
@@ -348,7 +377,7 @@ export class LspClient {
         let primed: string | null = null;
         for (const root of roots) {
           const dir = path.join(this.workspaceRoot, root);
-          const hit = findFirstSourceFile(dir, 4, this.language);
+          const hit = await findFirstSourceFile(dir, 4, this.language);
           if (hit) {
             primed = hit;
             try {
@@ -392,7 +421,7 @@ export class LspClient {
     const roots = ['src', 'app', 'lib', 'packages', '.'];
     for (const root of roots) {
       const dir = path.join(this.workspaceRoot, root);
-      const hit = findFirstSourceFile(dir, 4, this.language);
+      const hit = await findFirstSourceFile(dir, 4, this.language);
       if (hit) {
         try {
           await this.openFile(hit);
@@ -458,7 +487,8 @@ export class LspClient {
     // we only consume diagnostics and the publishDiagnostics
     // notification, so we don't need completion/hover/etc.
     await this.sendRequest('initialize', {
-      processId: process.pid,
+      // No OS pid in the browser; processId is informational to the server.
+      processId: 0,
       clientInfo: { name: 'ugly-studio', version: '0.1.0' },
       rootUri: pathToFileUri(this.workspaceRoot),
       capabilities: {
@@ -499,7 +529,7 @@ export class LspClient {
     let body = content;
     if (body === undefined) {
       try {
-        body = await fs.promises.readFile(abs, 'utf-8');
+        body = await native.fs.readFile(abs);
       } catch {
         return;
       }
@@ -982,7 +1012,7 @@ export class LspClient {
         }
         this.proc = null;
       }
-      this.events.removeAllListeners();
+      this.events.clear();
     }
   }
 
