@@ -81,10 +81,15 @@ export const AGENT_TOOLS: TextGenTool[] = [
   },
   {
     name: 'read_file',
-    description: 'Read the full UTF-8 contents of a file.',
+    description:
+      'Read a file as hashline-annotated lines: each line is `<n>:<hash>|<content>` inside a <file> element. The `<n>:<hash>` prefix is a stable anchor you can pass to edit_file (anchor/insert_after/range modes) for stale-safe edits. Use offset/limit for large files (defaults to the first 2000 lines).',
     parameters: {
       type: 'object',
-      properties: { path: { type: 'string', description: 'File path relative to the workspace root.' } },
+      properties: {
+        path: { type: 'string', description: 'File path relative to the workspace root.' },
+        offset: { type: 'number', description: 'First line to read (0-indexed). Default 0.' },
+        limit: { type: 'number', description: 'Max lines to read. Default 2000.' },
+      },
       required: ['path'],
       additionalProperties: false,
     },

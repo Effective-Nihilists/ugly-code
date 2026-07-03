@@ -28,6 +28,38 @@ export function computeLineHash(content: string, lineIdx: number): string {
   return ((h >>> 0) & 0xff).toString(16).padStart(2, '0');
 }
 
+export const DEFAULT_READ_LIMIT = 2000;
+
+/** Render a file body as hashline-annotated `read_file` output: each line as
+ *  `<n>:<hash>|<content>`, wrapped in a <file> element, with offset/limit slicing
+ *  and a truncation notice. Line hashes use the ABSOLUTE line index so an anchor
+ *  copied from this output verifies against the full file. Pure. */
+export function formatHashlineRead(
+  path: string,
+  body: string,
+  offset = 0,
+  limit: number = DEFAULT_READ_LIMIT,
+): string {
+  const stripped = body.endsWith('\n') ? body.slice(0, -1) : body;
+  const allLines = stripped.length === 0 ? [] : stripped.split('\n');
+  const off = Math.max(0, offset);
+  const lim = Math.max(1, limit);
+  const slice = allLines.slice(off, off + lim);
+  const rendered = slice
+    .map((line, i) => {
+      const lineIdx = off + i;
+      const num = String(lineIdx + 1).padStart(6, ' ');
+      return `${num}:${computeLineHash(line, lineIdx)}|${line}`;
+    })
+    .join('\n');
+  const wrapped = `<file path="${path}">\n${rendered}${rendered.length > 0 ? '\n' : ''}</file>\n`;
+  const truncated =
+    allLines.length > off + lim
+      ? `[truncated: ${allLines.length - off - lim} more lines]\n`
+      : '';
+  return wrapped + truncated;
+}
+
 /** One annotated line as `read_file` emits it. */
 export interface AnnotatedLine {
   lineNumber: number; // 1-based for display

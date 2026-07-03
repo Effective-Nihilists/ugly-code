@@ -8,6 +8,7 @@ import {
   parseAnchorRange,
   verifyAnchor,
   applyHashlineOp,
+  formatHashlineRead,
 } from '../../../client/agent/tools/hashline';
 
 describe('computeLineHash', () => {
@@ -97,5 +98,23 @@ describe('applyHashlineOp', () => {
     const r = applyHashlineOp(body, { kind: 'replace_line', anchor: { lineNumber: 2, hash: wrong }, newContent: 'B' });
     expect(r.ok).toBe(false);
     expect(r.diagnostic).toMatch(/stale hash/);
+  });
+});
+
+describe('formatHashlineRead', () => {
+  it('annotates lines with anchors + <file> wrapper', () => {
+    const out = formatHashlineRead('a.ts', 'x\ny\n');
+    expect(out).toMatch(/<file path="a.ts">/);
+    expect(out).toMatch(/1:[0-9a-f]{2}\|x/);
+    expect(out).toMatch(/2:[0-9a-f]{2}\|y/);
+    expect(out).toMatch(/<\/file>/);
+  });
+  it('respects offset/limit + emits a truncation notice', () => {
+    const body = Array.from({ length: 5 }, (_, i) => `L${i + 1}`).join('\n') + '\n';
+    const out = formatHashlineRead('a.ts', body, 1, 2);
+    expect(out).toMatch(/2:[0-9a-f]{2}\|L2/);
+    expect(out).toMatch(/3:[0-9a-f]{2}\|L3/);
+    expect(out).not.toMatch(/\|L1/);
+    expect(out).toMatch(/truncated: 2 more lines/);
   });
 });

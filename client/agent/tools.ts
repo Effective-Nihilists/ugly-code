@@ -8,6 +8,7 @@ import type { AgentToolName } from '../../shared/agent';
 import type { StepFn } from './engine';
 import { DB_SCRIPT } from '../studio/db/dbScript';
 import { runRegisteredTool } from './tools/registry';
+import { formatHashlineRead } from './tools/hashline';
 
 /** Project + mode context so tool subprocesses can be OS-user sandboxed by the
  *  daemon. Resolved by the agent loop (clientAgent) per turn. */
@@ -64,8 +65,16 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       );
       return items.map((e) => (e.isDirectory ? `${e.name}/` : e.name)).join('\n') || '(empty directory)';
     }
-    case 'read_file':
-      return native.fs.readFile(resolvePath(ctx, String(p.path)));
+    case 'read_file': {
+      const rawPath = String(p.path);
+      const raw = await native.fs.readFile(resolvePath(ctx, rawPath));
+      return formatHashlineRead(
+        rawPath,
+        raw,
+        p.offset != null ? Number(p.offset) : 0,
+        p.limit != null ? Number(p.limit) : undefined,
+      );
+    }
     case 'codebase_search': {
       // Semantic search over the host's index (codebase.* is a host-only channel; no facade
       // method, so call the raw UglyNative). Scoped to the open project; the worktree (if

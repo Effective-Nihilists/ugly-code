@@ -33,9 +33,20 @@ describe('list_dir', () => {
 });
 
 describe('read_file', () => {
-  it('returns the file contents', async () => {
+  it('returns hashline-annotated contents (<n>:<hash>|content in a <file> wrapper)', async () => {
     resetMock({ files: { 'a.txt': 'one\ntwo\n' } });
-    expect(await dispatchTool('read_file', { path: 'a.txt' })).toBe('one\ntwo\n');
+    const out = await dispatchTool('read_file', { path: 'a.txt' });
+    expect(out).toMatch(/<file path="a.txt">/);
+    expect(out).toMatch(/1:[0-9a-f]{2}\|one/);
+    expect(out).toMatch(/2:[0-9a-f]{2}\|two/);
+  });
+
+  it('supports offset/limit', async () => {
+    resetMock({ files: { 'a.txt': 'L1\nL2\nL3\nL4\n' } });
+    const out = await dispatchTool('read_file', { path: 'a.txt', offset: 1, limit: 2 });
+    expect(out).toMatch(/2:[0-9a-f]{2}\|L2/);
+    expect(out).toMatch(/3:[0-9a-f]{2}\|L3/);
+    expect(out).not.toMatch(/\|L1/);
   });
 
   it('rejects on a missing file', async () => {
