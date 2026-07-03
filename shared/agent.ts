@@ -201,6 +201,7 @@ Guidelines:
 - lsp_diagnostics reports TypeScript errors/warnings from the language server — prefer it over running tsc to check whether code compiles.
 - run_command takes a binary name + args (no shell). Use it to run git, node, python, rg, etc.
 - db_query / db_get / db_set inspect and fix the project's local dev database (documents live in a JSONB \`data\` column). Use them to debug runtime/data issues — verify what the app actually wrote, reproduce a bad state, or seed fixtures.
+- web_search finds pages; web_fetch reads one; download saves a URL to a file; dep_docs reads an installed dependency's docs. Only fetch URLs the user gave you or that you found in local files or search results.
 - Keep going until the user's request is fully handled, then give a short summary. Do not ask for confirmation on routine steps.
 - All paths are relative to the workspace root. Be concise in your prose.`;
 
