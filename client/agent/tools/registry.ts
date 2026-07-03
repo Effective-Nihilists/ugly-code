@@ -9,6 +9,8 @@ import { grepTool } from './grep';
 import { globTool } from './glob';
 import { lspDiagnosticsTool } from './lspDiagnostics';
 import { multieditTool } from './multiedit';
+import { pythonExecTool } from './pythonExec';
+import { pythonLibrariesTool } from './pythonLibraries';
 
 export interface ToolModule {
   name: string;
@@ -21,7 +23,7 @@ export interface ToolModule {
   ): Promise<string>;
 }
 
-export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool];
+export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool];
 
 /** Model-facing specs for every registered tool (appended to AGENT_TOOLS when
  *  assembling the per-turn tool list). */
