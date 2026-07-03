@@ -32,7 +32,7 @@ const GROUP_MODE_TOOLS: ToolName[] = ['blackboard_post'];
 const UGLY_APP_TOOLS: ToolName[] = [
   'database', 'database_sql_query',
   'dev_server_start', 'dev_server_stop', 'dev_server_logs', 'dev_server_errors',
-  'dev_server_screenshot', 'inspect_ux',
+  'inspect_ux',
 ];
 
 /** Feature gates. Defaults mirror the monolith: multiAgent OFF by default;

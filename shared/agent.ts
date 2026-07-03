@@ -107,7 +107,6 @@ export type ToolName =
   | 'dev_server_stop'
   | 'dev_server_logs'
   | 'dev_server_errors'
-  | 'dev_server_screenshot'
   | 'inspect_ux'
   // ugly-code additions (not in the monolith)
   | 'lsp_diagnostics'

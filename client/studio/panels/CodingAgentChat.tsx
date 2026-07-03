@@ -363,7 +363,6 @@ const TOOL_ICON_MAP: Record<string, React.ReactNode> = {
   // Dev server
   dev_server_start: <Zap size={13} />,
   dev_server_stop: <Square size={13} />,
-  dev_server_screenshot: <Eye size={13} />,
   dev_server_logs: <TerminalSquare size={13} />,
   dev_server_errors: <ShieldQuestion size={13} />,
   // Project DB

@@ -2,8 +2,8 @@
 // the project's dev server. The server is owned by PreviewPanel (renderer);
 // start/stop write a command via the control-file bridge (devServerControl.ts)
 // that PreviewPanel polls; errors reads the persisted dev log (devServerLog.ts)
-// and surfaces just the error-ish lines. (`dev_server_screenshot` needs a
-// preview-capture surface that doesn't exist yet — not implemented.)
+// and surfaces just the error-ish lines. (The monolith's `dev_server_screenshot`
+// is intentionally NOT ported — ugly-code has no Preview-iframe capture surface.)
 
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
