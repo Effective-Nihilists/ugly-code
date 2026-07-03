@@ -45,3 +45,21 @@ describe('multiedit', () => {
     expect(mockFiles().get('/proj/a.ts')).toBe('let x = 1;\nlet y = 2;\nlet y = 2;\n');
   });
 });
+
+describe('multiedit anchor modes', () => {
+  it('applies a mix of string-match and anchor edits atomically', async () => {
+    resetMock({ files: { '/proj/a.ts': 'l1\nl2\nl3\n' } });
+    await multieditTool.run(
+      {
+        path: '/proj/a.ts',
+        edits: [
+          { anchor: '1', new_content: 'L1' },
+          { old_string: 'l3', new_string: 'L3' },
+          { insert_after: '2', new_content: 'X' },
+        ],
+      },
+      undefined,
+    );
+    expect(mockFiles().get('/proj/a.ts')).toBe('L1\nl2\nX\nL3\n');
+  });
+});

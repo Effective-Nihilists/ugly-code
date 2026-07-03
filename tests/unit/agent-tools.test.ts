@@ -77,18 +77,14 @@ describe('edit_file', () => {
     expect(mockFiles().get('x.ts')).toBe('const x = 2;\n');
   });
 
-  it('errors when the old text is not found', async () => {
+  it('reports when the old text is not found', async () => {
     resetMock({ files: { 'x.ts': 'const x = 1;\n' } });
-    await expect(dispatchTool('edit_file', { path: 'x.ts', old: 'nope', new: 'y' })).rejects.toThrow(
-      /not found/,
-    );
+    expect(await dispatchTool('edit_file', { path: 'x.ts', old: 'nope', new: 'y' })).toMatch(/not found/);
   });
 
-  it('errors when the old text is not unique', async () => {
+  it('reports when the old text is not unique', async () => {
     resetMock({ files: { 'y.ts': 'a;\na;\n' } });
-    await expect(dispatchTool('edit_file', { path: 'y.ts', old: 'a;', new: 'b;' })).rejects.toThrow(
-      /not unique/,
-    );
+    expect(await dispatchTool('edit_file', { path: 'y.ts', old: 'a;', new: 'b;' })).toMatch(/not unique/);
     // unchanged
     expect(mockFiles().get('y.ts')).toBe('a;\na;\n');
   });
