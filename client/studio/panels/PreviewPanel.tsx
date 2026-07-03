@@ -4,6 +4,7 @@ import { sessionPort } from '../agent/sessionWorkspace';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { devServerSpawn } from './devServerCmd';
 import { persistDevLog, flushDevLog } from './devServerLog';
+import { readDevControl } from './devServerControl';
 
 // A live preview of the running dev server, in an iframe. Each session gets a
 // unique PORT (set in the env of its run_command spawns, so `pnpm dev` binds it),
@@ -182,6 +183,27 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
     setReloadKey((k) => k + 1);
     try { localStorage.setItem(keyFor(sessionId ?? null), u); } catch { /* ignore */ }
   }, [url, sessionId]);
+
+  // Bridge: honor dev-server start/stop requests the coding agent writes via the
+  // control file (devServerControl.ts) — the agent runs in the task context and
+  // can't call startDev/stopDev directly. Poll ~1.5s; act on each new nonce once.
+  const lastCtlNonce = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const proj = getActiveProjectPath();
+    if (!proj) return;
+    let cancelled = false;
+    // Seed with the current command so a stale pre-mount request isn't replayed.
+    void readDevControl(proj).then((c) => { if (!cancelled) lastCtlNonce.current = c?.nonce ?? null; });
+    const id = setInterval(() => {
+      void readDevControl(proj).then((c) => {
+        if (cancelled || !c || c.nonce === lastCtlNonce.current) return;
+        lastCtlNonce.current = c.nonce;
+        if (c.cmd === 'stop') stopDev(devKey);
+        else startDev(devKey, proj, port); // start | restart
+      });
+    }, 1500);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [devKey, port]);
 
   const startOrRestart = React.useCallback(() => {
     const proj = getActiveProjectPath();

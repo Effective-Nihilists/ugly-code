@@ -13,6 +13,7 @@ import { multieditTool } from './multiedit';
 import { pythonExecTool } from './pythonExec';
 import { pythonLibrariesTool } from './pythonLibraries';
 import { devServerLogsTool } from './devServerLogs';
+import { devServerStartTool, devServerStopTool, devServerErrorsTool } from './devServer';
 import { webFetchTool } from './webFetch';
 import { webSearchTool } from './webSearch';
 import { downloadTool } from './download';
@@ -45,7 +46,7 @@ export interface ToolModule {
   ): Promise<string>;
 }
 
-export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool, todosTool, scratchpadTool, memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool, askUserTool, delegateTool, delegateParallelTool, blackboardPostTool, toolSearchTool, toolRequestTool, specReadTool, specWriteTool, analyzeImageTool, inspectUxTool];
+export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, devServerStartTool, devServerStopTool, devServerErrorsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool, todosTool, scratchpadTool, memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool, askUserTool, delegateTool, delegateParallelTool, blackboardPostTool, toolSearchTool, toolRequestTool, specReadTool, specWriteTool, analyzeImageTool, inspectUxTool];
 
 /** Model-facing specs for every registered tool (appended to AGENT_TOOLS when
  *  assembling the per-turn tool list). */

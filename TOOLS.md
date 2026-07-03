@@ -576,11 +576,16 @@ checklist.
 > done: names renamed to `read`/`write`/`edit`/`bash`, `codebase_search` folded
 > into `grep semantic`, the `agent` tool retired, static gating adopted, tool
 > names made type-safe (`ToolName` + `isTool`), path handling fixed.
-> **Row 6 is partial:** `spec_write`, `database`, `database_sql_query` are added;
-> **`dev_server_{start,stop,errors,screenshot}` remain — they need ugly-studio
-> host channels (`dev.*`/`screenshot.*` don't exist yet).** They are gated
-> (ugly-app-project only) and named in `ToolName`, so they're wired everywhere
-> except the tool implementations + host channels.
+> **Row 6 nearly done:** `spec_write`, `database`, `database_sql_query`,
+> `dev_server_start`, `dev_server_stop`, `dev_server_errors` are added.
+> `dev_server_{start,stop}` drive PreviewPanel's dev server via a **control-file
+> bridge** (`client/studio/panels/devServerControl.ts`, polled by PreviewPanel) —
+> the renderer owns the dev server, so no host channel is needed; `dev_server_errors`
+> reads the persisted dev log and filters error lines.
+> **Only `dev_server_screenshot` remains** — it needs a preview-capture surface
+> (nothing screenshots the Preview iframe yet). It's gated (ugly-app-project only)
+> and named in `ToolName` but not registered, so it simply doesn't appear until a
+> capture surface exists.
 
 | # | Divergence | Monolith (authoritative) | Current ugly-code |
 |---|---|---|---|
