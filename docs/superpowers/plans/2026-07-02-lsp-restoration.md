@@ -126,3 +126,18 @@
 **Coverage:** recover (T1) → process layer (T2) → fs/emitter (T3) → server resolution (T4) → handlers+registry (T5) → status (T6) → e2e (T7) → provisioning (T8). The orphaned `lsp*` API gets real implementations; editor go-to-definition + references + implementation + hover + status restored; python LSP explicitly deferred.
 
 **Risks:** the sync→async fs conversion (T3) is the subtle part — audit every former `*Sync` call. npx cold-start latency (T7) — cache the client per workspace (registry already does). The recovered client may reference other deleted helpers — resolve each against the new native layer during T2/T3.
+
+---
+
+## Adaptation Inventory (discovered from the recovered client.ts — exact touchpoints)
+
+Node-API usages to convert (line numbers as recovered; re-grep after edits):
+
+- **child_process** — `import { spawn, type ChildProcess }` (34). Spawn at **397** `spawn(binaryPath, ['--stdio'], {cwd, stdio})` → `native.process.spawn(binaryPath, ['--stdio'], {cwd})`. Handlers: `proc.stdout?.on('data', …)` (403) → `proc.onStdout`; `proc.stderr?.on('data', …)` (404) → `proc.onStderr`; `proc.stdin?.on('error', …)` (426) → `proc.onError`; `proc.on('exit', …)` (430) → `proc.onExit`; `proc.on('error', …)` (445) → `proc.onError`. Writes: `this.proc?.stdin?.writable` guards (988, 1008) → drop (native handle has no `.writable`; just try/catch); `this.proc?.stdin?.write(header/body)` (1016–1017) → `this.proc?.write(header); this.proc?.write(body)`. Type `ChildProcess` → `ReturnType<typeof native.process.spawn>`.
+- **Framing (Buffer)** — 7 `Buffer` usages in `handleStdout`/`writeMessage`. `native.process.onStdout` delivers **decoded strings**, not Buffers. Extract a pure `parseMessages(buf: string): { messages: unknown[]; rest: string }` operating on a string accumulator. Content-Length is byte length; for the common ASCII/UTF-8 LSP payloads a string length matches — acceptable, but note the caveat in a comment (this is standard for JS LSP clients).
+- **url** — `url.pathToFileURL(p).toString()` (94) → build `file://` manually: `'file://' + encodeURI(p.replace(/\\/g,'/'))` (leading `/` for POSIX). `url.fileURLToPath(uri)` (99) → `decodeURIComponent(uri.replace(/^file:\/\//,''))`.
+- **process** — `process.env['UGLY_LSP_DEBUG']` (88) → `false` const (or `import.meta.env.VITE_LSP_DEBUG`). `process.cwd()` (151,175) + `process.env.PATH` (181) live in the binary-resolution helpers that **Task 4 deletes** (npx). `process.pid` (457) → `0` (only used as the LSP `processId`, informational).
+- **EventEmitter** — `events` (35), `readonly events = new EventEmitter()` (199), `this.events.on('lsp_event', …)` (262), `emitState` emits. Replace with a ~15-line `Emitter { on/off/emit }` over a `Set`.
+- **fs** — `fs.readdirSync` (122, in `findFirstSourceFile`) → `native.fs.readdir` (async) OR drop the first-source-file optimization; `fs.existsSync` (166,178,185) is in the resolve helpers **Task 4 deletes**.
+
+Order note: doing Task 4 (npx resolve) early deletes most fs/process usages, shrinking Tasks 2–3.
