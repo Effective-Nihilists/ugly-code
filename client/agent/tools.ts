@@ -11,6 +11,9 @@ import { runRegisteredTool } from './tools/registry';
 /** Project + mode context so tool subprocesses can be OS-user sandboxed by the
  *  daemon. Resolved by the agent loop (clientAgent) per turn. */
 export interface ToolContext {
+  /** The agent session this tool call belongs to (for per-session tool state:
+   *  todos, scratchpad, blackboard). */
+  sessionId?: string;
   projectDir?: string | null;
   /** Absolute root for resolving the model's (workspace-relative) fs paths. Set
    *  ONLY for worktree-isolated sessions; when unset, relative paths pass through

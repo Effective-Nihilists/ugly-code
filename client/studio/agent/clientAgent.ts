@@ -144,13 +144,17 @@ const fetchSocket: RunAgentSocket = {
 // (relative paths pass through, unchanged behavior). getSessionWorkspace is sync
 // (cached); ensureSessionWorkspace runs once up-front per session (see below).
 function makeToolHandlers(sessionId: string): Record<string, (input: unknown) => Promise<string>> {
+  // Core tools (legacy inline switch) + every registered tool — both dispatch
+  // through dispatchTool, which routes the registry first.
+  const names = [...AGENT_TOOL_NAMES, ...registeredToolSpecs().map((s) => s.name)];
   return Object.fromEntries(
-    AGENT_TOOL_NAMES.map((n) => [
+    names.map((n) => [
       n,
       (input: unknown) => {
         const ws = getSessionWorkspace(sessionId);
         const dir = ws?.isWorktree ? ws.dir : getActiveProjectPath();
         return dispatchTool(n, input, {
+          sessionId,
           projectDir: dir,
           mode: 'edit',
           ...(ws?.isWorktree ? { workspaceDir: ws.dir } : {}),
