@@ -37,7 +37,7 @@ export function composeSessionSnapshot(args: {
   completionTokens: number;
   perModel: PerModelAcc[];
   messageCount: number;
-}): Record<string, unknown> {
+}): SessionSnapshot {
   return {
     compositeId: args.sessionId,
     workspaceId: args.sessionId.split(':')[0] ?? '',
@@ -68,5 +68,15 @@ export function composeSessionSnapshot(args: {
     cacheCreationTokens: 0,
     perModel: args.perModel,
     messageCount: args.messageCount,
+    // Complete the snapshot so the mount/cast consumer (applySnapshot) can read
+    // these without a guard — an omitted array here surfaced as
+    // "Cannot read properties of undefined (reading 'map')". The granular path's
+    // safeParse fills these via zod `.default([])`, but the cast path doesn't parse.
+    modelDisplayLabel: '',
+    lastViewedAt: 0,
+    pendingPermissions: [],
+    pendingAskUsers: [],
+    pendingStepReviews: [],
+    eval: null,
   };
 }

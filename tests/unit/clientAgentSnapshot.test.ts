@@ -84,4 +84,23 @@ describe('composeSessionSnapshot (client-agent telemetry echo)', () => {
     const parsed = SessionSnapshotSchema.safeParse(snap);
     expect(parsed.success).toBe(true);
   });
+
+  // The mount/cast snapshot path (useCodingAgentChat) does NOT parse — it reads
+  // the raw emitted snapshot and calls `.map` on the pending arrays. If the
+  // producer omits them they arrive `undefined` → "Cannot read properties of
+  // undefined (reading 'map')". The snapshot must be COMPLETE, not just parseable.
+  it('emits complete pending arrays so the cast path never maps undefined', () => {
+    const snap = composeSessionSnapshot({
+      ...base,
+      model: 'glm_5_1',
+      reasoningEffort: 'medium',
+      permissionMode: 'edit',
+      modelMode: { kind: 'auto' },
+      patternMode: 'auto',
+    });
+    expect(Array.isArray(snap.pendingPermissions)).toBe(true);
+    expect(Array.isArray(snap.pendingAskUsers)).toBe(true);
+    expect(Array.isArray(snap.pendingStepReviews)).toBe(true);
+    expect(snap.eval).toBeNull();
+  });
 });
