@@ -23,6 +23,7 @@ import {
 } from 'ugly-app/agent/client';
 import { dispatchTool } from '../../agent/tools';
 import { registeredToolSpecs } from '../../agent/tools/registry';
+import { activeToolSpecs } from '../../agent/tools/catalog';
 import type { StepFn } from '../../agent/engine';
 import {
   AGENT_TOOLS,
@@ -555,7 +556,11 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
         ? `${AGENT_SYSTEM_PROMPT}\n\n# Project architecture (auto-generated map — exports, types, inheritance)\n\n${architectureDoc}`
         : AGENT_SYSTEM_PROMPT;
     },
-    tools: [...AGENT_TOOLS, ...registeredToolSpecs()],
+    // Dynamic per-session catalog: the model starts with the core tools and
+    // activates others via tool_search/tool_request (read afresh each turn).
+    get tools() {
+      return activeToolSpecs(sessionId);
+    },
     toolHandlers: makeToolHandlers(sessionId),
     budget: { maxTurns: 12 },
     // Pin the task + a work-log into every summary so a long session never loses
