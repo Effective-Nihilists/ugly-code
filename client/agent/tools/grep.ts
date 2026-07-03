@@ -6,6 +6,7 @@
 
 import type { TextGenTool } from 'ugly-app/shared';
 import { installUglyNative } from 'ugly-app/native';
+import { formatSearchResult, type SearchResponse } from './searchResponse';
 import type { ToolModule } from './registry';
 import type { ToolContext } from '../tools';
 import { projectRoot, lspForProject } from './lspForProject';
@@ -15,7 +16,9 @@ import { spawnCollect } from './spawn';
 export type GrepMode =
   | 'auto'
   | 'exact'
+  | 'fts'
   | 'semantic'
+  | 'mixed'
   | 'lsp-defs'
   | 'lsp-refs'
   | 'lsp-impls'
@@ -37,28 +40,28 @@ export interface GrepArgs {
   limit?: number;
 }
 
-/** Semantic search over the host's embedding index. `codebase.*` is a host-only
- *  UglyNative channel (no facade method), scoped to the open project; the
- *  worktree (if any) rides as the overlay so the agent sees its own uncommitted
- *  edits. Folded in from the retired `codebase_search` tool. */
-async function runSemantic(args: GrepArgs, ctx: ToolContext | undefined): Promise<string> {
+/** Index-backed search over the host (`codebase.search`): `fts` (BM25 keyword),
+ *  `semantic` (embedding), or `mixed` (both, cross-encoder re-ranked). `codebase.*`
+ *  is a host-only UglyNative channel, scoped to the open project; the worktree
+ *  (if any) rides as the overlay so the agent sees its own uncommitted edits.
+ *  Returns the discriminated `SearchResponse` formatted for the model (an
+ *  indexing / model-download / unavailable state surfaces a reason, never a
+ *  silent empty list). */
+async function runIndexSearch(
+  mode: 'fts' | 'semantic' | 'mixed',
+  args: GrepArgs,
+  ctx: ToolContext | undefined,
+): Promise<string> {
   const projectPath = ctx?.projectDir ?? '';
-  if (!projectPath) return 'grep mode=semantic unavailable: no project is open.';
-  const res = (await installUglyNative().invoke('codebase.search' as never, {
+  if (!projectPath) return `grep mode=${mode} unavailable: no project is open.`;
+  const resp = (await installUglyNative().invoke('codebase.search' as never, {
     projectPath,
+    mode,
     query: args.pattern,
     limit: typeof args.limit === 'number' ? args.limit : 10,
     ...(ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : {}),
-  } as never)) as {
-    results?: { file_path: string; start_line: number; end_line: number; content: string; score: number }[];
-  };
-  const results = res.results ?? [];
-  if (!results.length) {
-    return 'No semantic matches (the index may still be building — fall back to mode="exact" or `bash rg`).';
-  }
-  return results
-    .map((r) => `${r.file_path}:${r.start_line}-${r.end_line}  (score ${r.score.toFixed(2)})\n${r.content}`)
-    .join('\n\n---\n\n');
+  } as never)) as SearchResponse;
+  return formatSearchResult(resp);
 }
 
 /** Map grep args → ripgrep argv. Pure, exported for test. */
@@ -255,9 +258,11 @@ const SPEC: TextGenTool = {
   name: 'grep',
   description:
     'Search the workspace. mode "exact"/"auto" runs a regex (ripgrep). mode ' +
-    '"semantic" finds code by meaning/intent (embedding search over the indexed ' +
-    'codebase — pass a natural-language `pattern`, e.g. "where websocket reconnect ' +
-    'backoff is handled"). mode "lsp-defs"/"lsp-refs"/"lsp-impls" takes a SYMBOL ' +
+    '"fts" is ranked full-text keyword search (BM25). mode "semantic" finds code ' +
+    'by meaning/intent (embedding search over the indexed codebase). mode "mixed" ' +
+    '(recommended for natural-language lookups like "where websocket reconnect ' +
+    'backoff is handled") fuses fts + semantic and re-ranks with a cross-encoder. ' +
+    'mode "lsp-defs"/"lsp-refs"/"lsp-impls" takes a SYMBOL ' +
     'NAME and returns its definitions / references / implementations via the ' +
     'language server. mode "lsp-diagnostics" returns TypeScript errors/warnings ' +
     '(authoritative for "does this compile" — prefer over running tsc): pass a ' +
@@ -272,7 +277,7 @@ const SPEC: TextGenTool = {
       literal_text: { type: 'boolean', description: 'Treat pattern as a literal string, not a regex.' },
       caseInsensitive: { type: 'boolean', description: 'Case-insensitive match.' },
       include_ignored: { type: 'boolean', description: 'Also search .gitignore-d files.' },
-      mode: { type: 'string', enum: ['auto', 'exact', 'semantic', 'lsp-defs', 'lsp-refs', 'lsp-impls', 'lsp-diagnostics'] },
+      mode: { type: 'string', enum: ['auto', 'exact', 'fts', 'semantic', 'mixed', 'lsp-defs', 'lsp-refs', 'lsp-impls', 'lsp-diagnostics'] },
       output_mode: { type: 'string', enum: ['content', 'files_with_matches', 'count'] },
       head_limit: { type: 'number', description: 'Cap the number of exact-pass matches.' },
       before_lines: { type: 'number', description: 'Context lines before each match (content mode).' },
@@ -289,8 +294,8 @@ export const grepTool: ToolModule = {
   spec: SPEC,
   async run(input, ctx) {
     const args = input as unknown as GrepArgs;
-    if (args.mode === 'semantic') {
-      return runSemantic(args, ctx);
+    if (args.mode === 'fts' || args.mode === 'semantic' || args.mode === 'mixed') {
+      return runIndexSearch(args.mode, args, ctx);
     }
     if (args.mode === 'lsp-diagnostics') {
       return runDiagnostics(args, ctx);
