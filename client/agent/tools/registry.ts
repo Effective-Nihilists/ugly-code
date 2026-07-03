@@ -16,6 +16,10 @@ import { webFetchTool } from './webFetch';
 import { webSearchTool } from './webSearch';
 import { downloadTool } from './download';
 import { depDocsTool } from './depDocs';
+import { todosTool } from './todos';
+import { scratchpadTool } from './scratchpad';
+import { memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool } from './memory';
+import { askUserTool } from './askUser';
 
 export interface ToolModule {
   name: string;
@@ -28,7 +32,7 @@ export interface ToolModule {
   ): Promise<string>;
 }
 
-export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool];
+export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool, todosTool, scratchpadTool, memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool, askUserTool];
 
 /** Model-facing specs for every registered tool (appended to AGENT_TOOLS when
  *  assembling the per-turn tool list). */

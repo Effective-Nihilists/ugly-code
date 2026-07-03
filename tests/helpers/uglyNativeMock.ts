@@ -55,9 +55,11 @@ function emit(event: string, data: unknown): void {
   (state.listeners.get(event) ?? []).forEach((cb) => cb(data));
 }
 
-/** Normalize a dir path to a prefix for readdir: '' (root), or 'src/'. */
+/** Normalize a dir path to a prefix for readdir: '' (root), 'src/', or an
+ *  absolute '/proj/src/'. Preserves a leading slash so absolute paths (which
+ *  fs.readFile/writeFile store verbatim) match here too. */
 function dirPrefix(p: string): string {
-  const t = p.replace(/^\.\/?/, '').replace(/^\/+/, '').replace(/\/+$/, '');
+  const t = p.replace(/^\.\/?/, '').replace(/\/+$/, '');
   return t === '' || t === '.' ? '' : t + '/';
 }
 
