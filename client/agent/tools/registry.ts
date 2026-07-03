@@ -6,6 +6,7 @@
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolContext } from '../tools';
 import { grepTool } from './grep';
+import { globTool } from './glob';
 
 export interface ToolModule {
   name: string;
@@ -18,7 +19,7 @@ export interface ToolModule {
   ): Promise<string>;
 }
 
-export const TOOL_REGISTRY: ToolModule[] = [grepTool];
+export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool];
 
 /** Model-facing specs for every registered tool (appended to AGENT_TOOLS when
  *  assembling the per-turn tool list). */
