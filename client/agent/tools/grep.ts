@@ -6,7 +6,8 @@
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
 import type { ToolContext } from '../tools';
-import { projectRoot } from './lspForProject';
+import { projectRoot, lspForProject } from './lspForProject';
+import { fileUriToPath } from '../../studio/agent/lsp/client';
 import { spawnCollect } from './spawn';
 
 export type GrepMode =
@@ -67,6 +68,85 @@ async function runExact(args: GrepArgs, ctx: ToolContext | undefined): Promise<s
   return stdout.trimEnd() || `(no matches for ${JSON.stringify(args.pattern)})`;
 }
 
+type LspHit = { uri: string; line: number; character: number };
+
+/** Format LSP hits as cwd-relative `path:line:col`. Ported from the monolith
+ *  `formatLspHits`. */
+function formatLspHits(
+  mode: 'lsp-defs' | 'lsp-refs' | 'lsp-impls',
+  symbol: string,
+  hits: LspHit[],
+  cwd: string | null,
+): string {
+  const label =
+    mode === 'lsp-impls'
+      ? 'implementations'
+      : mode === 'lsp-refs'
+        ? 'references'
+        : 'definitions';
+  if (hits.length === 0) return `(no ${label} for ${JSON.stringify(symbol)})`;
+  const lines = hits.map((h) => {
+    let p = fileUriToPath(h.uri);
+    if (cwd && p.startsWith(cwd + '/')) p = p.slice(cwd.length + 1);
+    return `${p}:${h.line}:${h.character}`;
+  });
+  return `Found ${hits.length} ${label} for ${JSON.stringify(symbol)}\n${lines.join('\n')}\n`;
+}
+
+/** LSP-mode grep: `symbol` is a name → workspaceSymbol → defs directly, or
+ *  refs/impls dispatched from the first few declaration sites. Ported from the
+ *  monolith `runLspMode`; `ctx.lsp` → `lspForProject(ctx)`. */
+export async function runLspMode(
+  mode: 'lsp-defs' | 'lsp-refs' | 'lsp-impls',
+  symbol: string,
+  ctx: ToolContext | undefined,
+): Promise<string> {
+  const lsp = await lspForProject(ctx);
+  if (!lsp) {
+    return `(lsp not available — mode=${mode} requires the TypeScript language server)`;
+  }
+  if (lsp.getState() !== 'ready') {
+    return `(lsp not yet initialized — state=${lsp.getState()}; retry shortly)`;
+  }
+  const cwd = projectRoot(ctx);
+  const symbols = await lsp.workspaceSymbol(symbol);
+  if (symbols.length === 0) {
+    return `(no LSP symbol named ${JSON.stringify(symbol)} found; it may still be indexing — retry, or check spelling)`;
+  }
+  if (mode === 'lsp-defs') {
+    return formatLspHits(
+      mode,
+      symbol,
+      symbols.map((s) => ({ uri: s.uri, line: s.line, character: s.character })),
+      cwd,
+    );
+  }
+  // refs / impls: dispatch from the first 3 declaration sites, dedupe.
+  const seen = new Set<string>();
+  const results: LspHit[] = [];
+  for (const s of symbols.slice(0, 3)) {
+    const filePath = fileUriToPath(s.uri);
+    try {
+      const line0 = Math.max(0, s.line - 1);
+      const char0 = Math.max(0, s.character - 1);
+      await lsp.openFile(filePath);
+      const hits =
+        mode === 'lsp-impls'
+          ? await lsp.findImplementations(filePath, line0, char0)
+          : await lsp.findReferences(filePath, line0, char0);
+      for (const h of hits) {
+        const key = `${h.uri}:${h.line}:${h.character}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push(h);
+      }
+    } catch {
+      /* one site failing shouldn't kill the whole call */
+    }
+  }
+  return formatLspHits(mode, symbol, results, cwd);
+}
+
 const SPEC: TextGenTool = {
   name: 'grep',
   description:
@@ -99,7 +179,14 @@ export const grepTool: ToolModule = {
   spec: SPEC,
   async run(input, ctx) {
     const args = input as unknown as GrepArgs;
-    // LSP modes + auto-supplement are added in B1.2/B1.3.
+    if (
+      args.mode === 'lsp-defs' ||
+      args.mode === 'lsp-refs' ||
+      args.mode === 'lsp-impls'
+    ) {
+      return runLspMode(args.mode, args.pattern, ctx);
+    }
+    // Auto-supplement is added in B1.3.
     return runExact(args, ctx);
   },
 };
