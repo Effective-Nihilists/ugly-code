@@ -82,15 +82,17 @@ export default function StudioShell(): React.ReactElement {
   }, []);
 
   // Request — and thereby PROVISION — the bundled toolchain the IDE relies on:
-  // node/git/pnpm (+ the bash/npm/npx shell helpers) power Preview (`pnpm dev`),
-  // scaffolding (`npx ugly-app init`), and the terminal. Bundled tools are requested
-  // like any permission (mic/camera); the host installs the downloadable ones on
-  // grant. Fire-and-forget at boot so they're ready before the first spawn; a
-  // web-only shell with no host connected just no-ops (caught).
+  //   • node/git/pnpm (+ bash/npm/npx shell helpers) — Preview (`pnpm dev`),
+  //     scaffolding (`npx ugly-app init`), and the terminal.
+  //   • uv — semantic codebase search: the indexer uses uv to install CPython into
+  //     its own venv (+ sqlite_vec), so uv is the real dependency, not `python`.
+  // Bundled tools are requested like any permission (mic/camera); the host installs
+  // the downloadable ones on grant. Fire-and-forget at boot so they're ready before
+  // the first spawn; a web-only shell with no host connected just no-ops (caught).
   React.useEffect(() => {
     type GrantReq = Parameters<typeof permissions.request>[0];
     void permissions
-      .request({ process: ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'] } as unknown as GrantReq)
+      .request({ process: ['bash', 'node', 'git', 'npm', 'npx', 'pnpm', 'uv'] } as unknown as GrantReq)
       .catch(() => undefined);
   }, []);
 
