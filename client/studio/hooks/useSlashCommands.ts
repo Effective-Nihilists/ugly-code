@@ -22,6 +22,9 @@ export interface Skill {
    *  to the outgoing message. 'command' — built-in local action (e.g.
    *  `/clear`) that the panel handles directly on select. */
   kind?: 'skill' | 'command';
+  /** Absolute path to the skill's SKILL.md (set by discoverSkills; used to tell
+   *  the agent the exact path to read). */
+  path?: string;
 }
 
 /**

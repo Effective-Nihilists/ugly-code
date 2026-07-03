@@ -41,8 +41,9 @@ async function loadSkillsFromDir(dir: string, scope: Skill['scope']): Promise<Sk
   for (const e of entries) {
     if (!e.isDirectory) continue;
     try {
-      const fm = parseFrontmatter(await native.fs.readFile(`${dir}/${e.name}/SKILL.md`));
-      if (fm?.name) out.push({ name: fm.name, description: fm.description ?? '', scope });
+      const skillPath = `${dir}/${e.name}/SKILL.md`;
+      const fm = parseFrontmatter(await native.fs.readFile(skillPath));
+      if (fm?.name) out.push({ name: fm.name, description: fm.description ?? '', scope, path: skillPath });
     } catch {
       /* not a skill dir (no SKILL.md) — skip */
     }
@@ -101,4 +102,15 @@ export async function discoverSkills(): Promise<Skill[]> {
   for (const s of userSkills) byName.set(s.name, s);
   for (const s of projectSkills) byName.set(s.name, s);
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Render discovered skills as the system prompt's <available_skills> block.
+ *  Each line: `- <name> (<scope>): <description> [<path>]`. Empty → "(none)".
+ *  Pure — the agent reads `path` with read_file (per the skills_usage rules). */
+export function formatAvailableSkills(skills: Skill[]): string {
+  if (skills.length === 0) return '<available_skills>\n(none)\n</available_skills>';
+  const lines = skills
+    .filter((s) => s.kind !== 'command')
+    .map((s) => `- ${s.name} (${s.scope}): ${s.description}${s.path ? `\n  path: ${s.path}` : ''}`);
+  return `<available_skills>\n${lines.join('\n')}\n</available_skills>`;
 }

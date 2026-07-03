@@ -24,6 +24,7 @@ import {
 import { dispatchTool } from '../../agent/tools';
 import { registeredToolSpecs } from '../../agent/tools/registry';
 import { activeToolSpecs } from '../../agent/tools/catalog';
+import { discoverSkills, formatAvailableSkills } from '../hooks/skillDiscovery';
 import type { StepFn } from '../../agent/engine';
 import {
   AGENT_TOOLS,
@@ -218,6 +219,16 @@ interface SessionAgentState {
 // Keyed by sessionId; lives for the task process. See `ensureCodebaseAnalysis`.
 const codebaseReadinessBySession = new Map<string, SessionSnapshot['codebaseReadiness']>();
 const architectureDocBySession = new Map<string, string>();
+// Rendered <available_skills> block per session (discovered once, async, then
+// read synchronously by the systemPrompt getter — mirrors architectureDoc).
+const skillsBlockBySession = new Map<string, string>();
+function ensureSkillsDiscovered(sessionId: string): void {
+  if (skillsBlockBySession.has(sessionId)) return;
+  skillsBlockBySession.set(sessionId, formatAvailableSkills([])); // seed so the getter never blocks
+  void discoverSkills()
+    .then((skills) => skillsBlockBySession.set(sessionId, formatAvailableSkills(skills)))
+    .catch(() => { /* best-effort — keep the empty block */ });
+}
 
 /** Fold a (partial) user selection onto the session state. Called on create and
  *  on every subsequent turn so a mid-session model/mode swap takes effect. */
@@ -536,6 +547,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
   // to the header pill. Also runs at task boot (coding-task) so the pill fills in BEFORE the
   // first turn — see ensureCodebaseAnalysis.
   ensureCodebaseAnalysis(sessionId, emitRef.current);
+  ensureSkillsDiscovered(sessionId);
 
   state.controller = runAgent({
     socket: fetchSocket,
@@ -559,7 +571,9 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
       const ws = getSessionWorkspace(sessionId);
       const cwd = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? '(no project open)';
       const env = `<env>\nWorking directory: ${cwd}\nToday's date: ${new Date().toISOString().slice(0, 10)}\n</env>`;
-      return `${base}\n\n${env}`;
+      // Dynamic <available_skills> (discovered once per session; see below).
+      const skillsBlock = skillsBlockBySession.get(sessionId) ?? formatAvailableSkills([]);
+      return `${base.replace('{{AVAILABLE_SKILLS}}', skillsBlock)}\n\n${env}`;
     },
     // Dynamic per-session catalog: the model starts with the core tools and
     // activates others via tool_search/tool_request (read afresh each turn).
