@@ -22,6 +22,7 @@ import {
   type RunAgentSocket,
 } from 'ugly-app/agent/client';
 import { dispatchTool } from '../../agent/tools';
+import { registeredToolSpecs } from '../../agent/tools/registry';
 import {
   AGENT_TOOLS,
   AGENT_TOOL_NAMES,
@@ -545,7 +546,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
         ? `${AGENT_SYSTEM_PROMPT}\n\n# Project architecture (auto-generated map — exports, types, inheritance)\n\n${architectureDoc}`
         : AGENT_SYSTEM_PROMPT;
     },
-    tools: AGENT_TOOLS,
+    tools: [...AGENT_TOOLS, ...registeredToolSpecs()],
     toolHandlers: makeToolHandlers(sessionId),
     budget: { maxTurns: 12 },
     // Pin the task + a work-log into every summary so a long session never loses
