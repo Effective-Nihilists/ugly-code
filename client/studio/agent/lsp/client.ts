@@ -145,55 +145,28 @@ function findFirstSourceFile(
   return null;
 }
 
-function resolveTypescriptBinary(workspaceRoot: string): string | null {
-  const candidates = [
-    // Studio sidecar's own dep — present in dev and CI
-    path.resolve(
-      process.cwd(),
-      'node_modules',
-      '.bin',
-      'typescript-language-server',
-    ),
-    // Project-local install — used when the agent is running against a
-    // user project that ships its own LSP binary
-    path.resolve(
-      workspaceRoot,
-      'node_modules',
-      '.bin',
-      'typescript-language-server',
-    ),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  return null;
+/** How to launch a language server: the command + its argv. */
+export interface LspSpawnSpec {
+  cmd: string;
+  args: string[];
 }
 
-function resolvePythonBinary(workspaceRoot: string): string | null {
-  const candidates = [
-    path.resolve(workspaceRoot, '.venv', 'bin', 'pyright-langserver'),
-    path.resolve(workspaceRoot, 'venv', 'bin', 'pyright-langserver'),
-    path.resolve(process.cwd(), 'node_modules', '.bin', 'pyright-langserver'),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  // PATH fallback
-  const pathDirs = (process.env.PATH ?? '').split(path.delimiter);
-  for (const dir of pathDirs) {
-    if (!dir) continue;
-    const candidate = path.join(dir, 'pyright-langserver');
-    if (fs.existsSync(candidate)) return candidate;
+/**
+ * Resolve the spawn spec for a language. TypeScript launches via
+ * `npx --yes typescript-language-server --stdio` — node/npx are provisioned by
+ * the studio's bundled-binary system, and npx resolves the server from
+ * node_modules/.bin (if provisioned as a dep) or downloads it on first use.
+ * Python (pyright) is out of scope for v1 and returns null, which puts the
+ * client into `disabled` state (every method degrades to an empty result).
+ */
+export function resolveLspSpawn(language: LspLanguage): LspSpawnSpec | null {
+  if (language === 'typescript') {
+    return {
+      cmd: 'npx',
+      args: ['--yes', 'typescript-language-server', '--stdio'],
+    };
   }
   return null;
-}
-
-function resolveBinary(
-  language: LspLanguage,
-  workspaceRoot: string,
-): string | null {
-  if (language === 'python') return resolvePythonBinary(workspaceRoot);
-  return resolveTypescriptBinary(workspaceRoot);
 }
 
 /**
@@ -250,21 +223,21 @@ export class LspClient {
   >();
   private initPromise: Promise<void> | null = null;
   private readonly workspaceRoot: string;
-  private readonly binaryPath: string | null;
+  private readonly spawnSpec: LspSpawnSpec | null;
   private readonly language: LspLanguage;
 
   constructor(opts: LspClientOptions) {
     this.workspaceRoot = opts.workspaceRoot;
     this.language = opts.language ?? 'typescript';
-    this.binaryPath =
-      opts.binaryPath ?? resolveBinary(this.language, opts.workspaceRoot);
-    if (!this.binaryPath) {
+    this.spawnSpec = opts.binaryPath
+      ? { cmd: opts.binaryPath, args: ['--stdio'] }
+      : resolveLspSpawn(this.language);
+    if (!this.spawnSpec) {
       this.state = 'disabled';
-      const binName =
-        this.language === 'python'
-          ? 'pyright-langserver'
-          : 'typescript-language-server';
-      log(`${binName} not found — LSP integration disabled for this session`);
+      log(
+        `no language server available for '${this.language}' — ` +
+          `LSP integration disabled for this session`,
+      );
     }
   }
 
@@ -432,8 +405,8 @@ export class LspClient {
   }
 
   private async spawnAndInitialize(): Promise<void> {
-    if (!this.binaryPath) throw new Error('LSP binary missing');
-    const proc = native.process.spawn(this.binaryPath, ['--stdio'], {
+    if (!this.spawnSpec) throw new Error('LSP binary missing');
+    const proc = native.process.spawn(this.spawnSpec.cmd, this.spawnSpec.args, {
       cwd: this.workspaceRoot,
     });
     this.proc = proc;
