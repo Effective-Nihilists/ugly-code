@@ -23,6 +23,7 @@ import {
 } from 'ugly-app/agent/client';
 import { dispatchTool } from '../../agent/tools';
 import { registeredToolSpecs } from '../../agent/tools/registry';
+import type { StepFn } from '../../agent/engine';
 import {
   AGENT_TOOLS,
   AGENT_TOOL_NAMES,
@@ -157,6 +158,10 @@ function makeToolHandlers(sessionId: string): Record<string, (input: unknown) =>
           sessionId,
           projectDir: dir,
           mode: 'edit',
+          // Model-call for subagents (delegate/agent): one turn via the same
+          // agentStep endpoint the main loop uses.
+          step: ((req: unknown) =>
+            fetchSocket.request('agentStep', req)) as unknown as StepFn,
           ...(ws?.isWorktree ? { workspaceDir: ws.dir } : {}),
           ...(ws?.port ? { port: ws.port } : {}),
           ...(ws?.databaseUrl ? { databaseUrl: ws.databaseUrl } : {}),

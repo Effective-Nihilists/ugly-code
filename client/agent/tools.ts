@@ -5,6 +5,7 @@
 import { native, installUglyNative } from 'ugly-app/native';
 import type { SandboxMode } from 'ugly-app/native';
 import type { AgentToolName } from '../../shared/agent';
+import type { StepFn } from './engine';
 import { DB_SCRIPT } from '../studio/db/dbScript';
 import { runRegisteredTool } from './tools/registry';
 
@@ -24,6 +25,9 @@ export interface ToolContext {
   port?: number;
   /** Local dev DB connection string, injected as DATABASE_URL into run_command. */
   databaseUrl?: string;
+  /** Model-call function for subagents (delegate/agent). Provided by the agent
+   *  loop; absent → delegation tools degrade gracefully. */
+  step?: StepFn;
 }
 
 /** Coerce an `unknown` tool-input value to a string. Strings pass through;
