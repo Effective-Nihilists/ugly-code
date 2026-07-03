@@ -8,6 +8,7 @@ import StudioProjectPage from './StudioProjectPage';
 import { ModalStackProvider } from './system/modal/ModalContext';
 import { ModalHost } from './system/modal/ModalHost';
 import { PopoverHost } from './system/popover/PopoverHost';
+import BinariesInstallOverlay from './panels/BinariesInstallOverlay';
 import { recordRecentProject } from './state/recentProjects';
 
 // The Studio IDE on window.UglyNative, backed by the native transport shim
@@ -133,6 +134,9 @@ export default function StudioShell(): React.ReactElement {
       {body}
       <ModalHost />
       <PopoverHost />
+      {/* Blocks the page while the desktop shell installs bundled tools this app
+          needs — otherwise a slow/failed install is invisible to the user. */}
+      <BinariesInstallOverlay />
     </ModalStackProvider>
   );
 }
