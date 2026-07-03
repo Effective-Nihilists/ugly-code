@@ -24,6 +24,9 @@ import { delegateTool, delegateParallelTool, agentTool } from './delegate';
 import { blackboardPostTool } from './blackboard';
 import { toolSearchTool } from './toolSearch';
 import { toolRequestTool } from './toolRequest';
+import { specReadTool } from './specRead';
+import { analyzeImageTool } from './analyzeImage';
+import { inspectUxTool } from './inspectUx';
 
 export interface ToolModule {
   name: string;
@@ -36,7 +39,7 @@ export interface ToolModule {
   ): Promise<string>;
 }
 
-export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool, todosTool, scratchpadTool, memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool, askUserTool, delegateTool, delegateParallelTool, agentTool, blackboardPostTool, toolSearchTool, toolRequestTool];
+export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool, todosTool, scratchpadTool, memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool, askUserTool, delegateTool, delegateParallelTool, agentTool, blackboardPostTool, toolSearchTool, toolRequestTool, specReadTool, analyzeImageTool, inspectUxTool];
 
 /** Model-facing specs for every registered tool (appended to AGENT_TOOLS when
  *  assembling the per-turn tool list). */
