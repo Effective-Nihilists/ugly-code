@@ -7,11 +7,7 @@
  * This overlay pauses the page and shows exactly what it's waiting on.
  */
 import { useEffect, useState, type ReactElement } from 'react';
-
-interface ToolState {
-  phase: string;
-  pct: number;
-}
+import { computeInstallOverlay, type ToolState } from './binariesInstallState';
 
 const LABEL: Record<string, string> = {
   download: 'Downloading',
@@ -40,19 +36,18 @@ export default function BinariesInstallOverlay(): ReactElement | null {
   }, []);
 
   const entries = Object.entries(tools);
-  const failed = entries.some(([, t]) => t.phase === 'failed');
-  const installing = entries.some(([, t]) => t.phase !== 'done' && t.phase !== 'failed');
+  const { failed, allDone, visible } = computeInstallOverlay(tools, dismissed);
 
   // Clear shortly after every tool has finished successfully.
   useEffect(() => {
-    if (entries.length > 0 && entries.every(([, t]) => t.phase === 'done')) {
+    if (allDone) {
       const id = setTimeout(() => setTools({}), 700);
       return () => clearTimeout(id);
     }
     return undefined;
-  }, [tools]);
+  }, [allDone]);
 
-  if (dismissed || (!installing && !failed)) return null;
+  if (!visible) return null;
 
   return (
     <div
