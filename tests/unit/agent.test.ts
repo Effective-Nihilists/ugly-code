@@ -9,6 +9,7 @@ describe('agent tool specs', () => {
       'read_file',
       'write_file',
       'edit_file',
+      'codebase_search',
       'run_command',
       'db_query',
       'db_get',
