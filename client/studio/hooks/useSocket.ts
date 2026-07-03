@@ -25,6 +25,12 @@ import { gradeProject, type GradeDeps } from '../evals/grader';
 import { sessionApi, resolveProjectId } from '../agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
 import { DB_SCRIPT } from '../db/dbScript';
+import {
+  lspDefinition,
+  lspImplementation,
+  lspReferences,
+  lspHover,
+} from '../agent/lsp/handlers';
 
 /** Run a shell command through `bash -lc` (so `~` expands + login PATH applies)
  *  and resolve with the LAST stdout line — a trailing `pwd`/`echo` of a path.
@@ -890,7 +896,30 @@ const handlers: Record<string, Handler> = {
       })),
     };
   },
+
+  // ── LSP (editor right-click: go-to-definition / implementation / references
+  // / hover). Backed by a per-workspace typescript-language-server the studio
+  // host spawns via npx; positions are 0-indexed in, 1-indexed out. ──
+  lspDefinition: (i) => lspDefinition(lspInput(i), getActiveProjectPath()),
+  lspImplementation: (i) => lspImplementation(lspInput(i), getActiveProjectPath()),
+  lspReferences: (i) => lspReferences(lspInput(i), getActiveProjectPath()),
+  lspHover: (i) => lspHover(lspInput(i), getActiveProjectPath()),
 };
+
+/** Shape an untyped handler input into the lsp handlers' position input. */
+function lspInput(i: Input): {
+  path: string;
+  line: number;
+  character: number;
+  cwd?: string;
+} {
+  return {
+    path: str(i.path),
+    line: Number(i.line),
+    character: Number(i.character),
+    ...(i.cwd != null ? { cwd: str(i.cwd) } : {}),
+  };
+}
 
 /** Bare request dispatch — used by both the socket shim and components that
  *  fetched `/api/*` directly (e.g. ProjectOnboarding's `apiRequest`). */

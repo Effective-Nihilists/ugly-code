@@ -101,7 +101,7 @@ function pathToFileUri(filePath: string): string {
 
 /** Inverse of pathToFileUri — strip the scheme, decode, and drop the leading
  *  slash ahead of a Windows drive letter. */
-function fileUriToPath(uri: string): string {
+export function fileUriToPath(uri: string): string {
   try {
     let p = decodeURIComponent(uri.replace(/^file:\/\//, ''));
     if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
