@@ -31,11 +31,12 @@
  * is a no-op. The agent runs without diagnostics; nothing breaks.
  */
 
-import { spawn, type ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
 import url from 'url';
+import { native } from 'ugly-app/native';
+import type { UglyProcess } from 'ugly-app/native';
 
 export interface LspDiagnostic {
   /** 1-indexed line number for human display. */
@@ -195,11 +196,49 @@ function resolveBinary(
   return resolveTypescriptBinary(workspaceRoot);
 }
 
+/**
+ * Split an accumulated stdout string into complete LSP messages using
+ * Content-Length framing, returning the raw JSON bodies plus the unconsumed
+ * remainder to carry into the next chunk. Pure (no `this`) so the framing is
+ * unit-testable without spawning a real language server.
+ *
+ * NOTE: Content-Length is a BYTE count, but `buffer` is a decoded JS string
+ * (native.process delivers strings, not Buffers). For the ASCII/UTF-8 JSON that
+ * language servers emit, char length and byte length line up in practice; a
+ * multi-byte body could under-read by a few chars, which JSON.parse then
+ * rejects and handleMessage drops. This is the standard tradeoff for a
+ * string-based JS LSP client that never sees the raw bytes.
+ */
+export function parseMessages(buffer: string): {
+  messages: string[];
+  rest: string;
+} {
+  const messages: string[] = [];
+  let buf = buffer;
+  while (true) {
+    const headerEnd = buf.indexOf('\r\n\r\n');
+    if (headerEnd === -1) break;
+    const header = buf.slice(0, headerEnd);
+    const match = /Content-Length:\s*(\d+)/i.exec(header);
+    if (!match) {
+      buf = buf.slice(headerEnd + 4);
+      continue;
+    }
+    const contentLength = parseInt(match[1], 10);
+    const bodyStart = headerEnd + 4;
+    const total = bodyStart + contentLength;
+    if (buf.length < total) break;
+    messages.push(buf.slice(bodyStart, total));
+    buf = buf.slice(total);
+  }
+  return { messages, rest: buf };
+}
+
 export class LspClient {
   readonly events = new EventEmitter();
   private state: LspState = 'initializing';
-  private proc: ChildProcess | null = null;
-  private buffer = Buffer.alloc(0);
+  private proc: UglyProcess | null = null;
+  private buffer = '';
   private nextRequestId = 1;
   private readonly pending = new Map<number, PendingRequest>();
   private readonly diagnostics = new Map<string, LspDiagnostic[]>();
@@ -394,15 +433,14 @@ export class LspClient {
 
   private async spawnAndInitialize(): Promise<void> {
     if (!this.binaryPath) throw new Error('LSP binary missing');
-    const proc = spawn(this.binaryPath, ['--stdio'], {
+    const proc = native.process.spawn(this.binaryPath, ['--stdio'], {
       cwd: this.workspaceRoot,
-      stdio: ['pipe', 'pipe', 'pipe'],
     });
     this.proc = proc;
 
-    proc.stdout?.on('data', (chunk: Buffer) => this.handleStdout(chunk));
-    proc.stderr?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString('utf-8');
+    // native.process delivers already-decoded strings on stdout/stderr.
+    proc.onStdout((chunk) => this.handleStdout(chunk));
+    proc.onStderr((text) => {
       if (DEBUG) {
         // Full stderr passthrough when debugging — tsserver's
         // "Loading project ...", "No Project", and trace lines all
@@ -417,17 +455,7 @@ export class LspClient {
         if (first && first.trim()) log('stderr:', first);
       }
     });
-    // Guard against EPIPE on stdin. If the LSP server exits between
-    // our .writable check and the actual .write, the write emits
-    // 'error' asynchronously — an unhandled stdin 'error' takes down
-    // the whole node process. Log and swallow; writeMessage's caller
-    // handles the functional failure via request timeout + the
-    // 'exit' handler below which fails all pending requests.
-    proc.stdin?.on('error', (err) => {
-      if (this.proc !== proc) return;
-      log('stdin error (usually EPIPE after LSP exit):', err.message);
-    });
-    proc.on('exit', (code) => {
+    proc.onExit((code) => {
       // Only react to the exit if THIS proc is still the active one.
       // During `restart()` the old proc exits AFTER shutdown() has
       // unset `this.proc` and start() has already spawned a new
@@ -442,12 +470,15 @@ export class LspClient {
       this.emitState('updated', { message: `LSP exited with code ${code}` });
       this.failAllPending(new Error('LSP process exited'));
     });
-    proc.on('error', (err) => {
+    proc.onError((err) => {
+      // native's onError covers spawn failures and stdin/pipe errors alike
+      // (e.g. EPIPE if the server dies mid-write). Either way: mark the
+      // session errored and fail every pending request so callers degrade.
       if (this.proc !== proc) return;
-      log('LSP spawn error:', err.message);
+      log('LSP process error:', err);
       this.state = 'error';
-      this.emitState('updated', { message: err.message });
-      this.failAllPending(err);
+      this.emitState('updated', { message: err });
+      this.failAllPending(new Error(err));
     });
 
     // LSP initialize handshake. We declare bare minimum capabilities —
@@ -952,7 +983,7 @@ export class LspClient {
     // sets state='closed' which start() treats as "nothing to do".
     this.state = 'initializing';
     this.initPromise = null;
-    this.buffer = Buffer.alloc(0);
+    this.buffer = '';
     this.openDocuments.clear();
     this.diagnostics.clear();
     this.diagnosticsPublishedAt.clear();
@@ -985,7 +1016,7 @@ export class LspClient {
   // ── JSON-RPC framing ─────────────────────────────────────────────
 
   private sendRequest(method: string, params: unknown): Promise<unknown> {
-    if (!this.proc?.stdin?.writable) {
+    if (!this.proc) {
       return Promise.reject(new Error('LSP not writable'));
     }
     const id = this.nextRequestId++;
@@ -1005,40 +1036,30 @@ export class LspClient {
   }
 
   private sendNotification(method: string, params: unknown): void {
-    if (!this.proc?.stdin?.writable) return;
+    if (!this.proc) return;
     this.writeMessage({ jsonrpc: '2.0', method, params });
   }
 
   private writeMessage(message: unknown): void {
-    const body = Buffer.from(JSON.stringify(message), 'utf-8');
-    const header = `Content-Length: ${body.length}\r\n\r\n`;
+    const json = JSON.stringify(message);
+    // Content-Length is a BYTE count — compute it byte-accurately even though
+    // native.process.write takes a string, so the server frames our request
+    // correctly (a wrong length desyncs the whole JSON-RPC stream).
+    const byteLen = new TextEncoder().encode(json).length;
+    const header = `Content-Length: ${byteLen}\r\n\r\n`;
     try {
-      this.proc?.stdin?.write(header);
-      this.proc?.stdin?.write(body);
+      this.proc?.write(header);
+      this.proc?.write(json);
     } catch (err) {
       log('writeMessage failed:', (err as Error).message);
     }
   }
 
-  private handleStdout(chunk: Buffer): void {
-    this.buffer = Buffer.concat([this.buffer, chunk]);
-    while (true) {
-      const headerEnd = this.buffer.indexOf('\r\n\r\n');
-      if (headerEnd === -1) break;
-      const header = this.buffer.subarray(0, headerEnd).toString('utf-8');
-      const match = /Content-Length:\s*(\d+)/i.exec(header);
-      if (!match) {
-        this.buffer = this.buffer.subarray(headerEnd + 4);
-        continue;
-      }
-      const contentLength = parseInt(match[1], 10);
-      const bodyStart = headerEnd + 4;
-      const total = bodyStart + contentLength;
-      if (this.buffer.length < total) break;
-      const body = this.buffer.subarray(bodyStart, total).toString('utf-8');
-      this.buffer = this.buffer.subarray(total);
-      this.handleMessage(body);
-    }
+  private handleStdout(chunk: string): void {
+    this.buffer += chunk;
+    const { messages, rest } = parseMessages(this.buffer);
+    this.buffer = rest;
+    for (const raw of messages) this.handleMessage(raw);
   }
 
   private handleMessage(raw: string): void {
