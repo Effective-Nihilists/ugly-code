@@ -70,6 +70,58 @@ async function runExact(args: GrepArgs, ctx: ToolContext | undefined): Promise<s
 
 type LspHit = { uri: string; line: number; character: number };
 
+const BARE_IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const LSP_SUPPLEMENT_MAX = 20;
+
+/** Identifiers eligible for the LSP-definitions supplement: a bare identifier
+ *  ("AppTabPicker") or a `|`-union of them ("Foo|Bar"). Anything with regex
+ *  metacharacters, or names shorter than 3 chars, disqualifies. Deduped, capped
+ *  at 5. Pure, exported for test. Ported from the monolith `extractIdentSymbols`. */
+export function extractIdentSymbols(pattern: string): string[] {
+  const parts = pattern.split('|');
+  for (const p of parts) {
+    if (!BARE_IDENT_RE.test(p) || p.length < 3) return [];
+  }
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const id of parts) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    unique.push(id);
+    if (unique.length >= 5) break;
+  }
+  return unique;
+}
+
+/** Parallel `workspaceSymbol` for each identifier, exact-name filtered + deduped
+ *  + capped — the declaration sites appended as an `LSP DEFINITIONS` section. */
+async function lspSupplementDefs(
+  lsp: NonNullable<Awaited<ReturnType<typeof lspForProject>>>,
+  symbols: string[],
+): Promise<LspHit[]> {
+  const perSymbol = await Promise.all(
+    symbols.map(async (s) => {
+      try {
+        return (await lsp.workspaceSymbol(s)).filter((h) => h.name === s);
+      } catch {
+        return [];
+      }
+    }),
+  );
+  const seen = new Set<string>();
+  const defs: LspHit[] = [];
+  for (const hits of perSymbol) {
+    for (const h of hits) {
+      const key = `${h.uri}:${h.line}:${h.character}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      defs.push({ uri: h.uri, line: h.line, character: h.character });
+      if (defs.length >= LSP_SUPPLEMENT_MAX) return defs;
+    }
+  }
+  return defs;
+}
+
 /** Format LSP hits as cwd-relative `path:line:col`. Ported from the monolith
  *  `formatLspHits`. */
 function formatLspHits(
@@ -186,7 +238,25 @@ export const grepTool: ToolModule = {
     ) {
       return runLspMode(args.mode, args.pattern, ctx);
     }
-    // Auto-supplement is added in B1.3.
-    return runExact(args, ctx);
+
+    // Auto-supplement: for a bare-identifier auto grep, run the exact pass and
+    // an LSP workspaceSymbol lookup in parallel; append the canonical
+    // declaration site(s) as an `LSP DEFINITIONS` section when LSP is ready.
+    const modeOk = args.mode === undefined || args.mode === 'auto';
+    const symbols =
+      modeOk && args.literal_text !== true ? extractIdentSymbols(args.pattern) : [];
+    if (symbols.length === 0) return runExact(args, ctx);
+
+    const [exact, lsp] = await Promise.all([runExact(args, ctx), lspForProject(ctx)]);
+    if (!lsp || lsp.getState() !== 'ready') return exact;
+    const defs = await lspSupplementDefs(lsp, symbols);
+    if (defs.length === 0) return exact;
+    const cwd = projectRoot(ctx);
+    const defLines = defs.map((h) => {
+      let p = fileUriToPath(h.uri);
+      if (cwd && p.startsWith(cwd + '/')) p = p.slice(cwd.length + 1);
+      return `${p}:${h.line}:${h.character}`;
+    });
+    return `${exact}\n\nLSP DEFINITIONS\n${defLines.join('\n')}`;
   },
 };

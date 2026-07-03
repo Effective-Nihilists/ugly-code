@@ -7,8 +7,14 @@ vi.mock('../../../client/agent/tools/lspForProject', () => ({
   lspForProject: vi.fn(),
 }));
 
-import { buildRgArgs, runLspMode } from '../../../client/agent/tools/grep';
+import {
+  buildRgArgs,
+  runLspMode,
+  extractIdentSymbols,
+  grepTool,
+} from '../../../client/agent/tools/grep';
 import { lspForProject } from '../../../client/agent/tools/lspForProject';
+import { resetMock } from '../../helpers/uglyNativeMock';
 
 describe('grep buildRgArgs', () => {
   it('content mode with context + case-insensitive', () => {
@@ -91,5 +97,46 @@ describe('grep runLspMode', () => {
     vi.mocked(lspForProject).mockResolvedValue(null);
     const out = await runLspMode('lsp-defs', 'foo', { projectDir: '/proj' });
     expect(out).toMatch(/lsp|not available|unavailable/i);
+  });
+});
+
+describe('grep extractIdentSymbols', () => {
+  it('pulls bare identifiers and unions', () => {
+    expect(extractIdentSymbols('AppTabPicker')).toEqual(['AppTabPicker']);
+    expect(extractIdentSymbols('Foo|Bar')).toEqual(['Foo', 'Bar']);
+    expect(extractIdentSymbols('Foo|Foo')).toEqual(['Foo']); // deduped
+  });
+  it('rejects non-bare patterns and short names', () => {
+    expect(extractIdentSymbols('foo\\s+bar')).toEqual([]);
+    expect(extractIdentSymbols('a.b')).toEqual([]);
+    expect(extractIdentSymbols('ab')).toEqual([]); // < 3 chars
+  });
+});
+
+describe('grep auto-supplement', () => {
+  it('appends an LSP DEFINITIONS section for a bare-identifier auto grep', async () => {
+    resetMock({
+      proc: (cmd) => ({
+        stdout: cmd === 'rg' ? 'src/x.ts:5:  AppTabPicker()\n' : '',
+        code: 0,
+      }),
+    });
+    vi.mocked(lspForProject).mockResolvedValue({
+      getState: () => 'ready',
+      workspaceSymbol: async (q: string) =>
+        q === 'AppTabPicker'
+          ? [{ name: 'AppTabPicker', uri: 'file:///proj/comp/AppTabPicker.tsx', line: 10, character: 14 }]
+          : [],
+    } as never);
+    const out = await grepTool.run({ pattern: 'AppTabPicker' }, { projectDir: '/proj' });
+    expect(out).toMatch(/src\/x\.ts:5/); // exact hit preserved
+    expect(out).toMatch(/LSP DEFINITIONS/);
+    expect(out).toMatch(/AppTabPicker\.tsx:10:14/);
+  });
+
+  it('does not supplement a literal or non-identifier grep', async () => {
+    resetMock({ proc: () => ({ stdout: 'src/x.ts:5:foo\n', code: 0 }) });
+    const out = await grepTool.run({ pattern: 'foo.*bar' }, { projectDir: '/proj' });
+    expect(out).not.toMatch(/LSP DEFINITIONS/);
   });
 });
