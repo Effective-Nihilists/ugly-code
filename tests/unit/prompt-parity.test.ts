@@ -14,11 +14,14 @@ describe('system prompt parity with the monolith', () => {
     expect(AGENT_SYSTEM_PROMPT).toMatch(/tool_request/);
   });
 
-  it('uses ugly-code tool names, not the monolith short names', () => {
-    // The monolith said `read`/`bash`; ugly-code says read_file/run_command.
-    expect(AGENT_SYSTEM_PROMPT).toMatch(/`read_file`/);
-    expect(AGENT_SYSTEM_PROMPT).toMatch(/`run_command`/);
-    expect(AGENT_SYSTEM_PROMPT).not.toMatch(/`bash`/);
+  it('uses the monolith bare tool names, not the earlier read_file/run_command port', () => {
+    expect(AGENT_SYSTEM_PROMPT).toMatch(/`read`/);
+    expect(AGENT_SYSTEM_PROMPT).toMatch(/`edit`/);
+    expect(AGENT_SYSTEM_PROMPT).toMatch(/`bash`/);
+    expect(AGENT_SYSTEM_PROMPT).not.toMatch(/`read_file`/);
+    expect(AGENT_SYSTEM_PROMPT).not.toMatch(/`run_command`/);
+    expect(AGENT_SYSTEM_PROMPT).not.toMatch(/`edit_file`/);
+    expect(AGENT_SYSTEM_PROMPT).not.toMatch(/`write_file`/);
   });
 
   it('every tool it instructs the model to use exists in the catalog', () => {
@@ -30,8 +33,9 @@ describe('system prompt parity with the monolith', () => {
     // status values, and the explicitly-nonexistent apply_patch/apply_diff).
     const NON_TOOLS = new Set([
       'in_progress', 'completed', 'pending', 'reason', 'description',
-      'old_string', 'new_string', 'anchor', 'range', 'apply_patch', 'apply_diff',
-      'old', 'new', 'content', 'path', 'query', 'cmd', 'args',
+      'old_string', 'new_string', 'new_content', 'insert_after', 'anchor', 'range',
+      'apply_patch', 'apply_diff',
+      'old', 'new', 'content', 'path', 'query', 'cmd', 'args', 'command', 'working_dir',
     ]);
     const referenced = [...AGENT_SYSTEM_PROMPT.matchAll(/`([a-z_]{3,})`/g)]
       .map((m) => m[1])

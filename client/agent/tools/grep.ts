@@ -1,9 +1,11 @@
 // `grep` — ported from ugly-studio f5a74c2^:server/coding-agent/tools/grep.ts.
-// Exact regex pass via ripgrep (B1.1). LSP modes (B1.2) + auto-supplement (B1.3)
-// are layered on in later tasks. Trimmed vs the monolith: `semantic` mode
-// (covered by codebase_search) and the `.specs` virtual path are dropped.
+// The merged search tool: exact regex (ripgrep), `semantic` (embedding index via
+// the host `codebase.search` channel — the monolith folded the old
+// `codebase_search` tool in here), and LSP modes (defs/refs/impls) + the
+// auto-supplement. The `.specs` virtual path is still dropped.
 
 import type { TextGenTool } from 'ugly-app/shared';
+import { installUglyNative } from 'ugly-app/native';
 import type { ToolModule } from './registry';
 import type { ToolContext } from '../tools';
 import { projectRoot, lspForProject } from './lspForProject';
@@ -13,6 +15,7 @@ import { spawnCollect } from './spawn';
 export type GrepMode =
   | 'auto'
   | 'exact'
+  | 'semantic'
   | 'lsp-defs'
   | 'lsp-refs'
   | 'lsp-impls';
@@ -29,6 +32,32 @@ export interface GrepArgs {
   head_limit?: number;
   before_lines?: number;
   after_lines?: number;
+  /** Caps the semantic pass (mode="semantic"). Default 10. */
+  limit?: number;
+}
+
+/** Semantic search over the host's embedding index. `codebase.*` is a host-only
+ *  UglyNative channel (no facade method), scoped to the open project; the
+ *  worktree (if any) rides as the overlay so the agent sees its own uncommitted
+ *  edits. Folded in from the retired `codebase_search` tool. */
+async function runSemantic(args: GrepArgs, ctx: ToolContext | undefined): Promise<string> {
+  const projectPath = ctx?.projectDir ?? '';
+  if (!projectPath) return 'grep mode=semantic unavailable: no project is open.';
+  const res = (await installUglyNative().invoke('codebase.search' as never, {
+    projectPath,
+    query: args.pattern,
+    limit: typeof args.limit === 'number' ? args.limit : 10,
+    ...(ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : {}),
+  } as never)) as {
+    results?: { file_path: string; start_line: number; end_line: number; content: string; score: number }[];
+  };
+  const results = res.results ?? [];
+  if (!results.length) {
+    return 'No semantic matches (the index may still be building — fall back to mode="exact" or `bash rg`).';
+  }
+  return results
+    .map((r) => `${r.file_path}:${r.start_line}-${r.end_line}  (score ${r.score.toFixed(2)})\n${r.content}`)
+    .join('\n\n---\n\n');
 }
 
 /** Map grep args → ripgrep argv. Pure, exported for test. */
@@ -206,23 +235,27 @@ const SPEC: TextGenTool = {
   name: 'grep',
   description:
     'Search the workspace. mode "exact"/"auto" runs a regex (ripgrep). mode ' +
-    '"lsp-defs"/"lsp-refs"/"lsp-impls" takes a SYMBOL NAME and returns its ' +
-    'definitions / references / implementations via the language server. Plain ' +
-    'identifier searches in auto mode also get an appended LSP DEFINITIONS section.',
+    '"semantic" finds code by meaning/intent (embedding search over the indexed ' +
+    'codebase — pass a natural-language `pattern`, e.g. "where websocket reconnect ' +
+    'backoff is handled"). mode "lsp-defs"/"lsp-refs"/"lsp-impls" takes a SYMBOL ' +
+    'NAME and returns its definitions / references / implementations via the ' +
+    'language server. Plain identifier searches in auto mode also get an appended ' +
+    'LSP DEFINITIONS section.',
   parameters: {
     type: 'object',
     properties: {
-      pattern: { type: 'string', description: 'Regex (exact/auto) or symbol name (lsp-* modes).' },
+      pattern: { type: 'string', description: 'Regex (exact/auto), natural language (semantic), or symbol name (lsp-* modes).' },
       path: { type: 'string', description: 'Optional file or directory to scope the search.' },
       include: { type: 'string', description: 'Glob filter, e.g. "*.ts".' },
       literal_text: { type: 'boolean', description: 'Treat pattern as a literal string, not a regex.' },
       caseInsensitive: { type: 'boolean', description: 'Case-insensitive match.' },
       include_ignored: { type: 'boolean', description: 'Also search .gitignore-d files.' },
-      mode: { type: 'string', enum: ['auto', 'exact', 'lsp-defs', 'lsp-refs', 'lsp-impls'] },
+      mode: { type: 'string', enum: ['auto', 'exact', 'semantic', 'lsp-defs', 'lsp-refs', 'lsp-impls'] },
       output_mode: { type: 'string', enum: ['content', 'files_with_matches', 'count'] },
       head_limit: { type: 'number', description: 'Cap the number of exact-pass matches.' },
       before_lines: { type: 'number', description: 'Context lines before each match (content mode).' },
       after_lines: { type: 'number', description: 'Context lines after each match (content mode).' },
+      limit: { type: 'number', description: 'Cap the semantic-pass results (mode="semantic"). Default 10.' },
     },
     required: ['pattern'],
     additionalProperties: false,
@@ -234,6 +267,9 @@ export const grepTool: ToolModule = {
   spec: SPEC,
   async run(input, ctx) {
     const args = input as unknown as GrepArgs;
+    if (args.mode === 'semantic') {
+      return runSemantic(args, ctx);
+    }
     if (
       args.mode === 'lsp-defs' ||
       args.mode === 'lsp-refs' ||

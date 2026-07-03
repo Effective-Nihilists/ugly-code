@@ -46,47 +46,105 @@ export const agentMessageSchema = z.object({
 export type AgentContentPart = z.infer<typeof contentPartSchema>;
 export type AgentMessage = z.infer<typeof agentMessageSchema>;
 
-/** Tool names the client knows how to dispatch against the native API. */
+// Tool names the client dispatches against the native API. These mirror the
+// monolith's bare names (`read`/`write`/`edit`/`bash`) rather than the earlier
+// `read`/`bash` port, so the system prompt is monolith-faithful.
+// (`codebase_search` was folded into `grep`'s semantic mode; `list_dir` was
+// dropped — the monolith uses `glob`/`bash ls` for directory listings.)
 export const AGENT_TOOL_NAMES = [
-  'list_dir',
-  'read_file',
-  'write_file',
-  'edit_file',
-  'run_command',
-  'db_query',
-  'db_get',
-  'db_set',
-  'codebase_search',
+  'read',
+  'write',
+  'edit',
+  'bash',
+  'database',
+  'database_sql_query',
 ] as const;
 export type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
 
 /**
- * Binaries the desktop daemon will let an origin spawn (the bundled-tool
- * allowlist). `run_command` is modeled as cmd+args (not a shell string) because
- * the gate resolves each by name — so the agent invokes git/node/etc. directly.
+ * The SINGLE SOURCE OF TRUTH for every tool name the agent can emit — shared by
+ * the tool definitions (AGENT_TOOLS here + the client registry's ToolModules)
+ * and the chat UI. Both sides type against `ToolName`, so a rename is a
+ * compile-time error on every side instead of a silent string drift. Never
+ * compare `tool.name` against a raw string literal in the UI — the literal must
+ * be a `ToolName` or the build fails ("no overlap").
+ */
+export type ToolName =
+  // COMMON (always on)
+  | 'read'
+  | 'write'
+  | 'edit'
+  | 'multiedit'
+  | 'glob'
+  | 'grep'
+  | 'bash'
+  | 'todos'
+  | 'python_exec'
+  | 'web_fetch'
+  // single-mode
+  | 'spec_read'
+  | 'spec_write'
+  | 'scratchpad'
+  | 'memory_read'
+  | 'memory_save'
+  | 'memory_list'
+  | 'memory_delete'
+  | 'delegate'
+  | 'delegate_parallel'
+  | 'ask_user'
+  | 'web_search'
+  | 'analyze_image'
+  | 'dep_docs'
+  | 'python_libraries'
+  | 'tool_search'
+  | 'tool_request'
+  // group-mode
+  | 'blackboard_post'
+  // ugly-app project
+  | 'database'
+  | 'database_sql_query'
+  | 'dev_server_start'
+  | 'dev_server_stop'
+  | 'dev_server_logs'
+  | 'dev_server_errors'
+  | 'dev_server_screenshot'
+  | 'inspect_ux'
+  // ugly-code additions (not in the monolith)
+  | 'lsp_diagnostics'
+  | 'download';
+
+/** A model-facing tool spec whose `name` is constrained to a known `ToolName`. */
+export type AgentToolSpec = Omit<TextGenTool, 'name'> & { name: ToolName };
+
+/**
+ * Compare a wire tool name (an untyped `string` off the model) against a known
+ * tool. The `tool` argument is a `ToolName`, so the UI can only branch on names
+ * that actually exist — a renamed/removed tool turns every stale check into a
+ * compile error ("no overlap"), instead of a silently-dead string literal.
+ * Use this in the UI instead of `name === 'some_tool'`.
+ */
+export function isTool(name: string, tool: ToolName): boolean {
+  return name === tool;
+}
+
+/**
+ * Bundled binaries the desktop daemon puts on the sealed PATH. `bash` runs a
+ * shell command (`sh -c`), so these are the tools reachable from within it
+ * (surfaced to the model as guidance, mirroring the monolith's bundled-tool list).
  */
 export const AGENT_BINARIES = ['node', 'git', 'python', 'uv', 'rg', 'ffmpeg', 'imagemagick'] as const;
 
-/** Tool specs sent to the model (OpenAI/Anthropic JSON-schema function shape). */
-export const AGENT_TOOLS: TextGenTool[] = [
+/** Tool specs sent to the model (OpenAI/Anthropic JSON-schema function shape).
+ *  `name` is typed `ToolName` so these can't drift from the UI / registry. */
+export const AGENT_TOOLS: AgentToolSpec[] = [
   {
-    name: 'list_dir',
-    description: 'List the entries (files and directories) in a directory, relative to the workspace root.',
-    parameters: {
-      type: 'object',
-      properties: { path: { type: 'string', description: 'Directory path, e.g. "." or "src".' } },
-      required: ['path'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'read_file',
+    name: 'read',
     description:
-      'Read a file as hashline-annotated lines: each line is `<n>:<hash>|<content>` inside a <file> element. The `<n>:<hash>` prefix is a stable anchor you can pass to edit_file (anchor/insert_after/range modes) for stale-safe edits. Use offset/limit for large files (defaults to the first 2000 lines).',
+      'Read a file as hashline-annotated lines: each line is `<n>:<hash>|<content>` inside a <file> element. The `<n>:<hash>` prefix is a stable anchor you can pass to `edit` (anchor/insert_after/range modes) for stale-safe edits. Use offset/limit for large files (defaults to the first 2000 lines). For directory listings use `glob` or `bash ls`; for content search use `grep`.',
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'File path relative to the workspace root.' },
+        path: { type: 'string', description: 'File path. Relative paths resolve against the project (or worktree) root; absolute, ~, and ../ paths also work.' },
         offset: { type: 'number', description: 'First line to read (0-indexed). Default 0.' },
         limit: { type: 'number', description: 'Max lines to read. Default 2000.' },
       },
@@ -95,12 +153,12 @@ export const AGENT_TOOLS: TextGenTool[] = [
     },
   },
   {
-    name: 'write_file',
-    description: 'Create or overwrite a file with the given contents. Creates parent directories as needed.',
+    name: 'write',
+    description: 'Create or overwrite a file with the EXACT given contents (the whole final file body, never a stub/TODO). Creates parent directories as needed. Use `edit`/`multiedit` for surgical changes and `bash mv` for renames.',
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'File path relative to the workspace root.' },
+        path: { type: 'string', description: 'File path. Relative paths resolve against the project (or worktree) root; absolute, ~, and ../ paths also work.' },
         content: { type: 'string', description: 'The full new file contents.' },
       },
       required: ['path', 'content'],
@@ -108,13 +166,13 @@ export const AGENT_TOOLS: TextGenTool[] = [
     },
   },
   {
-    name: 'edit_file',
+    name: 'edit',
     description:
-      'Edit a file. Pass exactly ONE mode: `old_string` (+ `new_string`; unique substring, set `replace_all` for every occurrence); `anchor` (a `<n>:<hash>` line anchor from read_file, + `new_content`, replaces that line); `insert_after` (an anchor, + `new_content`, inserts after it); or `range` (e.g. "42:a3..47:b1", + `new_content` to replace, omit to delete). Hash anchors are re-verified — a stale hash returns a diagnostic telling you to re-read.',
+      'Edit an EXISTING file. Pass exactly ONE mode: `old_string` (+ `new_string`; unique substring, set `replace_all` for every occurrence); `anchor` (a `<n>:<hash>` line anchor from `read`, + `new_content`, replaces that line); `insert_after` (an anchor, + `new_content`, inserts after it); or `range` (e.g. "42:a3..47:b1", + `new_content` to replace, omit to delete). Hash anchors are re-verified — a stale hash returns a diagnostic telling you to re-read. For a NEW file use `write`; for many edits to one file prefer `multiedit`.',
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'File path relative to the workspace root.' },
+        path: { type: 'string', description: 'File path. Relative paths resolve against the project (or worktree) root; absolute, ~, and ../ paths also work.' },
         old_string: { type: 'string', description: 'Exact text to replace (string-match mode).' },
         new_string: { type: 'string', description: 'Replacement text (string-match mode).' },
         replace_all: { type: 'boolean', description: 'Replace every occurrence of old_string (default: first/unique only).' },
@@ -128,73 +186,74 @@ export const AGENT_TOOLS: TextGenTool[] = [
     },
   },
   {
-    name: 'codebase_search',
+    name: 'bash',
     description:
-      'Semantic search over the indexed codebase — find code by meaning/intent, not exact text. Returns the most relevant chunks with file path + line range. Prefer this over reading many files when locating where something is implemented or used.',
+      `Execute a shell command via POSIX sh. Chain with \`;\`/\`&&\` (state does NOT persist between calls — don't \`cd\`). Avoid \`find\`/\`grep\`/\`cat\`/\`sed\`/\`echo\` — use \`glob\`/\`grep\`/\`read\`/\`edit\`/\`write\` instead. Bash is for tests, lint/typecheck, one-line verifications, and long-running processes. Do NOT use it for git — the harness manages commits/branches/pushes. Bundled on PATH: ${AGENT_BINARIES.join(', ')} (plus \`pnpm\` for node projects).`,
     parameters: {
       type: 'object',
       properties: {
-        query: {
-          type: 'string',
-          description: 'Natural-language description of what to find, e.g. "where the websocket reconnect backoff is handled".',
-        },
-        limit: { type: 'number', description: 'Max results to return (default 10).' },
+        command: { type: 'string', description: 'The shell command to run (POSIX sh).' },
+        description: { type: 'string', description: 'A ≤10-word description of what this command does and why.' },
+        working_dir: { type: 'string', description: 'Directory to run in (defaults to the project/worktree root).' },
+        timeout_ms: { type: 'number', description: 'Timeout in ms (default 120000).' },
       },
-      required: ['query'],
+      required: ['command', 'description'],
       additionalProperties: false,
     },
   },
   {
-    name: 'run_command',
+    name: 'database',
     description:
-      `Run a program and capture its output. Provide the binary name and its arguments separately (no shell). Allowed binaries: ${AGENT_BINARIES.join(', ')}. Example: { "cmd": "git", "args": ["status", "--short"] }.`,
-    parameters: {
-      type: 'object',
-      properties: {
-        cmd: { type: 'string', description: `The binary to run (one of: ${AGENT_BINARIES.join(', ')}).` },
-        args: { type: 'array', items: { type: 'string' }, description: 'Arguments passed to the binary.' },
-      },
-      required: ['cmd', 'args'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'db_query',
-    description:
-      "Run a READ-ONLY SQL query against the project's local dev database and return the rows (JSON). Use this to inspect app state while debugging — e.g. `SELECT _id, data FROM todo ORDER BY created DESC LIMIT 20`. Documents are stored with their fields in a JSONB `data` column (plus `_id`, `created`, `updated`). Writes are rejected here — use db_set to mutate.",
-    parameters: {
-      type: 'object',
-      properties: { sql: { type: 'string', description: 'A single read-only SQL statement (SELECT/WITH/EXPLAIN).' } },
-      required: ['sql'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'db_get',
-    description: "Fetch one document by _id from a collection in the project's local dev database. Returns the document JSON or null.",
+      "Query the project's collection database (dev). Documents are stored as a JSONB `data` object per collection table (plus `_id`, `created`, `updated`). Returns matching documents. Use to inspect app state while debugging.",
     parameters: {
       type: 'object',
       properties: {
         collection: { type: 'string', description: 'Collection/table name, e.g. "todo".' },
-        id: { type: 'string', description: 'The document _id.' },
+        filters: {
+          type: 'array',
+          description: 'Optional structured filters (ANDed).',
+          items: {
+            type: 'object',
+            properties: {
+              field: { type: 'string', description: 'A field inside `data`, e.g. "status".' },
+              op: { type: 'string', enum: ['eq', 'ne', 'contains', 'exists'], description: 'Comparison operator.' },
+              value: { description: 'The value to compare against (omit for `exists`).' },
+            },
+            required: ['field', 'op'],
+            additionalProperties: false,
+          },
+        },
+        sort: {
+          type: 'object',
+          description: 'Optional sort (defaults to created DESC).',
+          properties: {
+            field: { type: 'string', description: 'Field to sort by.' },
+            dir: { type: 'string', enum: ['asc', 'desc'], description: 'Sort direction.' },
+          },
+          required: ['field'],
+          additionalProperties: false,
+        },
+        limit: { type: 'number', description: 'Max rows (default 50, max 1000).' },
+        skip: { type: 'number', description: 'Rows to skip (pagination).' },
+        dev_or_prod_mode: { type: 'string', enum: ['dev', 'prod'], description: 'Which database (only `dev` is available locally).' },
       },
-      required: ['collection', 'id'],
+      required: ['collection'],
       additionalProperties: false,
     },
   },
   {
-    name: 'db_set',
+    name: 'database_sql_query',
     description:
-      "Insert, update, or delete a single document in the project's local dev database (for fixing/seeding state while debugging). `doc` is the full document object (its keys become the JSONB data). For update/delete provide `id`.",
+      "Run a SQL statement against the project's dev database (documents live in a JSONB `data` column per collection table, plus `_id`/`created`/`updated`) — e.g. `SELECT _id, data FROM todo ORDER BY created DESC LIMIT 20`. Supports parameterized queries and writes (INSERT/UPDATE/DELETE) for seeding/fixing state while debugging.",
     parameters: {
       type: 'object',
       properties: {
-        collection: { type: 'string', description: 'Collection/table name.' },
-        action: { type: 'string', enum: ['insert', 'update', 'delete'], description: 'The mutation to perform.' },
-        id: { type: 'string', description: 'Document _id (required for update/delete).' },
-        doc: { type: 'object', description: 'The document object (for insert/update).', additionalProperties: true },
+        sql: { type: 'string', description: 'A single SQL statement.' },
+        params: { type: 'array', description: 'Optional positional parameters ($1, $2, …).', items: {} },
+        row_limit: { type: 'number', description: 'Cap returned rows (default/max applied by the server).' },
+        dev_or_prod_mode: { type: 'string', enum: ['dev', 'prod'], description: 'Which database (only `dev` is available locally).' },
       },
-      required: ['collection', 'action'],
+      required: ['sql'],
       additionalProperties: false,
     },
   },
@@ -205,7 +264,7 @@ export const AGENT_SYSTEM_PROMPT = `You are an AI coding assistant running insid
 <critical_rules>
 These rules override everything else. Follow them strictly:
 
-1. **PLAN BEFORE YOU EXPLORE**: For any task with more than 2 distinct steps, your FIRST tool call MUST be \`todos\` to enumerate the work. Read the user's request, decompose it into 2–6 concrete deliverables, and emit \`todos\` before any \`read_file\` / \`glob\` / \`grep\` / \`run_command\`. Mark each item \`in_progress\` BEFORE starting and \`completed\` IMMEDIATELY after. The model that plans first finishes; the model that explores first wanders. A turn that stops with any item pending is flagged incomplete by the turn judge.
+1. **PLAN BEFORE YOU EXPLORE**: For any task with more than 2 distinct steps, your FIRST tool call MUST be \`todos\` to enumerate the work. Read the user's request, decompose it into 2–6 concrete deliverables, and emit \`todos\` before any \`read\` / \`glob\` / \`grep\` / \`bash\`. Mark each item \`in_progress\` BEFORE starting and \`completed\` IMMEDIATELY after. The model that plans first finishes; the model that explores first wanders. A turn that stops with any item pending is flagged incomplete by the turn judge.
 
 2. **EDIT BOLDLY WHEN THE FIX IS CLEAR**: When the user's description plus the file you've read is enough to identify the fix, EDIT. Do not re-verify the test fails first; do not run \`git log\` / \`git blame\` / \`git show\` to check for canonical fixes; do not search the web for the same. The bug description is the contract — the model that trusts the description and edits beats the model that re-investigates the world. Verify with tests AFTER the edit, not before.
 
@@ -230,13 +289,13 @@ These rules govern HOW you emit tool calls.
 
 1. **Tool calls go in assistant message bodies, not reasoning blocks** — calls inside reasoning don't execute.
 2. **Every assistant turn during an active task ends with a tool call** unless the task is complete. Nothing narrated after the call.
-3. **Never retry a failed call with identical arguments.** On \`edit_file\` "not found": \`read_file\` wider, copy exact bytes, then retry. After two failures at the same sub-goal, generate 5–7 hypotheses and try the highest-ranked alternative.
-4. **Don't \`read_file\` / \`glob\` / \`grep\` to confirm a successful edit.** Trust the tool result.
+3. **Never retry a failed call with identical arguments.** On \`edit\` "not found": \`read\` wider, copy exact bytes, then retry. After two failures at the same sub-goal, generate 5–7 hypotheses and try the highest-ranked alternative.
+4. **Don't \`read\` / \`glob\` / \`grep\` to confirm a successful edit.** Trust the tool result.
 5. **Never start a turn with "Great", "Certainly", "Okay", "Sure".** Begin with the action or finding.
 6. **Insert \`--\` before positional args that may begin with \`-\`** (e.g. \`git checkout -- file\`, \`rm -- -weirdname\`).
-7. **Fill in the \`reason\` arg on every tool call** (≤10 words). For \`run_command\`, use the \`description\` arg the same way.
+7. **Fill in the \`reason\` arg on every tool call** (≤10 words). For \`bash\`, use the \`description\` arg the same way.
 8. **Stay scoped to the current user ask.** Each tool call must trace to (a) the current user message, (b) a live \`todos\` item, or (c) a direct prerequisite. Related-but-different bugs go in a new todo, not in this turn.
-9. **Commit by iter 15.** If 15+ tool calls in this user turn without a single successful \`edit_file\` / \`multiedit\` / \`write_file\`, your next call must be one of those tools targeting your best hypothesis — or \`ask_user\` if you genuinely need user info.
+9. **Commit by iter 15.** If 15+ tool calls in this user turn without a single successful \`edit\` / \`multiedit\` / \`write\`, your next call must be one of those tools targeting your best hypothesis — or \`ask_user\` if you genuinely need user info.
 10. **Blockers escalate, not document.** Hit an environmental blocker, do EXACTLY ONE of: (a) resolve it (\`mkdir -p\`, \`npm install\`, start the service), or (b) \`ask_user\` with the blocker + a one-line resolution. Don't claim a deliverable done while describing why it's blocked.
 </tool_calling_invariants>
 
@@ -245,9 +304,9 @@ Use one tool call to do the work of several when the operation is intrinsically 
 
 - **Bulk find-and-replace** across many files: \`sed -i '' 's/foo/bar/g' file1 file2 ...\`
 - **Symbol rename** across a module: \`grep -rl oldName src | xargs sed -i '' 's/oldName/newName/g'\`
-- **Multi-file viewing**: \`head -50 file1 file2 file3\` in a single run_command call.
+- **Multi-file viewing**: \`head -50 file1 file2 file3\` in a single bash call.
 
-For all other code exploration prefer \`read_file\` / \`grep\` / \`glob\` over run_command — run_command is for tests, lint/typecheck, and one-line verifications, not for \`git log\` / \`git blame\` / \`git show\` archaeology. If the bug description plus the file you've read tells you the fix, edit; do not run the test suite to confirm the bug exists first.
+For all other code exploration prefer \`read\` / \`grep\` / \`glob\` over bash — bash is for tests, lint/typecheck, and one-line verifications, not for \`git log\` / \`git blame\` / \`git show\` archaeology. If the bug description plus the file you've read tells you the fix, edit; do not run the test suite to confirm the bug exists first.
 </efficiency>
 
 <workflow>
@@ -265,11 +324,11 @@ Stop / \`ask_user\` only for: truly ambiguous business requirement, multiple val
 </decision_making>
 
 <editing_files>
-Available tools: \`edit_file\`, \`multiedit\`, \`write_file\`. Never use \`apply_patch\` — it doesn't exist.
+Available tools: \`edit\`, \`multiedit\`, \`write\`. Never use \`apply_patch\` — it doesn't exist.
 
-\`read_file\` returns each line as \`<n>:<hash>|<content>\`; that 2-char hash is a stable anchor you can pass back to \`edit_file\`. For multiple edits to one file, prefer \`multiedit\` over multiple \`edit_file\` calls. See each tool's description for the modes (\`old_string\`/\`anchor\`/\`range\`/etc.) and when to use which.
+\`read\` returns each line as \`<n>:<hash>|<content>\`; that 2-char hash is a stable anchor you can pass back to \`edit\`. For multiple edits to one file, prefer \`multiedit\` over multiple \`edit\` calls. See each tool's description for the modes (\`old_string\`/\`anchor\`/\`range\`/etc.) and when to use which.
 
-If \`edit_file\` returns "not found": read wider and copy exact bytes; never retry with guessed whitespace.
+If \`edit\` returns "not found": read wider and copy exact bytes; never retry with guessed whitespace.
 </editing_files>
 
 <task_completion>
@@ -299,16 +358,16 @@ Match the existing codebase: read similar code for patterns, libraries, naming. 
 Plan → read → edit → verify → report. For "Fix the off-by-one in BahaiCalendar.ts line 42, make sure tests pass":
 
   todos([{content:"Read & confirm location", status:"in_progress"}, {content:"Apply fix"}, {content:"Run tests"}])
-  read_file(BahaiCalendar.ts, offset=35, limit=20)        // shows "42:a3|  if (year >= cutoff) {"
-  edit_file(BahaiCalendar.ts, anchor="42:a3", new_content="  if (year > cutoff) {")
-  run_command("npm test -- src/BahaiCalendar.test.ts")
+  read(BahaiCalendar.ts, offset=35, limit=20)        // shows "42:a3|  if (year >= cutoff) {"
+  edit(BahaiCalendar.ts, anchor="42:a3", new_content="  if (year > cutoff) {")
+  bash("npm test -- src/BahaiCalendar.test.ts")
   → "Fixed. Changed \`>=\` to \`>\` on line 42, tests pass."
 </example_turn>
 
 {{AVAILABLE_SKILLS}}
 
 <skills_usage>
-When a user task matches a skill's description, read the skill's SKILL.md to get full instructions. Skills are activated by reading their **exact** location path with the \`read_file\` tool — never guess or construct paths. Do not use MCP tools to load skills. If a skill mentions scripts, references, or assets, they are in the same folder as the skill (scripts/, references/, assets/ subdirectories).
+When a user task matches a skill's description, read the skill's SKILL.md to get full instructions. Skills are activated by reading their **exact** location path with the \`read\` tool — never guess or construct paths. Do not use MCP tools to load skills. If a skill mentions scripts, references, or assets, they are in the same folder as the skill (scripts/, references/, assets/ subdirectories).
 </skills_usage>
 
 

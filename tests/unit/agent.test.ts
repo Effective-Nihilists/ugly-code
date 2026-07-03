@@ -5,15 +5,12 @@ import { AGENT_TOOLS, agentMessageSchema, type AgentMessage } from '../../shared
 describe('agent tool specs', () => {
   it('exposes the expected tools with valid JSON-schema parameters', () => {
     expect(AGENT_TOOLS.map((t) => t.name)).toEqual([
-      'list_dir',
-      'read_file',
-      'write_file',
-      'edit_file',
-      'codebase_search',
-      'run_command',
-      'db_query',
-      'db_get',
-      'db_set',
+      'read',
+      'write',
+      'edit',
+      'bash',
+      'database',
+      'database_sql_query',
     ]);
     for (const t of AGENT_TOOLS) {
       expect(t.parameters?.type).toBe('object');
@@ -27,7 +24,7 @@ describe('agent tool specs', () => {
         role: 'assistant',
         content: [
           { type: 'text', text: 'hi' },
-          { type: 'tool_use', id: 't1', name: 'read_file', input: { path: 'a' } },
+          { type: 'tool_use', id: 't1', name: 'read', input: { path: 'a' } },
         ],
       }).success,
     ).toBe(true);
@@ -47,7 +44,7 @@ describe('agent engine loop', () => {
         role: 'assistant',
         content: [
           { type: 'text', text: 'Reading.' },
-          { type: 'tool_use', id: 'a', name: 'read_file', input: { path: 'x.txt' } },
+          { type: 'tool_use', id: 'a', name: 'read', input: { path: 'x.txt' } },
         ],
       },
       { role: 'assistant', content: 'The file says hi.' },
@@ -64,7 +61,7 @@ describe('agent engine loop', () => {
 
     await runAgent({ history, step, dispatch, onEvent: (e) => events.push(e.type) });
 
-    expect(dispatched).toEqual(['read_file']);
+    expect(dispatched).toEqual(['read']);
     // user → assistant(tool_use) → user(tool_result) → assistant(final)
     expect(history).toHaveLength(4);
     expect(history[2]).toMatchObject({
@@ -76,7 +73,7 @@ describe('agent engine loop', () => {
 
   it('feeds a tool error back as tool_result and keeps going', async () => {
     const turns: AgentMessage[] = [
-      { role: 'assistant', content: [{ type: 'tool_use', id: 'b', name: 'read_file', input: {} }] },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'b', name: 'read', input: {} }] },
       { role: 'assistant', content: 'Recovered.' },
     ];
     let i = 0;
@@ -96,7 +93,7 @@ describe('agent engine loop', () => {
   it('stops at maxSteps when the model never finishes', async () => {
     const step: StepFn = () =>
       Promise.resolve({
-        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'x', name: 'list_dir', input: {} }] },
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'x', name: 'read', input: {} }] },
       });
     const dispatch = (): Promise<string> => Promise.resolve('ok');
     const events: string[] = [];

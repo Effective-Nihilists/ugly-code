@@ -1,6 +1,6 @@
-// `spec_read` — read a project spec from ugly.bot. Ported from ugly-studio
-// f5a74c2^:server/coding-agent/tools/spec-tools.ts + spec-vfs.ts. Degrades
-// cleanly when the spec service isn't reachable / no specs exist.
+// `spec_read` / `spec_write` — read/write a project spec on ugly.bot. Ported
+// from ugly-studio f5a74c2^:server/coding-agent/tools/spec-tools.ts + spec-vfs.ts.
+// Both degrade cleanly when the spec service isn't reachable / no specs exist.
 
 import { native } from 'ugly-app/native';
 import type { TextGenTool } from 'ugly-app/shared';
@@ -39,6 +39,38 @@ export const specReadTool: ToolModule = {
       return '(no spec content)';
     } catch (e) {
       return `spec_read unavailable: ${(e as Error).message}`;
+    }
+  },
+};
+
+const SPEC_WRITE: TextGenTool = {
+  name: 'spec_write',
+  description:
+    'Write/replace the current project spec (design/requirements doc) hosted on ' +
+    'ugly.bot. Pass the full spec `content`.',
+  parameters: {
+    type: 'object',
+    properties: { content: { type: 'string', description: 'The full spec content to store.' } },
+    required: ['content'],
+    additionalProperties: false,
+  },
+};
+
+export const specWriteTool: ToolModule = {
+  name: 'spec_write',
+  spec: SPEC_WRITE,
+  async run(input) {
+    const content = typeof input.content === 'string' ? input.content : '';
+    if (!content) return 'spec_write: `content` is required.';
+    try {
+      const res = (await native.uglybot.request('specWrite', { content })) as
+        | { ok?: boolean; error?: string }
+        | string;
+      if (typeof res === 'string') return res;
+      if (res?.error) return `spec_write unavailable: ${res.error}`;
+      return 'Spec written.';
+    } catch (e) {
+      return `spec_write unavailable: ${(e as Error).message}`;
     }
   },
 };

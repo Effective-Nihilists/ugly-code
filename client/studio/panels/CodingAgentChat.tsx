@@ -88,6 +88,7 @@ import {
   type Skill,
 } from '../hooks/useSlashCommands';
 import { useSocket, getActiveProjectPath } from '../hooks/useSocket';
+import { isTool } from '../../../shared/agent';
 import { native } from 'ugly-app/native';
 import { useTheme } from '../theme/ThemeProvider';
 import { shortcut } from '../utils/platform';
@@ -644,8 +645,8 @@ function ToolOutputView({ tool }: { tool: ToolUse }) {
   const name = tool.name.toLowerCase();
   const isError = tool.status === 'error';
 
-  // delegate / agent — result is prose (often markdown). Render it.
-  if (!isError && name === 'delegate') {
+  // delegate — result is prose (often markdown). Render it.
+  if (!isError && isTool(name, 'delegate')) {
     return (
       <>
         <SectionLabel copyText={tool.result} accent="accent">
@@ -665,7 +666,7 @@ function ToolOutputView({ tool }: { tool: ToolUse }) {
   }
 
   // delegate_parallel — result is a JSON array of child summaries.
-  if (!isError && name === 'delegate_parallel') {
+  if (!isError && isTool(name, 'delegate_parallel')) {
     let arr: DelegateSummary[] | null = null;
     try {
       const raw: unknown = JSON.parse(tool.result);
@@ -723,8 +724,8 @@ function ToolOutputView({ tool }: { tool: ToolUse }) {
     }
   }
 
-  // view — strip the <file>...</file> wrapper for readability.
-  if (name === 'view' || name === 'read_file') {
+  // read — strip the <file>...</file> wrapper for readability.
+  if (isTool(name, 'read')) {
     const body = unwrapViewResult(tool.result);
     return (
       <>
@@ -1284,8 +1285,8 @@ function EditCard({ tool }: { tool: ToolUse }) {
   const input = safeParse(tool.input) ?? {};
   const meta = (tool.metadata ?? {}) as ToolMetadata;
   const filePath: string = input.file_path ?? '(unknown path)';
-  const isWrite = tool.name.toLowerCase() === 'write';
-  const isMulti = tool.name.toLowerCase() === 'multiedit';
+  const isWrite = isTool(tool.name.toLowerCase(), 'write');
+  const isMulti = isTool(tool.name.toLowerCase(), 'multiedit');
   const additions = Number(meta.additions ?? 0);
   const removals = Number(meta.removals ?? 0);
   const editsApplied = Number(meta.edits ?? meta.edits_applied ?? 0);
@@ -2008,7 +2009,7 @@ function DevServerCard({
   tool: ToolUse;
   onStop?: (toolCallId: string) => void;
 }) {
-  const isStart = tool.name === 'dev_server_start';
+  const isStart = isTool(tool.name, 'dev_server_start');
   const input = safeParse(tool.input) ?? {};
   const requestedTimeoutMs: number | undefined =
     typeof input.timeout_ms === 'number' ? input.timeout_ms : undefined;
@@ -4564,10 +4565,10 @@ function AssistantMessage({
         if (lower === 'think') {
           return <ThinkCard key={tool.id} tool={tool} />;
         }
-        if (lower === 'edit' || lower === 'write' || lower === 'multiedit') {
+        if (isTool(lower, 'edit') || isTool(lower, 'write') || isTool(lower, 'multiedit')) {
           return <EditCard key={tool.id} tool={tool} />;
         }
-        if (lower === 'bash') {
+        if (isTool(lower, 'bash')) {
           return (
             <BashCard
               key={tool.id}
@@ -4576,7 +4577,7 @@ function AssistantMessage({
             />
           );
         }
-        if (lower === 'dev_server_start' || lower === 'dev_server_stop') {
+        if (isTool(lower, 'dev_server_start') || isTool(lower, 'dev_server_stop')) {
           return (
             <DevServerCard
               key={tool.id}

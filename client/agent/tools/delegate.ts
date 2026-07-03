@@ -1,6 +1,8 @@
-// `delegate` / `delegate_parallel` / `agent` — run subtasks in nested agent
-// loops. Ported from ugly-studio f5a74c2^:.../{delegate,delegate-parallel,agent}.ts.
-// All degrade to a clear message when no model-call `step` is available.
+// `delegate` / `delegate_parallel` — run subtasks in nested agent loops. Ported
+// from ugly-studio f5a74c2^:.../{delegate,delegate-parallel}.ts. Both degrade to
+// a clear message when no model-call `step` is available. (The monolith's `agent`
+// tool was retired 2026-04-25 — `delegate` is the single canonical sub-agent
+// primitive — so it is not ported here.)
 
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
@@ -71,34 +73,5 @@ export const delegateParallelTool: ToolModule = {
       ),
     );
     return results.join('\n\n');
-  },
-};
-
-export const agentTool: ToolModule = {
-  name: 'agent',
-  spec: {
-    name: 'agent',
-    description:
-      'Spawn a sub-agent with a specific role/persona to handle a task ' +
-      '(e.g. role="reviewer", task="review this diff").',
-    parameters: {
-      type: 'object',
-      properties: {
-        role: { type: 'string', description: 'The sub-agent role/persona.' },
-        task: { type: 'string', description: 'The task for the sub-agent.' },
-      },
-      required: ['role', 'task'],
-      additionalProperties: false,
-    },
-  } satisfies TextGenTool,
-  async run(input, ctx) {
-    const step = (ctx as ToolContext | undefined)?.step;
-    if (!step) return noStep();
-    const role = String(input.role ?? 'assistant');
-    return runSubAgent(String(input.task ?? ''), {
-      step,
-      ctx,
-      system: `You are a ${role}. Focus only on the task you are given and report your result concisely.`,
-    });
   },
 };

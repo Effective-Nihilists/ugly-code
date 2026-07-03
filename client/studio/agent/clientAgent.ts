@@ -21,9 +21,9 @@ import {
   type MsgTelemetry,
   type RunAgentSocket,
 } from 'ugly-app/agent/client';
-import { dispatchTool } from '../../agent/tools';
+import { dispatchTool, isUglyAppProject } from '../../agent/tools';
 import { registeredToolSpecs } from '../../agent/tools/registry';
-import { activeToolSpecs } from '../../agent/tools/catalog';
+import { sessionToolSpecs } from '../../agent/tools/gating';
 import { discoverSkills, formatAvailableSkills } from '../hooks/skillDiscovery';
 import type { StepFn } from '../../agent/engine';
 import {
@@ -228,6 +228,21 @@ function ensureSkillsDiscovered(sessionId: string): void {
   void discoverSkills()
     .then((skills) => skillsBlockBySession.set(sessionId, formatAvailableSkills(skills)))
     .catch(() => { /* best-effort — keep the empty block */ });
+}
+
+// Is the open project an ugly-app project? Resolved once (async) per session,
+// then read synchronously by the `tools` getter (default false until resolved)
+// to gate the UGLY_APP tool set — mirrors the skills/architecture pattern.
+const uglyAppBySession = new Map<string, boolean>();
+function ensureUglyAppFlag(sessionId: string): void {
+  if (uglyAppBySession.has(sessionId)) return;
+  const ws = getSessionWorkspace(sessionId);
+  const dir = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? '';
+  if (!dir) return; // no project yet — re-resolved on a later turn
+  uglyAppBySession.set(sessionId, false); // seed so the getter never blocks
+  void isUglyAppProject(dir)
+    .then((v) => uglyAppBySession.set(sessionId, v))
+    .catch(() => { /* best-effort — treat as not-ugly-app */ });
 }
 
 /** Fold a (partial) user selection onto the session state. Called on create and
@@ -548,6 +563,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
   // first turn — see ensureCodebaseAnalysis.
   ensureCodebaseAnalysis(sessionId, emitRef.current);
   ensureSkillsDiscovered(sessionId);
+  ensureUglyAppFlag(sessionId);
 
   state.controller = runAgent({
     socket: fetchSocket,
@@ -575,10 +591,13 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
       const skillsBlock = skillsBlockBySession.get(sessionId) ?? formatAvailableSkills([]);
       return `${base.replace('{{AVAILABLE_SKILLS}}', skillsBlock)}\n\n${env}`;
     },
-    // Dynamic per-session catalog: the model starts with the core tools and
-    // activates others via tool_search/tool_request (read afresh each turn).
+    // Static per-session gating (read afresh each turn): COMMON + single/group
+    // mode set + the ugly-app project set (when applicable) + feature gates —
+    // the monolith's model. `modelMode.kind` of 'auto' resolves to single mode.
     get tools() {
-      return activeToolSpecs(sessionId);
+      const mode = state.modelMode?.kind === 'group' ? 'group' : 'single';
+      const isUglyApp = uglyAppBySession.get(sessionId) ?? false;
+      return sessionToolSpecs({ mode, isUglyApp });
     },
     toolHandlers: makeToolHandlers(sessionId),
     budget: { maxTurns: 12 },

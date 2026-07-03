@@ -4,6 +4,7 @@
 // (or being registered) here — mirroring the monolith's tools/<tool>.ts layout.
 
 import type { TextGenTool } from 'ugly-app/shared';
+import type { AgentToolSpec, ToolName } from '../../../shared/agent';
 import type { ToolContext } from '../tools';
 import { grepTool } from './grep';
 import { globTool } from './glob';
@@ -20,17 +21,22 @@ import { todosTool } from './todos';
 import { scratchpadTool } from './scratchpad';
 import { memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool } from './memory';
 import { askUserTool } from './askUser';
-import { delegateTool, delegateParallelTool, agentTool } from './delegate';
+import { delegateTool, delegateParallelTool } from './delegate';
 import { blackboardPostTool } from './blackboard';
 import { toolSearchTool } from './toolSearch';
 import { toolRequestTool } from './toolRequest';
-import { specReadTool } from './specRead';
+import { specReadTool, specWriteTool } from './specRead';
 import { analyzeImageTool } from './analyzeImage';
 import { inspectUxTool } from './inspectUx';
 
 export interface ToolModule {
-  name: string;
-  /** Model-facing JSON-schema spec (added to AGENT_TOOLS). */
+  /** Typed against the shared `ToolName` union — a registry tool whose name
+   *  isn't a known `ToolName` fails to compile (keeps the UI + specs in sync).
+   *  This is the authoritative dispatch name; `registeredToolSpecs()` stamps it
+   *  onto the model-facing spec so the wire name can't drift from it. */
+  name: ToolName;
+  /** Model-facing JSON-schema spec (added to AGENT_TOOLS). Its `name` is
+   *  overwritten with `this.name` when specs are assembled. */
   spec: TextGenTool;
   /** Execute the tool; returns the string fed back as tool_result. */
   run(
@@ -39,12 +45,14 @@ export interface ToolModule {
   ): Promise<string>;
 }
 
-export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool, todosTool, scratchpadTool, memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool, askUserTool, delegateTool, delegateParallelTool, agentTool, blackboardPostTool, toolSearchTool, toolRequestTool, specReadTool, analyzeImageTool, inspectUxTool];
+export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, lspDiagnosticsTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, webFetchTool, webSearchTool, downloadTool, depDocsTool, todosTool, scratchpadTool, memorySaveTool, memoryReadTool, memoryListTool, memoryDeleteTool, askUserTool, delegateTool, delegateParallelTool, blackboardPostTool, toolSearchTool, toolRequestTool, specReadTool, specWriteTool, analyzeImageTool, inspectUxTool];
 
 /** Model-facing specs for every registered tool (appended to AGENT_TOOLS when
  *  assembling the per-turn tool list). */
-export function registeredToolSpecs(): TextGenTool[] {
-  return TOOL_REGISTRY.map((t) => t.spec);
+export function registeredToolSpecs(): AgentToolSpec[] {
+  // Stamp the typed dispatch name onto the model-facing spec so the wire name is
+  // always the `ToolName` the UI + dispatcher match on (no string drift).
+  return TOOL_REGISTRY.map((t) => ({ ...t.spec, name: t.name }));
 }
 
 /** Run a registered tool. Returns undefined when `name` is not registered, so

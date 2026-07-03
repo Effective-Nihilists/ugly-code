@@ -36,25 +36,24 @@ defineTask({
         }
       };
 
-      // A .uglyapp so the db/run_command project-id resolution has something to read.
-      await run('write_file:.uglyapp', () =>
-        dispatchTool('write_file', { path: '.uglyapp', content: JSON.stringify({ projectId: 'tool-smoke' }) }, ctx));
+      // A .uglyapp so the db/bash project-id resolution has something to read.
+      await run('write:.uglyapp', () =>
+        dispatchTool('write', { path: '.uglyapp', content: JSON.stringify({ projectId: 'tool-smoke' }) }, ctx));
       // fs tools
-      await run('write_file', () => dispatchTool('write_file', { path: 'hello.txt', content: 'hi from task' }, ctx));
-      await run('read_file', () => dispatchTool('read_file', { path: 'hello.txt' }, ctx));
-      await run('edit_file', () => dispatchTool('edit_file', { path: 'hello.txt', old: 'hi from', new: 'edited by' }, ctx));
-      await run('read_after_edit', () => dispatchTool('read_file', { path: 'hello.txt' }, ctx));
-      await run('list_dir', () => dispatchTool('list_dir', { path: '.' }, ctx));
-      // run_command — confirms the bundled binaries are on the task child's PATH
-      await run('run_command:node', () => dispatchTool('run_command', { cmd: 'node', args: ['--version'] }, ctx));
-      await run('run_command:node-path', () => dispatchTool('run_command', { cmd: 'node', args: ['-p', 'process.execPath'] }, ctx));
-      await run('run_command:git', () => dispatchTool('run_command', { cmd: 'git', args: ['--version'] }, ctx));
-      await run('run_command:bash', () => dispatchTool('run_command', { cmd: 'bash', args: ['-lc', 'echo task-bash-ok'] }, ctx));
+      await run('write', () => dispatchTool('write', { path: 'hello.txt', content: 'hi from task' }, ctx));
+      await run('read', () => dispatchTool('read', { path: 'hello.txt' }, ctx));
+      await run('edit', () => dispatchTool('edit', { path: 'hello.txt', old: 'hi from', new: 'edited by' }, ctx));
+      await run('read_after_edit', () => dispatchTool('read', { path: 'hello.txt' }, ctx));
+      await run('bash:ls', () => dispatchTool('bash', { command: 'ls', description: 'list dir' }, ctx));
+      // bash — confirms the bundled binaries are on the task child's PATH
+      await run('bash:node', () => dispatchTool('bash', { command: 'node --version', description: 'node version' }, ctx));
+      await run('bash:node-path', () => dispatchTool('bash', { command: 'node -p process.execPath', description: 'node path' }, ctx));
+      await run('bash:git', () => dispatchTool('bash', { command: 'git --version', description: 'git version' }, ctx));
+      await run('bash:echo', () => dispatchTool('bash', { command: 'echo task-bash-ok', description: 'echo ok' }, ctx));
       // db tools — spawn `node` with the DB script (confirms node resolves + the script runs;
       // a real query also needs the dev postgres, which the env confirmation doesn't require).
-      await run('db_query', () => dispatchTool('db_query', { sql: 'select 1 as n' }, ctx));
-      await run('db_set', () => dispatchTool('db_set', { collection: 'smoke', action: 'set', id: 'a', doc: { x: 1 } }, ctx));
-      await run('db_get', () => dispatchTool('db_get', { collection: 'smoke', id: 'a' }, ctx));
+      await run('database_sql_query', () => dispatchTool('database_sql_query', { sql: 'select 1 as n' }, ctx));
+      await run('database', () => dispatchTool('database', { collection: 'smoke', limit: 1 }, ctx));
       return results;
     },
   },

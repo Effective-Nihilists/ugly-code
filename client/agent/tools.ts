@@ -2,7 +2,7 @@
 // operation against the unified native API (fulfilled by the Ugly Studio
 // desktop daemon). Returns a string the agent loop feeds back as `tool_result`.
 
-import { native, installUglyNative } from 'ugly-app/native';
+import { native } from 'ugly-app/native';
 import type { SandboxMode } from 'ugly-app/native';
 import type { AgentToolName } from '../../shared/agent';
 import type { StepFn } from './engine';
@@ -41,13 +41,59 @@ function str(v: unknown): string {
   return String(v);
 }
 
-/** Resolve a model-supplied (workspace-relative) path. Absolute paths pass
- *  through; relative paths are rooted at `workspaceDir` when set (worktree). */
+/** The base a model-supplied relative path resolves against: the worktree root
+ *  when the session is worktree-isolated, else the open project dir. */
+function resolutionBase(ctx: ToolContext | undefined): string | null {
+  return ctx?.workspaceDir ?? ctx?.projectDir ?? null;
+}
+
+/** Best-effort home dir from the absolute project/worktree path (macOS/Linux). */
+function deriveHome(ctx: ToolContext | undefined): string | null {
+  const p = ctx?.workspaceDir ?? ctx?.projectDir ?? '';
+  const m = /^(\/Users\/[^/]+|\/home\/[^/]+|\/root)/.exec(p);
+  return m ? m[1] : null;
+}
+
+/** Collapse `.`/`..` segments in a POSIX path (no fs access). */
+function normalizePosix(p: string): string {
+  const isAbs = p.startsWith('/');
+  const out: string[] = [];
+  for (const seg of p.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') {
+      if (out.length && out[out.length - 1] !== '..') out.pop();
+      else if (!isAbs) out.push('..');
+    } else {
+      out.push(seg);
+    }
+  }
+  return (isAbs ? '/' : '') + out.join('/');
+}
+
+/** Resolve a model-supplied path to an absolute fs path. Handles absolute
+ *  (`/foo`), home (`~/foo`), and relative (`foo`, `./foo`, `../foo`) forms;
+ *  relative paths root at the worktree (if any) else the project dir. When no
+ *  base is known, the path passes through so the daemon can resolve it. */
 export function resolvePath(ctx: ToolContext | undefined, path: string): string {
-  if (path.startsWith('/')) return path;
-  const root = ctx?.workspaceDir;
-  if (!root) return path;
-  return root.replace(/\/+$/, '') + '/' + path.replace(/^\.\/?/, '');
+  if (path.startsWith('/')) return normalizePosix(path);
+  if (path === '~' || path.startsWith('~/')) {
+    const home = deriveHome(ctx);
+    return home ? normalizePosix(home + '/' + path.slice(path === '~' ? 1 : 2)) : path;
+  }
+  const base = resolutionBase(ctx);
+  if (!base) return path;
+  return normalizePosix(base.replace(/\/+$/, '') + '/' + path);
+}
+
+/** Render an absolute fs path back as a base-relative path for the model (paths
+ *  returned to the model must be relative — see TOOLS.md "Path handling"). Paths
+ *  outside the base, or when no base is known, are returned unchanged. */
+export function relativizePath(ctx: ToolContext | undefined, absPath: string): string {
+  const base = resolutionBase(ctx);
+  if (!base) return absPath;
+  const root = base.replace(/\/+$/, '');
+  if (absPath === root) return '.';
+  return absPath.startsWith(root + '/') ? absPath.slice(root.length + 1) : absPath;
 }
 
 export type ToolDispatch = (name: string, input: unknown, ctx?: ToolContext) => Promise<string>;
@@ -59,14 +105,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
   const fromRegistry = await runRegisteredTool(name, p, ctx);
   if (fromRegistry !== undefined) return fromRegistry;
   switch (name as AgentToolName) {
-    case 'list_dir': {
-      const items = await native.fs.readdir(resolvePath(ctx, str(p.path ?? '.')));
-      items.sort((a, b) =>
-        a.isDirectory === b.isDirectory ? a.name.localeCompare(b.name) : a.isDirectory ? -1 : 1,
-      );
-      return items.map((e) => (e.isDirectory ? `${e.name}/` : e.name)).join('\n') || '(empty directory)';
-    }
-    case 'read_file': {
+    case 'read': {
       const rawPath = String(p.path);
       const raw = await native.fs.readFile(resolvePath(ctx, rawPath));
       return formatHashlineRead(
@@ -76,32 +115,12 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
         p.limit != null ? Number(p.limit) : undefined,
       );
     }
-    case 'codebase_search': {
-      // Semantic search over the host's index (codebase.* is a host-only channel; no facade
-      // method, so call the raw UglyNative). Scoped to the open project; the worktree (if
-      // any) rides as the overlay so the agent sees its own uncommitted edits.
-      const projectPath = ctx?.projectDir ?? '';
-      if (!projectPath) return 'codebase_search unavailable: no project is open.';
-      const res = (await installUglyNative().invoke('codebase.search' as never, {
-        projectPath,
-        query: str(p.query ?? ''),
-        limit: typeof p.limit === 'number' ? p.limit : 10,
-        ...(ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : {}),
-      } as never)) as {
-        results?: { file_path: string; start_line: number; end_line: number; content: string; score: number }[];
-      };
-      const results = res.results ?? [];
-      if (!results.length) {
-        return 'No semantic matches (the index may still be building — fall back to list_dir/read_file or run_command rg).';
-      }
-      return results
-        .map((r) => `${r.file_path}:${r.start_line}-${r.end_line}  (score ${r.score.toFixed(2)})\n${r.content}`)
-        .join('\n\n---\n\n');
+    case 'write': {
+      const abs = resolvePath(ctx, String(p.path));
+      await native.fs.writeFile(abs, str(p.content ?? ''));
+      return `Wrote ${relativizePath(ctx, abs)}`;
     }
-    case 'write_file':
-      await native.fs.writeFile(resolvePath(ctx, String(p.path)), str(p.content ?? ''));
-      return `Wrote ${String(p.path)}`;
-    case 'edit_file': {
+    case 'edit': {
       const rawPath = String(p.path);
       const path = resolvePath(ctx, rawPath);
       const cur = await native.fs.readFile(path);
@@ -114,22 +133,26 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
           : {}),
       };
       const r = applyEdit(cur, op);
-      if (!r.ok) return `edit_file failed in ${rawPath}: ${r.error}`;
+      if (!r.ok) return `edit failed in ${relativizePath(ctx, path)}: ${r.error}`;
       await native.fs.writeFile(path, r.body!);
-      return `Edited ${rawPath}`;
+      return `Edited ${relativizePath(ctx, path)}`;
     }
-    case 'run_command':
-      return runCommand(String(p.cmd), Array.isArray(p.args) ? p.args.map(String) : [], await sandboxOptFor(ctx), ctx?.port, ctx?.databaseUrl);
-    case 'db_query':
-      return runDb(ctx, 'exec', { sql: str(p.sql ?? ''), allowWrite: false });
-    case 'db_get':
-      return runDb(ctx, 'getDoc', { collection: String(p.collection), id: String(p.id) });
-    case 'db_set':
-      return runDb(ctx, 'mutate', {
+    case 'bash':
+      return runBash(str(p.command ?? ''), await sandboxOptFor(ctx), ctx, p.working_dir != null ? str(p.working_dir) : undefined);
+    case 'database':
+      return runDb(ctx, 'getQuery', {
         collection: String(p.collection),
-        action: String(p.action),
-        id: p.id == null ? undefined : str(p.id),
-        doc: (p.doc ?? {}),
+        ...(Array.isArray(p.filters) ? { filters: p.filters } : {}),
+        ...(p.sort != null ? { sort: p.sort } : {}),
+        ...(p.limit != null ? { limit: Number(p.limit) } : {}),
+        ...(p.skip != null ? { skip: Number(p.skip) } : {}),
+      });
+    case 'database_sql_query':
+      return runDb(ctx, 'exec', {
+        sql: str(p.sql ?? ''),
+        ...(Array.isArray(p.params) ? { params: p.params } : {}),
+        // Raw SQL tool allows writes (seed/fix dev state); the daemon runs it
+        // against the bundled local dev postgres.
         allowWrite: true,
       });
     default:
@@ -188,6 +211,32 @@ async function readProjectId(projectDir: string): Promise<string | null> {
   return pid;
 }
 
+// Cached per project dir — is this an ugly-app project? (Gates the UGLY_APP
+// tool set.) Mirrors the monolith `isUglyAppProject`: a `.uglyapp` marker, or
+// an `ugly-app` dependency in package.json.
+const uglyAppCache = new Map<string, boolean>();
+export async function isUglyAppProject(projectDir: string): Promise<boolean> {
+  const cached = uglyAppCache.get(projectDir);
+  if (cached !== undefined) return cached;
+  let res = false;
+  try {
+    await native.fs.readFile(projectDir + '/.uglyapp');
+    res = true;
+  } catch {
+    try {
+      const pkg = JSON.parse(await native.fs.readFile(projectDir + '/package.json')) as {
+        dependencies?: Record<string, unknown>;
+        devDependencies?: Record<string, unknown>;
+      };
+      res = pkg.dependencies?.['ugly-app'] !== undefined || pkg.devDependencies?.['ugly-app'] !== undefined;
+    } catch {
+      res = false;
+    }
+  }
+  uglyAppCache.set(projectDir, res);
+  return res;
+}
+
 /** Build the daemon sandbox spawn option for this tool call (or undefined when
  *  there's no project / projectId → spawn runs unsandboxed). */
 async function sandboxOptFor(
@@ -201,29 +250,33 @@ async function sandboxOptFor(
   return { projectId, projectDir, mode };
 }
 
-/** Spawn a binary via native.process and resolve with its combined output. The
- *  daemon OS-user-sandboxes the subprocess when `sandbox` is provided. */
-function runCommand(
-  cmd: string,
-  args: string[],
-  sandbox?: { projectId: string; mode: SandboxMode; projectDir: string },
-  port?: number,
-  databaseUrl?: string,
+/** Run a shell command through the daemon (POSIX `sh -c`), resolving with the
+ *  combined output. The daemon OS-user-sandboxes the subprocess when `sandbox`
+ *  is provided; PORT (so `pnpm dev` binds the session's port → Preview loads it)
+ *  and DATABASE_URL (so the dev server boots against the bundled local DB) are
+ *  injected. `workingDir` overrides the cwd (else the worktree/project root). */
+function runBash(
+  command: string,
+  sandbox: { projectId: string; mode: SandboxMode; projectDir: string } | undefined,
+  ctx: ToolContext | undefined,
+  workingDir?: string,
 ): Promise<string> {
   return new Promise((resolve) => {
     let out = '';
     try {
-      // Inject PORT (so `pnpm dev` binds the session's port → Preview loads it)
-      // and DATABASE_URL (so the dev server boots against the bundled local DB).
+      const cwd = workingDir
+        ? resolvePath(ctx, workingDir)
+        : ctx?.workspaceDir ?? ctx?.projectDir ?? undefined;
       const env: Record<string, string> = {
-        ...(port ? { PORT: String(port) } : {}),
-        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+        ...(ctx?.port ? { PORT: String(ctx.port) } : {}),
+        ...(ctx?.databaseUrl ? { DATABASE_URL: ctx.databaseUrl } : {}),
       };
       const opts: Parameters<typeof native.process.spawn>[2] = {
         ...(sandbox ? { sandbox } : {}),
+        ...(cwd ? { cwd } : {}),
         ...(Object.keys(env).length ? { env } : {}),
       };
-      const proc = native.process.spawn(cmd, args, opts);
+      const proc = native.process.spawn('sh', ['-c', command], opts);
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (out += c));
       proc.onError((e) => { resolve(`${out}\n[error: ${e}]`); });

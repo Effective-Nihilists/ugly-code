@@ -1,11 +1,11 @@
-// Phase B5 — subagent runner + delegate/delegate_parallel/agent + blackboard.
+// Phase B5 — subagent runner + delegate/delegate_parallel + blackboard.
+// (The monolith's standalone `agent` tool was retired — delegate is canonical.)
 import { describe, it, expect } from 'vitest';
 import type { StepFn } from '../../../client/agent/engine';
 import { runSubAgent } from '../../../client/agent/tools/subagent';
 import {
   delegateTool,
   delegateParallelTool,
-  agentTool,
 } from '../../../client/agent/tools/delegate';
 import { blackboardPostTool, readBlackboard } from '../../../client/agent/tools/blackboard';
 
@@ -42,10 +42,6 @@ describe('delegate tools', () => {
     );
     expect(out).toMatch(/Subtask 1/);
     expect(out).toMatch(/Subtask 2/);
-  });
-  it('agent threads a role and runs', async () => {
-    const out = await agentTool.run({ role: 'reviewer', task: 'review' }, { step: echoStep('lgtm') });
-    expect(out).toBe('lgtm');
   });
 });
 
