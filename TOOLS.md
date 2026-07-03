@@ -569,8 +569,18 @@ builder. Documented so their absence is intentional and recorded.
 ## Current ugly-code divergences
 
 The client-side port in this repo (`client/agent/tools/`, `shared/agent.ts`)
-diverges from the authoritative set above. This section is the remediation
+diverged from the authoritative set above. This section was the remediation
 checklist.
+
+> **Status — resolved in commit `6f0af6c` (2026-07-03).** Rows 1–5, 7, 8, 9 are
+> done: names renamed to `read`/`write`/`edit`/`bash`, `codebase_search` folded
+> into `grep semantic`, the `agent` tool retired, static gating adopted, tool
+> names made type-safe (`ToolName` + `isTool`), path handling fixed.
+> **Row 6 is partial:** `spec_write`, `database`, `database_sql_query` are added;
+> **`dev_server_{start,stop,errors,screenshot}` remain — they need ugly-studio
+> host channels (`dev.*`/`screenshot.*` don't exist yet).** They are gated
+> (ugly-app-project only) and named in `ToolName`, so they're wired everywhere
+> except the tool implementations + host channels.
 
 | # | Divergence | Monolith (authoritative) | Current ugly-code |
 |---|---|---|---|
