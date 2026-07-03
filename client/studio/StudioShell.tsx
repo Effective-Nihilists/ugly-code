@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppOptional } from 'ugly-app/client';
+import { permissions } from 'ugly-app/native';
 import { ProjectsProvider } from './state/ProjectsContext';
 import { ProjectOnboarding } from './panels/ProjectOnboarding';
 import { ProjectCreationProgress } from './panels/ProjectCreationProgress';
@@ -78,6 +79,19 @@ export default function StudioShell(): React.ReactElement {
     const onPop = (): void => { setOpen(projectFromUrl()); };
     window.addEventListener('popstate', onPop);
     return () => { window.removeEventListener('popstate', onPop); };
+  }, []);
+
+  // Request — and thereby PROVISION — the bundled toolchain the IDE relies on:
+  // node/git/pnpm (+ the bash/npm/npx shell helpers) power Preview (`pnpm dev`),
+  // scaffolding (`npx ugly-app init`), and the terminal. Bundled tools are requested
+  // like any permission (mic/camera); the host installs the downloadable ones on
+  // grant. Fire-and-forget at boot so they're ready before the first spawn; a
+  // web-only shell with no host connected just no-ops (caught).
+  React.useEffect(() => {
+    type GrantReq = Parameters<typeof permissions.request>[0];
+    void permissions
+      .request({ process: ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'] } as unknown as GrantReq)
+      .catch(() => undefined);
   }, []);
 
   let body: React.ReactNode;
