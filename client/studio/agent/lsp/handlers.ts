@@ -24,6 +24,8 @@ export interface LspLocationInput {
   line: number;
   character: number;
   cwd?: string;
+  /** Live editor buffer for unsaved-edit accuracy; synced via openFile(path, content). */
+  content?: string;
 }
 
 export interface LspLocation {
@@ -68,7 +70,7 @@ async function locations(
     // be loaded, not just the cursor file. Definition resolves from the
     // containing project that opening the cursor file already loads.
     if (ensureProject) await client.ensureProjectLoaded();
-    await client.openFile(input.path);
+    await client.openFile(input.path, input.content);
     const raw = await client[method](input.path, input.line, input.character);
     const results = await Promise.all(
       raw.map(async (r): Promise<LspLocation> => {
@@ -115,7 +117,7 @@ export async function lspHover(
   try {
     const root = input.cwd ?? activeProjectPath ?? dirOf(input.path);
     const client = await getEditorLspClient(root, lang);
-    await client.openFile(input.path);
+    await client.openFile(input.path, input.content);
     return { contents: await client.hover(input.path, input.line, input.character) };
   } catch {
     return { contents: null };

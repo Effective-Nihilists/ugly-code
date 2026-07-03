@@ -1037,6 +1037,7 @@ export const requests = defineRequests({
       line: z.number().int().nonnegative(),
       character: z.number().int().nonnegative(),
       cwd: z.string().optional(),
+      content: z.string().optional(),
     }),
     output: z.object({
       results: z.array(
@@ -1056,6 +1057,7 @@ export const requests = defineRequests({
       line: z.number().int().nonnegative(),
       character: z.number().int().nonnegative(),
       cwd: z.string().optional(),
+      content: z.string().optional(),
     }),
     output: z.object({
       results: z.array(
@@ -1075,6 +1077,7 @@ export const requests = defineRequests({
       line: z.number().int().nonnegative(),
       character: z.number().int().nonnegative(),
       cwd: z.string().optional(),
+      content: z.string().optional(),
     }),
     output: z.object({
       results: z.array(
@@ -1094,6 +1097,7 @@ export const requests = defineRequests({
       line: z.number().int().nonnegative(),
       character: z.number().int().nonnegative(),
       cwd: z.string().optional(),
+      content: z.string().optional(),
     }),
     output: z.object({ contents: z.string().nullable() }),
   }),
