@@ -10,6 +10,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { FileIcon } from './navIcons';
 import { CodeMirrorFileEditor, type CmEditorHandle } from '../components/CodeMirrorFileEditor';
 import { ReferencesPanel } from '../components/ReferencesPanel';
+import { CodebaseSearch } from './CodebaseSearch';
 import {
   runDefinition,
   runImplementation,
@@ -318,7 +319,12 @@ export function FilePanel(): React.ReactElement {
   return (
     <div style={S.root}>
       {/* Desktop: persistent tree column. Mobile: an on-demand drawer (below). */}
-      {!isMobile && <div style={S.tree}>{renderDir(root, 0)}</div>}
+      {!isMobile && (
+        <div style={S.tree}>
+          <CodebaseSearch onOpen={(p) => { void openFile(p); }} />
+          {renderDir(root, 0)}
+        </div>
+      )}
 
       {isMobile && treeOpen && (
         <>
