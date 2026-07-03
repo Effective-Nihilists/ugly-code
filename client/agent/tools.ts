@@ -34,7 +34,7 @@ function str(v: unknown): string {
 
 /** Resolve a model-supplied (workspace-relative) path. Absolute paths pass
  *  through; relative paths are rooted at `workspaceDir` when set (worktree). */
-function resolvePath(ctx: ToolContext | undefined, path: string): string {
+export function resolvePath(ctx: ToolContext | undefined, path: string): string {
   if (path.startsWith('/')) return path;
   const root = ctx?.workspaceDir;
   if (!root) return path;
