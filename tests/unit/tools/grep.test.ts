@@ -64,6 +64,7 @@ describe('grep runLspMode', () => {
   it('lsp-defs formats workspaceSymbol hits (cwd-relative)', async () => {
     vi.mocked(lspForProject).mockResolvedValue({
       getState: () => 'ready',
+      ensureProjectLoaded: async () => undefined,
       workspaceSymbol: async () => [
         { name: 'foo', uri: 'file:///proj/a.ts', line: 3, character: 5 },
       ],
@@ -76,6 +77,7 @@ describe('grep runLspMode', () => {
   it('lsp-refs opens each decl site and lists references', async () => {
     const client = {
       getState: () => 'ready',
+      ensureProjectLoaded: async () => undefined,
       workspaceSymbol: async () => [
         { name: 'foo', uri: 'file:///proj/a.ts', line: 1, character: 17 },
       ],

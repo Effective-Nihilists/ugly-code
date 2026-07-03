@@ -160,6 +160,9 @@ export async function runLspMode(
   if (lsp.getState() !== 'ready') {
     return `(lsp not yet initialized — state=${lsp.getState()}; retry shortly)`;
   }
+  // Ensure the project graph is loaded so workspaceSymbol returns cross-file
+  // results (memoized after the first call).
+  await lsp.ensureProjectLoaded();
   const cwd = projectRoot(ctx);
   const symbols = await lsp.workspaceSymbol(symbol);
   if (symbols.length === 0) {
