@@ -133,10 +133,13 @@ async function detectInstall(projectPath: string): Promise<[string, string[]] | 
  * created had `ugly-app: command not found` on `pnpm dev`/publish and missing `pg`
  * in the Database panel. Now the main session installs too when deps are absent.
  */
-async function ensureDeps(dir: string, onProgress: ProgressFn | undefined, onlyIfMissing: boolean): Promise<void> {
-  if (onlyIfMissing && (await exists(`${dir}/node_modules`))) return;
+// Returns true iff it actually ran an install (so callers can decide whether to
+// surface a "Workspace ready" message — an already-provisioned main session should
+// stay silent rather than spamming the chat on every turn).
+async function ensureDeps(dir: string, onProgress: ProgressFn | undefined, onlyIfMissing: boolean): Promise<boolean> {
+  if (onlyIfMissing && (await exists(`${dir}/node_modules`))) return false;
   const inst = await detectInstall(dir);
-  if (!inst) return;
+  if (!inst) return false;
   onProgress?.('installing', `Installing dependencies (${inst[0]} ${inst[1].join(' ')})…`);
   let tail = '';
   const r = await runProc(inst[0], inst[1], {
@@ -149,6 +152,7 @@ async function ensureDeps(dir: string, onProgress: ProgressFn | undefined, onlyI
     }));
     onProgress?.('error', `Install exited ${r.code} — commands needing deps may fail.`);
   }
+  return true;
 }
 
 /** Resolve (creating if needed) the workspace for a session. Idempotent + cached. */
@@ -205,8 +209,11 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
     // The main session runs against the project dir — ensure its deps are installed
     // (only when node_modules is missing) so `pnpm dev` / publish / the DB panel's
     // `pg` resolve. Without this a never-installed project fails all three.
-    await ensureDeps(projectPath, onProgress, true);
-    onProgress?.('ready', 'Workspace ready.');
+    const installed = await ensureDeps(projectPath, onProgress, true);
+    // Only announce readiness if we actually installed — an already-provisioned
+    // main session must stay silent, or every turn spams "Workspace ready" into
+    // the chat (the onProgress callback renders as an assistant message).
+    if (installed) onProgress?.('ready', 'Workspace ready.');
     return fallback();
   }
 

@@ -24,7 +24,12 @@ export interface QueryFilter {
 }
 
 export const DB_SCRIPT = [
-  "import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import cp from 'node:child_process'; import crypto from 'node:crypto'; import pg from 'pg';",
+  "import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import cp from 'node:child_process'; import crypto from 'node:crypto'; import { createRequire } from 'node:module';",
+  // `pg` is ugly-app's dependency, NOT the project's — a bare `import pg from 'pg'`
+  // fails under pnpm's strict node_modules ("Cannot find package 'pg'"), which broke
+  // EVERY db op (top-level import → whole script won't load). Resolve it through
+  // ugly-app's location, where it's always visible.
+  "const pg = createRequire(import.meta.resolve('ugly-app/server'))('pg');",
   "const mode = process.env.UGLY_DB_MODE, proj = process.env.UGLY_DB_PROJECT, op = process.env.UGLY_DB_OP;",
   "const input = JSON.parse(process.env.UGLY_DB_INPUT || '{}');",
   // ── connection ──────────────────────────────────────────────────────────────
