@@ -110,15 +110,20 @@ export const AGENT_TOOLS: TextGenTool[] = [
   {
     name: 'edit_file',
     description:
-      'Replace an exact substring in a file with new text. `old` must appear exactly once. Use this for small, surgical edits instead of rewriting the whole file.',
+      'Edit a file. Pass exactly ONE mode: `old_string` (+ `new_string`; unique substring, set `replace_all` for every occurrence); `anchor` (a `<n>:<hash>` line anchor from read_file, + `new_content`, replaces that line); `insert_after` (an anchor, + `new_content`, inserts after it); or `range` (e.g. "42:a3..47:b1", + `new_content` to replace, omit to delete). Hash anchors are re-verified — a stale hash returns a diagnostic telling you to re-read.',
     parameters: {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'File path relative to the workspace root.' },
-        old: { type: 'string', description: 'The exact text to replace (must be unique in the file).' },
-        new: { type: 'string', description: 'The replacement text.' },
+        old_string: { type: 'string', description: 'Exact text to replace (string-match mode).' },
+        new_string: { type: 'string', description: 'Replacement text (string-match mode).' },
+        replace_all: { type: 'boolean', description: 'Replace every occurrence of old_string (default: first/unique only).' },
+        anchor: { type: 'string', description: 'A `<n>:<hash>` (or bare line number) anchor to replace that single line.' },
+        insert_after: { type: 'string', description: 'An anchor to insert `new_content` after.' },
+        range: { type: 'string', description: 'An inclusive anchor range, e.g. "42..47" or "42:a3..47:b1".' },
+        new_content: { type: 'string', description: 'Replacement/inserted content for anchor/insert_after/range modes.' },
       },
-      required: ['path', 'old', 'new'],
+      required: ['path'],
       additionalProperties: false,
     },
   },

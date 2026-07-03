@@ -7,6 +7,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { dispatchTool } from '../../client/agent/tools';
+import { annotateLines } from '../../client/agent/tools/hashline';
 import { runAgent, type StepFn } from '../../client/agent/engine';
 import type { AgentMessage } from '../../shared/agent';
 import { mockCalls, mockFiles, resetMock } from '../helpers/uglyNativeMock';
@@ -90,6 +91,42 @@ describe('edit_file', () => {
     );
     // unchanged
     expect(mockFiles().get('y.ts')).toBe('a;\na;\n');
+  });
+
+  it('replace_all replaces every occurrence', async () => {
+    resetMock({ files: { 'y.ts': 'a;\na;\n' } });
+    await dispatchTool('edit_file', { path: 'y.ts', old_string: 'a;', new_string: 'b;', replace_all: true });
+    expect(mockFiles().get('y.ts')).toBe('b;\nb;\n');
+  });
+
+  it('anchor mode replaces a single line (bare line number)', async () => {
+    resetMock({ files: { 'a.ts': 'l1\nl2\nl3\n' } });
+    const out = await dispatchTool('edit_file', { path: 'a.ts', anchor: '2', new_content: 'L2' });
+    expect(out).toMatch(/Edited/);
+    expect(mockFiles().get('a.ts')).toBe('l1\nL2\nl3\n');
+  });
+
+  it('insert_after inserts a line', async () => {
+    resetMock({ files: { 'a.ts': 'l1\nl2\n' } });
+    await dispatchTool('edit_file', { path: 'a.ts', insert_after: '1', new_content: 'X' });
+    expect(mockFiles().get('a.ts')).toBe('l1\nX\nl2\n');
+  });
+
+  it('range mode replaces a range; empty new_content deletes', async () => {
+    resetMock({ files: { 'a.ts': 'l1\nl2\nl3\n' } });
+    await dispatchTool('edit_file', { path: 'a.ts', range: '1..2', new_content: 'Z' });
+    expect(mockFiles().get('a.ts')).toBe('Z\nl3\n');
+    resetMock({ files: { 'b.ts': 'l1\nl2\nl3\n' } });
+    await dispatchTool('edit_file', { path: 'b.ts', range: '2..2' });
+    expect(mockFiles().get('b.ts')).toBe('l1\nl3\n');
+  });
+
+  it('a stale-hash anchor returns a diagnostic and leaves the file unchanged', async () => {
+    resetMock({ files: { 'a.ts': 'l1\nl2\n' } });
+    const wrong = annotateLines('l1\nl2\n')[1].hash === '00' ? '01' : '00';
+    const out = await dispatchTool('edit_file', { path: 'a.ts', anchor: `2:${wrong}`, new_content: 'X' });
+    expect(out).toMatch(/stale hash|failed/i);
+    expect(mockFiles().get('a.ts')).toBe('l1\nl2\n');
   });
 });
 

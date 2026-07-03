@@ -8,7 +8,13 @@ import type { AgentToolName } from '../../shared/agent';
 import type { StepFn } from './engine';
 import { DB_SCRIPT } from '../studio/db/dbScript';
 import { runRegisteredTool } from './tools/registry';
-import { formatHashlineRead } from './tools/hashline';
+import {
+  formatHashlineRead,
+  parseAnchor,
+  parseAnchorRange,
+  applyHashlineOp,
+  type HashlineOp,
+} from './tools/hashline';
 
 /** Project + mode context so tool subprocesses can be OS-user sandboxed by the
  *  daemon. Resolved by the agent loop (clientAgent) per turn. */
@@ -103,13 +109,44 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
     case 'edit_file': {
       const rawPath = String(p.path);
       const path = resolvePath(ctx, rawPath);
-      const oldStr = String(p.old);
-      const newStr = str(p.new ?? '');
       const cur = await native.fs.readFile(path);
+      const newContent = str(p.new_content ?? p.new_string ?? p.new ?? '');
+
+      // ── Hashline anchor modes (from read_file's <n>:<hash> anchors) ──
+      if (p.anchor != null || p.insert_after != null || p.range != null) {
+        let op: HashlineOp | null = null;
+        if (p.range != null) {
+          const range = parseAnchorRange(String(p.range));
+          if (!range) return `edit_file: could not parse range ${JSON.stringify(p.range)} (expected "42..47" or "42:a3..47:b1")`;
+          op = newContent ? { kind: 'replace_range', range, newContent } : { kind: 'delete_range', range };
+        } else if (p.insert_after != null) {
+          const anchor = parseAnchor(p.insert_after as string | number);
+          if (!anchor) return `edit_file: could not parse insert_after anchor ${JSON.stringify(p.insert_after)}`;
+          op = { kind: 'insert_after', anchor, newContent };
+        } else {
+          const anchor = parseAnchor(p.anchor as string | number);
+          if (!anchor) return `edit_file: could not parse anchor ${JSON.stringify(p.anchor)} (expected "42" or "42:a3")`;
+          op = { kind: 'replace_line', anchor, newContent };
+        }
+        const res = applyHashlineOp(cur, op);
+        if (!res.ok) return `edit_file failed: ${res.diagnostic}`;
+        await native.fs.writeFile(path, res.newBody!);
+        return `Edited ${rawPath}`;
+      }
+
+      // ── String-match mode ──
+      const oldStr = String(p.old_string ?? p.old ?? '');
+      if (!oldStr) return 'edit_file: provide one of `old_string`, `anchor`, `insert_after`, or `range`';
+      const newStr = str(p.new_string ?? p.new ?? '');
+      if (p.replace_all) {
+        if (!cur.includes(oldStr)) throw new Error(`edit_file: \`old_string\` not found in ${rawPath}`);
+        await native.fs.writeFile(path, cur.split(oldStr).join(newStr));
+        return `Edited ${rawPath} (all occurrences)`;
+      }
       const idx = cur.indexOf(oldStr);
-      if (idx === -1) throw new Error(`edit_file: \`old\` text not found in ${rawPath}`);
+      if (idx === -1) throw new Error(`edit_file: \`old_string\` not found in ${rawPath}`);
       if (cur.includes(oldStr, idx + oldStr.length))
-        throw new Error(`edit_file: \`old\` text is not unique in ${rawPath} — include more surrounding context`);
+        throw new Error(`edit_file: \`old_string\` is not unique in ${rawPath} — include more surrounding context or use replace_all`);
       await native.fs.writeFile(path, cur.slice(0, idx) + newStr + cur.slice(idx + oldStr.length));
       return `Edited ${rawPath}`;
     }
