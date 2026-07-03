@@ -622,7 +622,14 @@ export const SessionSnapshotSchema = z.object({
   // change (and, pre-first-turn, via the standalone
   // `codebase_readiness` event). Replaces the old
   // `getCodebaseReadiness` polling.
-  codebaseReadiness: CodebaseReadinessSchema,
+  //
+  // Optional/nullable: the client agent OMITS this until the first readiness
+  // event (clientAgent.ts conditionally assigns snap.codebaseReadiness), and the
+  // mount/cast path can send null. It MUST NOT be required — a missing value here
+  // failed safeParse and dropped the ENTIRE session_state snapshot, freezing the
+  // chat input (agent unusable → project deps never installed → preview/db/publish
+  // all fail). The consumer already guards `if (snap.codebaseReadiness !== undefined)`.
+  codebaseReadiness: CodebaseReadinessSchema.nullish(),
 
   /**
    * Eval-mode binding when this session was created from the interactive

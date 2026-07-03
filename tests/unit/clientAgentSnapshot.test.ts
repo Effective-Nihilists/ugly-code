@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { composeSessionSnapshot } from '../../client/studio/agent/clientAgent';
+import { SessionSnapshotSchema } from '../../client/studio/shared/api';
 
 // Regression: the client-side coding agent emits a `session_state` snapshot
 // after every turn. It used to HARDCODE model/modelMode/patternMode to
@@ -60,5 +61,27 @@ describe('composeSessionSnapshot (client-agent telemetry echo)', () => {
     expect(snap.messageCount).toBe(3);
     expect(snap.sessionId).toBe('abc'); // workspace:session split
     expect(snap.compositeId).toBe('cs:abc');
+  });
+
+  // Regression: the client agent OMITS codebaseReadiness until the first
+  // indexer/readiness event (clientAgent.ts: `if (readiness !== undefined)
+  // snap.codebaseReadiness = readiness`). SessionSnapshotSchema used to REQUIRE
+  // it, so every early snapshot failed safeParse and was dropped — the chat's
+  // session state never applied and the input froze (agent unusable → deps never
+  // installed → preview/database/publish all fail). The schema must tolerate an
+  // absent/null codebaseReadiness, matching both the producer and the consumer
+  // (useCodingAgentChat guards `if (snap.codebaseReadiness !== undefined)`).
+  it('validates a snapshot that omits codebaseReadiness (indexer not ready yet)', () => {
+    const snap = composeSessionSnapshot({
+      ...base,
+      model: 'glm_5_1',
+      reasoningEffort: 'medium',
+      permissionMode: 'edit',
+      modelMode: { kind: 'auto' },
+      patternMode: 'auto',
+    });
+    expect(snap.codebaseReadiness).toBeUndefined();
+    const parsed = SessionSnapshotSchema.safeParse(snap);
+    expect(parsed.success).toBe(true);
   });
 });
