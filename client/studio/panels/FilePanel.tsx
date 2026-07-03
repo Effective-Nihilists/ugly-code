@@ -8,6 +8,19 @@ import { useTheme } from '../theme/ThemeProvider';
 import { OpenUriContext } from '../components/LinkifiedText';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { FileIcon } from './navIcons';
+import { CodeMirrorFileEditor, type CmEditorHandle } from '../components/CodeMirrorFileEditor';
+import { ReferencesPanel } from '../components/ReferencesPanel';
+import {
+  runDefinition,
+  runImplementation,
+  runReferences,
+  runHover,
+  type LspResult,
+  type EditorPos,
+} from '../components/editorLsp';
+import { isDirty, externalChangeAction } from '../components/fileEditState';
+
+const MAX_EDITABLE_BYTES = 1_000_000;
 
 function isMarkdown(path: string): boolean {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
@@ -97,6 +110,15 @@ export function FilePanel(): React.ReactElement {
   // picked). Desktop keeps the persistent side-by-side tree.
   const isMobile = useIsMobile();
   const [treeOpen, setTreeOpen] = React.useState(false);
+  // Editing state. `content` holds the last-saved text; `dirtyValue` the live
+  // edited buffer (null = clean). `diskMtime` drives external-change detection.
+  const [dirtyValue, setDirtyValue] = React.useState<string | null>(null);
+  const [diskMtime, setDiskMtime] = React.useState<number | null>(null);
+  const [banner, setBanner] = React.useState(false);
+  const [refs, setRefs] = React.useState<LspResult[] | null>(null);
+  const editorRef = React.useRef<CmEditorHandle>(null);
+  const cur = (): string => dirtyValue ?? content;
+  const dirty = dirtyValue != null && isDirty(dirtyValue, content);
 
   const list = React.useCallback(async (dir: string): Promise<Entry[]> => {
     const ents = await native.fs.readdir(dir);
@@ -141,11 +163,20 @@ export function FilePanel(): React.ReactElement {
     setTreeOpen(false); // mobile: dismiss the file drawer once a file is chosen
     setLoadingFile(true);
     setError(null);
+    setDirtyValue(null);
+    setBanner(false);
+    setRefs(null);
     try {
       const text = await native.fs.readFile(path);
       setContent(text);
       setContentHtml(highlightFile(path, text));
       setMdRaw(false); // markdown opens in rendered view
+      try {
+        const s = await native.fs.stat(path);
+        setDiskMtime(s.mtimeMs);
+      } catch {
+        setDiskMtime(null);
+      }
     } catch (e) {
       setContent('');
       setContentHtml('');
@@ -154,6 +185,101 @@ export function FilePanel(): React.ReactElement {
       setLoadingFile(false);
     }
   }, []);
+
+  const save = React.useCallback(async () => {
+    if (!selected || dirtyValue == null) return;
+    await native.fs.writeFile(selected, dirtyValue);
+    setContent(dirtyValue);
+    setContentHtml(highlightFile(selected, dirtyValue));
+    setDirtyValue(null);
+    try {
+      const s = await native.fs.stat(selected);
+      setDiskMtime(s.mtimeMs);
+    } catch {
+      /* ignore */
+    }
+  }, [selected, dirtyValue]);
+
+  // Detect external writes (e.g. the coding agent editing the open file).
+  React.useEffect(() => {
+    if (!selected || diskMtime == null) return;
+    const id = setInterval(() => {
+      void (async () => {
+        try {
+          const s = await native.fs.stat(selected);
+          if (s.mtimeMs === diskMtime) return;
+          const action = externalChangeAction({
+            dirty: dirtyValue != null && isDirty(dirtyValue, content),
+            mtimeChanged: true,
+          });
+          if (action === 'reload') {
+            const text = await native.fs.readFile(selected);
+            setContent(text);
+            setContentHtml(highlightFile(selected, text));
+            setDirtyValue(null);
+            setDiskMtime(s.mtimeMs);
+          } else if (action === 'banner') {
+            setBanner(true);
+          }
+        } catch {
+          /* file gone / unreadable — ignore */
+        }
+      })();
+    }, 2000);
+    return () => clearInterval(id);
+  }, [selected, diskMtime, dirtyValue, content]);
+
+  // ── LSP navigation ──
+  const navTo = React.useCallback(
+    async (r: LspResult) => {
+      if (r.path !== selected) await openFile(r.path);
+      // openFile remounts the editor on the new value; reveal after that.
+      requestAnimationFrame(() => editorRef.current?.revealLine(r.line));
+    },
+    [selected, openFile],
+  );
+  const onDefinition = async (pos: EditorPos): Promise<void> => {
+    if (!selected) return;
+    const hits = await runDefinition(selected, pos, cur(), root);
+    if (hits[0]) await navTo(hits[0]);
+  };
+  const onImplementation = async (pos: EditorPos): Promise<void> => {
+    if (!selected) return;
+    const hits = await runImplementation(selected, pos, cur(), root);
+    if (hits[0]) await navTo(hits[0]);
+  };
+  const onReferences = async (pos: EditorPos): Promise<void> => {
+    if (!selected) return;
+    setRefs(await runReferences(selected, pos, cur(), root));
+  };
+  const hoverAt = (pos: EditorPos): Promise<string | null> =>
+    selected ? runHover(selected, pos, cur(), root) : Promise.resolve(null);
+
+  const reloadFromDisk = React.useCallback(async () => {
+    if (!selected) return;
+    const text = await native.fs.readFile(selected);
+    setContent(text);
+    setContentHtml(highlightFile(selected, text));
+    setDirtyValue(null);
+    setBanner(false);
+    try {
+      const s = await native.fs.stat(selected);
+      setDiskMtime(s.mtimeMs);
+    } catch {
+      /* ignore */
+    }
+  }, [selected]);
+
+  const keepMine = React.useCallback(async () => {
+    if (!selected) return;
+    try {
+      const s = await native.fs.stat(selected);
+      setDiskMtime(s.mtimeMs);
+    } catch {
+      /* ignore */
+    }
+    setBanner(false);
+  }, [selected]);
 
   const renderDir = (dir: string, depth: number): React.ReactNode => {
     const ents = open[dir] ?? [];
@@ -219,9 +345,13 @@ export function FilePanel(): React.ReactElement {
             {selected ? (
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {selected.startsWith(root) ? selected.slice(root.length + 1) : selected}
+                {dirty && <span data-id="file-dirty" title="Unsaved changes" style={{ color: 'var(--accent)', marginLeft: 6 }}>●</span>}
               </span>
             ) : (
               <span style={{ flex: 1 }} />
+            )}
+            {selected && dirty && (
+              <button data-id="file-save" onClick={() => void save()} style={S.saveBtn}>Save ⌘S</button>
             )}
             {selected && isMarkdown(selected) && !loadingFile && (
               <div style={S.segmented}>
@@ -231,18 +361,40 @@ export function FilePanel(): React.ReactElement {
             )}
           </div>
         )}
+        {banner && selected && (
+          <div data-id="file-external-change" style={S.banner}>
+            <span>Changed on disk.</span>
+            <button data-id="file-reload" onClick={() => void reloadFromDisk()} style={S.bannerBtn}>Reload</button>
+            <button data-id="file-keep-mine" onClick={() => void keepMine()} style={S.bannerBtn}>Keep mine</button>
+          </div>
+        )}
         {selected ? (
           loadingFile ? (
             <pre style={S.code}>Loading…</pre>
           ) : isMarkdown(selected) && !mdRaw ? (
             content ? <MarkdownView text={content} /> : <div style={S.empty}>(empty file)</div>
-          ) : (
+          ) : content.length > MAX_EDITABLE_BYTES ? (
             <pre style={S.code}>
               <code className="hljs" style={{ background: 'transparent', padding: 0 }} dangerouslySetInnerHTML={{ __html: contentHtml || '(empty file)' }} />
             </pre>
+          ) : (
+            <CodeMirrorFileEditor
+              ref={editorRef}
+              path={selected}
+              value={cur()}
+              onChange={(next) => setDirtyValue(next)}
+              onSave={() => void save()}
+              onDefinition={(p) => void onDefinition(p)}
+              onImplementation={(p) => void onImplementation(p)}
+              onReferences={(p) => void onReferences(p)}
+              hoverAt={hoverAt}
+            />
           )
         ) : (
           <div style={S.empty}>Select a file to view its contents.</div>
+        )}
+        {refs && (
+          <ReferencesPanel results={refs} onPick={(r) => void navTo(r)} onClose={() => setRefs(null)} />
         )}
         {error && <div style={S.error}>{error}</div>}
       </div>
@@ -268,6 +420,9 @@ const S: Record<string, React.CSSProperties> = {
   segmented: { display: 'inline-flex', flexShrink: 0, gap: 1, padding: 2, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6 },
   seg: { fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', background: 'transparent', border: 'none', borderRadius: 4, padding: '2px 9px', cursor: 'pointer' },
   segActive: { background: 'var(--bg-primary)', color: 'var(--accent)' },
+  saveBtn: { flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--accent)', background: 'var(--accent-dim)', border: '1px solid var(--accent)', borderRadius: 6, padding: '2px 10px', cursor: 'pointer' },
+  banner: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '6px 14px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' },
+  bannerBtn: { fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)', background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 10px', cursor: 'pointer' },
   code: { flex: 1, minHeight: 0, overflow: 'auto', margin: 0, padding: 14, fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.6, color: 'var(--text-primary)', whiteSpace: 'pre', tabSize: 2 },
   empty: { padding: 24, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)' },
   error: { padding: '8px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--error)', borderTop: '1px solid var(--border)' },
