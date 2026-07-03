@@ -93,7 +93,7 @@ export default function StudioShell(): React.ReactElement {
   React.useEffect(() => {
     type GrantReq = Parameters<typeof permissions.request>[0];
     void permissions
-      .request({ process: ['bash', 'node', 'git', 'npm', 'npx', 'pnpm', 'uv'] } as unknown as GrantReq)
+      .request({ process: ['bash', 'node', 'git', 'curl', 'npm', 'npx', 'pnpm', 'uv'] } as unknown as GrantReq)
       .catch(() => undefined);
   }, []);
 
