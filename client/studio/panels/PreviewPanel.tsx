@@ -1,6 +1,6 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
-import { sessionPort, ensureSessionWorkspace } from '../agent/sessionWorkspace';
+import { sessionPort } from '../agent/sessionWorkspace';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { devServerSpawn } from './devServerCmd';
 import { persistDevLog, flushDevLog } from './devServerLog';
@@ -78,7 +78,7 @@ function startTunnel(d: DevServer, projectPath: string, port: number): void {
   }
 }
 
-async function startDev(key: string, projectPath: string, port: number, sessionId: string | null): Promise<void> {
+function startDev(key: string, projectPath: string, port: number): void {
   const d = getDev(key, port);
   d.stopping = true; // killing any prior proc below is intentional, not a crash
   if (d.proc) { try { d.proc.kill(); } catch { /* already gone */ } }
@@ -86,27 +86,12 @@ async function startDev(key: string, projectPath: string, port: number, sessionI
   d.running = true;
   d.port = port;
   notify(d);
+  d.log = `$ pnpm dev  (PORT=${port})\n`;
   d.stopping = false;
-  // Provision the session workspace BEFORE `pnpm dev` — this installs the project's
-  // node_modules if missing (main session included). Without it a never-installed
-  // project fails with `ugly-app: command not found` / "node_modules missing". Use
-  // the workspace dir (worktree or the project) so the right toolchain is on PATH.
-  let cwd = projectPath;
-  d.log = `$ Preparing workspace (installing dependencies if needed)…\n`;
-  notify(d);
-  try {
-    const ws = await ensureSessionWorkspace(sessionId ?? key, projectPath);
-    if (ws.dir) cwd = ws.dir;
-  } catch (e) {
-    d.log += `[workspace prep failed: ${e instanceof Error ? e.message : String(e)} — trying project dir]\n`;
-  }
-  if (!d.running || d.proc) return; // stopped or superseded by a restart during prep
-  d.log += `$ pnpm dev  (PORT=${port})\n`;
-  notify(d);
   const spec = devServerSpawn(port);
   const cmdStr = `${spec.cmd} ${spec.args.join(' ')}`;
   try {
-    const p = native.process.spawn(spec.cmd, spec.args, { cwd, env: spec.env });
+    const p = native.process.spawn(spec.cmd, spec.args, { cwd: projectPath, env: spec.env });
     d.proc = p;
     p.onStdout((c) => { d.log = (d.log + c).slice(-12000); notify(d); void persistDevLog(projectPath, d.log); });
     p.onStderr((c) => { d.log = (d.log + c).slice(-12000); notify(d); void persistDevLog(projectPath, d.log); });
@@ -114,7 +99,7 @@ async function startDev(key: string, projectPath: string, port: number, sessionI
       if (d.proc !== p) return; // superseded by a restart — ignore the stale proc
       // Ship spawn failures to the error telemetry (browser Logger → errorLog); the
       // in-panel log alone isn't visible when the host is a remote/other machine.
-      console.error('[PreviewPanel:dev-server-error]', JSON.stringify({ cmd: cmdStr, cwd, port, error: String(e) }));
+      console.error('[PreviewPanel:dev-server-error]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, error: String(e) }));
       d.log = (d.log + `\n[error: ${e}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d); void flushDevLog(projectPath, d.log);
     });
     p.onExit((code) => {
@@ -123,15 +108,15 @@ async function startDev(key: string, projectPath: string, port: number, sessionI
       // command not found` when the host lacks pnpm on PATH. Log it WITH the boot-log
       // tail (carries the shell's error text) so it's debuggable from another machine.
       if (!d.stopping && code !== 0 && code != null) {
-        console.error('[PreviewPanel:dev-server-exit]', JSON.stringify({ cmd: cmdStr, cwd, port, code, logTail: d.log.slice(-1500) }));
+        console.error('[PreviewPanel:dev-server-exit]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, code, logTail: d.log.slice(-1500) }));
       }
       d.log = (d.log + `\n[dev server exited ${code ?? ''}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d);
     });
     // Publish it to a public https URL so the mobile preview can reach it.
-    startTunnel(d, cwd, port);
+    startTunnel(d, projectPath, port);
   } catch (e) {
     // Synchronous throw — e.g. NativeUnavailable when no host shell is wired.
-    console.error('[PreviewPanel:dev-server-threw]', JSON.stringify({ cmd: cmdStr, cwd, port, error: e instanceof Error ? e.message : String(e) }));
+    console.error('[PreviewPanel:dev-server-threw]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, error: e instanceof Error ? e.message : String(e) }));
     d.log += `[error: ${(e as Error).message}]\n`;
     d.running = false;
     notify(d);
@@ -201,7 +186,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   const startOrRestart = React.useCallback(() => {
     const proj = getActiveProjectPath();
     if (!proj) { setShowLog(true); return; }
-    void startDev(devKey, proj, port, sessionId ?? null);
+    startDev(devKey, proj, port);
     setShowLog(true);
     // Give the dev server a moment to bind, then point the preview at it + reload.
     const target = `http://localhost:${port}`;
