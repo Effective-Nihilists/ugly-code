@@ -11,8 +11,56 @@
 
 import path from 'path';
 import { LspClient, type LspLanguage } from './client.js';
+import type { LspEventEnvelope } from './client.js';
+import type { LspStatusSnapshot } from '../../shared/api';
 
 export type EditorLspLanguage = LspLanguage;
+
+// ── Editor LSP status surface ────────────────────────────────────────────
+// Every editor client created here reports its lifecycle + diagnostic events
+// into one aggregate status snapshot that the chat header subscribes to.
+// "Last event wins" — for v1 (typescript only) there's effectively one client
+// per workspace, so the aggregate is unambiguous.
+
+const IDLE_STATUS: LspStatusSnapshot = {
+  state: 'idle',
+  errors: 0,
+  warnings: 0,
+  lastUpdatedAt: null,
+};
+
+let currentStatus: LspStatusSnapshot = IDLE_STATUS;
+const statusListeners = new Set<(s: LspStatusSnapshot) => void>();
+
+/** Pure: fold an `lsp_event` envelope into a status snapshot. */
+export function statusFromEvent(
+  e: LspEventEnvelope,
+  now: number,
+): LspStatusSnapshot {
+  const p = e.payload.payload;
+  return {
+    state: p.state,
+    errors: p.totalErrors ?? 0,
+    warnings: p.totalWarnings ?? 0,
+    lastUpdatedAt: now,
+    ...(p.message !== undefined ? { lastMessage: p.message } : {}),
+  };
+}
+
+function publishStatus(next: LspStatusSnapshot): void {
+  currentStatus = next;
+  for (const l of [...statusListeners]) l(next);
+}
+
+/** Subscribe to the aggregate editor LSP status. Fires the current snapshot
+ *  immediately, then on every change. Returns an unsubscribe. */
+export function subscribeEditorLspStatus(
+  cb: (s: LspStatusSnapshot) => void,
+): () => void {
+  cb(currentStatus);
+  statusListeners.add(cb);
+  return () => statusListeners.delete(cb);
+}
 
 export function languageIdForPath(filePath: string): EditorLspLanguage | null {
   const lower = filePath.toLowerCase();
@@ -50,6 +98,9 @@ export async function getEditorLspClient(
   let client = clients.get(k);
   if (!client) {
     client = new LspClient({ workspaceRoot, language });
+    // Feed this client's lifecycle + diagnostics into the aggregate status
+    // the chat header renders.
+    client.onEvent((e) => publishStatus(statusFromEvent(e, Date.now())));
     clients.set(k, client);
   }
   // start() is idempotent; safe to call repeatedly.
@@ -68,5 +119,6 @@ export async function getEditorLspClient(
 export async function shutdownAllEditorLspClients(): Promise<void> {
   const entries = Array.from(clients.values());
   clients.clear();
+  publishStatus(IDLE_STATUS);
   await Promise.all(entries.map((c) => c.shutdown().catch(() => undefined)));
 }

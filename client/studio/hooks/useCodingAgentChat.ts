@@ -5,6 +5,7 @@ import { spliceMissingUserRows } from '../agent/messageBackfill';
 import { parseCodebaseReadinessEvent } from '../agent/codebaseReadinessEvent';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { onCustomMessage } from './useSocket';
+import { subscribeEditorLspStatus } from '../agent/lsp/registry';
 
 export interface ToolUse {
   id: string;
@@ -1241,6 +1242,21 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     warnings: 0,
     lastUpdatedAt: null,
   });
+  // The editor language server (registry-owned, spawned on the first
+  // go-to-definition/hover) drives this indicator now — the old agent-side
+  // diagnostics client was removed with the coding backend. Reflect its
+  // lifecycle + error/warning totals on the chat header.
+  useEffect(() => {
+    return subscribeEditorLspStatus((s) => {
+      setLspStatus({
+        state: s.state,
+        errors: s.errors,
+        warnings: s.warnings,
+        lastUpdatedAt: s.lastUpdatedAt,
+        ...(s.lastMessage !== undefined ? { lastMessage: s.lastMessage } : {}),
+      });
+    });
+  }, []);
   // Codebase-analysis readiness pushed via `session_state`. Updated
   // whenever the server's IndexerWatcher / ArchitectureManager emits
   // a state change, so the chat strip is always live without polling.
