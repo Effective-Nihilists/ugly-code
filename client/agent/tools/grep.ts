@@ -7,6 +7,7 @@
 import type { TextGenTool } from 'ugly-app/shared';
 import { installUglyNative } from 'ugly-app/native';
 import { formatSearchResult, type SearchResponse } from './searchResponse';
+import { drainDirty } from './codebaseDirty';
 import type { ToolModule } from './registry';
 import type { ToolContext } from '../tools';
 import { projectRoot, lspForProject } from './lspForProject';
@@ -54,6 +55,20 @@ async function runIndexSearch(
 ): Promise<string> {
   const projectPath = ctx?.projectDir ?? '';
   if (!projectPath) return `grep mode=${mode} unavailable: no project is open.`;
+  // Freshness: push this session's edits into the index before searching, so
+  // fts/semantic/mixed reflect the agent's own uncommitted changes.
+  const dirtyFiles = ctx?.sessionId ? drainDirty(ctx.sessionId) : [];
+  if (dirtyFiles.length) {
+    try {
+      await installUglyNative().invoke('codebase.update' as never, {
+        projectPath,
+        files: dirtyFiles,
+        ...(ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : {}),
+      } as never);
+    } catch {
+      /* best-effort freshness — search proceeds on the current index */
+    }
+  }
   const resp = (await installUglyNative().invoke('codebase.search' as never, {
     projectPath,
     mode,

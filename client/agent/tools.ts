@@ -10,6 +10,7 @@ import { DB_SCRIPT } from '../studio/db/dbScript';
 import { runRegisteredTool } from './tools/registry';
 import { formatHashlineRead } from './tools/hashline';
 import { applyEdit, type EditOp } from './tools/applyEdit';
+import { markDirty } from './tools/codebaseDirty';
 
 /** Project + mode context so tool subprocesses can be OS-user sandboxed by the
  *  daemon. Resolved by the agent loop (clientAgent) per turn. */
@@ -118,6 +119,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
     case 'write': {
       const abs = resolvePath(ctx, String(p.path));
       await native.fs.writeFile(abs, str(p.content ?? ''));
+      if (ctx?.sessionId) markDirty(ctx.sessionId, abs);
       return `Wrote ${relativizePath(ctx, abs)}`;
     }
     case 'edit': {
@@ -135,6 +137,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       const r = applyEdit(cur, op);
       if (!r.ok) return `edit failed in ${relativizePath(ctx, path)}: ${r.error}`;
       await native.fs.writeFile(path, r.body!);
+      if (ctx?.sessionId) markDirty(ctx.sessionId, path);
       return `Edited ${relativizePath(ctx, path)}`;
     }
     case 'bash':

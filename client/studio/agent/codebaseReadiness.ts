@@ -18,11 +18,17 @@ const pollers = new Map<string, ReturnType<typeof setInterval>>();
 const inv = (channel: string, payload: unknown): Promise<unknown> =>
   installUglyNative().invoke(channel as never, payload as never);
 
-/** Kick off indexing + poll readiness every 1.5s until both surfaces settle. */
+// Sessions whose worktree overlay has been reconciled once (on first 'ready').
+const reconciled = new Set<string>();
+
+/** Kick off indexing + poll readiness every 1.5s until both surfaces settle.
+ *  When a `worktreeRoot` is given, repair its overlay against on-disk state
+ *  once the base index reports ready (semantic-search freshness). */
 export function startCodebasePoll(
   sessionId: string,
   cwd: string,
   onReadiness: (r: CodebaseReadiness) => void,
+  worktreeRoot?: string,
 ): void {
   if (!cwd || pollers.has(sessionId)) return;
   void inv('codebase.ensureIndex', { projectPath: cwd }).catch(() => undefined);
@@ -31,6 +37,10 @@ export function startCodebasePoll(
       const r = (await inv('codebase.status', { projectPath: cwd })) as CodebaseReadiness;
       onReadiness(r);
       const idx = r.indexer?.status;
+      if (idx === 'ready' && worktreeRoot && worktreeRoot !== cwd && !reconciled.has(sessionId)) {
+        reconciled.add(sessionId);
+        void inv('codebase.reconcile', { projectPath: cwd, worktreeRoot }).catch(() => undefined);
+      }
       const arch = r.architecture?.status;
       const idxDone = idx === 'ready' || idx === 'error';
       const archDone = !arch || arch === 'ready' || arch === 'failed';
@@ -50,6 +60,7 @@ export function stopCodebasePoll(sessionId: string): void {
     clearInterval(t);
     pollers.delete(sessionId);
   }
+  reconciled.delete(sessionId);
 }
 
 /** Read the host-generated ARCHITECTURE.md for a project (null if absent/not built yet).

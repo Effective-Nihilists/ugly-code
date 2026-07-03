@@ -503,6 +503,9 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
  */
 export function ensureCodebaseAnalysis(sessionId: string, emit: Emit): void {
   const cwd = getActiveProjectPath() ?? '';
+  // Worktree-isolated sessions reconcile their overlay against disk once ready.
+  const ws = getSessionWorkspace(sessionId);
+  const worktreeRoot = ws?.isWorktree ? ws.dir : undefined;
   startCodebasePoll(sessionId, cwd, (r) => {
     codebaseReadinessBySession.set(sessionId, r as SessionSnapshot['codebaseReadiness']);
     safeEmit(emit, {
@@ -516,7 +519,7 @@ export function ensureCodebaseAnalysis(sessionId: string, emit: Emit): void {
         if (doc) architectureDocBySession.set(sessionId, doc);
       });
     }
-  });
+  }, worktreeRoot);
 }
 
 function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection): SessionAgentState {

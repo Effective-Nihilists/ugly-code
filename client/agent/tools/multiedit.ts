@@ -8,6 +8,7 @@ import { native } from 'ugly-app/native';
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
 import { resolvePath } from '../tools';
+import { markDirty } from './codebaseDirty';
 import { applyEdit, type EditOp } from './applyEdit';
 
 interface MultieditArgs {
@@ -77,6 +78,7 @@ export const multieditTool: ToolModule = {
       content = r.body!;
     }
     await native.fs.writeFile(abs, content);
+    if (ctx?.sessionId) markDirty(ctx.sessionId, abs);
     return `Applied ${args.edits.length} edit(s) to ${rawPath}`;
   },
 };
