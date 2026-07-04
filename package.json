@@ -11,7 +11,6 @@
     "db:migrate": "ugly-app db:migrate",
     "db:schema-gen": "ugly-app db:schema-gen",
     "db:schema-status": "ugly-app db:schema-status",
-    "deploy": "ugly-app publish",
     "prod": "ugly-app prod",
     "versions": "ugly-app versions",
     "versions:prune": "ugly-app versions:prune",
@@ -29,7 +28,8 @@
     "textGen": "ugly-app textGen",
     "imageGen": "ugly-app imageGen",
     "upgrade": "node -e \"const e=require('child_process').execSync,x=require('fs').existsSync,g=require('fs').readdirSync;g('node_modules').filter(f=>f.startsWith('.ugly-app-')).forEach(f=>require('fs').rmSync('node_modules/'+f,{recursive:true,force:true}));e(x('yarn.lock')?'yarn add ugly-app@latest':x('pnpm-lock.yaml')?'pnpm add ugly-app@latest':'npm install ugly-app@latest',{stdio:'inherit'});e('node node_modules/ugly-app/dist/cli/index.js upgrade',{stdio:'inherit'})\"",
-    "build:tasks": "ugly-app build:tasks"
+    "build:tasks": "ugly-app build:tasks",
+    "publish": "ugly-app publish"
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
