@@ -194,7 +194,13 @@ function BrowseView({ mode, writes }: { mode: DbMode; writes: boolean }) {
     socket
       .request('dbCollections', { mode })
       .then((res) => { setCollections(res.collections); })
-      .catch((e: unknown) => { setError(e instanceof Error ? e.message : String(e)); })
+      .catch((e: unknown) => {
+        // → errorLog (browser Logger); the panel's in-view error box is invisible
+        // when the host is another machine. This is the panel's initial load, so
+        // it's the most common "database panel failed".
+        console.error('[DatabasePanel:dbCollections]', JSON.stringify({ mode, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+        setError(e instanceof Error ? e.message : String(e));
+      })
       .finally(() => { setLoading(false); });
   }, [mode, socket]);
 
@@ -257,6 +263,7 @@ function CollectionDetail({
         setResult(res);
         setPage(toPage);
       } catch (e: unknown) {
+        console.error('[DatabasePanel:dbGetQuery]', JSON.stringify({ mode, collection, filters: filters.filter((f) => f.field.trim()), sort: { field: sortField, dir: sortDir }, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
         setError(e instanceof Error ? e.message : String(e));
         setResult(null);
       } finally {
@@ -283,6 +290,7 @@ function CollectionDetail({
         await socket.request('dbMutate', { mode, collection, action: 'delete', id, allowWrite: true });
         void run(page);
       } catch (e: unknown) {
+        console.error('[DatabasePanel:dbMutate:delete]', JSON.stringify({ mode, collection, id, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
         setError(e instanceof Error ? e.message : String(e));
       }
     },
@@ -471,7 +479,7 @@ function DocEditorModal({
     setSaving(true);
     setError(null);
     try { await onSave(doc); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); setSaving(false); }
+    catch (e: unknown) { console.error('[DatabasePanel:dbMutate:saveDoc]', JSON.stringify({ title, id: typeof doc._id === 'string' ? doc._id : undefined, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined); setError(e instanceof Error ? e.message : String(e)); setSaving(false); }
   }, [text, onSave]);
 
   return (
@@ -541,6 +549,7 @@ function SqlConsole({ mode, writes, onWantWrites }: { mode: DbMode; writes: bool
         setResult(res);
         pushHistory(q);
       } catch (e: unknown) {
+        console.error('[DatabasePanel:dbExec]', JSON.stringify({ mode, sql: q, allowWrite: writes, force, dryRun, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
         setError(e instanceof Error ? e.message : String(e));
         setResult(null);
       } finally {
@@ -605,7 +614,7 @@ function SchemaView({ mode }: { mode: DbMode }) {
   useEffect(() => {
     socket.request('dbCollections', { mode })
       .then((res) => { setCollections(res.collections); if (!selected && res.collections[0]) setSelected(res.collections[0].name); })
-      .catch((e: unknown) => { setError(e instanceof Error ? e.message : String(e)); });
+      .catch((e: unknown) => { console.error('[DatabasePanel:dbCollections:schema]', JSON.stringify({ mode, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined); setError(e instanceof Error ? e.message : String(e)); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
@@ -615,7 +624,7 @@ function SchemaView({ mode }: { mode: DbMode }) {
     setError(null);
     socket.request('dbSchema', { mode, collection: selected })
       .then(setSchema)
-      .catch((e: unknown) => { setError(e instanceof Error ? e.message : String(e)); });
+      .catch((e: unknown) => { console.error('[DatabasePanel:dbSchema]', JSON.stringify({ mode, collection: selected, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined); setError(e instanceof Error ? e.message : String(e)); });
     void loadTsInterface(selected).then(setTsType);
   }, [selected, mode, socket]);
 

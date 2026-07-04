@@ -138,7 +138,7 @@ export function FilePanel(): React.ReactElement {
     setContentHtml('');
     void list(root)
       .then((ents) => { if (!cancelled) setOpen({ [root]: ents }); })
-      .catch((e: unknown) => { if (!cancelled) setError(String(e)); });
+      .catch((e: unknown) => { console.error('[FilePanel:loadRoot]', JSON.stringify({ root, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined); if (!cancelled) setError(String(e)); });
     return () => { cancelled = true; };
   }, [root, list]);
 
@@ -154,6 +154,7 @@ export function FilePanel(): React.ReactElement {
         const ents = await list(dir);
         setOpen((prev) => ({ ...prev, [dir]: ents }));
       } catch (e) {
+        console.error('[FilePanel:toggleDir]', JSON.stringify({ dir, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
         setError(String(e));
       }
     }
@@ -179,6 +180,7 @@ export function FilePanel(): React.ReactElement {
         setDiskMtime(null);
       }
     } catch (e) {
+      console.error('[FilePanel:openFile]', JSON.stringify({ path, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setContent('');
       setContentHtml('');
       setError(`Could not read ${path}: ${String(e)}`);

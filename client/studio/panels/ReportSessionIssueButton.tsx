@@ -123,6 +123,7 @@ export function ReportSessionIssueButton({
       setDone(reportId);
       setTimeout(() => { setOpen(false); }, 1800);
     } catch (e) {
+      console.error('[ReportSessionIssueButton:submitIssue]', JSON.stringify({ compositeId, issueType: type, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSubmitting(false);

@@ -45,6 +45,14 @@ export function CodebaseSearch({ onOpen }: { onOpen: (path: string, line: number
         setState({ kind: 'response', resp });
       }
     } catch (e) {
+      // Ship to errorLog (browser Logger → errorLog) so a "search failed" is
+      // diagnosable remotely — the in-panel error text alone is invisible when
+      // the host is another machine. Carries mode/query/projectPath + stack.
+      console.error(
+        '[CodebaseSearch:search]',
+        JSON.stringify({ mode, query: q, projectPath, limit, error: e instanceof Error ? e.message : String(e) }),
+        e instanceof Error ? e.stack : undefined,
+      );
       setState({ kind: 'error', error: (e as Error).message });
     }
   }, [query, mode]);

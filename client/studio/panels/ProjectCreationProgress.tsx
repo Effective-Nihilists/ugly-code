@@ -73,6 +73,7 @@ export function ProjectCreationProgress({
       proc.onError((e) => {
         if (settled) return;
         settled = true;
+        console.error('[ProjectCreationProgress:createProject:procError]', JSON.stringify({ name, parentDir, error: e }));
         setStatus('error');
         setError(e);
       });
@@ -88,6 +89,7 @@ export function ProjectCreationProgress({
         }
       });
     } catch (e) {
+      console.error('[ProjectCreationProgress:createProject]', JSON.stringify({ name, parentDir, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setStatus('error');
       setError((e as Error).message);
     }

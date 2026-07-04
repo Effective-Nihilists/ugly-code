@@ -216,6 +216,7 @@ export function ProjectOnboarding({
         setShowEvalPicker(false);
         onProjectOpen(created.projectName, created.projectPath);
       } catch (err) {
+        console.error('[ProjectOnboarding:evalCreateProject]', JSON.stringify({ taskName, taskId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setEvalError((err as Error).message);
       } finally {
         setEvalSubmitting(false);
@@ -238,6 +239,7 @@ export function ProjectOnboarding({
         setShowEvalPicker(false);
         onProjectOpen(result.name, result.path);
       } catch (err) {
+        console.error('[ProjectOnboarding:openProject:evalRun]', JSON.stringify({ projectName, projectPath, sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setEvalError(`Failed to open prior run: ${(err as Error).message}`);
       } finally {
         setEvalSubmitting(false);
@@ -338,6 +340,7 @@ export function ProjectOnboarding({
         onProjectOpen(result.name, result.path);
       } catch (err) {
         const msg = (err as Error).message;
+        console.error('[ProjectOnboarding:openProject:recent]', JSON.stringify({ path: project.path, deviceId: project.deviceId, error: msg }), err instanceof Error ? err.stack : undefined);
         if (
           msg.includes('ENOENT') ||
           msg.includes('no such file') ||
@@ -378,6 +381,7 @@ export function ProjectOnboarding({
       });
       onProjectOpen(result.name, result.path);
     } catch (err) {
+      console.error('[ProjectOnboarding:openProject:folder]', JSON.stringify({ path: openPath.trim(), error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setError(`Failed to open project: ${(err as Error).message}`);
     } finally {
       setLoading(false);
@@ -396,6 +400,7 @@ export function ProjectOnboarding({
       const result = await apiRequest<OpenedProject>('cloneProject', input);
       onProjectOpen(result.name, result.path);
     } catch (err) {
+      console.error('[ProjectOnboarding:cloneProject]', JSON.stringify({ url: cloneUrl.trim(), parentDir: cloneDir.trim() || undefined, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setError(`Failed to clone repository: ${(err as Error).message}`);
     } finally {
       setLoading(false);

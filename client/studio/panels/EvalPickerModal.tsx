@@ -76,6 +76,7 @@ export function EvalPickerModal({
       } catch (err) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (cancelled) return;
+        console.error('[EvalPickerModal:evalListTasks]', JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setError(err instanceof Error ? err.message : 'failed to load tasks');
       }
     })();
@@ -89,6 +90,7 @@ export function EvalPickerModal({
       await socket.request('evalDeleteRun', { projectName });
       setHistory((prev) => prev.filter((r) => r.projectName !== projectName));
     } catch (err) {
+      console.error('[EvalPickerModal:evalDeleteRun]', JSON.stringify({ projectName, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setError(err instanceof Error ? err.message : 'failed to delete run');
     }
   };

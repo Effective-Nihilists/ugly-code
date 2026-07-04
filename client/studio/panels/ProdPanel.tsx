@@ -61,6 +61,9 @@ export function ProdPanel(): React.ReactElement {
       const ua = JSON.parse(await native.fs.readFile(`${cwd}/.uglyapp`)) as { deployTarget?: DeployTarget };
       setTarget(ua.deployTarget ?? null);
     } catch {
+      // Benign + expected: an unpublished project has no `.uglyapp` yet (ENOENT),
+      // and setTarget(null) is the correct "no deploy target" state. Logging here
+      // would spam errorLog for every unpublished project — deliberately silent.
       setTarget(null);
     }
   }, []);
@@ -113,6 +116,7 @@ export function ProdPanel(): React.ReactElement {
         else setError(`publish exited with code ${code ?? 'null'}`);
       });
     } catch (e) {
+      console.error('[ProdPanel:deploy]', JSON.stringify({ cwd, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setError((e as Error).message);
       setRunning(false);
     }
