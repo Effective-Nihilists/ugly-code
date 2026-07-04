@@ -4,7 +4,7 @@
  * `pnpm dev` runs the project's dev script (`ugly-app dev --watch`); PORT makes it bind the
  * session's preview port. NO_COLOR/FORCE_COLOR keep the captured boot log free of ANSI.
  */
-export function devServerSpawn(port: number): { cmd: string; args: string[]; env: Record<string, string> } {
+export function devServerSpawn(port: number, databaseUrl?: string): { cmd: string; args: string[]; env: Record<string, string> } {
   // Install deps first when the project was never set up (node_modules missing),
   // THEN run the dev script — otherwise `pnpm dev` → `ugly-app dev` fails with
   // `ugly-app: command not found` (the CLI lives in node_modules/.bin). Done inside
@@ -24,9 +24,20 @@ export function devServerSpawn(port: number): { cmd: string; args: string[]; env
   const freePort =
     `command -v lsof >/dev/null 2>&1 && ` +
     `{ lsof -ti tcp:${port} 2>/dev/null | xargs -I{} kill {} 2>/dev/null; sleep 0.5; } || true`;
+  // Inject the SAME bundled-postgres DATABASE_URL the Database panel + agent use
+  // (the session workspace's `databaseUrl`). Without it, `ugly-app dev` finds no
+  // connection string, so its startup `runMigrations()` no-ops (initPg returns
+  // early) — tables are never created, and the Database panel (which DOES boot the
+  // bundled pg) then reads an empty database. Passing it makes the dev server init
+  // its schema in the exact db the panel inspects, so "start dev → data appears".
   return {
     cmd: 'bash',
     args: ['-lc', `${freePort}; ${ensureDeps}; pnpm dev`],
-    env: { PORT: String(port), FORCE_COLOR: '0', NO_COLOR: '1' },
+    env: {
+      PORT: String(port),
+      FORCE_COLOR: '0',
+      NO_COLOR: '1',
+      ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+    },
   };
 }

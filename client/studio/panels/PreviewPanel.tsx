@@ -1,6 +1,6 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
-import { sessionPort } from '../agent/sessionWorkspace';
+import { sessionPort, getSessionWorkspace } from '../agent/sessionWorkspace';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { devServerSpawn } from './devServerCmd';
 import { persistDevLog, flushDevLog } from './devServerLog';
@@ -79,7 +79,7 @@ function startTunnel(d: DevServer, projectPath: string, port: number): void {
   }
 }
 
-function startDev(key: string, projectPath: string, port: number): void {
+function startDev(key: string, projectPath: string, port: number, databaseUrl?: string): void {
   const d = getDev(key, port);
   d.stopping = true; // killing any prior proc below is intentional, not a crash
   if (d.proc) { try { d.proc.kill(); } catch { /* already gone */ } }
@@ -89,7 +89,7 @@ function startDev(key: string, projectPath: string, port: number): void {
   notify(d);
   d.log = `$ pnpm dev  (PORT=${port})\n`;
   d.stopping = false;
-  const spec = devServerSpawn(port);
+  const spec = devServerSpawn(port, databaseUrl);
   const cmdStr = `${spec.cmd} ${spec.args.join(' ')}`;
   try {
     const p = native.process.spawn(spec.cmd, spec.args, { cwd: projectPath, env: spec.env });
@@ -199,23 +199,43 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
         if (cancelled || !c || c.nonce === lastCtlNonce.current) return;
         lastCtlNonce.current = c.nonce;
         if (c.cmd === 'stop') stopDev(devKey);
-        else startDev(devKey, proj, port); // start | restart
+        else startDev(devKey, proj, port, sessionId ? getSessionWorkspace(sessionId)?.databaseUrl : undefined); // start | restart
       });
     }, 1500);
     return () => { cancelled = true; clearInterval(id); };
-  }, [devKey, port]);
+  }, [devKey, port, sessionId]);
+
+  // Reload the iframe once the dev server is actually READY, instead of guessing.
+  // The old code blind-reloaded after a fixed 2500ms; a slower boot (install +
+  // Vite cold start) left the first load pointing at a not-yet-listening port —
+  // connection refused → blank preview until a manual reload. We watch the boot
+  // log for the "server ready" marker (Vite's "Local:" / "ready in Nms") and
+  // reload then; a longer fallback still fires once in case the marker changes.
+  const bootReloaded = React.useRef(false);
+  React.useEffect(() => {
+    if (!dev.running || bootReloaded.current) return;
+    // Vite: "➜  Local:   http://localhost:5173/" and "VITE vX ready in 412 ms".
+    // ugly-app dev wraps Vite, so these markers still appear in the captured log.
+    if (/(Local:\s*https?:\/\/|ready in\s+[\d.]+\s*m?s|listening on)/i.test(dev.log)) {
+      bootReloaded.current = true;
+      setReloadKey((k) => k + 1);
+    }
+  }, [dev.log, dev.running]);
 
   const startOrRestart = React.useCallback(() => {
     const proj = getActiveProjectPath();
     if (!proj) { setShowLog(true); return; }
-    startDev(devKey, proj, port);
+    bootReloaded.current = false; // arm the readiness-reload for this boot
+    startDev(devKey, proj, port, sessionId ? getSessionWorkspace(sessionId)?.databaseUrl : undefined);
     setShowLog(true);
-    // Give the dev server a moment to bind, then point the preview at it + reload.
+    // Point the preview at the dev server; the readiness effect above reloads the
+    // iframe once the server responds. A long fallback covers the case where the
+    // ready marker never matches (unusual dev server) — only if not already reloaded.
     const target = `http://localhost:${port}`;
     setUrl(target);
     setCommitted(target);
     try { localStorage.setItem(keyFor(sessionId ?? null), target); } catch { /* ignore */ }
-    setTimeout(() => { setReloadKey((k) => k + 1); }, 2500);
+    setTimeout(() => { if (!bootReloaded.current) { bootReloaded.current = true; setReloadKey((k) => k + 1); } }, 10000);
   }, [devKey, port, sessionId]);
 
   return (
