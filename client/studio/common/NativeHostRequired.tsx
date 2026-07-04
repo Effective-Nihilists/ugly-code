@@ -1,17 +1,22 @@
 import React from 'react';
 import { MonitorSmartphone } from 'lucide-react';
+import { useAppOptional } from 'ugly-app/client';
 
 /**
- * A clear notice shown when a panel needs the native host (Ugly Studio desktop
- * app) but the studio is running in a plain web browser — where `process.spawn`,
- * local Postgres, and the codebase indexer are unavailable (they'd throw
- * "[UglyNative] channel … requires a native shell").
+ * Shown when a panel needs the native host but none is reachable — either the
+ * studio is a plain browser tab, OR (the subtle one) a desktop Studio host IS
+ * running but under a DIFFERENT ugly.bot account. `listHosts`/presence is
+ * per-account, so a session signed in as account A can't see a host registered by
+ * account B; process.spawn then throws "requires a native shell" and the panel
+ * would otherwise fail silently (blank preview / empty DB / "Codebase: loading…").
  *
- * Without this, those panels failed SILENTLY — a blank preview, an empty database
- * list, an eternal "Codebase: loading…" — with no hint that the real problem is
- * "no native host". Callers gate on `isNativeAvailable()` and render this instead.
+ * We surface the SESSION's account so an account mismatch is obvious: if the
+ * desktop app on the machine is signed in as someone else, that's the problem.
  */
 export function NativeHostRequired({ feature }: { feature: string }): React.ReactElement {
+  const app = useAppOptional();
+  const account =
+    (app?.user as { email?: string } | undefined)?.email ?? app?.userId ?? null;
   return (
     <div
       data-id="native-host-required"
@@ -31,13 +36,18 @@ export function NativeHostRequired({ feature }: { feature: string }): React.Reac
     >
       <MonitorSmartphone size={30} style={{ opacity: 0.7 }} />
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-        {feature} needs the desktop app
+        {feature} needs a connected host
       </div>
-      <div style={{ fontSize: 12.5, lineHeight: 1.5, maxWidth: 380 }}>
-        This runs on your machine, so it needs the <strong>Ugly Studio desktop app</strong> (or a
-        browser connected to a running desktop host). A plain browser tab can’t start a local dev
-        server, database, or codebase index. Open this project in Ugly Studio to continue.
+      <div style={{ fontSize: 12.5, lineHeight: 1.5, maxWidth: 400 }}>
+        This runs on your machine, so it needs the <strong>Ugly Studio desktop app</strong> running
+        and signed into <strong>the same ugly.bot account</strong> as this session. A host signed
+        into a different account is invisible here — hosts are per-account.
       </div>
+      {account && (
+        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+          This session is signed in as <strong>{account}</strong> — the desktop host must match.
+        </div>
+      )}
     </div>
   );
 }
