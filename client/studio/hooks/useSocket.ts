@@ -389,15 +389,43 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
       });
       proc.onStdout((c) => (stdout += c));
       proc.onStderr((c) => (stderr += c));
-      proc.onError((e) => { reject(new Error(e)); });
+      // Centralized failure telemetry: every DB-script failure is console.error'd
+      // here (→ browser Logger → errorLog/D1) with the process-level context the
+      // React callers can't see — op/mode/project, exit code, and stdout/stderr
+      // tails. So a Database/Prod-panel error is fully debuggable from the logs
+      // alone. (stderr carries a benign multi-line pg SSL deprecation warning; it's
+      // deliberately NOT the error — the script emits a structured `__dbError` on
+      // stdout instead.)
+      const failTelemetry = (reason: string, extra: Record<string, unknown>): void => {
+        console.error('[DB:runDbScript]', JSON.stringify({ op, mode, project: proj, reason, ...extra }));
+      };
+      proc.onError((e) => {
+        failTelemetry('spawn-error', { error: String(e) });
+        reject(new Error(e));
+      });
       proc.onExit((code) => {
         if (code === 0) {
+          let parsed: unknown;
           try {
-            resolve(JSON.parse(stdout || '{}'));
+            parsed = JSON.parse(stdout || '{}');
           } catch {
+            failTelemetry('unparseable-stdout', { code, stdoutTail: stdout.slice(-400), stderrTail: stderr.slice(-400) });
             reject(new Error('DB query: unparseable output: ' + stdout.slice(0, 200)));
+            return;
           }
+          // The script caught its own error and reported it structurally — surface
+          // the REAL cause (with redacted target) instead of a generic failure.
+          const dbErr = (parsed as { __dbError?: { message?: string; code?: string; target?: string; stack?: string } }).__dbError;
+          if (dbErr) {
+            failTelemetry('db-error', { code: dbErr.code ?? null, target: dbErr.target ?? null, message: dbErr.message ?? null, stack: dbErr.stack ?? null });
+            reject(new Error(dbErr.message || 'DB query failed'));
+            return;
+          }
+          resolve(parsed);
         } else {
+          // Non-zero exit without a structured error (the script crashed before it
+          // could report) — capture the raw streams so the crash is still debuggable.
+          failTelemetry('nonzero-exit', { code, stdoutTail: stdout.slice(-400), stderrTail: stderr.slice(-800) });
           reject(new Error(stderr.trim() || `node exited ${String(code)}`));
         }
       });

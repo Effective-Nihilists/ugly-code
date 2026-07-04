@@ -94,6 +94,12 @@ export const DB_SCRIPT = [
   "  try { run('createdb', ['-h','127.0.0.1','-p',String(PORT),'-U','postgres', dbName]); } catch {}",
   "  return 'postgresql://postgres@127.0.0.1:'+PORT+'/'+dbName;",
   "}",
+  // Wrap the entire connect+query in a try so ANY failure (no prod connection
+  // string, SSL, bad SQL, adapter load) is emitted as a STRUCTURED error object on
+  // stdout — captured verbatim by runDbScript → errorLog. That makes every panel
+  // failure debuggable from the logs alone (no screenshot needed). The noisy pg
+  // deprecation warning goes to stderr and is NOT the signal; this is.
+  "try {",
   "process.env.DATABASE_URL = connStr();",
   "const mod = await import('ugly-app/server');",
   "mod.createAdapter();",
@@ -209,5 +215,13 @@ export const DB_SCRIPT = [
   // Force exit after the result flushes: createAdapter()'s pg pool keeps idle connections
   // (and thus the event loop) alive, so the process would otherwise never exit and the panel
   // hangs on "Loading…". Exit in the write callback so stdout isn't truncated on a pipe.
-  "process.stdout.write(JSON.stringify(out), () => process.exit(0));",
+  "  process.stdout.write(JSON.stringify(out), () => process.exit(0));",
+  "} catch (e) {",
+  // Structured error → stdout (exit 0) so runDbScript ALWAYS gets parseable JSON and can
+  // log the real cause + context (failing phase inferred from the message, redacted target)
+  // instead of scraping a truncated, warning-polluted stderr.
+  "  const target = String(process.env.DATABASE_URL || '(unresolved)').replace(/:\\/\\/([^:]+):[^@]+@/, '://$1:***@');",
+  "  const err = { __dbError: { message: (e && e.message) ? String(e.message) : String(e), code: (e && e.code) || null, op, mode, target, stack: (e && e.stack) ? String(e.stack).split('\\n').slice(0, 6).join('\\n') : null } };",
+  "  process.stdout.write(JSON.stringify(err), () => process.exit(0));",
+  "}",
 ].join('\n');
