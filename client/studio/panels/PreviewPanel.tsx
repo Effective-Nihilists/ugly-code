@@ -1,5 +1,6 @@
 import React from 'react';
-import { native } from 'ugly-app/native';
+import { native, isNativeAvailable } from 'ugly-app/native';
+import { NativeHostRequired } from '../common/NativeHostRequired';
 import { sessionPort, getSessionWorkspace } from '../agent/sessionWorkspace';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { devServerSpawn } from './devServerCmd';
@@ -237,6 +238,10 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
     try { localStorage.setItem(keyFor(sessionId ?? null), target); } catch { /* ignore */ }
     setTimeout(() => { if (!bootReloaded.current) { bootReloaded.current = true; setReloadKey((k) => k + 1); } }, 10000);
   }, [devKey, port, sessionId]);
+
+  // A browser tab has no host to spawn the dev server on — say so instead of
+  // silently showing a blank iframe forever.
+  if (!isNativeAvailable()) return <div style={S.root}><NativeHostRequired feature="Live preview" /></div>;
 
   return (
     <div data-id="preview-panel" style={S.root}>

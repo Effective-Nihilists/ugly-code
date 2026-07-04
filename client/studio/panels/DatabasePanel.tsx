@@ -19,6 +19,8 @@ import { ResultsTable } from '../components/ResultsTable';
 import { useSocket, getActiveProjectPath } from '../hooks/useSocket';
 import { useStudioUserSetting } from '../hooks/useStudioUserSetting';
 import { shortcut } from '../utils/platform';
+import { isNativeAvailable } from 'ugly-app/native';
+import { NativeHostRequired } from '../common/NativeHostRequired';
 
 type DbMode = 'dev' | 'prod';
 type Tab = 'browse' | 'sql' | 'schema';
@@ -115,6 +117,11 @@ export function DatabasePanel({ forceProd, forceDev }: DatabasePanelProps = {}) 
     }
     setWrites(true);
   }, [mode]);
+
+  // The DB panel runs its query script as a local node subprocess (both dev bundled
+  // Postgres AND prod Neon go through `native.process.spawn`), so a browser tab with
+  // no native host can't reach any database — show that instead of an empty list.
+  if (!isNativeAvailable()) return <NativeHostRequired feature="The database panel" />;
 
   return (
     <div data-id="database-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

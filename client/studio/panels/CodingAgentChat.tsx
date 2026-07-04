@@ -51,6 +51,7 @@ import {
   type ReactNode,
 } from 'react';
 import { MdastViewer } from 'ugly-app/markdown/client';
+import { isNativeAvailable } from 'ugly-app/native';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
 import { formatCurrency } from '../shared/Currency';
 import { estimateCost, isSubscriptionProvider } from '../shared/model-rates';
@@ -5577,9 +5578,14 @@ function CodebaseReadinessPill({
   const anyActive = archActive || idxActive;
   const anyError = arch?.status === 'failed' || indexer?.status === 'error';
 
+  // In a plain browser there's no host to run the indexer, so `codebase.status`
+  // never reports and the pill would spin "loading…" forever. Show it's the host
+  // that's missing, not an in-progress analysis.
+  const nativeMissing = !isNativeAvailable();
   // null = the client agent hasn't reported yet (poll spinning up the host indexer).
   let tone: 'loading' | 'active' | 'ready' | 'idle' | 'error';
-  if (!readiness) tone = 'loading';
+  if (nativeMissing) tone = 'idle';
+  else if (!readiness) tone = 'loading';
   else if (anyError) tone = 'error';
   else if (anyActive) tone = 'active';
   else if (archReady && idxReady) tone = 'ready';
@@ -5625,7 +5631,9 @@ function CodebaseReadinessPill({
     return 'Semantic index: not indexed';
   })();
   const shortLabel =
-    tone === 'loading'
+    nativeMissing
+      ? 'Codebase: desktop app'
+      : tone === 'loading'
       ? 'Codebase: loading…'
       : tone === 'active'
       ? 'Codebase: analyzing…'
@@ -5635,7 +5643,9 @@ function CodebaseReadinessPill({
       ? 'Codebase: error'
       : 'Codebase: idle';
   const fullHeadline =
-    tone === 'loading'
+    nativeMissing
+      ? 'Codebase analysis runs on your machine — open this project in the Ugly Studio desktop app'
+      : tone === 'loading'
       ? 'Codebase analysis: loading…'
       : tone === 'active'
       ? 'Codebase analysis running — AI coding quality reduced until ready'
