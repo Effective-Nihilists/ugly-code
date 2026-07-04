@@ -35,11 +35,23 @@ export const DB_SCRIPT = [
   // ── connection ──────────────────────────────────────────────────────────────
   "function connStr(){",
   "  if (mode === 'prod') {",
-  "    const ua = JSON.parse(fs.readFileSync(path.join(proj, '.uglyapp'), 'utf8'));",
-  "    const st = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.ugly-studio', 'projects', ua.projectId, 'publish-state.json'), 'utf8'));",
-  "    const neon = st.neon || (st.deployTarget && st.deployTarget.neon) || {};",
-  "    const cs = neon.connectionString || neon.connStr || (st.deployTarget && st.deployTarget.neonConnectionString);",
-  "    if (!cs) throw new Error('No Neon connection string in publish-state for ' + ua.projectId);",
+  "    let projectId = '(unknown)';",
+  "    let cs = null;",
+  // publish-state is per-machine (written by the publish flow). On a machine that
+  // published the project it carries the Neon URL; on any OTHER machine it's absent
+  // (this is the domain source-of-truth, not synced) — so a raw readFileSync ENOENT
+  // there is EXPECTED, not a crash. Try it, then fall back to an explicit prod URL.
+  "    try {",
+  "      const ua = JSON.parse(fs.readFileSync(path.join(proj, '.uglyapp'), 'utf8')); projectId = ua.projectId || projectId;",
+  "      const st = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.ugly-studio', 'projects', ua.projectId, 'publish-state.json'), 'utf8'));",
+  "      const neon = st.neon || (st.deployTarget && st.deployTarget.neon) || {};",
+  "      cs = neon.connectionString || neon.connStr || (st.deployTarget && st.deployTarget.neonConnectionString) || null;",
+  "    } catch (e) { /* no local publish-state — try an explicit prod override below */ }",
+  // Escape hatch for a machine that didn't publish: a deliberate PROD_DATABASE_URL
+  // in .env (NOT the plain DATABASE_URL, which is the local dev DB — mixing them
+  // would silently point 'prod' at dev).
+  "    if (!cs) { try { const env = fs.readFileSync(path.join(proj, '.env'), 'utf8'); const m = /^(?:PROD_DATABASE_URL|NEON_DATABASE_URL)=(.+)$/m.exec(env); if (m) cs = m[1].trim().replace(/^[\"\\']|[\"\\']$/g, ''); } catch {} }",
+  "    if (!cs) throw new Error('No prod database connection for project ' + projectId + ' on this machine. Its publish-state (~/.ugly-studio/projects/' + projectId + '/publish-state.json) is absent — the project was published from a different machine, and publish-state is per-machine (not synced). Fix: publish from this machine, or set PROD_DATABASE_URL=<neon url> in the project .env.');",
   "    return cs;",
   "  }",
   "  try { const env = fs.readFileSync(path.join(proj, '.env'), 'utf8'); const m = /^(?:DATABASE_URL|POSTGRES_URL)=(.+)$/m.exec(env); if (m) return m[1].trim().replace(/^[\"\\']|[\"\\']$/g, ''); } catch {}",
