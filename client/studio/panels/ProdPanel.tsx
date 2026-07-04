@@ -105,6 +105,10 @@ export function ProdPanel(): React.ReactElement {
       proc.onStdout(append);
       proc.onStderr(append);
       proc.onError((e) => {
+        // Ship spawn failures to errorLog with the output tail — otherwise a failed
+        // deploy is only visible in this panel, never in the logs (undebuggable from
+        // another machine / after the fact).
+        console.error('[ProdPanel:deploy] spawn-error', JSON.stringify({ cwd, error: String(e), outputTail: buf.slice(-1500) }));
         append(`\n[error: ${e}]\n`);
         setError(e);
         setRunning(false);
@@ -113,7 +117,12 @@ export function ProdPanel(): React.ReactElement {
         append(`\n[exit ${code ?? 'null'}]\n`);
         setRunning(false);
         if (code === 0) void loadTarget();
-        else setError(`publish exited with code ${code ?? 'null'}`);
+        else {
+          // A non-zero publish exit is a real failure — capture it (with the log tail
+          // carrying the orchestrator's actual error) to errorLog, not just the UI.
+          console.error('[ProdPanel:deploy] nonzero-exit', JSON.stringify({ cwd, code, outputTail: buf.slice(-2000) }));
+          setError(`publish exited with code ${code ?? 'null'}`);
+        }
       });
     } catch (e) {
       console.error('[ProdPanel:deploy]', JSON.stringify({ cwd, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);

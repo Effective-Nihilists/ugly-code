@@ -122,14 +122,25 @@ export function installTaskErrorLog(opts: { origin: string; sessionId: string; s
   };
   (['log', 'info', 'debug', 'warn', 'error'] as const).forEach(wrap);
 
+  // A dead IPC channel (ERR_IPC_CHANNEL_CLOSED / "channel closed") is a NORMAL task
+  // shutdown — the host closes our channel to stop us, and a late heartbeat send()
+  // then throws asynchronously. It is NOT a real error. Logging it shipped ~1 row
+  // per task teardown to errorLog, flooding it (400+ rows) and burying genuine
+  // failures. Skip it here, mirroring taskRunner.mjs's isChannelClosed shutdown path.
+  const isChannelClosed = (e: unknown): boolean => {
+    const err = e as { code?: string; message?: string } | null;
+    return !!err && (err.code === 'ERR_IPC_CHANNEL_CLOSED' || /channel closed/i.test(String(err.message ?? '')));
+  };
   const proc = (globalThis as { process?: NodeJS.Process }).process;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a browser-shimmed `process` may expose no `.on`
   proc?.on?.('uncaughtException', (err: Error) => {
+    if (isChannelClosed(err)) return; // clean shutdown, not a fault — don't flood errorLog
     record('error', [`[coding-task] uncaughtException: ${err.message}`, err]);
     void flush();
   });
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a browser-shimmed `process` may expose no `.on`
   proc?.on?.('unhandledRejection', (reason: unknown) => {
+    if (isChannelClosed(reason)) return; // clean shutdown, not a fault
     record('error', [
       `[coding-task] unhandledRejection: ${reason instanceof Error ? reason.message : String(reason)}`,
       ...(reason instanceof Error ? [reason] : []),

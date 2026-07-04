@@ -33,7 +33,33 @@ export const DB_SCRIPT = [
   "const mode = process.env.UGLY_DB_MODE, proj = process.env.UGLY_DB_PROJECT, op = process.env.UGLY_DB_OP;",
   "const input = JSON.parse(process.env.UGLY_DB_INPUT || '{}');",
   // ── connection ──────────────────────────────────────────────────────────────
-  "function connStr(){",
+  // Derive the prod Neon connection string from the COMMITTED `.uglyapp`
+  // deployTarget.neonProjectId + the user's Neon API key (~/.ugly-app/credentials.json),
+  // via the Neon API. This is the machine-independent fallback: publish-state is
+  // per-machine and absent on any machine that didn't publish, but neonProjectId is
+  // committed to the repo, so Neon auth alone is enough to reach prod from anywhere.
+  "async function deriveNeonConnStr(proj){",
+  "  try {",
+  "    const ua = JSON.parse(fs.readFileSync(path.join(proj, '.uglyapp'), 'utf8'));",
+  "    const npid = ua.deployTarget && ua.deployTarget.neonProjectId;",
+  "    if (!npid) return null;",
+  "    const creds = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.ugly-app', 'credentials.json'), 'utf8'));",
+  "    const apiKey = creds.neon && creds.neon.apiKey;",
+  "    if (!apiKey) return null;",
+  "    const H = { Authorization: 'Bearer ' + apiKey };",
+  "    const base = 'https://console.neon.tech/api/v2';",
+  "    const gj = async (p) => { const r = await fetch(base + p, { headers: H }); if (!r.ok) throw new Error('neon ' + p + ' -> ' + r.status); return r.json(); };",
+  "    const branches = (await gj('/projects/' + npid + '/branches')).branches || [];",
+  "    const def = branches.find(b => b.default) || branches[0]; if (!def) return null;",
+  "    const dbs = (await gj('/projects/' + npid + '/branches/' + def.id + '/databases')).databases || [];",
+  "    const roles = (await gj('/projects/' + npid + '/branches/' + def.id + '/roles')).roles || [];",
+  "    const db = dbs[0] && dbs[0].name, role = roles[0] && roles[0].name;",
+  "    if (!db || !role) return null;",
+  "    const cu = await gj('/projects/' + npid + '/connection_uri?branch_id=' + def.id + '&database_name=' + encodeURIComponent(db) + '&role_name=' + encodeURIComponent(role));",
+  "    return cu.uri || cu.connection_uri || null;",
+  "  } catch (e) { console.error('[dbScript:deriveNeonConnStr] ' + String((e && e.message) || e)); return null; }",
+  "}",
+  "async function connStr(){",
   "  if (mode === 'prod') {",
   "    let projectId = '(unknown)';",
   "    let cs = null;",
@@ -51,7 +77,9 @@ export const DB_SCRIPT = [
   // in .env (NOT the plain DATABASE_URL, which is the local dev DB — mixing them
   // would silently point 'prod' at dev).
   "    if (!cs) { try { const env = fs.readFileSync(path.join(proj, '.env'), 'utf8'); const m = /^(?:PROD_DATABASE_URL|NEON_DATABASE_URL)=(.+)$/m.exec(env); if (m) cs = m[1].trim().replace(/^[\"\\']|[\"\\']$/g, ''); } catch {} }",
-  "    if (!cs) throw new Error('No prod database connection for project ' + projectId + ' on this machine. Its publish-state (~/.ugly-studio/projects/' + projectId + '/publish-state.json) is absent — the project was published from a different machine, and publish-state is per-machine (not synced). Fix: publish from this machine, or set PROD_DATABASE_URL=<neon url> in the project .env.');",
+  // Machine-independent fallback: derive from committed neonProjectId + Neon API key.
+  "    if (!cs) { cs = await deriveNeonConnStr(proj); }",
+  "    if (!cs) throw new Error('No prod database connection for project ' + projectId + '. Tried: publish-state (~/.ugly-studio/projects/' + projectId + '/publish-state.json, per-machine — absent here), PROD_DATABASE_URL in .env, and deriving from .uglyapp deployTarget.neonProjectId via the Neon API. Fix: run `ugly-app login neon` so the API key is present (and ensure .uglyapp has deployTarget.neonProjectId), or set PROD_DATABASE_URL=<neon url> in .env.');",
   "    return cs;",
   "  }",
   "  try { const env = fs.readFileSync(path.join(proj, '.env'), 'utf8'); const m = /^(?:DATABASE_URL|POSTGRES_URL)=(.+)$/m.exec(env); if (m) return m[1].trim().replace(/^[\"\\']|[\"\\']$/g, ''); } catch {}",
@@ -100,7 +128,7 @@ export const DB_SCRIPT = [
   // failure debuggable from the logs alone (no screenshot needed). The noisy pg
   // deprecation warning goes to stderr and is NOT the signal; this is.
   "try {",
-  "process.env.DATABASE_URL = connStr();",
+  "process.env.DATABASE_URL = await connStr();",
   "const mod = await import('ugly-app/server');",
   "mod.createAdapter();",
   "const q = mod.query || mod.pgQuery;", // read path (adapter); no rowCount needed
