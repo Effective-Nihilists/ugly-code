@@ -87,13 +87,19 @@ export default function StudioShell(): React.ReactElement {
   //     scaffolding (`npx ugly-app init`), and the terminal.
   //   • uv — semantic codebase search: the indexer uses uv to install CPython into
   //     its own venv (+ sqlite_vec), so uv is the real dependency, not `python`.
+  //   • postgres — the local dev database: the Database panel (`dbScript`) and the
+  //     agent's dev server (`sessionWorkspace`) run bundled postgres. It MUST be in
+  //     this blocking grant — otherwise it falls to the host's best-effort launch
+  //     download, which can silently not-complete, leaving those features to fail
+  //     with "bundled postgres missing" on a machine that never finished it.
   // Bundled tools are requested like any permission (mic/camera); the host installs
-  // the downloadable ones on grant. Fire-and-forget at boot so they're ready before
-  // the first spawn; a web-only shell with no host connected just no-ops (caught).
+  // the downloadable ones on grant, and BinariesInstallOverlay blocks the page until
+  // they're ready. Fire-and-forget at boot so they're ready before the first spawn;
+  // a web-only shell with no host connected just no-ops (caught).
   React.useEffect(() => {
     type GrantReq = Parameters<typeof permissions.request>[0];
     void permissions
-      .request({ process: ['bash', 'node', 'git', 'curl', 'npm', 'npx', 'pnpm', 'uv'] } as unknown as GrantReq)
+      .request({ process: ['bash', 'node', 'git', 'curl', 'npm', 'npx', 'pnpm', 'uv', 'postgres'] } as unknown as GrantReq)
       .catch(() => undefined);
   }, []);
 
