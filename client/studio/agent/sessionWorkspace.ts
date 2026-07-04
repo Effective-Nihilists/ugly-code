@@ -82,13 +82,23 @@ async function ensureLocalPostgres(projectPath: string): Promise<string | null> 
     const home = homeFromProject(projectPath);
     if (!home) return null;
     const pgRoot = `${home}/.ugly-studio/binaries/postgres`;
-    const vers = (await native.fs.readdir(pgRoot)).filter((e) => e.isDirectory && /^[0-9]/.test(e.name)).map((e) => e.name).sort();
-    const ver = vers[vers.length - 1];
-    if (!ver) return null;
-    const plat = (await native.fs.readdir(`${pgRoot}/${ver}`)).find((e) => e.isDirectory)?.name;
-    if (!plat) return null;
-    const bin = `${pgRoot}/${ver}/${plat}/bin`;
-    const lib = `${pgRoot}/${ver}/${plat}/lib`;
+    // Resolve to the newest version that actually has a usable bin/initdb. The bin
+    // lives at either <ver>/bin (flat) or <ver>/<platform>/bin, and a partial
+    // download can leave an empty version dir that sorts newest — so scan for the
+    // one that's really there rather than assuming the first subdir (old code took
+    // `.find(isDirectory)`, which silently picked the wrong dir / bailed to null).
+    const vers = (await native.fs.readdir(pgRoot)).filter((e) => e.isDirectory && /^[0-9]/.test(e.name)).map((e) => e.name).sort().reverse();
+    let bin: string | null = null;
+    let lib: string | null = null;
+    for (const ver of vers) {
+      const vroot = `${pgRoot}/${ver}`;
+      const cands = [vroot, ...(await native.fs.readdir(vroot)).filter((e) => e.isDirectory).map((e) => `${vroot}/${e.name}`)];
+      for (const c of cands) {
+        if (await exists(`${c}/bin/initdb`)) { bin = `${c}/bin`; lib = `${c}/lib`; break; }
+      }
+      if (bin) break;
+    }
+    if (!bin || !lib) return null;
     const pgdata = `${home}/.ugly-studio/pgdata`;
     const port = 55432;
     const env = { DYLD_LIBRARY_PATH: lib, LD_LIBRARY_PATH: lib };

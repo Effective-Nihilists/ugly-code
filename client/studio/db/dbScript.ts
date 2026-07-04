@@ -47,10 +47,23 @@ export const DB_SCRIPT = [
   "}",
   "function ensureLocalPg(){",
   "  const pgRoot = path.join(os.homedir(), '.ugly-studio', 'binaries', 'postgres');",
-  "  const ver = fs.readdirSync(pgRoot).filter(d => /^[0-9]/.test(d)).sort().pop();",
-  "  if (!ver) throw new Error('Bundled postgres not found at ' + pgRoot + ' — open Ugly Studio so it downloads its binaries.');",
-  "  const plat = fs.readdirSync(path.join(pgRoot, ver)).find(d => fs.existsSync(path.join(pgRoot, ver, d, 'bin')));",
-  "  const bin = path.join(pgRoot, ver, plat, 'bin'), lib = path.join(pgRoot, ver, plat, 'lib');",
+  "  if (!fs.existsSync(pgRoot)) throw new Error('Bundled postgres not found at ' + pgRoot + ' — open Ugly Studio so it downloads its binaries.');",
+  // Resolve to the NEWEST version dir that actually has a usable bin/initdb.
+  // A partial/in-progress download can leave an empty or half-populated version
+  // dir that sorts newest; the bin also lives at either <ver>/bin (flat) or
+  // <ver>/<platform>/bin. Picking the highest-sorting NAME + assuming a platform
+  // subdir (the old code) left `plat` undefined → `path.join(...,undefined,...)`
+  // crashed with a cryptic ERR_INVALID_ARG_TYPE instead of a clear message.
+  "  const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };",
+  "  const hasInitdb = (b) => fs.existsSync(path.join(b, 'initdb')) || fs.existsSync(path.join(b, 'initdb.exe'));",
+  "  let bin = null, lib = null;",
+  "  for (const ver of fs.readdirSync(pgRoot).filter(d => /^[0-9]/.test(d)).sort().reverse()) {",
+  "    const vroot = path.join(pgRoot, ver); if (!isDir(vroot)) continue;",
+  "    const cands = [vroot].concat(fs.readdirSync(vroot).map(d => path.join(vroot, d)).filter(isDir));",
+  "    for (const c of cands) { if (hasInitdb(path.join(c, 'bin'))) { bin = path.join(c, 'bin'); lib = path.join(c, 'lib'); break; } }",
+  "    if (bin) break;",
+  "  }",
+  "  if (!bin) throw new Error('Bundled postgres under ' + pgRoot + ' is missing or incomplete (no <version>/bin/initdb) — reopen/restart Ugly Studio so it finishes downloading its binaries.');",
   "  const PGDATA = path.join(os.homedir(), '.ugly-studio', 'pgdata'), PORT = 55432;",
   "  const cenv = Object.assign({}, process.env, { DYLD_LIBRARY_PATH: lib, LD_LIBRARY_PATH: lib });",
   "  const run = (c, a) => cp.execFileSync(path.join(bin, c), a, { env: cenv, stdio: 'pipe' });",
