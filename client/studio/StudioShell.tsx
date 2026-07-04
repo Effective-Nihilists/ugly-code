@@ -101,7 +101,7 @@ export default function StudioShell(): React.ReactElement {
     // Bundled tools we PROVISION — typed against ugly-app's catalog (BundledToolName)
     // so a typo or a non-catalog name is a BUILD error, not a silent no-op on the
     // install side (which is how postgres went un-provisioned before).
-    const bundled: readonly BundledToolName[] = ['node', 'git', 'curl', 'pnpm', 'uv', 'postgres'];
+    const bundled: readonly BundledToolName[] = ['node', 'git', 'curl', 'pnpm', 'uv', 'postgres', 'rg'];
     // System executables we only need spawn PERMISSION for — present on every host
     // or shipped with node (npm/npx), so NOT catalog/installable tools.
     const permissionOnly = ['bash', 'npm', 'npx'];
