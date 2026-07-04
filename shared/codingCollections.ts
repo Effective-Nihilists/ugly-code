@@ -81,8 +81,21 @@ export const codingCollections = defineCollections({
   codingSession: {
     schema: CodingSessionSchema,
     meta: { cache: false, trackable: false, public: false, cascadeFrom: null },
-    // List a user's sessions for a project (newest first via the `updated` sort).
-    indexes: [{ fields: { userId: 1, projectId: 1 } }],
+    // Single-field expression indexes ONLY — the framework's db:init emits one
+    // btree per single JSONB field and SILENTLY SKIPS any composite `{a:1,b:1}`
+    // declaration (schemaIndexes.fieldIndexStatements: `if (fields.length !== 1)
+    // continue`). So we declare one index per field the handlers filter on:
+    //   userId+projectId+kind  → codingSessionUpsert (find existing 'main')
+    //   userId+projectId+archived → codingSessionList (active sessions)
+    // Postgres index-serves the selective field (userId/projectId) and filters the
+    // rest in memory; each field is present in SOME index so PostgresIndexes stays
+    // quiet. (A composite def here created NOTHING — prod had only the GIN index.)
+    indexes: [
+      { fields: { userId: 1 } },
+      { fields: { projectId: 1 } },
+      { fields: { kind: 1 } },
+      { fields: { archived: 1 } },
+    ],
   },
   codingSessionMessage: {
     schema: CodingSessionMessageSchema,
@@ -90,11 +103,14 @@ export const codingCollections = defineCollections({
     // so the transcript is preserved. (Cascade would key on `codingSessionId`; we
     // use `sessionId`.)
     meta: { cache: false, trackable: false, public: false, cascadeFrom: null },
+    // Single-field only (see codingSession note). Handlers filter by
+    // sessionId+userId(+compacted); `seq` is the sort key, not a filter, so it
+    // needs no index. `sessionId` is the selective one that keeps reads off a
+    // seq scan; the others exist so the per-field PostgresIndexes check passes.
     indexes: [
-      // The "normal" query: a session's live transcript, compaction excluded.
-      { fields: { sessionId: 1, compacted: 1, seq: 1 } },
-      // The "full" query: complete transcript incl. compacted originals.
-      { fields: { sessionId: 1, seq: 1 } },
+      { fields: { sessionId: 1 } },
+      { fields: { userId: 1 } },
+      { fields: { compacted: 1 } },
     ],
   },
 });

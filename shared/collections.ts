@@ -91,6 +91,10 @@ const baseCollections = defineCollections({
   recentProject: {
     schema: RecentProjectSchema,
     meta: { cache: false, trackable: true, public: false, cascadeFrom: null, trackKeys: ['userId'] },
+    // Every read filters by userId (a user's recent projects). `trackKeys` does
+    // NOT create a btree expression index, so declare one explicitly — otherwise
+    // db:init leaves only the GIN index and PostgresIndexes warns per query.
+    indexes: [{ fields: { userId: 1 } }],
   },
 });
 
