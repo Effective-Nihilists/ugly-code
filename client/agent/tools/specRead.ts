@@ -38,6 +38,7 @@ export const specReadTool: ToolModule = {
       }
       return '(no spec content)';
     } catch (e) {
+      console.error('[specReadTool:request]', JSON.stringify({ id, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `spec_read unavailable: ${(e as Error).message}`;
     }
   },
@@ -70,6 +71,7 @@ export const specWriteTool: ToolModule = {
       if (res?.error) return `spec_write unavailable: ${res.error}`;
       return 'Spec written.';
     } catch (e) {
+      console.error('[specWriteTool:request]', JSON.stringify({ contentLength: content.length, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `spec_write unavailable: ${(e as Error).message}`;
     }
   },

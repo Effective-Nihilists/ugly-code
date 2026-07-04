@@ -38,6 +38,7 @@ export const inspectUxTool: ToolModule = {
       const report = await fn(input);
       return JSON.stringify(report, null, 2);
     } catch (e) {
+      console.error('[inspectUxTool:inspect]', JSON.stringify({ input, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `inspect_ux failed: ${(e as Error).message}`;
     }
   },

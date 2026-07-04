@@ -307,7 +307,8 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
             setSubscriptionModels(r.models as CodingAgentModel[]);
           }
         })
-        .catch(() => {
+        .catch((e: unknown) => {
+          console.error('[ModelPicker:getCodingAgentSubscriptionModels]', JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
           if (!cancelled) setSubscriptionModels([]);
         });
     };

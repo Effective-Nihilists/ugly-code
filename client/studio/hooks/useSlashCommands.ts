@@ -73,7 +73,8 @@ async function fetchSkills(): Promise<Skill[]> {
       const skills = await discoverSkills();
       cachedSkills = skills;
       return skills;
-    } catch {
+    } catch (e) {
+      console.error('[useSlashCommands:discoverSkills]', JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       cachedSkills = [];
       return [];
     } finally {

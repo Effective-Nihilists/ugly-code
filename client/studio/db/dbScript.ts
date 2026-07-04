@@ -47,7 +47,10 @@ export const DB_SCRIPT = [
   "}",
   "function ensureLocalPg(){",
   "  const pgRoot = path.join(os.homedir(), '.ugly-studio', 'binaries', 'postgres');",
-  "  if (!fs.existsSync(pgRoot)) throw new Error('Bundled postgres not found at ' + pgRoot + ' — open Ugly Studio so it downloads its binaries.');",
+  "  const arch = os.platform() + '-' + os.arch();",
+  "  const intelMac = os.platform() === 'darwin' && os.arch() === 'x64';",
+  "  const pgHint = intelMac ? 'bundled postgres is NOT built for Intel Macs (darwin-x64) — the local dev DB is unavailable on this platform; use prod mode or set DATABASE_URL in .env.' : 'reopen/restart Ugly Studio so it finishes downloading its binaries.';",
+  "  if (!fs.existsSync(pgRoot)) throw new Error('Bundled postgres not found at ' + pgRoot + ' for ' + arch + ' — ' + pgHint);",
   // Resolve to the NEWEST version dir that actually has a usable bin/initdb.
   // A partial/in-progress download can leave an empty or half-populated version
   // dir that sorts newest; the bin also lives at either <ver>/bin (flat) or
@@ -63,7 +66,11 @@ export const DB_SCRIPT = [
   "    for (const c of cands) { if (hasInitdb(path.join(c, 'bin'))) { bin = path.join(c, 'bin'); lib = path.join(c, 'lib'); break; } }",
   "    if (bin) break;",
   "  }",
-  "  if (!bin) throw new Error('Bundled postgres under ' + pgRoot + ' is missing or incomplete (no <version>/bin/initdb) — reopen/restart Ugly Studio so it finishes downloading its binaries.');",
+  "  if (!bin) {",
+  "    let tree = [];",
+  "    try { for (const v of fs.readdirSync(pgRoot)) { let line = v; try { if (isDir(path.join(pgRoot, v))) { line += ' -> [' + fs.readdirSync(path.join(pgRoot, v)).map(k => k + (isDir(path.join(pgRoot, v, k, 'bin')) ? '/bin' : '')).join(', ') + ']'; } } catch (e) {} tree.push(line); } } catch (e) { tree.push('(readdir ' + pgRoot + ' failed: ' + (e && e.message) + ')'); }",
+  "    throw new Error('Bundled postgres unusable for ' + arch + ' under ' + pgRoot + ' (no <version>/bin/initdb) — ' + pgHint + ' Contents: ' + (tree.length ? tree.join(' ; ') : '(empty)'));",
+  "  }",
   "  const PGDATA = path.join(os.homedir(), '.ugly-studio', 'pgdata'), PORT = 55432;",
   "  const cenv = Object.assign({}, process.env, { DYLD_LIBRARY_PATH: lib, LD_LIBRARY_PATH: lib });",
   "  const run = (c, a) => cp.execFileSync(path.join(bin, c), a, { env: cenv, stdio: 'pipe' });",

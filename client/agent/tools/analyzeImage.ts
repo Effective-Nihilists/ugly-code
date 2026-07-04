@@ -44,6 +44,7 @@ export const analyzeImageTool: ToolModule = {
         const bytes = await native.fs.readFileBytes(resolvePath(ctx, input.path));
         imageUrl = `data:image/png;base64,${bytesToBase64(bytes)}`;
       } catch (e) {
+        console.error('[analyzeImageTool:readFile]', JSON.stringify({ path: input.path, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
         return `analyze_image: could not read ${input.path}: ${(e as Error).message}`;
       }
     } else {
@@ -64,6 +65,7 @@ export const analyzeImageTool: ToolModule = {
       if (typeof res === 'string') return res;
       return res.text ?? res.content ?? '(no analysis returned)';
     } catch (e) {
+      console.error('[analyzeImageTool:textGen]', JSON.stringify({ hasUrl: typeof input.url === 'string' && !!input.url, path: input.path, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `analyze_image failed (vision unavailable?): ${(e as Error).message}`;
     }
   },

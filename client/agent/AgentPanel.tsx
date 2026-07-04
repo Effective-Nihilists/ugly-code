@@ -76,6 +76,7 @@ export default function AgentPanel(): React.ReactElement {
         onEvent,
       });
     } catch (e) {
+      console.error('[AgentPanel:runAgent]', JSON.stringify({ model: AGENT_DEFAULT_MODEL, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       push({ kind: 'assistant', text: `⚠ ${(e as Error).message}` });
     } finally {
       setBusy(false);

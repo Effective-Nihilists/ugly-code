@@ -34,6 +34,7 @@ export const webSearchTool: ToolModule = {
       const body = page.content.replace(/\n{3,}/g, '\n\n').slice(0, 8000);
       return body.trim() || `(no results for ${JSON.stringify(query)})`;
     } catch (e) {
+      console.error('[webSearchTool:extract]', JSON.stringify({ query, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `web_search failed: ${(e as Error).message}`;
     }
   },

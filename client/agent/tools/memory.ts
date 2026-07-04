@@ -121,7 +121,8 @@ export const memoryDeleteTool: ToolModule = {
     try {
       await native.fs.rm(`${memDir(root)}/${slug(name)}.json`, { force: true });
       return `deleted memory ${JSON.stringify(name)}`;
-    } catch {
+    } catch (e) {
+      console.error('[memoryDeleteTool:rm]', JSON.stringify({ name, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `(could not delete ${JSON.stringify(name)})`;
     }
   },

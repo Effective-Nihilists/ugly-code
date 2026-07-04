@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppOptional } from 'ugly-app/client';
-import { permissions } from 'ugly-app/native';
+import { permissions, type BundledToolName } from 'ugly-app/native';
 import { ProjectsProvider } from './state/ProjectsContext';
 import { ProjectOnboarding } from './panels/ProjectOnboarding';
 import { ProjectCreationProgress } from './panels/ProjectCreationProgress';
@@ -98,8 +98,15 @@ export default function StudioShell(): React.ReactElement {
   // a web-only shell with no host connected just no-ops (caught).
   React.useEffect(() => {
     type GrantReq = Parameters<typeof permissions.request>[0];
+    // Bundled tools we PROVISION — typed against ugly-app's catalog (BundledToolName)
+    // so a typo or a non-catalog name is a BUILD error, not a silent no-op on the
+    // install side (which is how postgres went un-provisioned before).
+    const bundled: readonly BundledToolName[] = ['node', 'git', 'curl', 'pnpm', 'uv', 'postgres'];
+    // System executables we only need spawn PERMISSION for — present on every host
+    // or shipped with node (npm/npx), so NOT catalog/installable tools.
+    const permissionOnly = ['bash', 'npm', 'npx'];
     void permissions
-      .request({ process: ['bash', 'node', 'git', 'curl', 'npm', 'npx', 'pnpm', 'uv', 'postgres'] } as unknown as GrantReq)
+      .request({ process: [...permissionOnly, ...bundled] } as unknown as GrantReq)
       .catch(() => undefined);
   }, []);
 

@@ -34,6 +34,7 @@ export const webFetchTool: ToolModule = {
       const page = await native.browse.extract(url, { format });
       return `# ${page.title}\n${page.url}\n\n${page.content.slice(0, 20000)}`;
     } catch (e) {
+      console.error('[webFetchTool:extract]', JSON.stringify({ url, format, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `web_fetch failed: ${(e as Error).message}`;
     }
   },

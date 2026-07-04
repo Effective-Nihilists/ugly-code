@@ -63,6 +63,7 @@ export const devServerStartTool: ToolModule = {
       await writeDevControl(root, 'start', nextNonce());
       return 'Requested dev server start (Preview panel is booting `pnpm dev`). Check dev_server_logs for progress.';
     } catch (e) {
+      console.error('[devServerStartTool:writeDevControl]', JSON.stringify({ root, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `dev_server_start failed: ${(e as Error).message}`;
     }
   },
@@ -78,6 +79,7 @@ export const devServerStopTool: ToolModule = {
       await writeDevControl(root, 'stop', nextNonce());
       return 'Requested dev server stop.';
     } catch (e) {
+      console.error('[devServerStopTool:writeDevControl]', JSON.stringify({ root, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `dev_server_stop failed: ${(e as Error).message}`;
     }
   },

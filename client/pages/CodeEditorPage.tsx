@@ -51,6 +51,7 @@ export default function CodeEditorPage(): React.ReactElement {
         setRunning(false);
       });
     } catch (e) {
+      console.error('[CodeEditorPage:runCommand]', JSON.stringify({ cmd, cwd, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setOutput((o) => o + `error: ${(e as Error).message}\n`);
       setRunning(false);
     }
@@ -67,6 +68,7 @@ export default function CodeEditorPage(): React.ReactElement {
       setCwd(dir);
       setStatus(`${items.length} items`);
     } catch (e) {
+      console.error('[CodeEditorPage:list]', JSON.stringify({ dir, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setStatus(`error: ${(e as Error).message}`);
     }
   }, []);
@@ -79,6 +81,7 @@ export default function CodeEditorPage(): React.ReactElement {
         await permissions.request({ fs: 'full' });
         await list('/');
       } catch (e) {
+        console.error('[CodeEditorPage:mountFsInit]', JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
         setStatus(`permission error: ${(e as Error).message}`);
       }
     })();
@@ -98,6 +101,7 @@ export default function CodeEditorPage(): React.ReactElement {
       setDirty(false);
       setStatus(`opened ${path}`);
     } catch (e) {
+      console.error('[CodeEditorPage:openEntry]', JSON.stringify({ path, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setStatus(`error: ${(e as Error).message}`);
     }
   }
@@ -110,6 +114,7 @@ export default function CodeEditorPage(): React.ReactElement {
       setDirty(false);
       setStatus(`saved ${openFile}`);
     } catch (e) {
+      console.error('[CodeEditorPage:save]', JSON.stringify({ openFile, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setStatus(`error: ${(e as Error).message}`);
     }
   }

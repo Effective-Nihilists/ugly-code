@@ -149,6 +149,7 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
         try {
           awarded = parseJudge(await deps.judge(system, user), pts);
         } catch (e) {
+          console.error('[grader:judge]', JSON.stringify({ gateName: gate.name, rubricKey, points: pts, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
           awarded = { points: 0, verdict: `judge call failed: ${(e as Error).message}` };
         }
         judgeResults.push({ gateName: gate.name, points: pts, pointsAwarded: awarded.points, rubricKey, verdict: awarded.verdict });

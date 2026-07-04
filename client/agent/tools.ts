@@ -187,6 +187,7 @@ function runDb(ctx: ToolContext | undefined, op: string, input: Record<string, u
       proc.onError((e) => { resolve(`[error: ${e}]`); });
       proc.onExit((code) => { resolve(code === 0 ? truncate(out.trim()) : `[error: ${out.trim().slice(-400) || 'node exited ' + String(code)}]`); });
     } catch (e) {
+      console.error('[agentTools:runDbScript]', JSON.stringify({ op, projectDir, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       resolve(`[error: ${(e as Error).message}]`);
     }
   });
@@ -285,6 +286,7 @@ function runBash(
       proc.onError((e) => { resolve(`${out}\n[error: ${e}]`); });
       proc.onExit((code) => { resolve(`${out.trimEnd()}\n[exit ${code ?? 'null'}]`); });
     } catch (e) {
+      console.error('[agentTools:runBash]', JSON.stringify({ command, workingDir, projectDir: ctx?.projectDir, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       resolve(`[error: ${(e as Error).message}]`);
     }
   });

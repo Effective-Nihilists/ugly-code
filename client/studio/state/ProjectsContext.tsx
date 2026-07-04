@@ -535,7 +535,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     if (seed) {
       void socket
         .request('openProject', { path: seed.projectPath })
-        .catch(() => undefined);
+        .catch((e: unknown) => {
+          console.error('[ProjectsContext:openProject-seed]', JSON.stringify({ projectPath: seed.projectPath, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+        });
       // Tear-out windows don't go through the warm-start preload
       // path; release the workspace gate immediately so EditorInner
       // mounts and useLayout does its own fetch (single ~50ms flash

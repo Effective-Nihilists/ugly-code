@@ -119,6 +119,7 @@ export function WorkersPanel({
         setSelectedName(res.workers[0].name);
       }
     } catch (err) {
+      console.error('[WorkersPanel:workersGetManifest]', JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setUnavailableReason(
         err instanceof Error ? err.message : 'Failed to load workers',
       );
@@ -134,7 +135,8 @@ export function WorkersPanel({
         limit: 50,
       });
       setRuns(res.runs);
-    } catch {
+    } catch (err) {
+      console.error('[WorkersPanel:workersListRuns]', JSON.stringify({ mode, name: selectedName || undefined, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setRuns([]);
     }
   }, [socket, mode, selectedName, unavailableReason]);
@@ -197,6 +199,7 @@ export function WorkersPanel({
         for (let i = 1; i <= 6; i++) setTimeout(() => void loadRuns(), i * 2000);
       }
     } catch (err) {
+      console.error('[WorkersPanel:workersRun]', JSON.stringify({ name: selected.name, mode, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setLastResult({
         status: 'failed',
         error: err instanceof Error ? err.message : String(err),
@@ -214,7 +217,8 @@ export function WorkersPanel({
     try {
       const res = await socket.request('workersGetRun', { runId, mode });
       setExpandedRun(res.run as WorkerRunDetail | null);
-    } catch {
+    } catch (err) {
+      console.error('[WorkersPanel:workersGetRun]', JSON.stringify({ runId, mode, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setExpandedRun(null);
     }
   };

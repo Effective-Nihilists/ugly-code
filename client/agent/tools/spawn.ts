@@ -26,6 +26,7 @@ export function spawnCollect(
       proc.onError((e) => resolve({ stdout, stderr: stderr + e, code: null }));
       proc.onExit((code) => resolve({ stdout, stderr, code }));
     } catch (e) {
+      console.error('[spawnTool:spawn]', JSON.stringify({ cmd, args, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       resolve({ stdout, stderr: (e as Error).message, code: null });
     }
   });

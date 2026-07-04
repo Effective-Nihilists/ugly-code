@@ -98,7 +98,12 @@ async function ensureLocalPostgres(projectPath: string): Promise<string | null> 
       }
       if (bin) break;
     }
-    if (!bin || !lib) return null;
+    if (!bin || !lib) {
+      // A real degraded state: no usable bundled postgres → the session runs with
+      // no local DATABASE_URL, so `pnpm dev` / the Database panel can't reach a dev DB.
+      console.warn('[sessionWorkspace:ensureLocalPostgres] no usable bundled postgres', JSON.stringify({ projectPath, pgRoot, versions: vers, platform: (globalThis as { process?: { platform?: string } }).process?.platform }));
+      return null;
+    }
     const pgdata = `${home}/.ugly-studio/pgdata`;
     const port = 55432;
     const env = { DYLD_LIBRARY_PATH: lib, LD_LIBRARY_PATH: lib };

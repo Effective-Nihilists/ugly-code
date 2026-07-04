@@ -18,6 +18,7 @@ function git(args: string[], cwd: string): Promise<{ ok: boolean; out: string }>
       p.onError((e) => { resolve({ ok: false, out: `${stderr}\n${e}` }); });
       p.onExit((code) => { resolve({ ok: code === 0, out: code === 0 ? stdout : `${stdout}${stderr}`.trim() }); });
     } catch (e) {
+      console.error('[GitPanel:git-spawn]', JSON.stringify({ args, cwd, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       resolve({ ok: false, out: (e as Error).message });
     }
   });

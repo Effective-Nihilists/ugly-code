@@ -30,8 +30,8 @@ export function useGitStatus(pollIntervalMs = 5000, cwd?: string) {
       setBranch(result.branch);
       setRemote(result.remote);
       setFiles(result.files);
-    } catch {
-      /* empty */
+    } catch (e) {
+      console.error('[useGitStatus:gitStatus]', JSON.stringify({ cwd: cwd ?? null, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
     }
   }, [socket, cwd]);
 

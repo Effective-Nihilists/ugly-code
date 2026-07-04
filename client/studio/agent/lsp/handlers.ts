@@ -82,7 +82,8 @@ async function locations(
       }),
     );
     return { results };
-  } catch {
+  } catch (e) {
+    console.error('[lspHandlers:locations]', JSON.stringify({ method, path: input.path, line: input.line, character: input.character, cwd: input.cwd, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
     return { results: [] };
   }
 }
@@ -119,7 +120,8 @@ export async function lspHover(
     const client = await getEditorLspClient(root, lang);
     await client.openFile(input.path, input.content);
     return { contents: await client.hover(input.path, input.line, input.character) };
-  } catch {
+  } catch (e) {
+    console.error('[lspHandlers:lspHover]', JSON.stringify({ path: input.path, line: input.line, character: input.character, cwd: input.cwd, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
     return { contents: null };
   }
 }

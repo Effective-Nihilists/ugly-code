@@ -49,6 +49,7 @@ export function TerminalPanel(): React.ReactElement {
         inputRef.current?.focus();
       });
     } catch (e) {
+      console.error('[TerminalPanel:spawn-bash]', JSON.stringify({ cmd: c, cwd, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setLog((l) => `${l}[error: ${(e as Error).message}]\n`);
       setBusy(false);
     }

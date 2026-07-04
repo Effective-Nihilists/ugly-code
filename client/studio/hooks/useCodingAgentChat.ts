@@ -2616,6 +2616,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       knownMessageIds.current.clear();
       return true;
     } catch (err) {
+      console.error('[useCodingAgentChat:clearMessages]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       const errMsg = `Failed to clear chat: ${(err as Error).message}`;
       console.debug('[CodingAgentChat] %s', errMsg);
       setError(errMsg);
@@ -2695,6 +2696,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       }
       return newId;
     } catch (err) {
+      console.error('[useCodingAgentChat:startNewChat]', JSON.stringify({ model: modelRef.current, permissionMode, patternMode, reasoningEffort, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       const errMsg = `Failed to start chat: ${(err as Error).message}`;
       console.debug('[CodingAgentChat] %s', errMsg);
       setError(errMsg);
@@ -2719,7 +2721,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         })) as ListMessagesResponse | null;
         if (!Array.isArray(res?.messages)) return;
         history = res.messages;
-      } catch {
+      } catch (err) {
+        console.error('[useCodingAgentChat:backfillMissingUserMessages]', JSON.stringify({ sessionId: sid, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         return;
       }
       const rows = history.map((m) => ({
@@ -2952,6 +2955,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             );
             setIsStreaming(false);
           } catch (err) {
+            console.error('[useCodingAgentChat:historyBackfill]', JSON.stringify({ sessionId: newId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
             console.debug(
               '[CodingAgentChat] History backfill failed: %s',
               (err as Error).message,
@@ -2982,6 +2986,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             );
             onResumeMissingRef.current(initialSessionId);
           } else {
+            console.error('[useCodingAgentChat:resumeSession]', JSON.stringify({ initialSessionId, model, error: message }), err instanceof Error ? err.stack : undefined);
             setError(`Failed to start chat: ${message}`);
           }
           // Outer catch fires before the backfill block runs, so the
@@ -3026,6 +3031,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       });
       setHasMoreOlder(Boolean(hasMore));
     } catch (err) {
+      console.error('[useCodingAgentChat:loadOlderMessages]', JSON.stringify({ sessionId, beforeId: oldest.id, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       console.debug(
         '[CodingAgentChat] loadOlderMessages failed: %s',
         (err as Error).message,
@@ -3069,6 +3075,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       });
       setHasMoreNewer(Boolean(hasMore));
     } catch (err) {
+      console.error('[useCodingAgentChat:loadNewerMessages]', JSON.stringify({ sessionId, afterId: newest.id, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       console.debug(
         '[CodingAgentChat] loadNewerMessages failed: %s',
         (err as Error).message,
@@ -3098,6 +3105,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       setHasMoreNewer(false);
       knownMessageIds.current = new Set(fresh.map((m) => m.id));
     } catch (err) {
+      console.error('[useCodingAgentChat:jumpToTail]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       console.debug(
         '[CodingAgentChat] jumpToTail failed: %s',
         (err as Error).message,
@@ -3119,6 +3127,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           permissionMode: next,
         });
       } catch (err) {
+        console.error('[useCodingAgentChat:setPermissionMode]', JSON.stringify({ sessionId, permissionMode: next, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setError(`Failed to set permission: ${(err as Error).message}`);
       }
     },
@@ -3187,6 +3196,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           applyFamilyConvertLocally(next.model);
         }
       } catch (err) {
+        console.error('[useCodingAgentChat:setModelMode]', JSON.stringify({ sessionId, modelMode: next, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setError(`Failed to set model mode: ${(err as Error).message}`);
       }
     },
@@ -3203,6 +3213,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           patternMode: next,
         });
       } catch (err) {
+        console.error('[useCodingAgentChat:setPatternMode]', JSON.stringify({ sessionId, patternMode: next, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setError(`Failed to set pattern mode: ${(err as Error).message}`);
       }
     },
@@ -3289,6 +3300,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           ...(hasAttachments ? { attachments } : {}),
         });
       } catch (err) {
+        console.error('[useCodingAgentChat:sendMessage]', JSON.stringify({ sessionId: sid, hasAttachments, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setError(`Failed to send message: ${(err as Error).message}`);
         setIsStreaming(false);
         setStreamStartedAt(null);
@@ -3359,6 +3371,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           setFeatures(serverToFeatures(settings.codingAgent));
         }
       } catch (err) {
+        console.error('[useCodingAgentChat:getUserSettings]', JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         console.debug(
           '[CodingAgentChat] getUserSettings (features) failed: %s',
           (err as Error).message,
@@ -3452,6 +3465,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         });
         setPendingPermissions((prev) => prev.filter((p) => p.id !== perm.id));
       } catch (err) {
+        console.error('[useCodingAgentChat:approvePermission]', JSON.stringify({ sessionId, toolName: perm.toolName, action, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         console.debug(
           '[CodingAgentChat] Permission grant failed: %s',
           (err as Error).message,
@@ -3515,6 +3529,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       } catch (err) {
         // Network or RPC failure — clear the card so the user has a
         // way out and surface the error.
+        console.error('[useCodingAgentChat:answerAskUser]', JSON.stringify({ sessionId: sid, toolCallId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setPendingAskUsers(dropEntry);
         setError(`Answer failed: ${(err as Error).message}`);
         return false;
@@ -3613,6 +3628,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       await agentApi(backend.skipPermissions, { sessionId, skip: true });
       setPendingPermissions([]);
     } catch (err) {
+      console.error('[useCodingAgentChat:skipAllPermissions]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       console.debug(
         '[CodingAgentChat] Skip permissions failed: %s',
         (err as Error).message,
@@ -3640,6 +3656,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         setError(`Compact failed: ${res.error}`);
       }
     } catch (err) {
+      console.error('[useCodingAgentChat:compactNow]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setError(`Compact failed: ${(err as Error).message}`);
     }
   }, [sessionId, isStreaming]);
@@ -3665,6 +3682,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         }
         return !!res.ok;
       } catch (err) {
+        console.error('[useCodingAgentChat:restoreCheckpoint]', JSON.stringify({ sessionId, msgId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setError(`Restore failed: ${(err as Error).message}`);
         return false;
       }
@@ -3737,6 +3755,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         };
         return res;
       } catch (err) {
+        console.error('[useCodingAgentChat:finishSession]', JSON.stringify({ sessionId, runTypecheck: opts.runTypecheck, runLint: opts.runLint, runTests: opts.runTests, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         setFinishPipeline((prev) => ({
           ...prev,
           running: false,
@@ -3781,6 +3800,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         };
         return res;
       } catch (err) {
+        console.error('[useCodingAgentChat:mergeFinishedSession]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         return { ok: false, message: (err as Error).message };
       }
     },
@@ -3799,7 +3819,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           stage,
         })) as { ok: boolean };
         return res.ok;
-      } catch {
+      } catch (err) {
+        console.error('[useCodingAgentChat:stopFinishStage]', JSON.stringify({ sessionId, stage, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
         return false;
       }
     },
@@ -3820,6 +3841,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       if (!res.ok && res.error) setError(`Abandon failed: ${res.error}`);
       return res.ok;
     } catch (err) {
+      console.error('[useCodingAgentChat:abandonSession]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setError(`Abandon failed: ${(err as Error).message}`);
       return false;
     }
@@ -3839,6 +3861,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       })) as { ok: boolean };
       return res.ok;
     } catch (err) {
+      console.error('[useCodingAgentChat:archiveSession]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setError(`Archive failed: ${(err as Error).message}`);
       return false;
     }
@@ -3872,6 +3895,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       return res;
     } catch (err) {
       const msg = (err as Error).message;
+      console.error('[useCodingAgentChat:refreshWorktreeNow]', JSON.stringify({ sessionId, error: msg }), err instanceof Error ? err.stack : undefined);
       setError(`Worktree refresh failed: ${msg}`);
       return { ok: false, error: msg };
     }

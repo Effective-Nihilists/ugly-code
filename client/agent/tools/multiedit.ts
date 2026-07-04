@@ -67,6 +67,7 @@ export const multieditTool: ToolModule = {
     try {
       content = await native.fs.readFile(abs);
     } catch (e) {
+      console.error('[multieditTool:readFile]', JSON.stringify({ path: rawPath, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `multiedit: could not read ${rawPath}: ${(e as Error).message}`;
     }
     // Apply in memory; reject the whole set on the first failure (atomic).

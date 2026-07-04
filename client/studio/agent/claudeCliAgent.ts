@@ -183,6 +183,7 @@ export async function runClaudeCliTurn(sessionId: string, userText: string, mode
         } } : {}),
       });
     } catch (e) {
+      console.error('[claudeCliAgent:spawn]', JSON.stringify({ sessionId, bin, model, cwd, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       emitMessage(emit, sessionId, 'assistant', [{ type: 'text', data: { text: '⚠ Failed to spawn claude: ' + String(e) } }, { type: 'finish' }]);
       emitFinished(emit, sessionId);
       resolve();
@@ -224,6 +225,7 @@ export async function runClaudeCliTurn(sessionId: string, userText: string, mode
     try {
       proc.write(JSON.stringify({ type: 'user', message: { role: 'user', content: userText } }) + '\n');
     } catch (e) {
+      console.error('[claudeCliAgent:write-user-message]', JSON.stringify({ sessionId, model, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       emitMessage(emit, sessionId, 'assistant', [{ type: 'text', data: { text: '⚠ Failed to write to claude: ' + String(e) } }, { type: 'finish' }]);
       finish();
     }
