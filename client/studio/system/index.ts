@@ -2,6 +2,8 @@
 // the IDE shell isn't using it yet.
 export { Popover, type Placement } from './popover/Popover';
 export { Modal, type ModalSize, type ModalAnchor } from './modal/Modal';
+export { ContextMenu, type ContextMenuItem, type ContextMenuAnchor } from './ContextMenu';
+export { ConfirmDialog } from './ConfirmDialog';
 export {
   useAnyModalOpen,
   useRegisterModal,

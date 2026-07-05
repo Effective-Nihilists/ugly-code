@@ -127,6 +127,21 @@ export function useRecentProjects(): RecentProject[] {
   return projects;
 }
 
+/**
+ * True when the project at `path` physically lives on THIS computer — i.e. a
+ * recent-projects row matches the path and is stamped with this device's id. Used
+ * to gate "Open in Finder" (revealing a remote host's folder would open Finder on
+ * a machine the user isn't sitting at). Returns false while the device id is still
+ * resolving or when `path` isn't a known recent project.
+ */
+export function useIsLocalProject(path: string | null): boolean {
+  const selfDeviceId = useSelfDeviceId();
+  const projects = useRecentProjects();
+  if (!path || !selfDeviceId) return false;
+  const match = projects.find((p) => p.path === path);
+  return !!match && match.deviceId === selfDeviceId;
+}
+
 /** This desktop's deviceId (or null on web/phone), for the "This device" badge. */
 export function useSelfDeviceId(): string | null {
   const [id, setId] = useState<string | null>(null);

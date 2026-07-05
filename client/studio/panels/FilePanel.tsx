@@ -20,6 +20,10 @@ import {
   type EditorPos,
 } from '../components/editorLsp';
 import { isDirty, externalChangeAction } from '../components/fileEditState';
+import { ContextMenu, ConfirmDialog, type ContextMenuItem } from '../system';
+import { revealInFinder, trashPath } from '../native/fsActions';
+import { useIsLocalProject } from '../state/recentProjects';
+import { fileManagerName } from '../utils/platform';
 
 const MAX_EDITABLE_BYTES = 1_000_000;
 
@@ -120,6 +124,14 @@ export function FilePanel(): React.ReactElement {
   const editorRef = React.useRef<CmEditorHandle>(null);
   const cur = (): string => dirtyValue ?? content;
   const dirty = dirtyValue != null && isDirty(dirtyValue, content);
+
+  // "Open in Finder" reveals a path on the machine we're sitting at; only offer
+  // it when the open project physically lives on this same computer.
+  const isLocal = useIsLocalProject(root);
+  // Right-click / kebab context menu + delete confirmation.
+  const [hovered, setHovered] = React.useState<string | null>(null);
+  const [menu, setMenu] = React.useState<{ entry: Entry; x: number; y: number } | null>(null);
+  const [pendingDelete, setPendingDelete] = React.useState<Entry | null>(null);
 
   const list = React.useCallback(async (dir: string): Promise<Entry[]> => {
     const ents = await native.fs.readdir(dir);
@@ -284,6 +296,76 @@ export function FilePanel(): React.ReactElement {
     setBanner(false);
   }, [selected]);
 
+  // Trash an entry, then re-read its parent so the tree drops it. Errors bubble
+  // to the ConfirmDialog (it stays open and shows the message).
+  const deleteEntry = React.useCallback(async (entry: Entry): Promise<void> => {
+    await trashPath(entry.path);
+    const slash = entry.path.lastIndexOf('/');
+    const parent = slash > 0 ? entry.path.slice(0, slash) : root;
+    if (!parent) return;
+    const ents = await list(parent).catch(() => [] as Entry[]);
+    setOpen((prev) => {
+      const next: Record<string, Entry[] | undefined> = { ...prev, [parent]: ents };
+      next[entry.path] = undefined; // drop any cached children of a deleted folder
+      return next;
+    });
+    setExpanded((prev) => {
+      if (!prev.has(entry.path)) return prev;
+      const next = new Set(prev);
+      next.delete(entry.path);
+      return next;
+    });
+    if (selected === entry.path || (entry.isDir && selected?.startsWith(`${entry.path}/`))) {
+      setSelected(null);
+      setContent('');
+      setContentHtml('');
+      setDirtyValue(null);
+    }
+  }, [root, list, selected]);
+
+  const openMenu = (e: React.MouseEvent, entry: Entry): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenu({ entry, x: e.clientX, y: e.clientY });
+  };
+
+  const menuItems = (entry: Entry): ContextMenuItem[] => [
+    {
+      label: `Open in ${fileManagerName}`,
+      hidden: !isLocal,
+      onClick: () => { void revealInFinder(entry.path); },
+    },
+    {
+      label: 'Delete',
+      danger: true,
+      onClick: () => { setPendingDelete(entry); },
+    },
+  ];
+
+  // A right-aligned "⋯" affordance revealed on hover (always shown on touch, where
+  // there is no hover or right-click). Opens the same menu as a right-click.
+  const kebab = (entry: Entry): React.ReactElement => (
+    <button
+      type="button"
+      data-id={`file-tree-menu-${entry.path}`}
+      aria-label={`Actions for ${entry.name}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        const r = e.currentTarget.getBoundingClientRect();
+        setMenu({ entry, x: r.left, y: r.bottom + 2 });
+      }}
+      style={{
+        ...S.kebab,
+        visibility:
+          isMobile || hovered === entry.path || menu?.entry.path === entry.path
+            ? 'visible'
+            : 'hidden',
+      }}
+    >
+      ⋯
+    </button>
+  );
+
   const renderDir = (dir: string, depth: number): React.ReactNode => {
     const ents = open[dir] ?? [];
     return ents.map((e) => {
@@ -295,9 +377,14 @@ export function FilePanel(): React.ReactElement {
               data-id="file-tree-dir"
               style={{ ...S.row, paddingLeft: 8 + depth * 14 }}
               onClick={() => void toggleDir(e.path)}
+              onContextMenu={(ev) => { openMenu(ev, e); }}
+              onMouseEnter={() => { setHovered(e.path); }}
+              onMouseLeave={() => { setHovered((h) => (h === e.path ? null : h)); }}
             >
               <span style={S.caret}>{isOpen ? '▾' : '▸'}</span>
               <span style={S.dirName}>{e.name}</span>
+              <span style={{ flex: 1 }} />
+              {kebab(e)}
             </div>
             {isOpen && renderDir(e.path, depth + 1)}
           </React.Fragment>
@@ -309,8 +396,13 @@ export function FilePanel(): React.ReactElement {
           data-id="file-tree-file"
           style={{ ...S.row, paddingLeft: 8 + depth * 14 + 14, ...(selected === e.path ? S.rowActive : {}) }}
           onClick={() => void openFile(e.path)}
+          onContextMenu={(ev) => { openMenu(ev, e); }}
+          onMouseEnter={() => { setHovered(e.path); }}
+          onMouseLeave={() => { setHovered((h) => (h === e.path ? null : h)); }}
         >
           <span style={S.fileName}>{e.name}</span>
+          <span style={{ flex: 1 }} />
+          {kebab(e)}
         </div>
       );
     });
@@ -406,6 +498,25 @@ export function FilePanel(): React.ReactElement {
         )}
         {error && <div style={S.error}>{error}</div>}
       </div>
+
+      {menu && (
+        <ContextMenu
+          anchor={{ x: menu.x, y: menu.y }}
+          items={menuItems(menu.entry)}
+          onClose={() => { setMenu(null); }}
+        />
+      )}
+      <ConfirmDialog
+        open={pendingDelete != null}
+        title="Move to Trash"
+        message={
+          pendingDelete
+            ? `Move ${pendingDelete.isDir ? 'folder' : 'file'} "${pendingDelete.name}" to the Trash?`
+            : ''
+        }
+        onConfirm={() => (pendingDelete ? deleteEntry(pendingDelete) : Promise.resolve())}
+        onClose={() => { setPendingDelete(null); }}
+      />
     </div>
   );
 }
@@ -421,6 +532,7 @@ const S: Record<string, React.CSSProperties> = {
   row: { display: 'flex', alignItems: 'center', gap: 4, height: 22, padding: '0 8px', cursor: 'pointer', whiteSpace: 'nowrap', color: 'var(--text-primary)' },
   rowActive: { background: 'var(--accent-dim)', color: 'var(--accent)' },
   caret: { width: 12, flexShrink: 0, color: 'var(--text-muted)', fontSize: 10 },
+  kebab: { flexShrink: 0, width: 20, height: 18, marginRight: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 4, color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 },
   dirName: { fontWeight: 600 },
   fileName: { color: 'var(--text-secondary)' },
   viewer: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 },

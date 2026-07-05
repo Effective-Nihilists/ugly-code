@@ -10,7 +10,9 @@ import {
 } from '../state/recentProjects';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { FilePicker } from '../components/FilePicker';
-import { shortcut } from '../utils/platform';
+import { shortcut, fileManagerName } from '../utils/platform';
+import { ContextMenu, ConfirmDialog, type ContextMenuItem } from '../system';
+import { revealInFinder, trashPath } from '../native/fsActions';
 import { generateTaskId } from '../utils/taskId';
 import { timeAgoShort } from '../utils/timeAgo';
 import { EvalPickerModal } from './EvalPickerModal';
@@ -163,6 +165,9 @@ export function ProjectOnboarding({
   const recentProjects = useRecentProjects();
   const selfDeviceId = useSelfDeviceId();
   const app = useAppOptional();
+  // Per-row "⋯" menu + delete confirmation (Open in Finder / Remove / Delete).
+  const [menuFor, setMenuFor] = useState<{ project: RecentProject; x: number; y: number } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<RecentProject | null>(null);
   const [activeAction, setActiveAction] = useState<ActionTab>('new');
   const [newName, setNewName] = useState('');
   const [newParentDir, setNewParentDir] = useState(DEFAULT_PARENT_DIR);
@@ -360,6 +365,22 @@ export function ProjectOnboarding({
       }
     },
     [onProjectOpen, selfDeviceId, app],
+  );
+
+  // Delete a project from disk (→ OS Trash), then drop it from the recents list.
+  // Works cross-device: for a project owned by another desktop we connect to that
+  // host first so `fs.trash` tunnels to the machine that holds the folder. Errors
+  // bubble to the ConfirmDialog. Distinct from the menu's "Remove from recents",
+  // which only deletes the synced row.
+  const handleDeleteProject = useCallback(
+    async (project: RecentProject) => {
+      if (project.deviceId && project.deviceId !== selfDeviceId) {
+        connectToHost(project.deviceId, project.deviceLabel);
+      }
+      await trashPath(project.path);
+      await removeRecentProject(app?.socket, project._id);
+    },
+    [selfDeviceId, app],
   );
 
   const handleNewProject = useCallback(() => {
@@ -887,7 +908,7 @@ export function ProjectOnboarding({
                     project={p}
                     isThisDevice={!!selfDeviceId && p.deviceId === selfDeviceId}
                     onOpen={() => void handleOpenRecent(p)}
-                    onDelete={() => void removeRecentProject(app?.socket, p._id)}
+                    onMenu={(x, y) => { setMenuFor({ project: p, x, y }); }}
                     delayMs={1100 + i * 70}
                   />
                 ))
@@ -1005,6 +1026,48 @@ export function ProjectOnboarding({
 
       {/* Project-init progress now lives in <ProjectCreationProgress>,
           mounted by EditorInner when the tab's `creating` field is set. */}
+
+      {menuFor && (
+        <ContextMenu
+          anchor={{ x: menuFor.x, y: menuFor.y }}
+          onClose={() => { setMenuFor(null); }}
+          items={((): ContextMenuItem[] => {
+            const p = menuFor.project;
+            const onThisDevice = !!selfDeviceId && p.deviceId === selfDeviceId;
+            return [
+              {
+                label: `Open in ${fileManagerName}`,
+                hidden: !onThisDevice,
+                onClick: () => { void revealInFinder(p.path); },
+              },
+              {
+                label: 'Remove from recents',
+                onClick: () => { void removeRecentProject(app?.socket, p._id); },
+              },
+              {
+                label: 'Delete',
+                danger: true,
+                onClick: () => { setPendingDelete(p); },
+              },
+            ];
+          })()}
+        />
+      )}
+      <ConfirmDialog
+        open={pendingDelete != null}
+        title="Move project to Trash"
+        message={
+          pendingDelete
+            ? `Move project "${pendingDelete.name}" to the Trash? This deletes the folder on ${
+                !!selfDeviceId && pendingDelete.deviceId === selfDeviceId
+                  ? 'this computer'
+                  : pendingDelete.deviceLabel || 'another device'
+              } and removes it from recents.`
+            : ''
+        }
+        onConfirm={() => (pendingDelete ? handleDeleteProject(pendingDelete) : Promise.resolve())}
+        onClose={() => { setPendingDelete(null); }}
+      />
     </div>
   );
 }
@@ -1330,14 +1393,14 @@ function ProjectRow({
   project,
   isThisDevice,
   onOpen,
-  onDelete,
+  onMenu,
   delayMs,
 }: {
   index: number;
   project: RecentProject;
   isThisDevice: boolean;
   onOpen: () => void;
-  onDelete: () => void;
+  onMenu: (x: number, y: number) => void;
   delayMs?: number;
 }): React.ReactElement {
   const indexDelay = delayMs != null ? delayMs + 100 : undefined;
@@ -1350,6 +1413,10 @@ function ProjectRow({
       tabIndex={0}
       data-id={`recent-project-${project.path}`}
       onClick={onOpen}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onMenu(e.clientX, e.clientY);
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -1473,32 +1540,36 @@ function ProjectRow({
       <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <button
           type="button"
-          aria-label="Remove from recent projects"
-          data-id={`recent-project-delete-${project.path}`}
+          aria-label="Project actions"
+          data-id={`recent-project-menu-${project.path}`}
           onClick={(e) => {
             e.stopPropagation();
-            onDelete();
+            const r = e.currentTarget.getBoundingClientRect();
+            onMenu(r.left, r.bottom + 2);
           }}
           style={{
             display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             padding: 4,
             background: 'none',
             border: 'none',
             cursor: 'pointer',
             color: 'var(--text-muted)',
+            fontSize: 18,
+            lineHeight: 1,
           }}
         >
           <svg
-            width={13}
-            height={13}
+            width={16}
+            height={16}
             viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            fill="currentColor"
+            stroke="none"
           >
-            <path d="M18 6 6 18M6 6l12 12" />
+            <circle cx={12} cy={5} r={1.6} />
+            <circle cx={12} cy={12} r={1.6} />
+            <circle cx={12} cy={19} r={1.6} />
           </svg>
         </button>
         <span style={{ color: 'var(--text-muted)' }}>
