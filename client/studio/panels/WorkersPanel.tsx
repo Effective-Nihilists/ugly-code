@@ -136,7 +136,7 @@ export function WorkersPanel({
       });
       setRuns(res.runs);
     } catch (err) {
-      console.error('[WorkersPanel:workersListRuns]', JSON.stringify({ mode, name: selectedName || undefined, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error('[WorkersPanel:workersListRuns]', JSON.stringify({ mode, name: selectedName === '' ? undefined : selectedName, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       setRuns([]);
     }
   }, [socket, mode, selectedName, unavailableReason]);

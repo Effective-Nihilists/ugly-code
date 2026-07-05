@@ -35,7 +35,7 @@ export const scratchpadTool: ToolModule = {
     if (!root) return '(no project open)';
     const sid = ctx?.sessionId ?? 'default';
     const file = scratchPath(root, sid);
-    const action = String(input.action ?? 'read');
+    const action = (typeof input.action === 'string' ? input.action : 'read');
     const readCur = async (): Promise<string> => {
       try {
         return await native.fs.readFile(file);
@@ -54,7 +54,7 @@ export const scratchpadTool: ToolModule = {
     }
     // append
     const cur = await readCur();
-    const next = (cur ? cur.replace(/\n*$/, '\n') : '') + String(input.content ?? '') + '\n';
+    const next = (cur ? cur.replace(/\n*$/, '\n') : '') + (typeof input.content === 'string' ? input.content : '') + '\n';
     await native.fs.writeFile(file, next);
     return 'appended to scratchpad';
   },

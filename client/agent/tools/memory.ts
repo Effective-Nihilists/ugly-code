@@ -14,6 +14,7 @@ function slug(name: string): string {
   return name.trim().replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'note';
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await
 async function requireRoot(ctx: Parameters<ToolModule['run']>[1]): Promise<string | null> {
   return projectRoot(ctx);
 }
@@ -36,12 +37,12 @@ export const memorySaveTool: ToolModule = {
   async run(input, ctx) {
     const root = await requireRoot(ctx);
     if (!root) return '(no project open)';
-    const name = String(input.name ?? '').trim();
+    const name = (typeof input.name === 'string' ? input.name : '').trim();
     if (!name) return 'memory_save: `name` is required';
     await native.fs.mkdir(memDir(root), true);
     await native.fs.writeFile(
       `${memDir(root)}/${slug(name)}.json`,
-      JSON.stringify({ name, content: String(input.content ?? '') }, null, 2),
+      JSON.stringify({ name, content: (typeof input.content === 'string' ? input.content : '') }, null, 2),
     );
     return `saved memory ${JSON.stringify(name)}`;
   },
@@ -62,7 +63,7 @@ export const memoryReadTool: ToolModule = {
   async run(input, ctx) {
     const root = await requireRoot(ctx);
     if (!root) return '(no project open)';
-    const name = String(input.name ?? '').trim();
+    const name = (typeof input.name === 'string' ? input.name : '').trim();
     try {
       const raw = await native.fs.readFile(`${memDir(root)}/${slug(name)}.json`);
       const m = JSON.parse(raw) as { name: string; content: string };
@@ -117,7 +118,7 @@ export const memoryDeleteTool: ToolModule = {
   async run(input, ctx) {
     const root = await requireRoot(ctx);
     if (!root) return '(no project open)';
-    const name = String(input.name ?? '').trim();
+    const name = (typeof input.name === 'string' ? input.name : '').trim();
     try {
       await native.fs.rm(`${memDir(root)}/${slug(name)}.json`, { force: true });
       return `deleted memory ${JSON.stringify(name)}`;

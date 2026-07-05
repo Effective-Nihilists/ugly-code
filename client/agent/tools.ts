@@ -129,7 +129,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       // Accept `old`/`new` as aliases for old_string/new_string (legacy callers).
       const op: EditOp = {
         ...(p as EditOp),
-        ...(p.old != null ? { old_string: String(p.old) } : {}),
+        ...(p.old != null ? { old_string: str(p.old) } : {}),
         ...(p.new != null && p.new_string == null && p.new_content == null
           ? { new_string: str(p.new) }
           : {}),

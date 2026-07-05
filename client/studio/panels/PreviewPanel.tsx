@@ -101,7 +101,7 @@ function startDev(key: string, projectPath: string, port: number, databaseUrl?: 
       if (d.proc !== p) return; // superseded by a restart — ignore the stale proc
       // Ship spawn failures to the error telemetry (browser Logger → errorLog); the
       // in-panel log alone isn't visible when the host is a remote/other machine.
-      console.error('[PreviewPanel:dev-server-error]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, error: String(e) }));
+      console.error('[PreviewPanel:dev-server-error]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, error: e }));
       d.log = (d.log + `\n[error: ${e}]\n`).slice(-12000); d.running = false; d.proc = null; notify(d); void flushDevLog(projectPath, d.log);
     });
     p.onExit((code) => {

@@ -29,7 +29,7 @@ export const specReadTool: ToolModule = {
         | { content?: string; specs?: { id: string; title?: string }[]; error?: string }
         | string;
       if (typeof res === 'string') return res;
-      if (res?.error) return `spec_read unavailable: ${res.error}`;
+      if (res.error) return `spec_read unavailable: ${res.error}`;
       if (res.content) return res.content;
       if (res.specs) {
         return res.specs.length
@@ -68,7 +68,7 @@ export const specWriteTool: ToolModule = {
         | { ok?: boolean; error?: string }
         | string;
       if (typeof res === 'string') return res;
-      if (res?.error) return `spec_write unavailable: ${res.error}`;
+      if (res.error) return `spec_write unavailable: ${res.error}`;
       return 'Spec written.';
     } catch (e) {
       console.error('[specWriteTool:request]', JSON.stringify({ contentLength: content.length, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);

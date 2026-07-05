@@ -87,6 +87,7 @@ function log(msg: string, ...args: unknown[]) {
 // plain const (not process.env) because this client runs in the browser.
 const DEBUG = false;
 function debug(msg: string, ...args: unknown[]) {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- DEBUG is a compile-time toggle flipped to true locally when tracing
   if (DEBUG) console.log(`[lsp:debug] ${msg}`, ...args);
 }
 
@@ -233,6 +234,7 @@ export function parseMessages(buffer: string): {
 } {
   const messages: string[] = [];
   let buf = buffer;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- intentional loop with multiple internal break points
   while (true) {
     const headerEnd = buf.indexOf('\r\n\r\n');
     if (headerEnd === -1) break;
@@ -366,6 +368,7 @@ export class LspClient {
     if (this.state === 'disabled') return;
     if (this.state !== 'ready') await this.start();
     if (this.state !== 'ready') return;
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- ??= would force reindenting the whole multi-line IIFE below
     if (!this.projectReadyPromise) {
       this.projectReadyPromise = (async () => {
         const t0 = Date.now();
@@ -441,8 +444,9 @@ export class LspClient {
     this.proc = proc;
 
     // native.process delivers already-decoded strings on stdout/stderr.
-    proc.onStdout((chunk) => this.handleStdout(chunk));
+    proc.onStdout((chunk) => { this.handleStdout(chunk); });
     proc.onStderr((text) => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- DEBUG is a compile-time toggle flipped to true locally when tracing
       if (DEBUG) {
         // Full stderr passthrough when debugging — tsserver's
         // "Loading project ...", "No Project", and trace lines all
@@ -454,7 +458,7 @@ export class LspClient {
         // typescript-language-server is chatty on stderr. Surface only
         // the first line of each chunk so test logs don't drown in it.
         const first = text.split('\n')[0];
-        if (first && first.trim()) log('stderr:', first);
+        if (first.trim()) log('stderr:', first);
       }
     });
     proc.onExit((code) => {
@@ -1034,6 +1038,9 @@ export class LspClient {
           reject(new Error(`LSP request ${method} timed out`));
         }
       }, 5000);
+      // Typed as a Node Timeout (has unref), but in the browser setTimeout returns
+      // a number with no unref — keep the optional call as a real runtime guard.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       t.unref?.();
     });
   }
@@ -1074,6 +1081,10 @@ export class LspClient {
       params?: unknown;
     };
     try {
+      // JSON.parse returns `any`; `message` keeps its declared shape and every
+      // field is read defensively below. This is the local tsserver subprocess's
+      // LSP protocol, not untrusted external input.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       message = JSON.parse(raw);
     } catch (err) {
       log('Failed to parse LSP message:', (err as Error).message);

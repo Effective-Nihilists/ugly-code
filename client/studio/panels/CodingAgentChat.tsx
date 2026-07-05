@@ -6854,7 +6854,7 @@ CodingAgentChatProps = {}) {
       );
       setEvalLocalGrade(result);
     } catch (err) {
-      console.error('[CodingAgentChat:evalGradeSession]', JSON.stringify({ sessionId, taskName: evalTaskName || undefined, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error('[CodingAgentChat:evalGradeSession]', JSON.stringify({ sessionId, taskName: evalTaskName === '' ? undefined : evalTaskName, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a non-Error throw makes .message undefined at runtime despite the cast
       setEvalGradeError((err as Error).message ?? 'grading failed');
     } finally {

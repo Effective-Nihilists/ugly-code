@@ -129,7 +129,7 @@ export function installTaskErrorLog(opts: { origin: string; sessionId: string; s
   // failures. Skip it here, mirroring taskRunner.mjs's isChannelClosed shutdown path.
   const isChannelClosed = (e: unknown): boolean => {
     const err = e as { code?: string; message?: string } | null;
-    return !!err && (err.code === 'ERR_IPC_CHANNEL_CLOSED' || /channel closed/i.test(String(err.message ?? '')));
+    return !!err && (err.code === 'ERR_IPC_CHANNEL_CLOSED' || /channel closed/i.test(err.message ?? ''));
   };
   const proc = (globalThis as { process?: NodeJS.Process }).process;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a browser-shimmed `process` may expose no `.on`

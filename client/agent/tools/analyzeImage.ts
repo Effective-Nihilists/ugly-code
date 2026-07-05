@@ -35,7 +35,7 @@ export const analyzeImageTool: ToolModule = {
   name: 'analyze_image',
   spec: SPEC,
   async run(input, ctx) {
-    const prompt = String(input.prompt ?? 'Describe this image in detail.');
+    const prompt = (typeof input.prompt === 'string' ? input.prompt : 'Describe this image in detail.');
     let imageUrl: string;
     if (typeof input.url === 'string' && input.url) {
       imageUrl = input.url;

@@ -22,8 +22,9 @@ const SPEC: TextGenTool = {
 export const toolSearchTool: ToolModule = {
   name: 'tool_search',
   spec: SPEC,
+  // eslint-disable-next-line @typescript-eslint/require-await
   async run(input) {
-    const query = String(input.query ?? '').trim();
+    const query = (typeof input.query === 'string' ? input.query : '').trim();
     if (!query) return 'tool_search: `query` is required';
     const hits = searchCatalog(query);
     if (hits.length === 0) return `(no tools match ${JSON.stringify(query)})`;

@@ -46,7 +46,7 @@ export function ReferencesPanel({
                 key={i}
                 data-id="reference-row"
                 style={S.row}
-                onClick={() => onPick(h)}
+                onClick={() => { onPick(h); }}
               >
                 <span style={S.loc}>{h.line}</span>
                 <span style={S.preview}>{h.preview ?? ''}</span>

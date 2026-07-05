@@ -57,7 +57,7 @@ export const multieditTool: ToolModule = {
   spec: SPEC,
   async run(input, ctx) {
     const args = input as unknown as MultieditArgs;
-    const rawPath = String(args.path ?? args.file_path ?? '');
+    const rawPath = args.path ?? args.file_path ?? '';
     if (!rawPath) return 'multiedit: `path` is required';
     if (!Array.isArray(args.edits) || args.edits.length === 0) {
       return 'multiedit: `edits` must be a non-empty array';
@@ -72,7 +72,7 @@ export const multieditTool: ToolModule = {
     }
     // Apply in memory; reject the whole set on the first failure (atomic).
     for (let i = 0; i < args.edits.length; i++) {
-      const r = applyEdit(content, args.edits[i]!);
+      const r = applyEdit(content, args.edits[i]);
       if (!r.ok) {
         return `multiedit: edit ${i + 1} (index ${i}) failed in ${rawPath}: ${r.error}; file left unchanged`;
       }

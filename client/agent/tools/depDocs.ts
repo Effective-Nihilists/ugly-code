@@ -28,7 +28,7 @@ export const depDocsTool: ToolModule = {
   name: 'dep_docs',
   spec: SPEC,
   async run(input, ctx) {
-    const pkg = String(input.package ?? '').trim();
+    const pkg = (typeof input.package === 'string' ? input.package : '').trim();
     if (!pkg) return 'dep_docs: `package` is required';
     const root = projectRoot(ctx);
     if (!root) return '(no project open)';

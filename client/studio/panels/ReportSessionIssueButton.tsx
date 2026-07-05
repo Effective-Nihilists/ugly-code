@@ -25,7 +25,7 @@ const MAX_BUNDLE_BYTES = 700_000;
 /** Trim a bundle's `messages` (oldest-first) until the whole thing fits the cap. */
 function capBundle(bundle: Record<string, unknown>): Record<string, unknown> {
   if (JSON.stringify(bundle).length <= MAX_BUNDLE_BYTES) return bundle;
-  const msgs = Array.isArray(bundle['messages']) ? [...(bundle['messages'] as unknown[])] : [];
+  const msgs = Array.isArray(bundle.messages) ? [...(bundle.messages as unknown[])] : [];
   const originalCount = msgs.length;
   let kept = msgs;
   while (kept.length > 1 &&
@@ -85,8 +85,7 @@ export function ReportSessionIssueButton({
     setSubmitting(true);
     setError(null);
     try {
-      const reportId =
-        'sir_' + (globalThis.crypto?.randomUUID?.().slice(0, 8) ?? String(Date.now()).slice(-8));
+      const reportId = 'sir_' + globalThis.crypto.randomUUID().slice(0, 8);
       const description = message.trim();
       const bundle = capBundle({
         compositeId,

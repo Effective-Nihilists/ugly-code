@@ -13,7 +13,6 @@ export function devServerLogPath(projectPath: string): string {
 
 // Throttle writes so a chatty dev server doesn't hammer the fs bridge.
 const lastWrite = new Map<string, number>();
-let nowMs = 0; // monotonic-ish; bumped on each call via performance-free counter
 
 /** Best-effort persist of the current log for a project (throttled ~1/sec). */
 export async function persistDevLog(projectPath: string, text: string): Promise<void> {
@@ -24,7 +23,6 @@ export async function persistDevLog(projectPath: string, text: string): Promise<
   const n = (lastWrite.get(key) ?? 0) + 1;
   lastWrite.set(key, n);
   if (n % 40 !== 1) return;
-  nowMs++;
   try {
     await native.fs.mkdir(`${projectPath.replace(/\/+$/, '')}/.ugly-studio`, true);
     await native.fs.writeFile(devServerLogPath(projectPath), text);

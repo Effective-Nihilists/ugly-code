@@ -3,7 +3,6 @@
 
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
-import type { ToolContext } from '../tools';
 import { projectRoot } from './lspForProject';
 import { spawnCollect } from './spawn';
 

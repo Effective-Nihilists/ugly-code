@@ -31,12 +31,13 @@ const SPEC: TextGenTool = {
 export const blackboardPostTool: ToolModule = {
   name: 'blackboard_post',
   spec: SPEC,
+  // eslint-disable-next-line @typescript-eslint/require-await
   async run(input, ctx) {
     const sid = ctx?.sessionId ?? 'default';
-    const message = String(input.message ?? '').trim();
+    const message = (typeof input.message === 'string' ? input.message : '').trim();
     if (!message) return 'blackboard_post: `message` is required';
     const notes = boards.get(sid) ?? [];
-    notes.push({ message, ...(input.tag ? { tag: String(input.tag) } : {}) });
+    notes.push({ message, ...(input.tag ? { tag: (typeof input.tag === 'string' ? input.tag : '') } : {}) });
     boards.set(sid, notes);
     return `posted to blackboard (${notes.length} note(s))`;
   },

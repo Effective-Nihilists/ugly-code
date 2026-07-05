@@ -26,7 +26,7 @@ export const pythonExecTool: ToolModule = {
   name: 'python_exec',
   spec: SPEC,
   async run(input, ctx) {
-    const code = String(input.code ?? '');
+    const code = (typeof input.code === 'string' ? input.code : '');
     if (!code) return 'python_exec: `code` is required';
     const root = projectRoot(ctx) ?? undefined;
     const { stdout, stderr, code: exit } = await spawnCollect('python', ['-c', code], {

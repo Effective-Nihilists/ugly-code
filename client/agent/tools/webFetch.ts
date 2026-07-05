@@ -27,7 +27,7 @@ export const webFetchTool: ToolModule = {
   name: 'web_fetch',
   spec: SPEC,
   async run(input) {
-    const url = String(input.url ?? '');
+    const url = (typeof input.url === 'string' ? input.url : '');
     if (!/^https?:\/\//i.test(url)) return `web_fetch: only http/https URLs are supported (got ${url})`;
     const format = input.format === 'html' || input.format === 'text' ? input.format : 'readability';
     try {

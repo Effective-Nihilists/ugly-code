@@ -25,8 +25,9 @@ const SPEC: TextGenTool = {
 export const askUserTool: ToolModule = {
   name: 'ask_user',
   spec: SPEC,
+  // eslint-disable-next-line @typescript-eslint/require-await
   async run(input) {
-    const question = String(input.question ?? '').trim();
+    const question = (typeof input.question === 'string' ? input.question : '').trim();
     if (!question) return 'ask_user: `question` is required';
     const options = Array.isArray(input.options)
       ? (input.options as unknown[]).map((o) => String(o))

@@ -400,7 +400,7 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
         console.error('[DB:runDbScript]', JSON.stringify({ op, mode, project: proj, reason, ...extra }));
       };
       proc.onError((e) => {
-        failTelemetry('spawn-error', { error: String(e) });
+        failTelemetry('spawn-error', { error: e });
         reject(new Error(e));
       });
       proc.onExit((code) => {
@@ -418,7 +418,7 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
           const dbErr = (parsed as { __dbError?: { message?: string; code?: string; target?: string; stack?: string } }).__dbError;
           if (dbErr) {
             failTelemetry('db-error', { code: dbErr.code ?? null, target: dbErr.target ?? null, message: dbErr.message ?? null, stack: dbErr.stack ?? null });
-            reject(new Error(dbErr.message || 'DB query failed'));
+            reject(new Error(dbErr.message ?? 'DB query failed'));
             return;
           }
           resolve(parsed);

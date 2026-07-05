@@ -23,8 +23,8 @@ export function spawnCollect(
       const proc = native.process.spawn(cmd, args, opts);
       proc.onStdout((c) => (stdout += c));
       proc.onStderr((c) => (stderr += c));
-      proc.onError((e) => resolve({ stdout, stderr: stderr + e, code: null }));
-      proc.onExit((code) => resolve({ stdout, stderr, code }));
+      proc.onError((e) => { resolve({ stdout, stderr: stderr + e, code: null }); });
+      proc.onExit((code) => { resolve({ stdout, stderr, code }); });
     } catch (e) {
       console.error('[spawnTool:spawn]', JSON.stringify({ cmd, args, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       resolve({ stdout, stderr: (e as Error).message, code: null });

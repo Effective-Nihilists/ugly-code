@@ -231,6 +231,9 @@ export function applyHashlineOp(body: string, op: HashlineOp): ApplyResult {
     return { ok: true, newBody: out.join('\n') + (trailingNewline ? '\n' : '') };
   }
 
+  // op.kind is type-narrowed to 'delete_range' here; keep the explicit guard +
+  // trailing diag() as a runtime safety net for a malformed op.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (op.kind === 'delete_range') {
     const errStart = checkAnchor(op.range.start, 'delete_range start');
     if (errStart) return diag(errStart);

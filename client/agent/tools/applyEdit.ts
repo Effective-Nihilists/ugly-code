@@ -27,13 +27,13 @@ export interface EditResult {
 }
 
 export function applyEdit(body: string, e: EditOp): EditResult {
-  const newContent = String(e.new_content ?? e.new_string ?? '');
+  const newContent = e.new_content ?? e.new_string ?? '';
 
   // ── Hashline anchor modes ──
   if (e.anchor != null || e.insert_after != null || e.range != null) {
     let op: HashlineOp;
     if (e.range != null) {
-      const range = parseAnchorRange(String(e.range));
+      const range = parseAnchorRange(e.range);
       if (!range) return { ok: false, error: `could not parse range ${JSON.stringify(e.range)} (expected "42..47" or "42:a3..47:b1")` };
       op = newContent ? { kind: 'replace_range', range, newContent } : { kind: 'delete_range', range };
     } else if (e.insert_after != null) {
@@ -50,9 +50,9 @@ export function applyEdit(body: string, e: EditOp): EditResult {
   }
 
   // ── String-match mode ──
-  const oldStr = String(e.old_string ?? '');
+  const oldStr = e.old_string ?? '';
   if (!oldStr) return { ok: false, error: 'provide one of old_string, anchor, insert_after, or range' };
-  const newStr = String(e.new_string ?? '');
+  const newStr = e.new_string ?? '';
   if (e.replace_all) {
     if (!body.includes(oldStr)) return { ok: false, error: 'old_string not found' };
     return { ok: true, body: body.split(oldStr).join(newStr) };

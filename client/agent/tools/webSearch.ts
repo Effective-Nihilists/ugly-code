@@ -26,7 +26,7 @@ export const webSearchTool: ToolModule = {
   name: 'web_search',
   spec: SPEC,
   async run(input) {
-    const query = String(input.query ?? '').trim();
+    const query = (typeof input.query === 'string' ? input.query : '').trim();
     if (!query) return 'web_search: `query` is required';
     const url = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query);
     try {

@@ -6,7 +6,6 @@
 
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
-import type { ToolContext } from '../tools';
 import { runSubAgent } from './subagent';
 
 function noStep(): string {
@@ -32,10 +31,10 @@ export const delegateTool: ToolModule = {
     },
   } satisfies TextGenTool,
   async run(input, ctx) {
-    const step = (ctx as ToolContext | undefined)?.step;
+    const step = (ctx)?.step;
     if (!step) return noStep();
     const allowedTools = Array.isArray(input.tools) ? (input.tools as unknown[]).map(String) : undefined;
-    return runSubAgent(String(input.task ?? ''), {
+    return runSubAgent((typeof input.task === 'string' ? input.task : ''), {
       step,
       ctx,
       ...(allowedTools ? { allowedTools } : {}),
@@ -60,7 +59,7 @@ export const delegateParallelTool: ToolModule = {
     },
   } satisfies TextGenTool,
   async run(input, ctx) {
-    const step = (ctx as ToolContext | undefined)?.step;
+    const step = (ctx)?.step;
     if (!step) return noStep();
     const tasks = Array.isArray(input.tasks) ? (input.tasks as unknown[]).map(String) : [];
     if (tasks.length === 0) return 'delegate_parallel: `tasks` must be a non-empty array';

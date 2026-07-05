@@ -30,8 +30,9 @@ const SPEC: TextGenTool = {
 export const toolRequestTool: ToolModule = {
   name: 'tool_request',
   spec: SPEC,
+  // eslint-disable-next-line @typescript-eslint/require-await
   async run(input) {
-    const name = String(input.name ?? '').trim();
+    const name = (typeof input.name === 'string' ? input.name : '').trim();
     if (!name) return 'tool_request: `name` is required';
     const exists = fullCatalog().some((t) => t.name === name);
     if (exists) {

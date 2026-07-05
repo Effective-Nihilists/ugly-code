@@ -28,7 +28,7 @@ export async function writeDevControl(projectPath: string, cmd: DevControlCmd, n
 export async function readDevControl(projectPath: string): Promise<DevControl | null> {
   try {
     const raw = JSON.parse(await native.fs.readFile(controlPath(projectPath))) as Partial<DevControl>;
-    if (raw && (raw.cmd === 'start' || raw.cmd === 'stop' || raw.cmd === 'restart') && typeof raw.nonce === 'string') {
+    if ((raw.cmd === 'start' || raw.cmd === 'stop' || raw.cmd === 'restart') && typeof raw.nonce === 'string') {
       return { cmd: raw.cmd, nonce: raw.nonce };
     }
     return null;

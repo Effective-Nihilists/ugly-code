@@ -108,7 +108,7 @@ export function ProdPanel(): React.ReactElement {
         // Ship spawn failures to errorLog with the output tail — otherwise a failed
         // deploy is only visible in this panel, never in the logs (undebuggable from
         // another machine / after the fact).
-        console.error('[ProdPanel:deploy] spawn-error', JSON.stringify({ cwd, error: String(e), outputTail: buf.slice(-1500) }));
+        console.error('[ProdPanel:deploy] spawn-error', JSON.stringify({ cwd, error: e, outputTail: buf.slice(-1500) }));
         append(`\n[error: ${e}]\n`);
         setError(e);
         setRunning(false);

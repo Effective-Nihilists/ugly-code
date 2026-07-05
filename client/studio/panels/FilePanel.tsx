@@ -229,7 +229,7 @@ export function FilePanel(): React.ReactElement {
         }
       })();
     }, 2000);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); };
   }, [selected, diskMtime, dirtyValue, content]);
 
   // ── LSP navigation ──
@@ -390,7 +390,7 @@ export function FilePanel(): React.ReactElement {
               ref={editorRef}
               path={selected}
               value={cur()}
-              onChange={(next) => setDirtyValue(next)}
+              onChange={(next) => { setDirtyValue(next); }}
               onSave={() => void save()}
               onDefinition={(p) => void onDefinition(p)}
               onImplementation={(p) => void onImplementation(p)}
@@ -402,7 +402,7 @@ export function FilePanel(): React.ReactElement {
           <div style={S.empty}>Select a file to view its contents.</div>
         )}
         {refs && (
-          <ReferencesPanel results={refs} onPick={(r) => void navTo(r)} onClose={() => setRefs(null)} />
+          <ReferencesPanel results={refs} onPick={(r) => void navTo(r)} onClose={() => { setRefs(null); }} />
         )}
         {error && <div style={S.error}>{error}</div>}
       </div>

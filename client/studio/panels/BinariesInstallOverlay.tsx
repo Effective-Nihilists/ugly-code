@@ -31,11 +31,11 @@ const C = {
   border: '#3a2f22',
 } as const;
 
-type ElectronApi = {
+interface ElectronApi {
   onBinariesProgress?: (
     cb: (e: { origin: string; name: string; phase: string; pct: number }) => void,
   ) => () => void;
-};
+}
 
 // One-time keyframes for the header spinner, id-guarded so re-mounts don't stack
 // <style> tags and so it can't clash with the host page's stylesheet.
@@ -61,8 +61,8 @@ export default function BinariesInstallOverlay(): ReactElement | null {
   // Clear shortly after every tool has finished successfully.
   useEffect(() => {
     if (allDone) {
-      const id = setTimeout(() => setTools({}), 700);
-      return () => clearTimeout(id);
+      const id = setTimeout(() => { setTools({}); }, 700);
+      return () => { clearTimeout(id); };
     }
     return undefined;
   }, [allDone]);
@@ -233,7 +233,7 @@ export default function BinariesInstallOverlay(): ReactElement | null {
           <div style={{ marginTop: 16, display: 'flex', gap: 9 }}>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => { window.location.reload(); }}
               style={{
                 flex: 1,
                 display: 'flex',
@@ -255,7 +255,7 @@ export default function BinariesInstallOverlay(): ReactElement | null {
             </button>
             <button
               type="button"
-              onClick={() => setDismissed(true)}
+              onClick={() => { setDismissed(true); }}
               style={{
                 flex: 1,
                 padding: '9px 10px',

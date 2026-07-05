@@ -74,7 +74,7 @@ export function CodebaseSearch({ onOpen }: { onOpen: (path: string, line: number
 
   return (
     <div style={S.root} data-id="codebase-search">
-      <button style={S.header} onClick={() => setOpen((o) => !o)}>
+      <button style={S.header} onClick={() => { setOpen((o) => !o); }}>
         {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         <Search size={13} />
         <span style={{ fontWeight: 600 }}>Search</span>
@@ -87,7 +87,7 @@ export function CodebaseSearch({ onOpen }: { onOpen: (path: string, line: number
             style={S.input}
             placeholder="Search the codebase…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); }}
             onKeyDown={(e) => { if (e.key === 'Enter') void run(); }}
           />
           <div style={S.tabs}>
@@ -95,7 +95,7 @@ export function CodebaseSearch({ onOpen }: { onOpen: (path: string, line: number
               <button
                 key={m}
                 data-id={`codebase-search-mode-${m}`}
-                onClick={() => setMode(m)}
+                onClick={() => { setMode(m); }}
                 style={{ ...S.tab, ...(mode === m ? S.tabActive : {}) }}
                 title={
                   m === 'grep' ? 'ripgrep regex/exact'
@@ -114,7 +114,7 @@ export function CodebaseSearch({ onOpen }: { onOpen: (path: string, line: number
               <div key={`${h.file_path}:${h.start_line}:${i}`} style={S.hit}>
                 <button
                   style={S.hitLabel}
-                  onClick={() => onOpen(h.file_path, h.start_line)}
+                  onClick={() => { onOpen(h.file_path, h.start_line); }}
                   title={h.file_path}
                 >
                   {resultLabel(h)}

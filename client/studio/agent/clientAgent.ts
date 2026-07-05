@@ -27,7 +27,6 @@ import { sessionToolSpecs } from '../../agent/tools/gating';
 import { discoverSkills, formatAvailableSkills } from '../hooks/skillDiscovery';
 import type { StepFn } from '../../agent/engine';
 import {
-  AGENT_TOOLS,
   AGENT_TOOL_NAMES,
   AGENT_SYSTEM_PROMPT,
   AGENT_DEFAULT_MODEL,
@@ -603,7 +602,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     // mode set + the ugly-app project set (when applicable) + feature gates —
     // the monolith's model. `modelMode.kind` of 'auto' resolves to single mode.
     get tools() {
-      const mode = state.modelMode?.kind === 'group' ? 'group' : 'single';
+      const mode = state.modelMode.kind === 'group' ? 'group' : 'single';
       const isUglyApp = uglyAppBySession.get(sessionId) ?? false;
       return sessionToolSpecs({ mode, isUglyApp });
     },

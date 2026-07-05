@@ -116,7 +116,7 @@ async function runExact(args: GrepArgs, ctx: ToolContext | undefined): Promise<s
   return stdout.trimEnd() || `(no matches for ${JSON.stringify(args.pattern)})`;
 }
 
-type LspHit = { uri: string; line: number; character: number };
+interface LspHit { uri: string; line: number; character: number }
 
 const BARE_IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const LSP_SUPPLEMENT_MAX = 20;
@@ -332,7 +332,7 @@ export const grepTool: ToolModule = {
     if (symbols.length === 0) return runExact(args, ctx);
 
     const [exact, lsp] = await Promise.all([runExact(args, ctx), lspForProject(ctx)]);
-    if (!lsp || lsp.getState() !== 'ready') return exact;
+    if (lsp?.getState() !== 'ready') return exact;
     const defs = await lspSupplementDefs(lsp, symbols);
     if (defs.length === 0) return exact;
     const cwd = projectRoot(ctx);

@@ -100,7 +100,7 @@ export async function getEditorLspClient(
     client = new LspClient({ workspaceRoot, language });
     // Feed this client's lifecycle + diagnostics into the aggregate status
     // the chat header renders.
-    client.onEvent((e) => publishStatus(statusFromEvent(e, Date.now())));
+    client.onEvent((e) => { publishStatus(statusFromEvent(e, Date.now())); });
     clients.set(k, client);
   }
   // start() is idempotent; safe to call repeatedly.

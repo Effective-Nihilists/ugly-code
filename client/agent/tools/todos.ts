@@ -57,11 +57,15 @@ const SPEC: TextGenTool = {
 export const todosTool: ToolModule = {
   name: 'todos',
   spec: SPEC,
+  // eslint-disable-next-line @typescript-eslint/require-await -- ToolModule.run must return Promise<string>; this impl has no async work
   async run(input, ctx) {
     const todos = Array.isArray(input.todos) ? (input.todos as Todo[]) : [];
     const sid = ctx?.sessionId ?? 'default';
     bySession.set(sid, todos);
     if (todos.length === 0) return '(no todos)';
+    // input.todos is an unchecked cast, so t.status may be an unexpected value at
+    // runtime — keep the ?? fallback as a real safety net.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const lines = todos.map((t) => `${MARK[t.status] ?? '[ ]'} ${t.content}`);
     const done = todos.filter((t) => t.status === 'completed').length;
     return `${lines.join('\n')}\n(${done}/${todos.length} complete)`;
