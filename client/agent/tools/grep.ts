@@ -13,6 +13,7 @@ import type { ToolContext } from '../tools';
 import { projectRoot, lspForProject } from './lspForProject';
 import { fileUriToPath } from '../../studio/agent/lsp/client';
 import { spawnCollect } from './spawn';
+import { HARD_EXCLUDES } from './pathExcludes';
 
 export type GrepMode =
   | 'auto'
@@ -85,6 +86,7 @@ export function buildRgArgs(args: GrepArgs): string[] {
   const mode = args.output_mode ?? 'content';
   if (args.caseInsensitive) a.push('-i');
   if (args.include_ignored) a.push('--no-ignore');
+  for (const dir of HARD_EXCLUDES) a.push('-g', `!${dir}`);
   if (args.include) a.push('-g', args.include);
   if (mode === 'files_with_matches') {
     a.push('-l');

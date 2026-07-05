@@ -58,6 +58,12 @@ describe('grep buildRgArgs', () => {
     expect(a).toContain('5');
     expect(a).toContain('--no-ignore');
   });
+
+  it('excludes .git and node_modules even with include_ignored', () => {
+    const a = buildRgArgs({ pattern: 'foo', include_ignored: true });
+    expect(a).toContain('!.git');
+    expect(a).toContain('!node_modules');
+  });
 });
 
 describe('grep runLspMode', () => {
