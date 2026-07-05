@@ -1,7 +1,7 @@
 // Task B1.4 — glob (file-name finding via `rg --files -g`).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetMock, mockCalls } from '../../helpers/uglyNativeMock';
-import { globTool, buildGlobArgs } from '../../../client/agent/tools/glob';
+import { globTool, buildGlobArgs, parseGlobignore } from '../../../client/agent/tools/glob';
 
 describe('glob buildGlobArgs', () => {
   it('lists files matching the glob', () => {
@@ -12,6 +12,26 @@ describe('glob buildGlobArgs', () => {
   });
   it('includes ignored files when requested', () => {
     expect(buildGlobArgs({ pattern: '*.ts', include_ignored: true })).toContain('--no-ignore');
+  });
+});
+
+describe('glob hard excludes', () => {
+  it('always excludes .git and node_modules, even with include_ignored', () => {
+    const a = buildGlobArgs({ pattern: '*', include_ignored: true });
+    expect(a).toContain('--no-ignore');
+    expect(a).toContain('!.git');
+    expect(a).toContain('!node_modules');
+  });
+  it('appends .globignore patterns as negative globs', () => {
+    const a = buildGlobArgs({ pattern: '**/*' }, ['coverage', 'tmp']);
+    expect(a).toContain('!coverage');
+    expect(a).toContain('!tmp');
+  });
+});
+
+describe('parseGlobignore', () => {
+  it('keeps patterns, drops blanks and # comments', () => {
+    expect(parseGlobignore('# a comment\n\ncoverage\n  logs/  \n')).toEqual(['coverage', 'logs/']);
   });
 });
 
