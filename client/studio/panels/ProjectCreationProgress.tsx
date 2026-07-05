@@ -1,7 +1,8 @@
 import React from 'react';
 import { permissions } from 'ugly-app/native';
 import { InteractiveTerminal } from '../components/InteractiveTerminal';
-import { buildScaffoldCommand, parseScaffoldResult } from './scaffoldCommand';
+import { buildScaffoldCommand, parseScaffoldResult, normalizeScaffoldPath } from './scaffoldCommand';
+import { isWindows } from '../utils/platform';
 
 /** Bundled tools the scaffold needs. The desktop daemon gates uglyNative.process
  *  on (a) the binary being bundled and (b) a granted `process` capability; we
@@ -58,7 +59,11 @@ export function ProjectCreationProgress({
   const handleCommandExit = React.useCallback((code: number | null, _command: string, output: string): void => {
     const result = parseScaffoldResult(output, code);
     if (result.ok) {
-      const path = result.path || `${parentDir.replace(/\/+$/, '')}/${name}`;
+      // On Windows the bundled Git-Bash prints `/c/Users/...`; normalize to
+      // `C:\Users\...` so the project opens at the real path (else Node mangles
+      // it to `C:\c\Users\...` → `.uglyapp`/template "not found").
+      const raw = result.path || `${parentDir.replace(/\/+$/, '')}/${name}`;
+      const path = normalizeScaffoldPath(raw, isWindows);
       onDone(name, path);
     } else {
       setStatus('error');

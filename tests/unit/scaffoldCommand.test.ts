@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildScaffoldCommand, parseScaffoldResult } from '../../client/studio/panels/scaffoldCommand';
+import { buildScaffoldCommand, parseScaffoldResult, normalizeScaffoldPath } from '../../client/studio/panels/scaffoldCommand';
 
 describe('buildScaffoldCommand', () => {
   it('expands a leading ~ to $HOME and quotes name + parent', () => {
@@ -31,5 +31,31 @@ describe('parseScaffoldResult', () => {
 
   it('is ok with an empty path when there is no output', () => {
     expect(parseScaffoldResult('', 0)).toEqual({ ok: true, path: '' });
+  });
+});
+
+describe('normalizeScaffoldPath', () => {
+  it('maps an MSYS/Git-Bash pwd path to native Windows (the C:\\c\\ bug)', () => {
+    // Git-Bash `pwd` prints /c/Users/...; Node path.resolve would otherwise
+    // mangle it to C:\c\Users\... (drive-root-relative).
+    expect(normalizeScaffoldPath('/c/Users/theju/Documents/Ugly Studio/test', true))
+      .toBe('C:\\Users\\theju\\Documents\\Ugly Studio\\test');
+  });
+
+  it('normalizes a forward-slash drive path (pwd -W style) to backslashes', () => {
+    expect(normalizeScaffoldPath('C:/Users/theju/proj', true)).toBe('C:\\Users\\theju\\proj');
+  });
+
+  it('leaves an already-native Windows path unchanged', () => {
+    expect(normalizeScaffoldPath('C:\\Users\\theju\\proj', true)).toBe('C:\\Users\\theju\\proj');
+  });
+
+  it('is a no-op on non-Windows (POSIX paths pass through)', () => {
+    expect(normalizeScaffoldPath('/c/Users/x', false)).toBe('/c/Users/x');
+    expect(normalizeScaffoldPath('/Users/x/proj', false)).toBe('/Users/x/proj');
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(normalizeScaffoldPath('  /Users/x/proj \n', false)).toBe('/Users/x/proj');
   });
 });
