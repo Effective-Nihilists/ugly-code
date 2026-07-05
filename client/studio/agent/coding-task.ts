@@ -135,16 +135,22 @@ defineTask({
     worktreeBehind: async () => ({ behind: await behindCount(sessionId, t.params.projectPath ?? null) }),
 
     // ── Interactive turn controls (C1) ─────────────────────────────────
-    // The chat renders ask-user / step-review cards from `session_state`
-    // SNAPSHOTS (it ignores the granular ask_user_request/step_review_request
-    // events — see useCodingAgentChat.ts). This task-based agent loop
-    // (clientAgent.runClientAgentTurn) does not yet emit those snapshots, and the
-    // ugly-app agent framework's AgentController exposes no manual compaction.
-    // So these are safe acknowledgements: they keep the shim names wired (no
-    // "not yet wired" reject) and answer cleanly. Full interactivity needs the
-    // session_state snapshot-emission subsystem (pendingAskUsers/
-    // pendingStepReviews) + broker + hot-path tool gating — tracked as a
-    // follow-up. answerAskUser resolves a broker request if one is pending.
+    // BY DESIGN in ugly-code these are card-inactive: the `ask_user` tool
+    // (client/agent/tools/askUser.ts) is chat-based — it ends the turn with the
+    // question and the user answers in their next message, rather than the
+    // monolith's pending-card + answer-RPC flow. composeSessionSnapshot always
+    // emits pendingAskUsers/pendingStepReviews = [], so those cards never render
+    // and these answer RPCs are never invoked in practice. They're wired as
+    // correct safe responses so the shim names resolve (no "not yet wired"
+    // reject) IF the card UI is ever activated:
+    //   • answerAskUser → resolves a broker request when one is pending (ready for
+    //     a future card-based ask_user), else ok:false (phantom card).
+    //   • answerStepReview → ack (step-review gating is not enabled in this design).
+    //   • compact → ack; the agent framework's AgentController auto-compacts at
+    //     maxContextTokens and exposes no manual compaction, so there's nothing to
+    //     force — returning ok avoids a spurious error banner.
+    //   • restoreCheckpoint → ok:false, exactly what the chat expects for a session
+    //     with no checkpoint tracker (checkpoints default off; no tracker wired).
     // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
     answerAskUser: async (p: { toolCallId?: string; answer?: string }) => ({
       ok: answerPendingAskUser(p.toolCallId ?? '', p.answer ?? ''),
@@ -154,7 +160,7 @@ defineTask({
     // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
     compact: async () => ({ ok: true }),
     // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
-    restoreCheckpoint: async () => ({ ok: true }),
+    restoreCheckpoint: async () => ({ ok: false }),
   },
 });
 
