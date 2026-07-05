@@ -15,6 +15,21 @@ import { fileUriToPath } from '../../studio/agent/lsp/client';
 import { spawnCollect } from './spawn';
 import { HARD_EXCLUDES } from './pathExcludes';
 
+/** Strip `cwd` from an absolute path for model-facing display. Separator- and
+ *  case-insensitive on Windows so `C:\proj\a.ts` under a `C:\proj` cwd still
+ *  relativizes (a plain `cwd + '/'` prefix never matches backslash paths). */
+function displayRelative(p: string, cwd: string): string {
+  if (!cwd) return p;
+  const isWin = cwd.includes('\\') && !cwd.startsWith('/');
+  if (isWin) {
+    const norm = (s: string): string => s.replace(/\//g, '\\').toLowerCase();
+    const np = norm(p);
+    const nc = norm(cwd.replace(/[\\/]+$/, ''));
+    return np.startsWith(nc + '\\') ? p.slice(nc.length + 1) : p;
+  }
+  return p.startsWith(cwd + '/') ? p.slice(cwd.length + 1) : p;
+}
+
 export type GrepMode =
   | 'auto'
   | 'exact'
@@ -188,8 +203,7 @@ function formatLspHits(
         : 'definitions';
   if (hits.length === 0) return `(no ${label} for ${JSON.stringify(symbol)})`;
   const lines = hits.map((h) => {
-    let p = fileUriToPath(h.uri);
-    if (cwd && p.startsWith(cwd + '/')) p = p.slice(cwd.length + 1);
+    const p = displayRelative(fileUriToPath(h.uri), cwd ?? '');
     return `${p}:${h.line}:${h.character}`;
   });
   return `Found ${hits.length} ${label} for ${JSON.stringify(symbol)}\n${lines.join('\n')}\n`;
@@ -339,8 +353,7 @@ export const grepTool: ToolModule = {
     if (defs.length === 0) return exact;
     const cwd = projectRoot(ctx);
     const defLines = defs.map((h) => {
-      let p = fileUriToPath(h.uri);
-      if (cwd && p.startsWith(cwd + '/')) p = p.slice(cwd.length + 1);
+      const p = displayRelative(fileUriToPath(h.uri), cwd ?? '');
       return `${p}:${h.line}:${h.character}`;
     });
     return `${exact}\n\nLSP DEFINITIONS\n${defLines.join('\n')}`;

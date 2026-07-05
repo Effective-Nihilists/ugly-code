@@ -48,18 +48,53 @@ function resolutionBase(ctx: ToolContext | undefined): string | null {
   return ctx?.workspaceDir ?? ctx?.projectDir ?? null;
 }
 
-/** Best-effort home dir from the absolute project/worktree path (macOS/Linux). */
-function deriveHome(ctx: ToolContext | undefined): string | null {
-  const p = ctx?.workspaceDir ?? ctx?.projectDir ?? '';
-  const m = /^(\/Users\/[^/]+|\/home\/[^/]+|\/root)/.exec(p);
-  return m ? m[1] : null;
+/** A Windows-absolute path: drive-letter (`C:\`, `C:/`) or UNC (`\\host\share`). */
+function isWindowsAbsolute(p: string): boolean {
+  return /^[a-zA-Z]:[\\/]/.test(p) || /^\\\\/.test(p);
 }
 
-/** Collapse `.`/`..` segments in a POSIX path (no fs access). */
-function normalizePosix(p: string): string {
-  const isAbs = p.startsWith('/');
+/** Whether a path uses Windows conventions (drive/UNC root or backslash seps).
+ *  Used to pick the join separator so a Windows base keeps producing Windows
+ *  paths (mixed `C:\a/b` blobs corrupt native.fs + codebase.update on Windows). */
+function isWindowsPath(p: string): boolean {
+  return isWindowsAbsolute(p) || p.includes('\\');
+}
+
+/** The separator to build paths with, inferred from the resolution base. */
+function sepFor(p: string): '\\' | '/' {
+  return isWindowsPath(p) ? '\\' : '/';
+}
+
+/** Best-effort home dir from the absolute project/worktree path. Handles
+ *  macOS/Linux (`/Users/x`, `/home/x`, `/root`) and Windows (`C:\Users\x`). */
+function deriveHome(ctx: ToolContext | undefined): string | null {
+  const p = ctx?.workspaceDir ?? ctx?.projectDir ?? '';
+  const win = /^([a-zA-Z]:[\\/]Users[\\/][^\\/]+)/.exec(p);
+  if (win) return win[1];
+  const posix = /^(\/Users\/[^/]+|\/home\/[^/]+|\/root)/.exec(p);
+  return posix ? posix[1] : null;
+}
+
+/** Collapse `.`/`..` segments (no fs access). Splits on both `/` and `\` and
+ *  re-joins with `sep`, preserving a leading POSIX `/`, drive (`C:\`), or UNC
+ *  (`\\host\share\`) root so `..` never climbs past it. */
+function normalizePath(p: string, sep: '\\' | '/'): string {
+  const winAbs = isWindowsAbsolute(p);
+  const isAbs = winAbs || p.startsWith('/');
+  let prefix = '';
+  let rest = p;
+  if (winAbs) {
+    const m = /^([a-zA-Z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+[\\/])/.exec(p);
+    if (m) {
+      prefix = m[1].replace(/[\\/]+$/, '') + sep;
+      rest = p.slice(m[1].length);
+    }
+  } else if (isAbs) {
+    prefix = sep;
+    rest = p.slice(1);
+  }
   const out: string[] = [];
-  for (const seg of p.split('/')) {
+  for (const seg of rest.split(/[\\/]+/)) {
     if (seg === '' || seg === '.') continue;
     if (seg === '..') {
       if (out.length && out[out.length - 1] !== '..') out.pop();
@@ -68,31 +103,45 @@ function normalizePosix(p: string): string {
       out.push(seg);
     }
   }
-  return (isAbs ? '/' : '') + out.join('/');
+  return prefix + out.join(sep);
 }
 
-/** Resolve a model-supplied path to an absolute fs path. Handles absolute
- *  (`/foo`), home (`~/foo`), and relative (`foo`, `./foo`, `../foo`) forms;
- *  relative paths root at the worktree (if any) else the project dir. When no
- *  base is known, the path passes through so the daemon can resolve it. */
+/** Resolve a model-supplied path to an absolute fs path. Handles POSIX and
+ *  Windows absolute forms (`/foo`, `C:\foo`, `\\host\share`), home (`~/foo`),
+ *  and relative (`foo`, `./foo`, `../foo`) forms; relative paths root at the
+ *  worktree (if any) else the project dir, and follow the base's separator
+ *  style. When no base is known, the path passes through so the daemon can
+ *  resolve it. */
 export function resolvePath(ctx: ToolContext | undefined, path: string): string {
-  if (path.startsWith('/')) return normalizePosix(path);
-  if (path === '~' || path.startsWith('~/')) {
+  if (isWindowsAbsolute(path)) return normalizePath(path, '\\');
+  if (path.startsWith('/')) return normalizePath(path, '/');
+  if (path === '~' || path.startsWith('~/') || path.startsWith('~\\')) {
     const home = deriveHome(ctx);
-    return home ? normalizePosix(home + '/' + path.slice(path === '~' ? 1 : 2)) : path;
+    if (!home) return path;
+    const sep = sepFor(home);
+    return normalizePath(home + sep + path.slice(1).replace(/^[\\/]+/, ''), sep);
   }
   const base = resolutionBase(ctx);
   if (!base) return path;
-  return normalizePosix(base.replace(/\/+$/, '') + '/' + path);
+  const sep = sepFor(base);
+  return normalizePath(base.replace(/[\\/]+$/, '') + sep + path, sep);
 }
 
 /** Render an absolute fs path back as a base-relative path for the model (paths
  *  returned to the model must be relative — see TOOLS.md "Path handling"). Paths
- *  outside the base, or when no base is known, are returned unchanged. */
+ *  outside the base, or when no base is known, are returned unchanged. Windows
+ *  comparison is separator- and case-insensitive. */
 export function relativizePath(ctx: ToolContext | undefined, absPath: string): string {
   const base = resolutionBase(ctx);
   if (!base) return absPath;
-  const root = base.replace(/\/+$/, '');
+  const root = base.replace(/[\\/]+$/, '');
+  if (isWindowsPath(base)) {
+    const norm = (s: string): string => s.replace(/\//g, '\\').toLowerCase();
+    const a = norm(absPath);
+    const r = norm(root);
+    if (a === r) return '.';
+    return a.startsWith(r + '\\') ? absPath.slice(root.length + 1) : absPath;
+  }
   if (absPath === root) return '.';
   return absPath.startsWith(root + '/') ? absPath.slice(root.length + 1) : absPath;
 }

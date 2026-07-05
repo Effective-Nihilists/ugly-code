@@ -68,7 +68,11 @@ export function stopCodebasePoll(sessionId: string): void {
 export async function fetchArchitectureDoc(cwd: string): Promise<string | null> {
   if (!cwd) return null;
   try {
-    const path = `${cwd.replace(/\/+$/, '')}/.ugly-studio/ARCHITECTURE.md`;
+    // Follow the cwd's separator style so Windows paths stay all-backslash
+    // (a mixed `C:\proj/.ugly-studio/...` blob is fragile on native.fs).
+    const sep = cwd.includes('\\') && !cwd.startsWith('/') ? '\\' : '/';
+    const root = cwd.replace(/[\\/]+$/, '');
+    const path = `${root}${sep}.ugly-studio${sep}ARCHITECTURE.md`;
     const res = (await inv('fs.readFile', { path })) as { content?: string } | undefined;
     const content = res?.content;
     return content?.trim() ? content : null;

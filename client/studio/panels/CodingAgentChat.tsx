@@ -50,6 +50,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { registerFeedbackContextProvider } from 'ugly-app/client';
 import { MdastViewer } from 'ugly-app/markdown/client';
 import { isNativeAvailable } from 'ugly-app/native';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
@@ -105,7 +106,7 @@ import {
   ReasoningSelector,
   supportsReasoningClient,
 } from './ReasoningSelector';
-import { ReportSessionIssueButton } from './ReportSessionIssueButton';
+import { capSessionBundle } from './sessionFeedbackBundle';
 
 // ── Shared helpers ──────────────────────────────────────────────────
 
@@ -1284,7 +1285,10 @@ function EditCard({ tool }: { tool: ToolUse }) {
   const cwd = useChatCwd();
   const input = safeParse(tool.input) ?? {};
   const meta = (tool.metadata ?? {}) as ToolMetadata;
-  const filePath: string = input.file_path ?? '(unknown path)';
+  // The edit/write/multiedit tool schemas name the parameter `path` (see
+  // shared/agent.ts); `file_path` is only a legacy alias. Read both so the card
+  // header shows the real path instead of "(unknown path)".
+  const filePath: string = input.file_path ?? input.path ?? '(unknown path)';
   const isWrite = isTool(tool.name.toLowerCase(), 'write');
   const isMulti = isTool(tool.name.toLowerCase(), 'multiedit');
   const additions = Number(meta.additions ?? 0);
@@ -6020,6 +6024,30 @@ CodingAgentChatProps = {}) {
     onTitleChanged,
     ...(onResumeMissing ? { onResumeMissing } : {}),
   });
+  // Contribute the live coding session (messages + model/mode settings) to any
+  // Ugly Studio feedback report filed from this page. The bundle is expensive to
+  // serialize, so we register a LAZY provider (invoked only at submit time) rather
+  // than keeping a serialized copy alive — we just stash the live state in a ref
+  // (O(1) each render) and cap+stringify on demand inside the provider callback.
+  const feedbackBundleRef = useRef<Record<string, unknown>>({});
+  feedbackBundleRef.current = {
+    compositeId: sessionId,
+    messages,
+    model,
+    reasoningEffort,
+    modelMode,
+    patternMode,
+  };
+  useEffect(
+    () =>
+      registerFeedbackContextProvider('sessionBundle', (): Record<string, string> =>
+        sessionId
+          ? { sessionBundle: JSON.stringify(capSessionBundle(feedbackBundleRef.current)) }
+          : {},
+      ),
+    [sessionId],
+  );
+
   const globalActiveSpec = useActiveSpec();
   // Per-session spec takes precedence over the global "studio
   // active spec". The global value only tracks what the Specs tab
@@ -7324,7 +7352,6 @@ CodingAgentChatProps = {}) {
           )}
           <CodebaseReadinessPill readiness={codebaseReadiness} />
           {sessionId && <CopySessionIdButton compositeId={sessionId} />}
-          {sessionId && <ReportSessionIssueButton compositeId={sessionId} getBundle={() => ({ messages, model, reasoningEffort, modelMode, patternMode })} />}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
               data-id="archive-session-empty"
@@ -7489,7 +7516,6 @@ CodingAgentChatProps = {}) {
           )}
           <CodebaseReadinessPill readiness={codebaseReadiness} />
           {sessionId && <CopySessionIdButton compositeId={sessionId} />}
-          {sessionId && <ReportSessionIssueButton compositeId={sessionId} getBundle={() => ({ messages, model, reasoningEffort, modelMode, patternMode })} />}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
               data-id="archive-session"
