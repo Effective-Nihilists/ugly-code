@@ -1165,6 +1165,13 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // overwrite this from disk via the chatCreate response.
   const [reasoningEffort, setReasoningEffortState] =
     useState<ReasoningEffort>('max');
+  // Ref mirror so a same-tick hero pre-pick (handleHeroSubmit → switchReasoningEffort
+  // → sendMessage → startNewChat, before any re-render) reaches chatCreate instead of
+  // the stale closure default. Mirrors the `modelRef` pattern below.
+  const reasoningEffortRef = useRef(reasoningEffort);
+  useEffect(() => {
+    reasoningEffortRef.current = reasoningEffort;
+  }, [reasoningEffort]);
   const [pendingSkill, setPendingSkill] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingPermissions, setPendingPermissions] = useState<
@@ -1276,6 +1283,34 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   );
   const [patternMode, setPatternModeState] =
     useState<SessionSnapshot['patternMode']>('auto');
+  // Ref mirrors of the three axes so a same-tick new-session hero pre-pick reaches
+  // `chatCreate` (see reasoningEffortRef / modelRef). The setters below write these
+  // synchronously; `startNewChat` reads `.current` so it never sends a stale default.
+  const permissionModeRef = useRef(permissionMode);
+  const modelModeRef = useRef(modelMode);
+  const patternModeRef = useRef(patternMode);
+  useEffect(() => {
+    permissionModeRef.current = permissionMode;
+  }, [permissionMode]);
+  useEffect(() => {
+    modelModeRef.current = modelMode;
+  }, [modelMode]);
+  useEffect(() => {
+    patternModeRef.current = patternMode;
+  }, [patternMode]);
+  // One-shot tracking sentinel: the axes we asked `chatCreate` to seed for a fresh
+  // session, checked against that session's FIRST snapshot. If the snapshot doesn't
+  // echo them, a downstream drop (create-schema strip, handler default, or snapshot
+  // clobber) silently ignored the user's new-session picks — the exact class of bug
+  // reported. `console.error` → errorLog (source='browser'), queryable per user.
+  // Cleared after the first matching snapshot so steady-state changes never log.
+  const intendedCreateAxesRef = useRef<{
+    id: string;
+    permissionMode: SessionSnapshot['permissionMode'];
+    modelMode: SessionSnapshot['modelMode'];
+    patternMode: SessionSnapshot['patternMode'];
+    reasoningEffort: ReasoningEffort;
+  } | null>(null);
   const [resolvedPattern, setResolvedPattern] =
     useState<SessionSnapshot['resolvedPattern']>(null);
   const [currentStepId, setCurrentStepId] =
@@ -1366,6 +1401,28 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
    */
   const applySnapshot = useCallback(
     (snap: SessionSnapshot) => {
+      // One-shot new-session drift check (see intendedCreateAxesRef). The first
+      // snapshot for a freshly-created session must echo the axes we seeded on
+      // create; if it doesn't, the user's picks were silently dropped downstream.
+      const intended = intendedCreateAxesRef.current;
+      if (intended && (snap.sessionId === intended.id || snap.compositeId === intended.id)) {
+        intendedCreateAxesRef.current = null;
+        const drift: string[] = [];
+        if (snap.permissionMode !== intended.permissionMode)
+          drift.push(`permissionMode ${intended.permissionMode}→${snap.permissionMode}`);
+        if (JSON.stringify(snap.modelMode) !== JSON.stringify(intended.modelMode))
+          drift.push(`modelMode ${JSON.stringify(intended.modelMode)}→${JSON.stringify(snap.modelMode)}`);
+        if (snap.patternMode !== intended.patternMode)
+          drift.push(`patternMode ${intended.patternMode}→${snap.patternMode}`);
+        if (snap.reasoningEffort !== intended.reasoningEffort)
+          drift.push(`reasoningEffort ${intended.reasoningEffort}→${snap.reasoningEffort}`);
+        if (drift.length > 0) {
+          console.error(
+            '[session-origin] new-session axis drift — picked settings were ignored',
+            JSON.stringify({ sessionId: intended.id, drift }),
+          );
+        }
+      }
       setModel(snap.model);
       setReasoningEffortState(snap.reasoningEffort);
       // Three-axis state — drives the AgentAxisSelector dropdowns and
@@ -2649,16 +2706,23 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     console.debug('[CodingAgentChat] Starting new chat with model: %s', model);
 
     try {
-      // Server's `mode` field is still required by the chatCreate
-      // contract; collapse the new permissionMode axis onto it. yolo
-      // → 'yolo' (server skips sandbox); normal → 'edit' (server
-      // applies edit-mode ACL to the worktree). The legacy 'spec'
-      // value is never sent — the spec-build-verify pattern handles
-      // read-only spec turns via system-prompt tail, not OS ACL.
-      const serverMode = permissionMode === 'yolo' ? 'yolo' : 'edit';
-      // Read the ref (not the closed-over `model`) so a just-picked model from
-      // the new-session hero is honored on this same-tick create.
+      // Resolve EVERY create axis from its ref, not the closed-over React state.
+      // `handleHeroSubmit` applies the hero's picks via the axis setters, then
+      // synchronously calls sendMessage → startNewChat in the SAME tick, before a
+      // re-render commits the new state — so the closure still holds the hook's
+      // defaults. The setters write these refs synchronously, so they carry the
+      // user's actual picks. (This is the "new session ignored my model/plan
+      // settings" bug — previously only `model` read a ref.)
       const createModel = modelRef.current;
+      const createModelMode = modelModeRef.current;
+      const createPatternMode = patternModeRef.current;
+      const createReasoningEffort = reasoningEffortRef.current;
+      // Send the permission axis from the ref, not the stale closure. In-process
+      // (ugly.bot) sessions only ever carry 'edit' | 'yolo' (the selector hides
+      // 'claude-plan' for them), and 'yolo' now takes effect at runtime via the
+      // daemon SandboxMode. We send the value RAW (no yolo?→edit collapse) so a
+      // Claude-CLI session's own native 'claude-plan' mode also round-trips.
+      const serverMode = permissionModeRef.current;
       console.log(
         `[session-origin] useCodingAgentChat.startNewChat chatCreate model=${createModel} mode=${serverMode}`,
       );
@@ -2669,15 +2733,24 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       const { sessionId: newId } = (await agentApi(backend.chatCreate, {
         model: createModel,
         mode: serverMode,
-        patternMode,
-        modelMode,
+        patternMode: createPatternMode,
+        modelMode: createModelMode,
         // Seed reasoning effort ON CREATE too (like patternMode/modelMode). The
         // post-create chatSetReasoningEffort below is fire-and-forget, so a first
         // turn that starts before it lands would otherwise run at the default —
         // the "new session ignored my reasoning setting" bug.
-        reasoningEffort,
+        reasoningEffort: createReasoningEffort,
       })) as ChatCreateResponse;
       console.debug('[CodingAgentChat] Session created: %s', newId);
+      // Arm the one-shot drift sentinel: the first snapshot for `newId` must echo
+      // these seeded axes; applySnapshot logs to errorLog if it doesn't.
+      intendedCreateAxesRef.current = {
+        id: newId,
+        permissionMode: serverMode,
+        modelMode: createModelMode,
+        patternMode: createPatternMode,
+        reasoningEffort: createReasoningEffort,
+      };
       setSessionId(newId);
       onSessionCreatedRef.current?.(newId);
       // Skip-permissions piggy-backed on legacy spec-mode; with the
@@ -2688,10 +2761,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         sessionId: newId,
         skip: true,
       }).catch(() => {/* noop */});
-      if (reasoningEffort !== 'off') {
+      if (createReasoningEffort !== 'off') {
         agentApi(backend.chatSetReasoningEffort, {
           sessionId: newId,
-          effort: reasoningEffort,
+          effort: createReasoningEffort,
         }).catch(() => {/* noop */});
       }
       return newId;
@@ -2774,11 +2847,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     let cancelled = false;
     void (async () => {
       try {
-        // permissionMode → server `mode` mapping: yolo → 'yolo' (server
-        // skips sandbox), normal → 'edit' (server applies edit-mode
-        // ACL). 'spec' is no longer used; pattern engine handles
-        // read-only-ness via system-prompt tail.
-        const serverMode = permissionMode === 'yolo' ? 'yolo' : 'edit';
+        // Send the permission axis RAW (edit | yolo | claude-plan) — no longer
+        // collapsed to edit/yolo, so plan mode round-trips. On this mount/resume
+        // path the closure value is the initial/persisted mode (no same-tick hero
+        // pre-pick), so reading state directly is correct here.
+        const serverMode = permissionMode;
         console.log(
           `[session-origin] useCodingAgentChat.mountEffect chatCreate initialSessionId=${initialSessionId} model=${model} mode=${serverMode}`,
         );
@@ -3119,6 +3192,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
    */
   const setPermissionMode = useCallback(
     async (next: SessionSnapshot['permissionMode']) => {
+      permissionModeRef.current = next; // synchronous — startNewChat reads this
       setPermissionModeState(next);
       if (!sessionId) return;
       try {
@@ -3157,6 +3231,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // change and react to its verdict:
       //   • needsFamilySwitchConfirm → confirm + retry via chatSetModel(reset)
       //   • ok (+ maybe a silent empty-session convert) → mirror locally
+      modelModeRef.current = next; // synchronous — startNewChat reads this
       setModelModeState(next);
       // Keep the `model` string in sync with a single pick — it drives both the
       // displayed model and what startNewChat sends to chatCreate. (Without this
@@ -3205,6 +3280,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
 
   const setPatternMode = useCallback(
     async (next: SessionSnapshot['patternMode']) => {
+      patternModeRef.current = next; // synchronous — startNewChat reads this
       setPatternModeState(next);
       if (!sessionId) return;
       try {
@@ -3385,6 +3461,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
 
   const switchReasoningEffort = useCallback(
     (next: ReasoningEffort) => {
+      reasoningEffortRef.current = next; // synchronous — startNewChat reads this
       if (next === reasoningEffort) return;
       console.debug(
         '[CodingAgentChat] Switching reasoning effort: %s → %s',

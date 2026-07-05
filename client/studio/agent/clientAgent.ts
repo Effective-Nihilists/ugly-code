@@ -159,7 +159,12 @@ function makeToolHandlers(sessionId: string): Record<string, (input: unknown) =>
         return dispatchTool(n, input, {
           sessionId,
           projectDir: dir,
-          mode: 'edit',
+          // Carry the session's real permission axis to the daemon SandboxMode
+          // (read live — this closure runs at tool-call time, after the state is
+          // registered) so the axis actually affects the runtime: 'yolo' skips the
+          // sandbox, 'edit' applies the normal edit-mode ACL. Previously hardcoded
+          // 'edit', so 'yolo' had no effect for in-process (ugly.bot) sessions.
+          mode: sessions.get(sessionId)?.permissionMode ?? 'edit',
           // Model-call for subagents (delegate/agent): one turn via the same
           // agentStep endpoint the main loop uses.
           step: ((req: unknown) =>

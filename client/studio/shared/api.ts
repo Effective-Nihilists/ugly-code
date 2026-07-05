@@ -2292,6 +2292,45 @@ export const requests = defineRequests({
        * ignore this flag — they have their own MCP wiring.
        */
       exposeMcp: z.boolean().optional(),
+      /**
+       * Initial Model axis for the session. `startNewChat` sends this so a
+       * new-session hero pre-pick (single model vs auto strategy) is seeded
+       * on create — the per-axis `codingAgentSetModelMode` RPC no-ops while
+       * there's no sessionId yet. Undeclared previously, which let a
+       * validated transport strip it and drop the pick. Shape mirrors
+       * `codingAgentSetModelMode` + `SessionSnapshot.modelMode`.
+       */
+      modelMode: z
+        .union([
+          z.object({ kind: z.literal('auto') }),
+          z.object({ kind: z.literal('max') }),
+          z.object({ kind: z.literal('single'), model: z.string() }),
+          z.object({ kind: z.literal('mid'), survivor: z.string() }),
+          z.object({ kind: z.literal('auto-cheap') }),
+          z.object({
+            kind: z.literal('group'),
+            models: z.array(z.string()),
+            personas: z.record(z.string(), z.string()).optional(),
+          }),
+        ])
+        .optional(),
+      /**
+       * Initial Pattern axis for the session — seeded on create for the same
+       * reason as `modelMode`. Mirrors `codingAgentSetPatternMode`.
+       */
+      patternMode: z
+        .enum([
+          'none',
+          'auto',
+          'spec-build-verify',
+          'super-spec-build-verify',
+          'quick-edit',
+          'investigate-fix',
+          'super-investigate-fix',
+          'chat-qa',
+          'chat-advisory',
+        ])
+        .optional(),
     }),
     output: z.object({
       sessionId: z.string(),
