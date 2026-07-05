@@ -1,11 +1,13 @@
 /**
  * Header button in CodingAgentChat that lets a user file an issue report for the
- * current coding session. On submit it writes ONE row to the app's errorLog D1 —
- * the SAME sink as a normal error (POST /api/errorLogCaptureNoAuth) — but carrying
- * the full session history (messages + settings) in `context`, so a session issue
- * sits alongside the agent's own task-error rows and can be analyzed together by
- * `compositeId`. (The old design bundled on-disk artifacts to R2 + emailed a
- * maintainer; this replaces that with a queryable errorLog row.)
+ * current coding session. On submit it files framework feedback (POST
+ * /api/feedbackReportCreateNoAuth → feedbackReport D1) carrying the full session
+ * history (messages + settings) in `context`, so a session issue flows through
+ * the same triage/resolution + reporter-notification path as normal user
+ * feedback. `user_id` is stamped server-side from the session cookie, which is
+ * how the resolve step later looks up the reporter's email (via ugly.bot) to
+ * email them. (Previously this wrote to errorLog; before that it bundled on-disk
+ * artifacts to R2 + emailed a maintainer.)
  *
  * The parent passes `getBundle()` — it owns the live session state (messages,
  * model, reasoning/mode axes). We cap the serialized bundle so an enormous session
@@ -95,23 +97,26 @@ export function ReportSessionIssueButton({
         userAgent: navigator.userAgent,
         ...(getBundle ? getBundle() : {}),
       });
-      // Write to the SAME errorLog D1 as a normal error (framework Logger sink),
-      // with the whole session bundle in `context`. type='session-issue' so these
-      // rows are filterable apart from ordinary console errors.
-      const entry = {
-        level: 'error',
-        message: `[session-issue:${type}] ${description}`.slice(0, 8000),
-        url: typeof location !== 'undefined' ? location.href : '',
-        timestamp: Date.now(),
-        source: 'session-issue',
-        type: 'session-issue',
-        context: bundle,
-      };
-      const res = await fetch('/api/errorLogCaptureNoAuth', {
+      // Submit through the framework feedback pipeline (feedbackReport D1), with
+      // the whole session bundle in `context`. This lands the report alongside
+      // normal user feedback so it flows through the same triage/resolution +
+      // reporter-notification path. `user_id` is stamped server-side from the
+      // session cookie (the request is public but auth-aware), which is how the
+      // resolve step later looks up the reporter's email via ugly.bot.
+      const res = await fetch('/api/feedbackReportCreateNoAuth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ input: { entries: [entry] } }),
+        body: JSON.stringify({
+          input: {
+            type,
+            description,
+            url: typeof location !== 'undefined' ? location.href : '',
+            page: typeof location !== 'undefined' ? location.pathname : '',
+            userAgent: navigator.userAgent,
+            context: bundle,
+          },
+        }),
       });
       if (!res.ok) {
         const body = await res.text().catch(() => '');
