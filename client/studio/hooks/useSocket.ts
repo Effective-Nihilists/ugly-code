@@ -646,7 +646,37 @@ const handlers: Record<string, Handler> = {
     }));
     return { sessions };
   },
-  gitStatus: () => Promise.resolve({ branch: 'main', remote: null, files: [] }),
+  // Real git status for the Git panel (was stubbed to a fixed 'main'/empty). Runs
+  // git in the panel's cwd (or the active project) via native.process. A non-git
+  // dir / failure degrades to the old safe default so the panel never throws.
+  gitStatus: async (i) => {
+    const explicit = str(i.cwd ?? i.projectPath ?? '');
+    const dir = explicit !== '' ? explicit : (getActiveProjectPath() ?? '');
+    if (dir === '') return { branch: 'main', remote: null, files: [] };
+    const run = (args: string[]): Promise<{ code: number; out: string }> =>
+      new Promise((resolve) => {
+        let out = '';
+        try {
+          const p = native.process.spawn('git', ['-C', dir, ...args], {});
+          p.onStdout((c) => { out += c; });
+          p.onExit((code) => { resolve({ code: code ?? -1, out }); });
+          p.onError(() => { resolve({ code: -1, out }); });
+        } catch {
+          resolve({ code: -1, out: '' });
+        }
+      });
+    const branchR = await run(['rev-parse', '--abbrev-ref', 'HEAD']);
+    if (branchR.code !== 0) return { branch: 'main', remote: null, files: [] }; // not a git repo
+    const branch = branchR.out.trim() || 'main';
+    const statusR = await run(['status', '--porcelain']);
+    const files = statusR.out
+      .split('\n')
+      .filter((l) => l.trim().length > 0)
+      .map((l) => ({ status: l.slice(0, 2).trim(), path: l.slice(3).trim() }));
+    const remoteR = await run(['remote', 'get-url', 'origin']);
+    const remote = remoteR.code === 0 && remoteR.out.trim() ? remoteR.out.trim() : null;
+    return { branch, remote, files };
+  },
   deleteCodingAgentSession: async (i) => {
     await sessionApi.archive({ sessionId: str(i.sessionId ?? '') });
     return {};
