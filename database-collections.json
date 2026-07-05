@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-27T22:53:42.301Z",
+  "generatedAt": "2026-07-05T17:33:08.342Z",
   "source": "shared/collections.ts",
   "collections": {
     "perfLog": {
@@ -151,6 +151,125 @@
         "cascadeFrom": null
       }
     },
+    "debugLogSession": {
+      "name": "debugLogSession",
+      "schema": {
+        "fields": {
+          "active": {
+            "type": "boolean",
+            "required": true,
+            "default": false
+          },
+          "expiresAt": {
+            "type": "number",
+            "required": true,
+            "default": 0
+          },
+          "grep": {
+            "type": "string",
+            "required": true,
+            "nullable": true,
+            "default": null
+          },
+          "level": {
+            "type": "enum",
+            "values": [
+              "log",
+              "info",
+              "warn",
+              "error",
+              "debug"
+            ],
+            "required": true,
+            "nullable": true,
+            "default": null
+          },
+          "operatorId": {
+            "type": "string",
+            "required": true,
+            "default": ""
+          },
+          "projectId": {
+            "type": "string",
+            "required": true,
+            "default": ""
+          },
+          "source": {
+            "type": "enum",
+            "values": [
+              "browser",
+              "server",
+              "both"
+            ],
+            "required": true,
+            "default": "browser"
+          },
+          "startedAt": {
+            "type": "number",
+            "required": true,
+            "default": 0
+          },
+          "updatedAt": {
+            "type": "number",
+            "required": true,
+            "default": 0
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "userId": 1
+            }
+          },
+          {
+            "fields": {
+              "expiresAt": 1
+            },
+            "ttl": 3600
+          }
+        ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": true,
+        "public": false,
+        "cascadeFrom": null,
+        "trackKeys": [
+          "userId"
+        ]
+      }
+    },
+    "debugLogStream": {
+      "name": "debugLogStream",
+      "schema": {
+        "fields": {
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "userId": 1
+            }
+          }
+        ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": true,
+        "public": false,
+        "cascadeFrom": null,
+        "trackKeys": [
+          "userId"
+        ]
+      }
+    },
     "todo": {
       "name": "todo",
       "schema": {
@@ -284,7 +403,14 @@
             "type": "string",
             "required": true
           }
-        }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "userId": 1
+            }
+          }
+        ]
       },
       "meta": {
         "cache": false,
@@ -345,7 +471,15 @@
           {
             "fields": {
               "userId": 1,
-              "projectId": 1
+              "projectId": 1,
+              "kind": 1
+            }
+          },
+          {
+            "fields": {
+              "userId": 1,
+              "projectId": 1,
+              "archived": 1
             }
           }
         ]
@@ -394,6 +528,7 @@
           {
             "fields": {
               "sessionId": 1,
+              "userId": 1,
               "compacted": 1,
               "seq": 1
             }
@@ -401,6 +536,7 @@
           {
             "fields": {
               "sessionId": 1,
+              "userId": 1,
               "seq": 1
             }
           }
