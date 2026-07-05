@@ -51,6 +51,19 @@ function pushProjectUrl(project: OpenProject | null): void {
   window.history.pushState({}, '', url);
 }
 
+const GATE: React.CSSProperties = {
+  height: '100dvh',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 14,
+  padding: 24,
+  background: 'var(--bg-primary)',
+  color: 'var(--text-primary)',
+  boxSizing: 'border-box',
+};
+
 export default function StudioShell(): React.ReactElement {
   // Restore an open project from the URL on first paint (deep link / reload).
   const [open, setOpen] = React.useState<OpenProject | null>(() => projectFromUrl());
@@ -93,9 +106,14 @@ export default function StudioShell(): React.ReactElement {
   //     download, which can silently not-complete, leaving those features to fail
   //     with "bundled postgres missing" on a machine that never finished it.
   // Bundled tools are requested like any permission (mic/camera); the host installs
-  // the downloadable ones on grant, and BinariesInstallOverlay blocks the page until
-  // they're ready. Fire-and-forget at boot so they're ready before the first spawn;
-  // a web-only shell with no host connected just no-ops (caught).
+  // the downloadable ones on grant. We AWAIT this grant and gate the whole app on it
+  // (`binariesReady`) — `daemon.requestPermissions` resolves only AFTER the host
+  // finishes installing the requested tools. Rendering the body before that let a
+  // project spawn (`npx ugly-app init`, the terminal) race an in-flight install →
+  // `InstallingError` ("bundled tools are still installing before 'bash' can run"),
+  // which on a fresh machine broke project setup (empty/wrong-dir project). A
+  // web-only shell with no host rejects → we unblock (nothing to install).
+  const [binariesReady, setBinariesReady] = React.useState(false);
   React.useEffect(() => {
     type GrantReq = Parameters<typeof permissions.request>[0];
     // Bundled tools we PROVISION — typed against ugly-app's catalog (BundledToolName)
@@ -105,13 +123,33 @@ export default function StudioShell(): React.ReactElement {
     // System executables we only need spawn PERMISSION for — present on every host
     // or shipped with node (npm/npx), so NOT catalog/installable tools.
     const permissionOnly = ['bash', 'npm', 'npx'];
+    let alive = true;
     void permissions
       .request({ process: [...permissionOnly, ...bundled] } as unknown as GrantReq)
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => { if (alive) setBinariesReady(true); });
+    return () => { alive = false; };
   }, []);
 
   let body: React.ReactNode;
-  if (creating) {
+  if (!binariesReady) {
+    // Paused until the host finishes installing the bundled toolchain. Blocks
+    // project creation / the coding agent / any spawn so nothing runs against a
+    // not-yet-installed tool. BinariesInstallOverlay (below) layers live download
+    // progress on top when the host emits it.
+    body = (
+      <div data-id="binaries-install-gate" style={GATE}>
+        <div className="us-spin" style={{ fontSize: 22, color: 'var(--accent)' }}>⟳</div>
+        <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 15 }}>
+          Setting up your developer tools…
+        </div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', maxWidth: 380, textAlign: 'center' }}>
+          Installing the bundled toolchain (node, git, pnpm, postgres…). This runs
+          once and can take a few minutes on a fresh machine.
+        </div>
+      </div>
+    );
+  } else if (creating) {
     body = (
       <ProjectCreationProgress
         name={creating.name}
