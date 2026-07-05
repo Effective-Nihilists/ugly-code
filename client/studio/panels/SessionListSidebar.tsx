@@ -1038,19 +1038,20 @@ function SessionListStyles(): React.ReactElement {
         opacity: 1 !important;
         pointer-events: auto !important;
       }
-      /* No fill-mode + no max-height on enter: rows mounted inside a
-         display:none project tab (multi-tab shell) hit a Chromium
-         quirk where the enter animation pins at the from-frame
-         (max-height: 0 + overflow: hidden) and the row stays clipped
-         to zero height until something forces a repaint (e.g. user
-         hovering). Dropping max-height from the keyframes removes the
-         layout-affecting property entirely, and omitting fill-mode
-         lets the natural style (opacity 1, no transform, no max-height)
-         take over as the resting state. The enter remains a pure
-         opacity+slide fade-in; only the leave animation still drives
-         max-height for the smooth row-collapse on archive. */
+      /* fill-mode backwards + no max-height on enter. Each row carries a
+         staggered animation-delay (see AnimatedRow), so without a backwards
+         fill the row paints at its resting (visible) style during the delay,
+         then snaps to opacity:0 and slides in — a "blink out then fade in"
+         flash. backwards applies the from-frame (opacity:0, translateX)
+         during the delay window, killing the flash. It stays safe for rows
+         mounted inside a display:none project tab (multi-tab shell): the
+         layout-clipping max-height was already dropped from the enter
+         keyframe, and backwards never forward-fills, so the natural resting
+         style (opacity 1, no transform) wins whenever the animation isn't
+         actively running — no stranding. Only the leave animation still
+         drives max-height for the smooth row-collapse on archive. */
       .us-session-row-wrap {
-        animation: us-session-row-enter ${ROW_TRANSITION_MS}ms ease-out;
+        animation: us-session-row-enter ${ROW_TRANSITION_MS}ms ease-out backwards;
         overflow: hidden;
       }
       .us-session-row-wrap-leaving {

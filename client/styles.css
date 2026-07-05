@@ -750,42 +750,45 @@ h6 {
 }
 
 /* Enter animation classes (run once on mount) */
-/* fill-mode `forwards` (not `both`): the `to` keyframe latches after
-   the animation ends, but the `from` keyframe is NOT applied while
-   the animation is waiting to start. That matters for elements that
-   end up inside a `display: none` subtree before their animation
-   runs (multi-tab shells, hidden popovers) — with `both` the element
-   is stuck at opacity 0 forever because animations don't progress
-   under display:none. With `forwards` the resting style wins, so
-   when the subtree becomes visible again the content is readable
-   instead of invisible. No visual difference on the happy path:
-   the animation still drives 0→1 from the first paint. */
+/* fill-mode `backwards` (not `forwards` or `both`): `backwards` applies
+   the `from` (opacity:0) keyframe during the `animation-delay` window,
+   BEFORE the animation starts. Without it, a delayed element paints at
+   its resting (fully-visible) style during the delay, then snaps to
+   opacity:0 and animates in — a "blink out then fade in" flash. Because
+   every enter keyframe's `to` state (opacity:1; transform:none) is
+   identical to the natural resting style, we do NOT need a forward latch:
+   `backwards` fixes the flash while staying safe for elements mounted
+   inside a `display: none` subtree (the chat pane stays mounted-but-hidden
+   in the multi-tab shell). `backwards` never forward-fills, so whenever the
+   animation isn't actively running (hidden pane, never started, interrupted)
+   the resting *visible* style wins — the content is readable instead of
+   stranded at opacity 0. */
 .us-fade {
-  animation: us-fade-in var(--dur-content) var(--ease-out) forwards;
+  animation: us-fade-in var(--dur-content) var(--ease-out) backwards;
 }
 .us-fade-up {
-  animation: us-fade-up var(--dur-content) var(--ease-out) forwards;
+  animation: us-fade-up var(--dur-content) var(--ease-out) backwards;
 }
 /* Same keyframe as `.us-fade-up`, but slowed to `--dur-page` so
    top-level view changes (home/session/prod/git/terminal) feel
    weightier than tab swaps. Tabs keep using `.us-fade-up`. */
 .us-fade-page {
-  animation: us-fade-up var(--dur-page) var(--ease-out) forwards;
+  animation: us-fade-up var(--dur-page) var(--ease-out) backwards;
 }
 .us-fade-down {
-  animation: us-fade-down var(--dur-content) var(--ease-out) forwards;
+  animation: us-fade-down var(--dur-content) var(--ease-out) backwards;
 }
 .us-pop {
-  animation: us-pop-in var(--dur-content) var(--ease-out) forwards;
+  animation: us-pop-in var(--dur-content) var(--ease-out) backwards;
 }
 .us-slide-r {
-  animation: us-slide-in-r var(--dur-layout) var(--ease-out) forwards;
+  animation: us-slide-in-r var(--dur-layout) var(--ease-out) backwards;
 }
 .us-slide-l {
-  animation: us-slide-in-l var(--dur-layout) var(--ease-out) forwards;
+  animation: us-slide-in-l var(--dur-layout) var(--ease-out) backwards;
 }
 .us-toast {
-  animation: us-toast-in var(--dur-content) var(--ease-spring) forwards;
+  animation: us-toast-in var(--dur-content) var(--ease-spring) backwards;
 }
 
 /* Word-by-word reveal — each word is a span with its own animation-delay */
@@ -804,13 +807,15 @@ h6 {
 /* When the renderer boots in a subsequent window (`?skipSplash=1` —
    tear-out, "Open in New Window", Cmd+Shift+N), the surface should
    feel like "appears continuously from the source window", not
-   "fresh React tree replays every mount animation". `main.tsx`
-   sets `body.us-no-mount-anim` for the first 250ms of the SPA's
-   life in such windows; this rule zeros out the page-level fade /
-   word-cascade animations for that window so the user sees the
-   workspace already-present instead of fading-in. Hover/focus
-   transitions and intentional state-change animations (which fire
-   AFTER the 250ms window) are unaffected. */
+   "fresh React tree replays every mount animation". The intent is for
+   the boot code to set `body.us-no-mount-anim` for the first ~250ms of
+   the SPA's life in such windows; this rule then zeros out the page-level
+   fade / word-cascade animations for that window so the user sees the
+   workspace already-present instead of fading-in. Hover/focus transitions
+   and intentional state-change animations (which fire AFTER the window)
+   are unaffected.
+   NOTE: `body.us-no-mount-anim` is not currently set anywhere in the
+   client — this block is a ready-made hook, not live behavior. */
 body.us-no-mount-anim .us-fade,
 body.us-no-mount-anim .us-fade-up,
 body.us-no-mount-anim .us-fade-page,
@@ -1338,6 +1343,25 @@ svg[fill^='var('] {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+  /* The rules above shrink duration but do NOT zero `animation-delay`, so
+     a staggered enter element (opacity:0 during its `backwards`/base fill)
+     would sit invisible for its full delay — up to ~1400ms on the picker —
+     then pop. Force the enter classes fully visible and un-animated instead. */
+  .us-fade,
+  .us-fade-up,
+  .us-fade-page,
+  .us-fade-down,
+  .us-pop,
+  .us-slide-r,
+  .us-slide-l,
+  .us-toast,
+  .us-word,
+  .us-word-pop,
+  .us-letter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 
