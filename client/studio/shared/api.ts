@@ -3442,26 +3442,6 @@ export const requests = defineRequests({
     output: z.object({ ok: z.boolean() }),
   }),
 
-  // ── Session issue report ─────────────────────────────────────────
-  // Bundles the current coding-agent session's on-disk artifacts
-  // (messages, telemetry, finish events, ai-proxy debug, electron
-  // log tail, env fingerprint), redacts secrets, uploads the gzipped
-  // tar to R2's temp bucket (7-day TTL), and emails a Claude-Code-
-  // ready markdown report with the bundle URL to the studio
-  // maintainer. No DB row written — email is the only sink.
-  submitSessionIssueReport: req({
-    input: z.object({
-      projectPath: z.string().optional(),
-      compositeId: z.string().min(1),
-      description: z.string().min(1).max(5000),
-      type: z.enum(['bug', 'feature', 'design']),
-    }),
-    output: z.object({
-      ok: z.literal(true),
-      reportId: z.string(),
-    }),
-  }),
-
   // Feedback (proxied to ugly.bot)
   feedbackList: req({
     input: z.object({

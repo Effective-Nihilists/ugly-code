@@ -50,7 +50,7 @@ function resolutionBase(ctx: ToolContext | undefined): string | null {
 
 /** A Windows-absolute path: drive-letter (`C:\`, `C:/`) or UNC (`\\host\share`). */
 function isWindowsAbsolute(p: string): boolean {
-  return /^[a-zA-Z]:[\\/]/.test(p) || /^\\\\/.test(p);
+  return /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('\\\\');
 }
 
 /** Whether a path uses Windows conventions (drive/UNC root or backslash seps).
