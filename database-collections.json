@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-05T17:33:08.342Z",
+  "generatedAt": "2026-07-05T21:26:42.009Z",
   "source": "shared/collections.ts",
   "collections": {
     "perfLog": {
@@ -411,6 +411,30 @@
             }
           }
         ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": true,
+        "public": false,
+        "cascadeFrom": null,
+        "trackKeys": [
+          "userId"
+        ]
+      }
+    },
+    "userSettings": {
+      "name": "userSettings",
+      "schema": {
+        "fields": {
+          "data": {
+            "type": "string",
+            "required": true
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        }
       },
       "meta": {
         "cache": false,

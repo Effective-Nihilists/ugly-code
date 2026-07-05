@@ -20,3 +20,4 @@ playwright-report/
 .ugly-studio/tmp/
 .ugly-studio/users/
 .ugly-studio/home/
+.env.publish
