@@ -10,7 +10,6 @@ import {
   sweTier,
   type SubscriptionKey,
 } from '../shared/model-rankings';
-import { useSocket } from '../hooks/useSocket';
 import { Popover } from '../system';
 
 /**
@@ -274,10 +273,6 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
     rowHint,
   } = props;
 
-  const socket = useSocket();
-  const [subscriptionModels, setSubscriptionModels] = useState<
-    CodingAgentModel[]
-  >([]);
   // Detect the local Claude CLI; when present, surface the claude-cli rows.
   const [claudeCliAvailable, setClaudeCliAvailable] = useState(false);
   useEffect(() => {
@@ -296,40 +291,13 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
   // the full ugly.bot framework catalog.
   const [uglyBotExpanded, setUglyBotExpanded] = useState(false);
 
-  // ── Subscription model fetch + live refresh on key add/remove
-  useEffect(() => {
-    let cancelled = false;
-    const fetchList = () => {
-      socket
-        .request('getCodingAgentSubscriptionModels', {})
-        .then((r) => {
-          if (!cancelled) {
-            setSubscriptionModels(r.models as CodingAgentModel[]);
-          }
-        })
-        .catch((e: unknown) => {
-          console.error('[ModelPicker:getCodingAgentSubscriptionModels]', JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
-          if (!cancelled) setSubscriptionModels([]);
-        });
-    };
-    fetchList();
-    const onChangeEvent = () => { fetchList(); };
-    window.addEventListener('zai-subscription-changed', onChangeEvent);
-    window.addEventListener('kimi-subscription-changed', onChangeEvent);
-    window.addEventListener('minimax-subscription-changed', onChangeEvent);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('zai-subscription-changed', onChangeEvent);
-      window.removeEventListener('kimi-subscription-changed', onChangeEvent);
-      window.removeEventListener('minimax-subscription-changed', onChangeEvent);
-    };
-  }, [socket]);
-
-  // ── Group all available models by subscription, applying family filter
+  // ── Group all available models by subscription, applying family filter.
+  // Framework catalog (BASE_MODELS) + local Claude CLI rows are the only
+  // sources — BYO subscription models were removed (everything routes through
+  // the metered ugly.bot proxy).
   const groups = useMemo(() => {
     const all: CodingAgentModel[] = [
       ...BASE_MODELS,
-      ...subscriptionModels,
       ...(claudeCliAvailable ? CLAUDE_CLI_MODELS : []),
     ];
     const bySub = new Map<SubscriptionKey, CodingAgentModel[]>();
@@ -343,7 +311,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
     // Sort within each group by SWE-bench desc, then weighted price asc.
     for (const arr of bySub.values()) arr.sort(sortBySweAndCost);
     return bySub;
-  }, [family, subscriptionModels, claudeCliAvailable]);
+  }, [family, claudeCliAvailable]);
 
   // ── Trigger label resolution
   const triggerText = useMemo(() => {

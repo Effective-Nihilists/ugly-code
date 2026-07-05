@@ -23,6 +23,12 @@ import { agentTurnHandler } from 'ugly-app/agent/server';
 import type { Todo, RecentProject } from '../shared/collections';
 import { collections } from '../shared/collections';
 import { makeCodingSessionHandlers } from './codingSessionHandlers';
+import {
+  DEFAULT_USER_SETTINGS,
+  mergeUserSettings,
+  parseStoredUserSettings,
+  type UserSettings,
+} from '../shared/userSettings';
 import { cronTasks } from '../shared/cron';
 import { experiments } from '../shared/experiments';
 import en from '../shared/lang/en';
@@ -186,6 +192,31 @@ const app = createApp(
     sendTestEmail: async (_userId, { userId, subject, html, id }) => {
       await emailSend({ userId, subject, html, id });
       return { ok: true };
+    },
+
+    // ── Per-user coding-agent settings (Neon-backed; one doc per user) ──────
+    getUserSettings: async (userId): Promise<UserSettings> => {
+      const doc = await app.db.getDoc(collections.userSettings, userId);
+      return parseStoredUserSettings(doc?.data);
+    },
+    updateUserSettings: async (userId, patch): Promise<UserSettings> => {
+      const doc = await app.db.getDoc(collections.userSettings, userId);
+      const current = parseStoredUserSettings(doc?.data);
+      const next = mergeUserSettings(current, patch);
+      await app.db.setDoc(collections.userSettings, {
+        _id: userId,
+        userId,
+        data: JSON.stringify(next),
+        ...dbDefaults(),
+      });
+      return next;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    resetUserSettings: async (userId): Promise<UserSettings> => {
+      // Delete the doc so a fresh read falls back to defaults (best-effort — a
+      // missing doc already reads as defaults).
+      void app.db.deleteDoc(collections.userSettings, userId).catch(() => {/* noop */});
+      return DEFAULT_USER_SETTINGS;
     },
 
     // ── Coding-agent session persistence (shared factory — see workers.ts) ──

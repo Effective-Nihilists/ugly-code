@@ -48,6 +48,16 @@ export const RecentProjectSchema = z.object({
 });
 export type RecentProject = InferDocType<typeof RecentProjectSchema>;
 
+// Per-user coding-agent settings (studio getUserSettings/update/reset). The
+// settings object is stored as a JSON string blob so this file stays under
+// TypeScript's type-instantiation budget — the typed shape + defaults + merge
+// live in ./userSettings.ts. Doc `_id` is the userId (one row per user).
+export const UserSettingsSchema = z.object({
+  userId: z.string(),
+  data: z.string(),
+});
+export type UserSettingsDoc = InferDocType<typeof UserSettingsSchema>;
+
 // Coding-agent session collections live in their own module (codingCollections)
 // to keep this file under TypeScript's type-instantiation budget — see that file
 // for the full rationale. Re-export their types for convenience.
@@ -95,6 +105,13 @@ const baseCollections = defineCollections({
     // NOT create a btree expression index, so declare one explicitly — otherwise
     // db:init leaves only the GIN index and PostgresIndexes warns per query.
     indexes: [{ fields: { userId: 1 } }],
+  },
+  userSettings: {
+    schema: UserSettingsSchema,
+    // Trackable + userId key so a settings change fans out to the user's other
+    // devices/sessions via trackDocs. Reads are getDoc by _id (=userId), so the
+    // primary key covers lookups — no extra btree index needed.
+    meta: { cache: false, trackable: true, public: false, cascadeFrom: null, trackKeys: ['userId'] },
   },
 });
 

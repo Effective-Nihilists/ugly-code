@@ -651,6 +651,17 @@ const handlers: Record<string, Handler> = {
     await sessionApi.archive({ sessionId: str(i.sessionId ?? '') });
     return {};
   },
+  // Archive (reversible) — send the session to the archived drawer. The worktree
+  // + branch are preserved (unlike abandon), so it can be resumed on unarchive.
+  // Same server soft-archive op as delete.
+  codingAgentArchiveSession: async (i) => {
+    await sessionApi.archive({ sessionId: str(i.compositeId ?? i.sessionId ?? '') });
+    return { ok: true };
+  },
+  // No persisted active-spec source in the Phase-1 shim (the spec system —
+  // specList/specGet/setActiveSpec — isn't wired). Return null; the Specs tab
+  // fills in via `activeSpec:changed` broadcasts when a spec is created/opened.
+  getActiveSpec: () => Promise.resolve({ spec: null }),
   // ── coding-agent session protocol — server-backed persistence ──
   codingAgentChatListMessages: async (i) => {
     const sessionId = str(i.sessionId ?? '');
@@ -766,6 +777,32 @@ const handlers: Record<string, Handler> = {
     return Promise.resolve({ ok: true });
   },
   codingAgentToolStop: () => Promise.resolve({}),
+  // ── Interactive turn controls (C1) — forward to the coding task. The task
+  //    acks safely today (the ask-user / step-review CARDS render from
+  //    session_state snapshots the task loop doesn't emit yet, and the agent
+  //    framework has no manual compaction) — so these keep the names wired
+  //    without rejecting; end-to-end interactivity is a follow-up. No live task
+  //    → benign default (a phantom card / no-op).
+  codingAgentAnswerAskUser: (i) => {
+    const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
+    if (!taskId) return Promise.resolve({ ok: false });
+    return native.task.call(taskId, 'answerAskUser', { toolCallId: str(i.toolCallId ?? ''), answer: str(i.value ?? '') });
+  },
+  codingAgentAnswerStepReview: (i) => {
+    const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
+    if (!taskId) return Promise.resolve({ ok: false });
+    return native.task.call(taskId, 'answerStepReview', { id: i.id, action: i.action });
+  },
+  codingAgentCompactNow: (i) => {
+    const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
+    if (!taskId) return Promise.resolve({ ok: false });
+    return native.task.call(taskId, 'compact', {});
+  },
+  codingAgentRestoreCheckpoint: (i) => {
+    const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
+    if (!taskId) return Promise.resolve({ ok: false });
+    return native.task.call(taskId, 'restoreCheckpoint', { msgId: i.msgId });
+  },
   codingAgentChatSetModel: (i) => {
     setSessionModel(str(i.sessionId ?? ''), str(i.model ?? ''));
     return Promise.resolve({});
@@ -797,13 +834,64 @@ const handlers: Record<string, Handler> = {
     return Promise.resolve({});
   },
   markSessionViewed: () => Promise.resolve({}),
-  getCodingAgentWorktreeBehind: () => Promise.resolve({ behind: 0 }),
-  getCodingAgentWorktreeAhead: () => Promise.resolve({ ahead: 0 }),
+  // ── Finish-session lifecycle — driven by the coding background task (which
+  //    runs the ported pipeline against the worktree with real host git). Each
+  //    forwards to a task onCall method; ensureCodingTask spins the task up if a
+  //    user-initiated action arrives before the first turn. See agent/finish/.
+  finishCodingAgentSession: async (i) => {
+    const id = await ensureCodingTask(str(i.sessionId ?? ''));
+    return native.task.call(id, 'finish', {
+      runTypecheck: !!i.runTypecheck,
+      runLint: !!i.runLint,
+      runTests: !!i.runTests,
+      commitDirtyMainBeforeMerge: !!i.commitDirtyMainBeforeMerge,
+      pauseBeforeSquash: !!i.pauseBeforeSquash,
+    });
+  },
+  mergeFinishedCodingAgentSession: async (i) => {
+    const id = await ensureCodingTask(str(i.sessionId ?? ''));
+    return native.task.call(id, 'merge', { commitMessage: i.commitMessage });
+  },
+  codingAgentFinishStop: async (i) => {
+    const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
+    if (!taskId) return { ok: false };
+    return native.task.call(taskId, 'finishStop', { stage: i.stage });
+  },
+  abandonCodingAgentSession: async (i) => {
+    const id = await ensureCodingTask(str(i.sessionId ?? ''));
+    return native.task.call(id, 'abandon', {});
+  },
+  refreshCodingAgentSession: async (i) => {
+    const id = await ensureCodingTask(str(i.sessionId ?? ''));
+    return native.task.call(id, 'refreshWorktree', {});
+  },
+  // Real ahead/behind reads (were stubbed to 0). Poll-friendly: only query when a
+  // live task already exists (no ensureCodingTask), else report 0 (nothing to sync).
+  getCodingAgentWorktreeBehind: (i) => {
+    const taskId = sessionTaskIds.get(str(i.compositeId ?? i.sessionId ?? ''));
+    if (!taskId) return Promise.resolve({ behind: 0 });
+    return native.task.call(taskId, 'worktreeBehind', {});
+  },
+  getCodingAgentWorktreeAhead: (i) => {
+    const taskId = sessionTaskIds.get(str(i.compositeId ?? i.sessionId ?? ''));
+    if (!taskId) return Promise.resolve({ ahead: 0 });
+    return native.task.call(taskId, 'worktreeAhead', {});
+  },
   // The eval picker: all 59 task defs (ported from app/studio/evals/tasks) with
   // derived difficulty + "why interesting". See client/studio/evals/registry.ts.
   evalListTasks: () => Promise.resolve(listEvalTasks()),
   evalListHistory: () => Promise.resolve({ runs: [] }),
   evalDeleteRun: () => Promise.resolve({}),
+  // The eval picker pre-fills a task's turn prompts. Read straight from the
+  // local eval registry (same source as evalListTasks/evalCreateProject).
+  evalGetTask: (i) => {
+    const task = getEvalTask(str(i.taskName ?? ''));
+    return Promise.resolve({ turns: task?.turns ?? [] });
+  },
+  // Eval-run turn bookkeeping (runStartedAt stamp + server turn index) lived in
+  // the removed sidecar. The harness now tracks turn index client-side and the
+  // caller ignores the result (.catch(noop)), so a no-op keeps eval runs working.
+  evalAdvanceTurn: () => Promise.resolve({}),
   // Scaffold an eval run under ~/.ugly-studio/eval-projects, open it, and seed
   // the task's first-turn prompt. When the task has a `repoUrl` (57/59 tasks —
   // each fixture is published as a public github.com/Effective-Nihilists/

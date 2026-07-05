@@ -21,14 +21,13 @@
  * New code should import `ModelPicker` directly.
  */
 
-import React, { useEffect, useState } from 'react';
-import { getCodingAgentModels, type CodingAgentModel } from 'ugly-app/shared';
+import React from 'react';
+import { getCodingAgentModels } from 'ugly-app/shared';
 import {
   ModelPicker,
   type Family,
   type ModelChoice,
 } from '../components/ModelPicker';
-import { useSocket } from '../hooks/useSocket';
 
 export {
   isWeakModel,
@@ -71,47 +70,16 @@ function isAutoString(v: string): v is 'auto' | 'auto:cheap' | 'auto:max' {
 }
 
 export function ModelSelector(props: ModelSelectorProps): React.ReactElement {
-  const socket = useSocket();
-  const [subscriptionModels, setSubscriptionModels] = useState<
-    CodingAgentModel[]
-  >([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchList = () => {
-      socket
-        .request('getCodingAgentSubscriptionModels', {})
-        .then((r) => {
-          if (!cancelled) setSubscriptionModels(r.models as CodingAgentModel[]);
-        })
-        .catch(() => {
-          if (!cancelled) setSubscriptionModels([]);
-        });
-    };
-    fetchList();
-    const onChange = () => { fetchList(); };
-    window.addEventListener('zai-subscription-changed', onChange);
-    window.addEventListener('kimi-subscription-changed', onChange);
-    window.addEventListener('minimax-subscription-changed', onChange);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('zai-subscription-changed', onChange);
-      window.removeEventListener('kimi-subscription-changed', onChange);
-      window.removeEventListener('minimax-subscription-changed', onChange);
-    };
-  }, [socket]);
-
   const family = mapFamily(props.family);
 
   // Resolve string `value` → ModelChoice. Auto sentinels pass through as
-  // strings; concrete ids are looked up in the live catalog (framework +
-  // subscription rows). When a persisted id falls out of the catalog
-  // (e.g. user removed the corresponding subscription key), fall back to
-  // 'auto' so the trigger still renders something sane.
+  // strings; concrete ids are looked up in the framework catalog
+  // (getCodingAgentModels — the sole model source now that BYO subscriptions
+  // are removed). An unknown id falls back to 'auto' so the trigger still
+  // renders something sane.
   const choice: ModelChoice = (() => {
     if (isAutoString(props.value)) return props.value;
-    const catalog = [...FRAMEWORK_MODELS, ...subscriptionModels];
-    const found = catalog.find((m) => m.id === props.value);
+    const found = FRAMEWORK_MODELS.find((m) => m.id === props.value);
     return found ?? 'auto';
   })();
 

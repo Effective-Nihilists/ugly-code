@@ -8,6 +8,18 @@ import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
 import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, ensureCodebaseAnalysis, type AgentSelection } from './clientAgent';
 import { installTaskErrorLog } from './taskErrorLog';
+import {
+  abandonSession,
+  aheadCount,
+  behindCount,
+  mergeFinished,
+  refreshSession,
+  runFinish,
+  stopFinish,
+  type FinishEventPayload,
+  type FinishStage,
+} from './finish';
+import { answerPendingAskUser } from './askUserBroker';
 
 const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
 
@@ -77,8 +89,85 @@ defineTask({
     // via codingSessionListMessages, same as before).
     // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
     getState: async () => ({ sessionId, projectPath: t.params.projectPath ?? null }),
+
+    // ── Finish-session pipeline (ported into the task so it runs against the
+    //    worktree with real host git via createNodeUglyNative). Emits
+    //    finish_event envelopes (rendered inline in chat) and returns the
+    //    FinishResult that drives the review modal. See ./finish/.
+    finish: (p: {
+      runTypecheck?: boolean;
+      runLint?: boolean;
+      runTests?: boolean;
+      commitDirtyMainBeforeMerge?: boolean;
+      pauseBeforeSquash?: boolean;
+    }) =>
+      runFinish({
+        sessionId,
+        projectPath: t.params.projectPath ?? null,
+        opts: {
+          runTypecheck: !!p.runTypecheck,
+          runLint: !!p.runLint,
+          runTests: !!p.runTests,
+          ...(p.commitDirtyMainBeforeMerge ? { commitDirtyMainBeforeMerge: true } : {}),
+          ...(p.pauseBeforeSquash ? { pauseBeforeSquash: true } : {}),
+        },
+        sessionTitle: null,
+        firstUserMessageText: null,
+        emit: emitFinish,
+      }),
+    // The squash-merge tail after the review modal is accepted.
+    merge: (p: { commitMessage?: string }) =>
+      mergeFinished({
+        sessionId,
+        projectPath: t.params.projectPath ?? null,
+        commitMessage: p.commitMessage ?? '',
+        emit: emitFinish,
+      }),
+    // Stop an in-flight validation gate (tsc/lint/tests).
+    // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
+    finishStop: async (p: { stage?: FinishStage }) => ({ ok: stopFinish(sessionId, p.stage ?? 'tsc') }),
+    // Discard the worktree + branch without merging.
+    abandon: () => abandonSession(sessionId, t.params.projectPath ?? null),
+    // Pull from parent: merge the parent branch into the worktree.
+    refreshWorktree: () => refreshSession(sessionId, t.params.projectPath ?? null),
+    // Commit counts for the chat header's ahead/behind badges.
+    worktreeAhead: async () => ({ ahead: await aheadCount(sessionId, t.params.projectPath ?? null) }),
+    worktreeBehind: async () => ({ behind: await behindCount(sessionId, t.params.projectPath ?? null) }),
+
+    // ── Interactive turn controls (C1) ─────────────────────────────────
+    // The chat renders ask-user / step-review cards from `session_state`
+    // SNAPSHOTS (it ignores the granular ask_user_request/step_review_request
+    // events — see useCodingAgentChat.ts). This task-based agent loop
+    // (clientAgent.runClientAgentTurn) does not yet emit those snapshots, and the
+    // ugly-app agent framework's AgentController exposes no manual compaction.
+    // So these are safe acknowledgements: they keep the shim names wired (no
+    // "not yet wired" reject) and answer cleanly. Full interactivity needs the
+    // session_state snapshot-emission subsystem (pendingAskUsers/
+    // pendingStepReviews) + broker + hot-path tool gating — tracked as a
+    // follow-up. answerAskUser resolves a broker request if one is pending.
+    // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
+    answerAskUser: async (p: { toolCallId?: string; answer?: string }) => ({
+      ok: answerPendingAskUser(p.toolCallId ?? '', p.answer ?? ''),
+    }),
+    // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
+    answerStepReview: async () => ({ ok: true }),
+    // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
+    compact: async () => ({ ok: true }),
+    // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
+    restoreCheckpoint: async () => ({ ok: true }),
   },
 });
+
+// Wrap a FinishEventPayload in the AgentEvent envelope the chat expects
+// (event.type='finish_event' → payload.payload = the FinishEventPayload). Mirrors
+// the monolith's emitFinishEvent so stage_output chunks stream into the UI.
+function emitFinish(e: FinishEventPayload): void {
+  t.emit('msg', {
+    type: 'codingAgent:event',
+    sessionId,
+    event: { type: 'finish_event', payload: { type: 'updated', payload: { ...e, session_id: sessionId } } },
+  });
+}
 
 t.setSnapshot({ turn: 'idle', sessionId });
 

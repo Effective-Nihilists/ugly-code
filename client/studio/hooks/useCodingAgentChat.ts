@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useAppOptional } from 'ugly-app/client';
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
 import { SessionSnapshotSchema } from '../shared/api';
 import { spliceMissingUserRows } from '../agent/messageBackfill';
@@ -3434,11 +3435,19 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     () => DEFAULT_FEATURES,
   );
 
+  // getUserSettings is a per-user Neon read via the ugly-app framework socket
+  // (app.socket.request), NOT the window.UglyNative shim — settings persist in
+  // the project's backend and sync across the user's devices. See shared/api.ts
+  // + server/index.ts. The socket is typed to framework requests only, so reach
+  // the app-specific request through a narrow structural interface.
+  const app = useAppOptional();
   useEffect(() => {
+    if (!app) return;
     let cancelled = false;
     void (async () => {
       try {
-        const settings = (await agentApi('getUserSettings', {})) as {
+        const socket = app.socket as unknown as { request(name: string, input: unknown): Promise<unknown> };
+        const settings = (await socket.request('getUserSettings', {})) as {
           codingAgent?: ServerCodingAgent;
         } | null;
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
@@ -3457,7 +3466,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [app]);
 
   const switchReasoningEffort = useCallback(
     (next: ReasoningEffort) => {

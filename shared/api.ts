@@ -1,6 +1,7 @@
 import { authReq, defineMessages, defineRequests, frameworkMessages, frameworkRequests, z } from 'ugly-app/shared';
 import { agentMessageSchema } from './agent';
 import { agentTurnRequestSchema, agentTurnResponseSchema } from 'ugly-app/agent/shared';
+import { userSettingsSchema, userSettingsPatchSchema } from './userSettings';
 
 export const requests = defineRequests({
   // Standardized client-driven agent turn (ugly-app/agent). The studio coding
@@ -227,6 +228,25 @@ export const requests = defineRequests({
   codingSessionClearMessages: authReq({
     input: z.object({ sessionId: z.string() }),
     output: z.object({ ok: z.boolean(), deleted: z.number() }),
+  }),
+
+  // ── Per-user coding-agent settings (survive reload, sync across devices) ────
+  // Formerly a host-local file served by the removed studio sidecar; now a
+  // per-user Neon doc read/written via the framework request path (see
+  // shared/userSettings.ts + the userSettings collection). The studio chat reads
+  // these on mount (serverToFeatures); a future Settings panel writes them.
+  getUserSettings: authReq({
+    input: z.object({}),
+    output: userSettingsSchema,
+  }),
+  updateUserSettings: authReq({
+    input: userSettingsPatchSchema,
+    output: userSettingsSchema,
+    rateLimit: { max: 120, window: 60 },
+  }),
+  resetUserSettings: authReq({
+    input: z.object({}),
+    output: userSettingsSchema,
   }),
 
   // Example: public request — userId is string | null
