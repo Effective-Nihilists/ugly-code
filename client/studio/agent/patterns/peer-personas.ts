@@ -139,7 +139,7 @@ const CREATIVE_PREAMBLE = [
  * group-mode-host parses `UGLY_PEER_PERSONAS=modelId:personaId,...`
  * and looks each personaId up here.
  */
-const PERSONAS: Record<PersonaId, PersonaDefinition> = {
+export const PERSONAS: Record<PersonaId, PersonaDefinition> = {
   'safe-engineer': {
     id: 'safe-engineer',
     description:

@@ -28,7 +28,7 @@ export async function runComparison(
         });
         cells.push({ task, config: config.label, ...r });
       } catch (e) {
-        cells.push({ task, config: config.label, score: 0, scoreMax: 0, costUsd: 0, turns: 0 });
+        cells.push({ task, config: config.label, score: 0, scoreMax: 0, costUsd: 0, turns: 0, resolvedPattern: null });
         process.stderr.write(`[compare] ${task} / ${config.label} failed: ${e instanceof Error ? e.message : String(e)}\n`);
       }
     }

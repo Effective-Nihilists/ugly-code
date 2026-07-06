@@ -7,11 +7,30 @@ import { resolveAuth } from './auth';
 import { runEval } from './evalRun';
 import { runComparison, renderScoreboard, type CompareSpec } from './compare';
 import { historyPath, type RunHistoryEntry } from '../studio/evals/history';
+import type { SessionSnapshot } from '../studio/shared/api';
 
 function flag(argv: string[], name: string): string | undefined {
   const i = argv.indexOf(name);
   const v = i >= 0 ? argv[i + 1] : undefined;
   return v && !v.startsWith('--') ? v : undefined;
+}
+
+/**
+ * Parse the `--model-mode` / `--group-models` flags into a `modelMode` union.
+ *   --model-mode auto|max|group|single:<id>   --group-models a,b,c (→ group)
+ * `--group-models` wins (implies group with an explicit pool); `group` with no
+ * pool → empty models[] (the host falls back to its default peer pool).
+ */
+export function parseModelMode(modelModeStr: string | undefined, groupModels: string | undefined): SessionSnapshot['modelMode'] | undefined {
+  if (groupModels) {
+    return { kind: 'group', models: groupModels.split(',').map((s) => s.trim()).filter(Boolean) };
+  }
+  if (!modelModeStr) return undefined;
+  if (modelModeStr === 'auto') return { kind: 'auto' };
+  if (modelModeStr === 'max') return { kind: 'max' };
+  if (modelModeStr === 'group') return { kind: 'group', models: [] };
+  if (modelModeStr.startsWith('single:')) return { kind: 'single', model: modelModeStr.slice('single:'.length) };
+  return undefined;
 }
 
 export async function main(argv: string[]): Promise<number> {
@@ -85,12 +104,42 @@ export async function main(argv: string[]): Promise<number> {
       const model = flag(argv, '--model');
       const pattern = flag(argv, '--pattern');
       const toolset = flag(argv, '--toolset');
-      const res = await runEval({ taskName, origin: auth.origin, token: auth.token, ...(model ? { model } : {}), ...(pattern ? { pattern } : {}), ...(toolset ? { toolset } : {}) });
-      process.stdout.write(`${taskName}: ${res.score}/${res.scoreMax}\n`);
+      const modelMode = parseModelMode(flag(argv, '--model-mode'), flag(argv, '--group-models'));
+      const res = await runEval({
+        taskName,
+        origin: auth.origin,
+        token: auth.token,
+        ...(model ? { model } : {}),
+        ...(pattern ? { pattern } : {}),
+        ...(toolset ? { toolset } : {}),
+        ...(modelMode ? { modelMode } : {}),
+      });
+      if (argv.includes('--json')) {
+        // Structured output for e2e assertions: score, cost/turns, the pattern the
+        // engine resolved to (routing accuracy), and the requested config.
+        process.stdout.write(JSON.stringify({
+          task: taskName,
+          score: res.score,
+          scoreMax: res.scoreMax,
+          solved: res.score >= res.scoreMax,
+          costUsd: res.costUsd,
+          turns: res.turns,
+          resolvedPattern: res.resolvedPattern,
+          config: { model: model ?? null, pattern: pattern ?? null, modelMode: modelMode ?? null, toolset: toolset ?? null },
+        }) + '\n');
+      } else {
+        process.stdout.write(`${taskName}: ${res.score}/${res.scoreMax}\n`);
+      }
       return res.score >= res.scoreMax ? 0 : 1;
     }
 
-    process.stderr.write('usage: ugly-code --eval <task> [--model m] [--origin o] [--token t] [--test-user]\n       ugly-code --login\n');
+    process.stderr.write(
+      'usage: ugly-code --eval <task> [--model <id>] [--pattern <id>]\n' +
+      '                 [--model-mode auto|max|group|single:<id>] [--group-models a,b,c]\n' +
+      '                 [--toolset <name>] [--json] [--origin <url>] [--token <t>] [--test-user]\n' +
+      '       ugly-code --compare <spec.json> | --eval <task> --compare\n' +
+      '       ugly-code --analyze <id> | --history | --login\n',
+    );
     return 2;
   } catch (e) {
     process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);

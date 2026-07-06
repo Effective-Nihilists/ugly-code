@@ -30,7 +30,7 @@ describe('runEval', () => {
     expect(bootDriver).toHaveBeenCalled();
     expect(runTurn).toHaveBeenCalledWith(expect.any(String), 'do it', expect.any(Function), undefined);
     expect(gradeProject).toHaveBeenCalled();
-    expect(res).toEqual({ score: 1, scoreMax: 1, costUsd: 0, turns: 0 });
+    expect(res).toEqual({ score: 1, scoreMax: 1, costUsd: 0, turns: 0, resolvedPattern: null });
   });
 
   it('errors on unknown task', async () => {

@@ -7,7 +7,26 @@ const { runEval, resolveAuth } = vi.hoisted(() => ({
 vi.mock('../../../client/cli/evalRun', () => ({ runEval }));
 vi.mock('../../../client/cli/auth', () => ({ resolveAuth }));
 
-import { main } from '../../../client/cli/evalCli';
+import { main, parseModelMode } from '../../../client/cli/evalCli';
+
+describe('parseModelMode', () => {
+  it('maps each --model-mode form to a modelMode union', () => {
+    expect(parseModelMode(undefined, undefined)).toBeUndefined();
+    expect(parseModelMode('auto', undefined)).toEqual({ kind: 'auto' });
+    expect(parseModelMode('max', undefined)).toEqual({ kind: 'max' });
+    expect(parseModelMode('single:deepseek_v4_flash', undefined)).toEqual({ kind: 'single', model: 'deepseek_v4_flash' });
+    expect(parseModelMode('group', undefined)).toEqual({ kind: 'group', models: [] });
+    expect(parseModelMode('bogus', undefined)).toBeUndefined();
+  });
+  it('--group-models wins and builds an explicit pool', () => {
+    expect(parseModelMode(undefined, 'deepseek_v4_flash, glm_5_2 ,minimax_m2_7')).toEqual({
+      kind: 'group',
+      models: ['deepseek_v4_flash', 'glm_5_2', 'minimax_m2_7'],
+    });
+    // group-models overrides an explicit --model-mode
+    expect(parseModelMode('max', 'a,b')).toEqual({ kind: 'group', models: ['a', 'b'] });
+  });
+});
 
 describe('evalCli', () => {
   it('routes `--eval <task>` through auth + runEval, exit 0 on full score', async () => {

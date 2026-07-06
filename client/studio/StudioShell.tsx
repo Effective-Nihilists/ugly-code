@@ -9,6 +9,7 @@ import { ModalStackProvider } from './system/modal/ModalContext';
 import { ModalHost } from './system/modal/ModalHost';
 import { PopoverHost } from './system/popover/PopoverHost';
 import BinariesInstallOverlay from './panels/BinariesInstallOverlay';
+import { StudioSettingsModal } from './panels/StudioSettingsModal';
 import { recordRecentProject } from './state/recentProjects';
 
 // The Studio IDE on window.UglyNative, backed by the native transport shim
@@ -86,6 +87,19 @@ export default function StudioShell(): React.ReactElement {
   const closeProject = React.useCallback(() => {
     setOpen(null);
     pushProjectUrl(null);
+  }, []);
+
+  // Studio settings modal (coding-agent axis defaults). Opened either by
+  // the ProjectOnboarding "Settings" affordance below or by the
+  // `ugly-studio:open-settings` window event that CodingAgentChat /
+  // ModelSelector dispatch when a locked subscription row is clicked.
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  React.useEffect(() => {
+    const onOpenSettings = (): void => { setSettingsOpen(true); };
+    window.addEventListener('ugly-studio:open-settings', onOpenSettings);
+    return () => {
+      window.removeEventListener('ugly-studio:open-settings', onOpenSettings);
+    };
   }, []);
 
   // Browser Back/Forward → re-derive the open project from the URL.
@@ -173,7 +187,7 @@ export default function StudioShell(): React.ReactElement {
           onProjectOpen={(name, path) => { openProject(name, path); }}
           onBeginCreate={(name, parentDir) => { setCreating({ name, parentDir }); }}
           platform={null}
-          onOpenSettings={() => undefined}
+          onOpenSettings={() => { setSettingsOpen(true); }}
           leaving={false}
         />
       </ProjectsProvider>
@@ -183,6 +197,10 @@ export default function StudioShell(): React.ReactElement {
   return (
     <ModalStackProvider>
       {body}
+      <StudioSettingsModal
+        open={settingsOpen}
+        onClose={() => { setSettingsOpen(false); }}
+      />
       <ModalHost />
       <PopoverHost />
       {/* Blocks the page while the desktop shell installs bundled tools this app

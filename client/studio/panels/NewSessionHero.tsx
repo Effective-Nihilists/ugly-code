@@ -56,10 +56,10 @@ function splitWords(
  */
 
 export const MODEL_SETTING_KEY = 'codingAgentModel';
-const PERMISSION_SETTING_KEY = 'codingAgentPermissionMode';
-const MODEL_MODE_SETTING_KEY = 'codingAgentModelMode';
-const PATTERN_SETTING_KEY = 'codingAgentPatternMode';
-const REASONING_SETTING_KEY = 'codingAgentReasoningEffort';
+export const PERMISSION_SETTING_KEY = 'codingAgentPermissionMode';
+export const MODEL_MODE_SETTING_KEY = 'codingAgentModelMode';
+export const PATTERN_SETTING_KEY = 'codingAgentPatternMode';
+export const REASONING_SETTING_KEY = 'codingAgentReasoningEffort';
 
 /**
  * Max pixel height the prompt textarea will auto-grow to before it

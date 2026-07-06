@@ -9,7 +9,7 @@ import { gradeProject, type GradeDeps } from '../studio/evals/grader';
 import { isSbpTask } from '../studio/evals/sbp/registry';
 import { gradeSbp } from '../studio/evals/sbpGrader';
 import { ensureUv } from '../agent/binaries/resolve';
-import type { EvalGradeResult } from '../studio/shared/api';
+import type { EvalGradeResult, SessionSnapshot } from '../studio/shared/api';
 import { spawnCollect } from '../agent/tools/spawn';
 import { bootDriver, runTurn } from './taskDriver';
 import { setSessionToolset, setSessionEval } from '../studio/agent/clientAgent';
@@ -116,7 +116,7 @@ async function readFinalText(storeRoot: string, sessionId: string): Promise<stri
   return undefined;
 }
 
-export interface EvalRunResult { score: number; scoreMax: number; costUsd: number; turns: number }
+export interface EvalRunResult { score: number; scoreMax: number; costUsd: number; turns: number; resolvedPattern: string | null }
 
 /** Read the run's cost + turn count from the fs session store's metadata. */
 async function readRunTotals(storeRoot: string, sessionId: string): Promise<{ costUsd: number; turns: number }> {
@@ -129,7 +129,15 @@ async function readRunTotals(storeRoot: string, sessionId: string): Promise<{ co
   }
 }
 
-export async function runEval(cfg: { taskName: string; origin: string; token: string; model?: string; pattern?: string; toolset?: string }): Promise<EvalRunResult> {
+export async function runEval(cfg: {
+  taskName: string;
+  origin: string;
+  token: string;
+  model?: string;
+  pattern?: string;
+  toolset?: string;
+  modelMode?: SessionSnapshot['modelMode'];
+}): Promise<EvalRunResult> {
   const task = getEvalTask(cfg.taskName);
   if (!task) throw new Error(`Unknown eval task: ${cfg.taskName}`);
   const projectPath = await cloneFixture(task.name, task.repoUrl);
@@ -139,12 +147,26 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
   await runReproSetup(task, projectPath); // SBP tasks: uv venv + pip install before the agent
   setSessionEval(sessionId, true); // every CLI run is an eval → criteria judge active under SBV
   if (cfg.toolset && isToolset(cfg.toolset)) setSessionToolset(sessionId, cfg.toolset);
-  const selection = cfg.model || cfg.pattern
-    ? { ...(cfg.model ? { model: cfg.model } : {}), ...(cfg.pattern ? { patternMode: cfg.pattern as never } : {}) }
+  const selection = cfg.model || cfg.pattern || cfg.modelMode
+    ? {
+        ...(cfg.model ? { model: cfg.model } : {}),
+        ...(cfg.pattern ? { patternMode: cfg.pattern as never } : {}),
+        ...(cfg.modelMode ? { modelMode: cfg.modelMode } : {}),
+      }
     : undefined;
+  // Capture the pattern the engine resolved to (echoed in every session_state
+  // snapshot) so the CLI + e2e tests can assert classifier routing accuracy.
+  let resolvedPattern: string | null = null;
+  const onMsg = (msg: unknown): void => {
+    const m = msg as { event?: { type?: string; payload?: { payload?: { resolvedPattern?: string | null } } } };
+    if (m.event?.type === 'session_state') {
+      const rp = m.event.payload?.payload?.resolvedPattern;
+      if (rp != null) resolvedPattern = rp;
+    }
+  };
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
   for (const turn of turns) {
-    await runTurn(sessionId, turn, () => { /* transcript persisted by the fs store */ }, selection);
+    await runTurn(sessionId, turn, onMsg, selection);
   }
   const finalText = await readFinalText(storeRoot, sessionId);
   const gradeInput = {
@@ -172,7 +194,7 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
     scoreMax: result.scoreMax ?? 0,
     costUsd: totals.costUsd,
     turns: totals.turns,
-    config: [cfg.model, cfg.pattern, cfg.toolset].filter(Boolean).join('/') || 'default',
+    config: [cfg.model, cfg.pattern, cfg.modelMode?.kind, cfg.toolset].filter(Boolean).join('/') || 'default',
   }).catch(() => undefined);
-  return { score: result.score ?? 0, scoreMax: result.scoreMax ?? 0, ...totals };
+  return { score: result.score ?? 0, scoreMax: result.scoreMax ?? 0, ...totals, resolvedPattern };
 }

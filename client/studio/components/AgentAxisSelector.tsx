@@ -99,7 +99,7 @@ export interface DropdownOption<T extends string> {
   hint: string;
 }
 
-const PERMISSION_OPTIONS: DropdownOption<PermissionAxisValue>[] = [
+export const PERMISSION_OPTIONS: DropdownOption<PermissionAxisValue>[] = [
   { value: 'edit', label: 'Edit', hint: 'r/w within the worktree' },
   {
     value: 'yolo',
