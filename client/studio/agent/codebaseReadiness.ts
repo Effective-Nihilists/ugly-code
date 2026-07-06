@@ -71,19 +71,24 @@ export function stopCodebasePoll(sessionId: string): void {
 }
 
 /** Read the host-generated ARCHITECTURE.md for a project (null if absent/not built yet).
- *  The architecture manager writes it to <project>/.ugly-studio/ARCHITECTURE.md. */
+ *  Newer hosts write it to the project ROOT (<project>/ARCHITECTURE.md); older hosts
+ *  wrote <project>/.ugly-studio/ARCHITECTURE.md — try root first, then fall back so
+ *  the pill works across the desktop auto-update lag. */
 export async function fetchArchitectureDoc(cwd: string): Promise<string | null> {
   if (!cwd) return null;
-  try {
-    // Follow the cwd's separator style so Windows paths stay all-backslash
-    // (a mixed `C:\proj/.ugly-studio/...` blob is fragile on native.fs).
-    const sep = cwd.includes('\\') && !cwd.startsWith('/') ? '\\' : '/';
-    const root = cwd.replace(/[\\/]+$/, '');
-    const path = `${root}${sep}.ugly-studio${sep}ARCHITECTURE.md`;
-    const res = (await inv('fs.readFile', { path })) as { content?: string } | undefined;
-    const content = res?.content;
-    return content?.trim() ? content : null;
-  } catch {
-    return null;
+  // Follow the cwd's separator style so Windows paths stay all-backslash
+  // (a mixed `C:\proj/...` blob is fragile on native.fs).
+  const sep = cwd.includes('\\') && !cwd.startsWith('/') ? '\\' : '/';
+  const root = cwd.replace(/[\\/]+$/, '');
+  const paths = [`${root}${sep}ARCHITECTURE.md`, `${root}${sep}.ugly-studio${sep}ARCHITECTURE.md`];
+  for (const path of paths) {
+    try {
+      const res = (await inv('fs.readFile', { path })) as { content?: string } | undefined;
+      const content = res?.content;
+      if (content?.trim()) return content;
+    } catch {
+      /* try next candidate */
+    }
   }
+  return null;
 }
