@@ -107,6 +107,7 @@ import {
   supportsReasoningClient,
 } from './ReasoningSelector';
 import { capSessionBundle } from './sessionFeedbackBundle';
+import { fetchCodebaseStatus } from '../agent/codebaseReadiness';
 
 // ── Shared helpers ──────────────────────────────────────────────────
 
@@ -167,39 +168,6 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
  * `styles.css`) instead of `title=` so dark-mode users don't see
  * the OS's white-on-light native tooltip.
  */
-function CopySessionIdButton({ compositeId }: { compositeId: string }) {
-  const [copied, copy] = useCopyButton();
-  const isCopied = copied === 'session-id';
-  const tooltip = isCopied
-    ? `Copied: ${compositeId}`
-    : `Copy session id\n${compositeId}`;
-  return (
-    <button
-      data-id="copy-session-id"
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        copy('session-id', compositeId);
-      }}
-      style={{
-        background: 'transparent',
-        color: isCopied ? 'var(--accent)' : 'var(--text-muted)',
-        border: '1px solid var(--border)',
-        borderRadius: 4,
-        padding: '2px 6px',
-        cursor: 'pointer',
-        flexShrink: 0,
-        display: 'inline-flex',
-        alignItems: 'center',
-      }}
-      aria-label="Copy session id"
-      data-us-tooltip={tooltip}
-    >
-      {isCopied ? <Check size={14} /> : <Copy size={14} />}
-    </button>
-  );
-}
-
 // Tools whose output is usually worth seeing at a glance — shell opens them
 // by default. Everything else starts collapsed.
 const DEFAULT_EXPANDED_TOOLS = new Set([
@@ -2701,6 +2669,16 @@ function SessionReadout({
       peerCaveat +
       billedCaveat
     : '';
+  // Cost line folded into the token tooltip so hovering the token chip also
+  // shows what the session cost (actual upstream cost when reported, else a
+  // rate-card estimate) — requested via feedback.
+  const tokenCostLine = showActual
+    ? `\nEst. cost so far: ${formatCurrency(totalCost)}`
+    : showEstimate
+    ? `\nEst. cost: ${formatCurrency(estimate.total)} (standard rates${
+        isSubscriptionProvider(resolvedSingleModel) ? '; billed via subscription' : ''
+      })`
+    : '';
   const tokenTitle = `Input: ${totalPromptTokens.toLocaleString()} tokens · Output: ${totalCompletionTokens.toLocaleString()} tokens${
     totalCacheReadTokens > 0
       ? ` · Cache read: ${totalCacheReadTokens.toLocaleString()}`
@@ -2709,7 +2687,7 @@ function SessionReadout({
     totalCacheCreationTokens > 0
       ? ` · Cache write: ${totalCacheCreationTokens.toLocaleString()}`
       : ''
-  }${peerCaveat}`;
+  }${tokenCostLine}${peerCaveat}`;
   // Multi-model overrides: derive total + tooltip from `perModel` so the
   // chip reflects what actually ran across the session. Rows that
   // logged a non-zero per-turn `cost` (framework-billed) use it
@@ -5659,9 +5637,31 @@ function CodebaseReadinessPill({
       ? 'Codebase analysis: error'
       : 'Codebase analysis: not started';
 
+  // Full-detail tooltip. The loading state has no numbers to show yet (the host
+  // hasn't reported), so explain WHAT is loading + what to expect rather than a
+  // bare "loading…" — this is the "codebase: loading" report the tester hit.
+  const detailLines = [archLabel, idxLabel];
+  if (tone === 'loading') {
+    detailLines.push(
+      '',
+      'The host indexer is starting up. On first use it downloads a Python',
+      'runtime + embedding model — this can take a few minutes, especially on',
+      'Windows. Semantic search and architecture-aware answers turn on once it',
+      'reports ready. If it stays here for many minutes, the indexer likely',
+      'failed to install; reopen the project or report it from this session.',
+    );
+  } else if (nativeMissing) {
+    detailLines.length = 0;
+    detailLines.push(
+      'Open this project in the Ugly Studio desktop app to enable semantic',
+      'search + architecture analysis (a browser tab has no host to run them).',
+    );
+  }
+  const tooltip = [fullHeadline, ...detailLines].join('\n');
+
   return (
     <span
-      data-us-tooltip={`${fullHeadline}\n${archLabel}\n${idxLabel}`}
+      data-us-tooltip={tooltip}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -6046,6 +6046,39 @@ CodingAgentChatProps = {}) {
           : {},
       ),
     [sessionId],
+  );
+
+  // Diagnostics for "codebase: loading" / broken-semantic-search reports. The
+  // client can't see WHY the indexer is stuck from the pill alone, so a report
+  // carries: whether the native host is present, the project path (Windows vs
+  // posix), the client-side readiness the pill reflects (null ⇒ still loading),
+  // AND a FRESH host `codebase.status` pulled at submit time (async provider) so
+  // we see the actual indexer/architecture state rather than the last poll.
+  const codebaseReadinessRef = useRef<unknown>(null);
+  codebaseReadinessRef.current = codebaseReadiness ?? null;
+  useEffect(
+    () =>
+      registerFeedbackContextProvider(
+        'codebaseDiagnostics',
+        async (): Promise<Record<string, string>> => {
+          const cwd = getActiveProjectPath() ?? '';
+          const diag: Record<string, unknown> = {
+            nativeAvailable: isNativeAvailable(),
+            cwd,
+            userAgent: navigator.userAgent,
+            readiness: codebaseReadinessRef.current,
+          };
+          if (isNativeAvailable() && cwd) {
+            try {
+              diag.freshStatus = await fetchCodebaseStatus(cwd);
+            } catch (e) {
+              diag.statusError = e instanceof Error ? e.message : String(e);
+            }
+          }
+          return { codebaseDiagnostics: JSON.stringify(diag) };
+        },
+      ),
+    [],
   );
 
   const globalActiveSpec = useActiveSpec();
@@ -7351,7 +7384,7 @@ CodingAgentChatProps = {}) {
             />
           )}
           <CodebaseReadinessPill readiness={codebaseReadiness} />
-          {sessionId && <CopySessionIdButton compositeId={sessionId} />}
+          {/* Session-id copy button removed per feedback (header was cluttered). */}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
               data-id="archive-session-empty"
@@ -7515,7 +7548,7 @@ CodingAgentChatProps = {}) {
             />
           )}
           <CodebaseReadinessPill readiness={codebaseReadiness} />
-          {sessionId && <CopySessionIdButton compositeId={sessionId} />}
+          {/* Session-id copy button removed per feedback (header was cluttered). */}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
               data-id="archive-session"

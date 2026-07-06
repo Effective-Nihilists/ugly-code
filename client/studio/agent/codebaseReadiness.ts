@@ -13,6 +13,13 @@ export interface CodebaseReadiness {
 
 const pollers = new Map<string, ReturnType<typeof setInterval>>();
 
+/** One-shot fresh read of the host indexer/architecture status for a project.
+ *  Used to enrich feedback reports (a "codebase: loading" report should carry
+ *  the actual indexer state at submit time, not just the last polled snapshot). */
+export async function fetchCodebaseStatus(cwd: string): Promise<unknown> {
+  return inv('codebase.status', { projectPath: cwd });
+}
+
 // The raw UglyNative (with .invoke) — the facade exposes typed namespaces but no generic
 // invoke, and `codebase.*` is a host-only channel with no facade method.
 const inv = (channel: string, payload: unknown): Promise<unknown> =>

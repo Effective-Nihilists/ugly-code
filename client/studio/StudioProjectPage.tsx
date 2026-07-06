@@ -146,11 +146,30 @@ export default function StudioProjectPage({
     return () => { setActiveProjectPath(null); };
   }, [projectPath]);
 
+  // A file (with an optional line) to open in the File panel — set when a tool
+  // card / console file path is clicked, consumed + cleared by <FilePanel>.
+  const [pendingFile, setPendingFile] = React.useState<{ path: string; line?: number } | null>(null);
+
   // One handler for clickable links across ALL panels (chat tool widgets + publish console +
-  // anything using LinkifiedText). http(s) opens the browser; file:// opens in the OS default.
+  // anything using LinkifiedText). http(s) opens the browser; a FILE path opens in the in-app
+  // File panel (was: OS default editor) so clicking a tool's path stays inside Studio.
   const openUri = React.useCallback((uri: string) => {
-    void native.system.openExternal({ url: uri });
-  }, []);
+    if (/^https?:\/\//i.test(uri)) {
+      void native.system.openExternal({ url: uri });
+      return;
+    }
+    // File path, possibly `file://`-prefixed and/or with a trailing :line[-endLine].
+    let p = uri.replace(/^file:\/\//, '');
+    let line: number | undefined;
+    const m = /:(\d+)(?:-\d+)?$/.exec(p);
+    if (m) { line = Number(m[1]); p = p.slice(0, m.index); }
+    const isAbs = p.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('\\\\');
+    const abs = isAbs || !projectPath ? p : `${projectPath.replace(/[\\/]+$/, '')}/${p}`;
+    setPendingFile(line ? { path: abs, line } : { path: abs });
+    setTab('file');
+  }, [projectPath]);
+
+  const clearPendingFile = React.useCallback(() => { setPendingFile(null); }, []);
 
   // Reload the session list when the project actually changes (not on first
   // mount — initial state already came from the URL + store).
@@ -364,7 +383,7 @@ export default function StudioProjectPage({
           </div>
           {/* Session tabs (dev-scoped) */}
           {tab === 'preview' && <div style={S.pane}><PreviewPanel sessionId={activeSessionId} /></div>}
-          {tab === 'file' && <div style={S.pane}><FilePanel /></div>}
+          {tab === 'file' && <div style={S.pane}><FilePanel openTarget={pendingFile} onOpened={clearPendingFile} /></div>}
           {tab === 'git' && <div style={S.pane}><GitPanel /></div>}
           {tab === 'database' && <div style={S.paneScroll}><DatabasePanel forceDev /></div>}
           {/* Sidebar prod views */}

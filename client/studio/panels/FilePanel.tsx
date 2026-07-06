@@ -99,7 +99,15 @@ interface Entry {
 
 const IGNORED = new Set(['.git', 'node_modules', '.next', 'dist', '.turbo', '.cache']);
 
-export function FilePanel(): React.ReactElement {
+export function FilePanel({
+  openTarget,
+  onOpened,
+}: {
+  /** A file (+ optional line) to open, requested from another panel (e.g. a
+   *  clicked tool-card path). Consumed once, then cleared via `onOpened`. */
+  openTarget?: { path: string; line?: number } | null;
+  onOpened?: () => void;
+} = {}): React.ReactElement {
   const root = getActiveProjectPath();
   const [open, setOpen] = React.useState<Record<string, Entry[] | undefined>>({});
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
@@ -200,6 +208,24 @@ export function FilePanel(): React.ReactElement {
       setLoadingFile(false);
     }
   }, []);
+
+  // Open a file requested from another panel (e.g. a clicked tool-card path).
+  // Runs whenever the target changes; reveals the requested line, then clears
+  // the request so the same file can be re-requested later.
+  React.useEffect(() => {
+    if (!openTarget) return;
+    let cancelled = false;
+    void (async () => {
+      await openFile(openTarget.path);
+      const line = openTarget.line;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- set true by cleanup across the await; flow analysis can't see the async gap
+      if (!cancelled && typeof line === 'number' && line > 0) {
+        requestAnimationFrame(() => editorRef.current?.revealLine(line));
+      }
+      onOpened?.();
+    })();
+    return () => { cancelled = true; };
+  }, [openTarget, openFile, onOpened]);
 
   const save = React.useCallback(async () => {
     if (!selected || dirtyValue == null) return;
