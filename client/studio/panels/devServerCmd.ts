@@ -35,8 +35,10 @@ export function devServerSpawn(port: number, databaseUrl?: string): { cmd: strin
     args: ['-lc', `${freePort}; ${ensureDeps}; pnpm dev`],
     env: {
       PORT: String(port),
-      FORCE_COLOR: '0',
-      NO_COLOR: '1',
+      // Force ANSI color even though stdout is a pipe (not a TTY), so the Preview
+      // log view can render colored output. The view parses the codes (ansi.tsx)
+      // and strips them where it needs plain text (the ready-marker match).
+      FORCE_COLOR: '1',
       ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
     },
   };

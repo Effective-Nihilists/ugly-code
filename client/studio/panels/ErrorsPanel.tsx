@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { DevProdToggle } from '../components/DevProdToggle';
 import { useSocket } from '../hooks/useSocket';
 import { useStudioUserSetting } from '../hooks/useStudioUserSetting';
+import { useProdDeployGate } from '../hooks/useProdDeployGate';
+import { ProdPublishGate } from './ProdPublishGate';
 
 interface ErrorSummary {
   message: string;
@@ -54,6 +56,9 @@ export interface ErrorsPanelProps {
   forceDev?: boolean;
   /** Hide the panel header when rendered inside an outer tab bar. */
   hideHeader?: boolean;
+  /** Route to the Publish tab (shown when prod errors are requested but the
+   *  project was never deployed, so there's no prod error log yet). */
+  onPublish?: () => void;
   /**
    * When rendered inside SessionLayout, this is the active session's
    * compositeId. The list query filters by it so the Errors tab shows
@@ -69,6 +74,7 @@ export function ErrorsPanel({
   forceDev,
   hideHeader,
   studioSessionId,
+  onPublish,
 }: ErrorsPanelProps = {}) {
   const socket = useSocket();
   const [storedMode, setStoredMode] = useStudioUserSetting<'dev' | 'prod'>(
@@ -86,6 +92,10 @@ export function ErrorsPanel({
   const [errors, setErrors] = useState<ErrorLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Prod errors live in the project's prod D1; a never-deployed project has none,
+  // so gate on publish state and prompt to publish first instead of an empty list.
+  const prodDeploy = useProdDeployGate(mode === 'prod');
+  const gated = mode === 'prod' && prodDeploy !== 'deployed';
 
   const handleModeChange = (m: 'dev' | 'prod') => {
     if (modePinned) return;
@@ -93,6 +103,7 @@ export function ErrorsPanel({
   };
 
   useEffect(() => {
+    if (gated) { setLoading(false); return; }
     setLoading(true);
     // When the panel is rendered inside a session, scope the list
     // query to that session's compositeId via studioSessionId.
@@ -110,7 +121,11 @@ export function ErrorsPanel({
       })
       .catch((e: unknown) => { console.error('[ErrorsPanel]', e); })
       .finally(() => { setLoading(false); });
-  }, [mode, studioSessionId]);
+  }, [mode, studioSessionId, gated]);
+
+  if (mode === 'prod' && prodDeploy === 'undeployed') {
+    return <ProdPublishGate what="error log" onPublish={onPublish} />;
+  }
 
   return (
     <div

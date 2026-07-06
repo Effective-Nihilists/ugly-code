@@ -6,6 +6,7 @@ import { getActiveProjectPath } from '../hooks/useSocket';
 import { devServerSpawn } from './devServerCmd';
 import { persistDevLog, flushDevLog } from './devServerLog';
 import { readDevControl } from './devServerControl';
+import { ansiToNodes, stripAnsi } from './ansi';
 
 // The desktop daemon gates `native.process.spawn` on (a) the binary being bundled
 // and (b) a granted `process` capability with the binary allowlisted. Without an
@@ -177,6 +178,26 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   const [committed, setCommitted] = React.useState<string>(url);
   const [reloadKey, setReloadKey] = React.useState(0);
   const [showLog, setShowLog] = React.useState(false);
+  // Dev-server log view: resizable height + auto-scroll-to-bottom (pinned unless
+  // the user scrolls up to read history).
+  const [logHeight, setLogHeight] = React.useState(200);
+  const logRef = React.useRef<HTMLDivElement>(null);
+  const logPinnedRef = React.useRef(true);
+  const startLogResize = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = logHeight;
+    const onMove = (ev: MouseEvent): void => {
+      // Handle sits above the log (log is at the bottom), so dragging UP grows it.
+      setLogHeight(Math.min(600, Math.max(80, startH + (startY - ev.clientY))));
+    };
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [logHeight]);
   // Subscribe to the (module-level) dev-server state for this session.
   const [, forceRender] = React.useReducer((n: number) => n + 1, 0);
   const dev = getDev(devKey, port);
@@ -236,38 +257,62 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
     return () => { cancelled = true; clearInterval(id); };
   }, [devKey, port, sessionId]);
 
-  // Reload the iframe once the dev server is actually READY, instead of guessing.
-  // The old code blind-reloaded after a fixed 2500ms; a slower boot (install +
-  // Vite cold start) left the first load pointing at a not-yet-listening port —
-  // connection refused → blank preview until a manual reload. We watch the boot
-  // log for the "server ready" marker (Vite's "Local:" / "ready in Nms") and
-  // reload then; a longer fallback still fires once in case the marker changes.
-  const bootReloaded = React.useRef(false);
+  // Reload the iframe once the dev server is actually READY. `ugly-app dev` runs
+  // Vite in MIDDLEWARE mode, so it never prints Vite's "➜ Local:" / "ready in Nms"
+  // banner — the real readiness line is `[App] Server running on port N` (printed
+  // right after it starts listening). Match that (plus the Vite banners, for other
+  // servers). Keyed off `dev.startToken` so every start/restart re-arms — the old
+  // one-shot `bootReloaded` ref meant an agent-triggered restart never reloaded.
+  const reloadedTokenRef = React.useRef<number | null>(null);
+  const READY_RE = /(Local:\s*https?:\/\/|ready in\s+[\d.]+\s*m?s|listening on|Server running on port)/i;
   React.useEffect(() => {
-    if (!dev.running || bootReloaded.current) return;
-    // Vite: "➜  Local:   http://localhost:5173/" and "VITE vX ready in 412 ms".
-    // ugly-app dev wraps Vite, so these markers still appear in the captured log.
-    if (/(Local:\s*https?:\/\/|ready in\s+[\d.]+\s*m?s|listening on)/i.test(dev.log)) {
-      bootReloaded.current = true;
+    if (!dev.running) return;
+    const token = dev.startToken;
+    if (reloadedTokenRef.current === token) return; // already reloaded this run
+    if (READY_RE.test(stripAnsi(dev.log))) {
+      reloadedTokenRef.current = token;
       setReloadKey((k) => k + 1);
     }
-  }, [dev.log, dev.running]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dev.log, dev.running, dev.startToken]);
+
+  // Fallback while the ready marker hasn't matched yet (unusual dev server, or a
+  // reload that landed before the server was listening / mid Vite cold-optimize —
+  // the old code latched after ONE early reload and stuck on connection-refused
+  // forever). Retry-reload every 4s until the marker fires, capped at ~60s.
+  React.useEffect(() => {
+    if (!dev.running) return;
+    const token = dev.startToken;
+    let n = 0;
+    const id = setInterval(() => {
+      if (reloadedTokenRef.current === token) { clearInterval(id); return; }
+      n += 1;
+      setReloadKey((k) => k + 1);
+      if (n >= 15) clearInterval(id);
+    }, 4000);
+    return () => { clearInterval(id); };
+  }, [dev.running, dev.startToken]);
 
   const startOrRestart = React.useCallback(() => {
     const proj = getActiveProjectPath();
     if (!proj) { setShowLog(true); return; }
-    bootReloaded.current = false; // arm the readiness-reload for this boot
     startDev(devKey, proj, port, sessionId ? getSessionWorkspace(sessionId)?.databaseUrl : undefined);
     setShowLog(true);
-    // Point the preview at the dev server; the readiness effect above reloads the
-    // iframe once the server responds. A long fallback covers the case where the
-    // ready marker never matches (unusual dev server) — only if not already reloaded.
+    // Point the preview at the dev server; the readiness + retry effects above
+    // reload the iframe once the server actually responds (startDev bumps the
+    // run token, which re-arms them).
     const target = `http://localhost:${port}`;
     setUrl(target);
     setCommitted(target);
     try { localStorage.setItem(keyFor(sessionId ?? null), target); } catch { /* ignore */ }
-    setTimeout(() => { if (!bootReloaded.current) { bootReloaded.current = true; setReloadKey((k) => k + 1); } }, 10000);
   }, [devKey, port, sessionId]);
+
+  // Auto-scroll the log to the bottom as new output arrives, while pinned.
+  React.useEffect(() => {
+    if (!showLog) return;
+    const el = logRef.current;
+    if (el && logPinnedRef.current) el.scrollTop = el.scrollHeight;
+  }, [dev.log, showLog, logHeight]);
 
   // A browser tab has no host to spawn the dev server on — say so instead of
   // silently showing a blank iframe forever.
@@ -302,9 +347,6 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
         <button data-id="preview-logs" style={{ ...S.iconBtn, ...(showLog ? S.iconBtnActive : {}) }} title="Dev server logs" onClick={() => { setShowLog((s) => !s); }}>⌗</button>
         <a data-id="preview-open" style={S.openBtn} href={committed} target="_blank" rel="noreferrer" title="Open in new tab">↗</a>
       </div>
-      {showLog && (
-        <pre data-id="preview-devlog" style={S.devlog}>{dev.log || '(dev server not started — click “Start app”)'}</pre>
-      )}
       <div style={S.frameWrap}>
         {committed ? (
           <iframe
@@ -318,6 +360,28 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
           <div style={S.empty}>Enter your dev server URL above to preview the app.</div>
         )}
       </div>
+      {showLog && (
+        <>
+          <div
+            data-id="preview-log-resize"
+            onMouseDown={startLogResize}
+            style={S.logResize}
+            title="Drag to resize the log"
+          />
+          <div
+            ref={logRef}
+            data-id="preview-devlog"
+            style={{ ...S.devlog, height: logHeight }}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              // Re-pin when the user scrolls back to (near) the bottom.
+              logPinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+            }}
+          >
+            {dev.log ? ansiToNodes(dev.log) : '(dev server not started — click “Start app”)'}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -333,7 +397,8 @@ const S: Record<string, React.CSSProperties> = {
   input: { flex: 1, minWidth: 0, height: 26, boxSizing: 'border-box', padding: '0 10px', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6 },
   goBtn: { height: 26, flexShrink: 0, padding: '0 12px', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 6, cursor: 'pointer' },
   openBtn: { width: 26, height: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, textDecoration: 'none', fontSize: 13 },
-  devlog: { flexShrink: 0, maxHeight: 160, overflow: 'auto', margin: 0, padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.5, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' },
+  devlog: { flexShrink: 0, overflow: 'auto', margin: 0, padding: '8px 12px', borderTop: '1px solid var(--border)', background: '#111', fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.5, color: '#ddd', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  logResize: { flexShrink: 0, height: 6, cursor: 'ns-resize', background: 'var(--border)', borderTop: '1px solid var(--bg-panel)' },
   frameWrap: { flex: 1, minHeight: 0, position: 'relative', background: '#fff' },
   frame: { width: '100%', height: '100%', border: 'none' },
   empty: { padding: 24, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)' },

@@ -41,3 +41,6 @@ export const FileIcon = (): React.ReactElement => (
 export const AgentIcon = (): React.ReactElement => (
   <Svg><path d="M12 8V4M8 8h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z" /><circle cx={9.5} cy={13} r={0.5} fill="currentColor" /><circle cx={14.5} cy={13} r={0.5} fill="currentColor" /></Svg>
 );
+export const FeedbackIcon = (): React.ReactElement => (
+  <Svg><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></Svg>
+);

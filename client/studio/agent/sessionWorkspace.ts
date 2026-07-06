@@ -18,6 +18,7 @@
 
 import { native } from 'ugly-app/native';
 import { loadSessions } from '../state/projectSessions';
+import { isWindows } from '../utils/platform';
 
 export interface SessionWorkspace {
   /** The absolute dir the session's tools operate in (worktree, or project). */
@@ -32,6 +33,9 @@ export interface SessionWorkspace {
 }
 
 function homeFromProject(projectPath: string): string | null {
+  // Windows: C:\Users\<name>\… → C:\Users\<name>
+  const win = /^([a-zA-Z]:[\\/]Users[\\/][^\\/]+)/.exec(projectPath);
+  if (win) return win[1];
   const m = /^(\/Users\/[^/]+|\/home\/[^/]+|\/root)/.exec(projectPath);
   return m ? m[1] : null;
 }
@@ -88,13 +92,14 @@ async function ensureLocalPostgres(projectPath: string): Promise<string | null> 
     // one that's really there rather than assuming the first subdir (old code took
     // `.find(isDirectory)`, which silently picked the wrong dir / bailed to null).
     const vers = (await native.fs.readdir(pgRoot)).filter((e) => e.isDirectory && /^[0-9]/.test(e.name)).map((e) => e.name).sort().reverse();
+    const exe = isWindows ? '.exe' : ''; // bundled postgres binaries carry .exe on Windows
     let bin: string | null = null;
     let lib: string | null = null;
     for (const ver of vers) {
       const vroot = `${pgRoot}/${ver}`;
       const cands = [vroot, ...(await native.fs.readdir(vroot)).filter((e) => e.isDirectory).map((e) => `${vroot}/${e.name}`)];
       for (const c of cands) {
-        if (await exists(`${c}/bin/initdb`)) { bin = `${c}/bin`; lib = `${c}/lib`; break; }
+        if (await exists(`${c}/bin/initdb${exe}`)) { bin = `${c}/bin`; lib = `${c}/lib`; break; }
       }
       if (bin) break;
     }
@@ -108,16 +113,21 @@ async function ensureLocalPostgres(projectPath: string): Promise<string | null> 
     const port = 55432;
     const env = { DYLD_LIBRARY_PATH: lib, LD_LIBRARY_PATH: lib };
     if (!(await exists(`${pgdata}/PG_VERSION`))) {
-      await runProc(`${bin}/initdb`, ['-D', pgdata, '-U', 'postgres', '--auth=trust', '-E', 'UTF8'], { env });
+      await runProc(`${bin}/initdb${exe}`, ['-D', pgdata, '-U', 'postgres', '--auth=trust', '-E', 'UTF8'], { env });
     }
-    const ready = await runProc(`${bin}/pg_isready`, ['-h', '127.0.0.1', '-p', String(port)], { env });
+    const ready = await runProc(`${bin}/pg_isready${exe}`, ['-h', '127.0.0.1', '-p', String(port)], { env });
     if (ready.code !== 0) {
-      await runProc(`${bin}/pg_ctl`, ['-D', pgdata, '-o', `-p ${port} -k /tmp -c listen_addresses=127.0.0.1`, '-l', `${home}/.ugly-studio/pg.log`, '-w', 'start'], { env });
+      // Windows postgres has no unix sockets and needs dynamic_shared_memory_type=windows;
+      // Unix keeps the /tmp socket dir. (We connect over TCP either way.)
+      const startOpts = isWindows
+        ? `-p ${port} -c listen_addresses=127.0.0.1 -c dynamic_shared_memory_type=windows`
+        : `-p ${port} -k /tmp -c listen_addresses=127.0.0.1`;
+      await runProc(`${bin}/pg_ctl${exe}`, ['-D', pgdata, '-o', startOpts, '-l', `${home}/.ugly-studio/pg.log`, '-w', 'start'], { env });
     }
     let projectId = 'dev';
     try { projectId = (JSON.parse(await native.fs.readFile(`${projectPath}/.uglyapp`)) as { projectId?: string }).projectId ?? 'dev'; } catch { /* default */ }
     const dbName = `p_${projectId}`.replace(/[^a-zA-Z0-9_]/g, '_');
-    await runProc(`${bin}/createdb`, ['-h', '127.0.0.1', '-p', String(port), '-U', 'postgres', dbName], { env }); // ignore "exists"
+    await runProc(`${bin}/createdb${exe}`, ['-h', '127.0.0.1', '-p', String(port), '-U', 'postgres', dbName], { env }); // ignore "exists"
     return `postgresql://postgres@127.0.0.1:${port}/${dbName}`;
   } catch {
     return null;

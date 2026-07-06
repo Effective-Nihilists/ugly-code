@@ -368,6 +368,73 @@ function runCli(cmd: string): Promise<{ _id: string; created: number; data: Reco
   });
 }
 
+/** Studio's ugly.bot session as the CLI's auth.json blob (owner token needed by
+ *  `feedback:resolve`). Mirrors ProdPanel's bridge. */
+function uglyBotAuthJson(): string | null {
+  const m = document.cookie.split('; ').find((c) => c.startsWith('auth_token='));
+  const token = m ? m.slice('auth_token='.length) : '';
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(
+      atob((token.split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')),
+    ) as { sub?: string };
+    if (!payload.sub) return null;
+    return JSON.stringify({ token, userId: payload.sub, serverUrl: 'https://ugly.bot' });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve/decline a feedback report via the `ugly-app feedback:resolve` CLI. That
+ * command POSTs to the deployed app with the OWNER's ugly.bot token, so we bridge
+ * Studio's login into `~/.ugly-bot/auth.json` first, then run the CLI. All user
+ * values go through the process ENV (not the command string) so the resolution
+ * text can't break out of the shell.
+ */
+async function resolveFeedbackCli(
+  id: string,
+  status: 'resolved' | 'declined',
+  resolution: string,
+): Promise<void> {
+  const proj = getActiveProjectPath();
+  if (!proj) throw new Error('No active project');
+  const authJson = uglyBotAuthJson();
+  type GrantReq = Parameters<typeof permissions.request>[0];
+  await permissions
+    .request({ fs: 'full', process: ['bash', 'node'] } as unknown as GrantReq)
+    .catch(() => undefined);
+  const seedAuth = authJson
+    ? 'mkdir -p "$HOME/.ugly-bot" && printf "%s" "$UGLY_BOT_AUTH_JSON" > "$HOME/.ugly-bot/auth.json"; '
+    : '';
+  const cmd =
+    seedAuth +
+    'node ./node_modules/ugly-app/dist/cli/index.js feedback:resolve --id "$FB_ID" --status "$FB_STATUS" --resolution "$FB_RESOLUTION"';
+  await new Promise<void>((resolve, reject) => {
+    let out = '';
+    try {
+      const p = native.process.spawn('bash', ['-lc', cmd], {
+        cwd: proj,
+        env: {
+          ...(authJson ? { UGLY_BOT_AUTH_JSON: authJson } : {}),
+          FB_ID: id,
+          FB_STATUS: status,
+          FB_RESOLUTION: resolution,
+        },
+      });
+      p.onStdout((c) => (out += c));
+      p.onStderr((c) => (out += c));
+      p.onError((e) => { reject(new Error(e)); });
+      p.onExit((code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`feedback:resolve failed (${code ?? '?'}): ${out.slice(-300)}`));
+      });
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
+}
+
 const mapWorkerStatus = (s: unknown): 'completed' | 'failed' =>
   s === 'error' ? 'failed' : 'completed';
 
@@ -530,6 +597,32 @@ const handlers: Record<string, Handler> = {
       }
     }
     return { aggregations: [...map.values()].sort((a, b) => b.count - a.count) };
+  },
+  feedbackList: async () => {
+    const docs = await runCli('feedback');
+    return {
+      items: docs.map((d) => ({
+        id: d._id,
+        created: d.created,
+        type: str(d.data.type ?? 'bug'),
+        status: str(d.data.status ?? 'new'),
+        description: str(d.data.description ?? d.data.message ?? ''),
+        url: str(d.data.url ?? ''),
+        page: str(d.data.page ?? ''),
+        userId: (d.data.userId ?? null) as string | null,
+        resolution: (d.data.resolution ?? null) as string | null,
+      })),
+      nextCursor: null,
+    };
+  },
+  feedbackResolve: async (input) => {
+    const i = input as {
+      feedbackReportId: string;
+      status: 'resolved' | 'declined';
+      resolution: string;
+    };
+    await resolveFeedbackCli(i.feedbackReportId, i.status, i.resolution);
+    return {};
   },
   eventList: async () => {
     const docs = await runCli('events');

@@ -15,6 +15,7 @@ import { CodingAgentChat } from './panels/CodingAgentChat';
 import { DatabasePanel } from './panels/DatabasePanel';
 import { ErrorsPanel } from './panels/ErrorsPanel';
 import { EventsPanel } from './panels/EventsPanel';
+import { FeedbackPanel } from './panels/FeedbackPanel';
 import { WorkersPanel } from './panels/WorkersPanel';
 import { GitPanel } from './panels/GitPanel';
 import { TerminalPanel } from './panels/TerminalPanel';
@@ -22,7 +23,7 @@ import { ProdPanel } from './panels/ProdPanel';
 import { PreviewPanel } from './panels/PreviewPanel';
 import { FilePanel } from './panels/FilePanel';
 import {
-  PublishIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon,
+  PublishIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon,
   AgentIcon, PreviewIcon, FileIcon, GitIcon,
 } from './panels/navIcons';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -35,7 +36,7 @@ import { useIsMobile } from './hooks/useIsMobile';
 //    appears in both (dev in the top tabs, prod in the sidebar).
 type WorkspaceTab =
   | 'chat' | 'preview' | 'file' | 'git' | 'database'
-  | 'publish' | 'prodDatabase' | 'errors' | 'events' | 'workers' | 'terminal';
+  | 'publish' | 'prodDatabase' | 'errors' | 'events' | 'workers' | 'terminal' | 'feedback';
 const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: 'chat', label: 'Agent' },
   { id: 'preview', label: 'Preview' },
@@ -45,7 +46,7 @@ const TABS: { id: WorkspaceTab; label: string }[] = [
 ];
 const ALL_TABS: WorkspaceTab[] = [
   'chat', 'preview', 'file', 'git', 'database',
-  'publish', 'prodDatabase', 'errors', 'events', 'workers', 'terminal',
+  'publish', 'prodDatabase', 'errors', 'events', 'workers', 'terminal', 'feedback',
 ];
 // Icons for the per-session view sub-nav (rendered under the active session row in
 // the sidebar). Keyed by the same ids as TABS. The session-scoped views
@@ -252,6 +253,21 @@ export default function StudioProjectPage({
     setTab('chat');
   }, [hasRealMain]);
 
+  // Hand a feedback report to the coding agent: seed the composer with a fix
+  // prompt (via the same sessionStorage bridges the eval flow uses) in an existing
+  // session or a fresh one, then switch to it. The user reviews + hits Send.
+  const sendFeedbackToAgent = React.useCallback((prompt: string, sessionId: string | null) => {
+    if (sessionId) {
+      try { sessionStorage.setItem(`eval-first-turn-prompt:${sessionId}`, prompt); } catch { /* ignore */ }
+      selectSession(sessionId);
+    } else {
+      try {
+        sessionStorage.setItem('eval-pending-task', JSON.stringify({ taskName: 'feedback-fix', firstTurnPrompt: prompt }));
+      } catch { /* ignore */ }
+      newSession();
+    }
+  }, [selectSession, newSession]);
+
   const archiveSession = React.useCallback((id: string) => {
     setStored((prev) => prev.filter((s) => s.compositeId !== id));
     setActiveSessionId((cur) => (cur === id ? null : cur));
@@ -312,6 +328,7 @@ export default function StudioProjectPage({
       { id: 'prodDatabase', label: 'Database', icon: <DatabaseIcon />, active: tab === 'prodDatabase', onClick: () => { setTab('prodDatabase'); closeDrawer(); } },
       { id: 'errors', label: 'Errors', icon: <ErrorsIcon />, active: tab === 'errors', onClick: () => { setTab('errors'); closeDrawer(); } },
       { id: 'events', label: 'Events', icon: <EventsIcon />, active: tab === 'events', onClick: () => { setTab('events'); closeDrawer(); } },
+      { id: 'feedback', label: 'Feedback', icon: <FeedbackIcon />, active: tab === 'feedback', onClick: () => { setTab('feedback'); closeDrawer(); } },
       { id: 'workers', label: 'Workers', icon: <WorkersIcon />, active: tab === 'workers', onClick: () => { setTab('workers'); closeDrawer(); } },
       { id: 'terminal', label: 'Terminal', icon: <TerminalIcon />, active: tab === 'terminal', onClick: () => { setTab('terminal'); closeDrawer(); } },
     ],
@@ -389,8 +406,9 @@ export default function StudioProjectPage({
           {/* Sidebar prod views */}
           {tab === 'publish' && <div style={S.pane}><ProdPanel /></div>}
           {tab === 'prodDatabase' && <div style={S.paneScroll}><DatabasePanel forceProd onPublish={() => { setTab('publish'); }} /></div>}
-          {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel forceProd /></div>}
+          {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel forceProd onPublish={() => { setTab('publish'); }} /></div>}
           {tab === 'events' && <div style={S.paneScroll}><EventsPanel /></div>}
+          {tab === 'feedback' && <div style={S.paneScroll}><FeedbackPanel onPublish={() => { setTab('publish'); }} sessions={stored.map((s) => ({ compositeId: s.compositeId, title: s.title }))} onSendToAgent={sendFeedbackToAgent} /></div>}
           {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel forceProd /></div>}
           {tab === 'terminal' && <div style={S.pane}><TerminalPanel /></div>}
         </div>
@@ -434,7 +452,7 @@ export default function StudioProjectPage({
 // list reuses TABS for its own labels (these match).
 const ALL_TAB_LABELS: Record<WorkspaceTab, string> = {
   chat: 'Agent', preview: 'Preview', file: 'File', git: 'Git', database: 'Database',
-  publish: 'Publish', prodDatabase: 'Database', errors: 'Errors', events: 'Events',
+  publish: 'Publish', prodDatabase: 'Database', errors: 'Errors', events: 'Events', feedback: 'Feedback',
   workers: 'Workers', terminal: 'Terminal',
 };
 
