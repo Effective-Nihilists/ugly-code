@@ -49,6 +49,7 @@ import { getPattern } from './patterns/registry';
 import { decorateForStep, renderStepDecoration, filterToolsForStep } from './patterns/decorate';
 import type { Step } from './patterns/types';
 import { deriveCriteria, gradeAgainstCriteria, buildRevisePrompt, type Judge } from './patterns/judge';
+import { classifyForAuto, shouldRunEngine } from './patterns/classify';
 import { spawnCollect } from '../../agent/tools/spawn';
 
 /** No-tools LLM completion for the criteria grader — the same governed,
@@ -817,7 +818,16 @@ export async function runClientAgentTurn(
   // each step ends on natural stop, then the driver advances. The step
   // instruction rides on the (synthetic) user message; the live `tools` getter
   // reads `state.currentStep` to gate the model's tool list per step.
-  const pattern = state.patternMode === 'spec-build-verify' ? getPattern('spec-build-verify') : undefined;
+  // Resolve whether to run the SBV engine: an explicit pin always runs it; `auto`
+  // classifies and runs it only for genuinely-novel, non-trivial work (else the
+  // engine is skipped and the turn is a plain single-send — the monolith's
+  // engine-skip-below-0.65 rationale, which avoids SBV overhead on easy tasks).
+  let runSbv = state.patternMode === 'spec-build-verify';
+  if (state.patternMode === 'auto') {
+    const cls = await classifyForAuto(userText, agentStepJudge).catch(() => null);
+    runSbv = cls ? shouldRunEngine(cls) : false;
+  }
+  const pattern = runSbv ? getPattern('spec-build-verify') : undefined;
   if (pattern) {
     const ws = getSessionWorkspace(sessionId);
     const projectDir = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? null;
