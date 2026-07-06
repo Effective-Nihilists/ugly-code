@@ -38,15 +38,15 @@ Run **one level at a time** to checkpoint score/cost between levels (L4/L5 cells
 cost $4–8 each; 25×3 = 75 cells run sequentially):
 
 ```bash
-ugly-code --compare docs/eval-ladder/level-1.json --origin <deployed-origin> --test-user
-ugly-code --compare docs/eval-ladder/level-2.json --origin <deployed-origin> --test-user
+ugly-code --compare docs/eval-ladder/level-1.json --origin https://code.ugly.bot --test-user
+ugly-code --compare docs/eval-ladder/level-2.json --origin https://code.ugly.bot --test-user
 # … level-3, level-4, level-5
 ```
 
 Or the whole ladder at once:
 
 ```bash
-ugly-code --compare docs/eval-ladder/ladder-round.json --origin <deployed-origin> --test-user
+ugly-code --compare docs/eval-ladder/ladder-round.json --origin https://code.ugly.bot --test-user
 ```
 
 Each run prints a `score/max $cost Nturns` scoreboard per task and writes the

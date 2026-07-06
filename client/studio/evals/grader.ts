@@ -302,16 +302,38 @@ function joinPath(base: string, rel: string): string {
   return `${base.replace(/\/$/, '')}/${rel.replace(/^\//, '')}`;
 }
 
+/** Paths the judge should never see — installed deps, build output, the agent's
+ *  isolated worktrees, and leaked session logs. Excluded from BOTH the stage and
+ *  the diff so they don't crowd out the real change under the 20k-char cap
+ *  (node_modules sorts before src/, so without this it fills the whole budget and
+ *  the actual edit gets truncated away → the judge scores a correct fix as 0). */
+const DIFF_EXCLUDES = [
+  ':(exclude)node_modules',
+  ':(exclude)dist',
+  ':(exclude).ugly-studio',
+  ':(exclude)*.jsonl',
+  // Lockfiles: an agent that runs `npm/pnpm install` regenerates a huge lockfile
+  // that sorts before src/ and would eat the whole 20k-char cap, truncating the
+  // actual code change out of the judge's view (a correct fix then scores 0).
+  ':(exclude)package-lock.json',
+  ':(exclude)**/package-lock.json',
+  ':(exclude)pnpm-lock.yaml',
+  ':(exclude)**/pnpm-lock.yaml',
+  ':(exclude)yarn.lock',
+  ':(exclude)**/yarn.lock',
+];
+
 /** The agent's changes (capped) — evidence for the LLM judge. Stages everything
  *  first (`git add -A`) then diffs the index, so NEW/untracked files the agent
  *  wrote (e.g. DESIGN.md / DECISION.md for planning + write-to-spec tasks) are
  *  included — plain `git diff` only shows modified tracked files and would feed
  *  the judge an empty diff for doc-producing tasks. `cloneFixture` commits a
  *  baseline seed, so `--cached` diffs against that; with no baseline commit it
- *  diffs against the empty tree (still shows the new files). */
+ *  diffs against the empty tree (still shows the new files). Junk dirs
+ *  (node_modules/dist/…) are excluded so real edits survive the cap. */
 async function collectDiff(projectPath: string, deps: GradeDeps): Promise<string> {
-  await deps.run('git', ['add', '-A'], projectPath);
-  const r = await deps.run('git', ['diff', '--cached', '--no-color'], projectPath);
+  await deps.run('git', ['add', '-A', '--', '.', ...DIFF_EXCLUDES], projectPath);
+  const r = await deps.run('git', ['diff', '--cached', '--no-color', '--', '.', ...DIFF_EXCLUDES], projectPath);
   const out = r.out;
   return out.length > 20_000 ? out.slice(0, 20_000) + '\n…(diff truncated)' : out;
 }

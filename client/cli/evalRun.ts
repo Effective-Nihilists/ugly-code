@@ -38,8 +38,13 @@ async function cloneFixture(taskName: string, repoUrl: string | undefined): Prom
   // cheap-model "terminated" crashes on rrule — those are a deployed-proxy limit on
   // long generation, not context size.) No grader path reads the fixture's eval/
   // (vitestScore→test/, SBP→vendored metadata).
+  // Seed a .gitignore too, so installed deps / build output never enter the
+  // baseline or the agent's later `git add -A` — otherwise a post-install
+  // node_modules (100k+ lines) swamps every diff/inspection surface and buries
+  // the real change. Appends (creates if absent) so fixture-specific ignores stay.
   const seedGit =
-    `rm -rf .git eval && git init -b main -q && git add -A && ` +
+    `rm -rf .git eval && printf '%s\\n' 'node_modules/' 'dist/' '.venv/' '.ugly-studio/' >> .gitignore && ` +
+    `git init -b main -q && git add -A && ` +
     `git -c user.email=eval@ugly.bot -c user.name=eval commit -q -m "eval: seed ${safe}"`;
   const cmd = repoUrl
     ? `mkdir -p "$HOME/.ugly-code/eval-projects" && ` +
@@ -94,17 +99,27 @@ const GRADER_JUDGE_MODEL = process.env.UGLY_GRADER_MODEL ?? 'sonnet';
 
 async function claudeJudge(system: string, user: string): Promise<string> {
   const prompt = `${system}\n\n${user}`;
-  try {
-    const { stdout } = await execFileP(
-      'claude',
-      ['--print', '--output-format', 'json', '--model', GRADER_JUDGE_MODEL, prompt],
-      { maxBuffer: 32 * 1024 * 1024, timeout: 180_000 },
-    );
-    return (JSON.parse(stdout) as { result?: string }).result ?? '';
-  } catch (e) {
-    process.stderr.write(`[claudeJudge] FAILED (${GRADER_JUDGE_MODEL}): ${e instanceof Error ? e.message : String(e)}\n`);
-    throw e;
+  // Retry transient failures / empty output up to 3× before giving up. A judge
+  // that momentarily errors or returns nothing must NOT silently become a 0-score
+  // (parseJudge maps empty → 0 points) — that made a correct fix score 0/5 during
+  // a provider blip. Only a genuine, parseable low score should count as low.
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const { stdout } = await execFileP(
+        'claude',
+        ['--print', '--output-format', 'json', '--model', GRADER_JUDGE_MODEL, prompt],
+        { maxBuffer: 32 * 1024 * 1024, timeout: 180_000 },
+      );
+      const result = (JSON.parse(stdout) as { result?: string }).result ?? '';
+      if (result.trim()) return result;
+      lastErr = new Error('empty judge result');
+    } catch (e) {
+      lastErr = e;
+    }
+    process.stderr.write(`[claudeJudge] attempt ${attempt}/3 failed (${GRADER_JUDGE_MODEL}): ${lastErr instanceof Error ? lastErr.message : String(lastErr)}\n`);
   }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 /** The single follow-up sent when an implementation run ends with zero edits. */
@@ -160,13 +175,22 @@ export interface EvalRunResult { score: number; scoreMax: number; costUsd: numbe
 const RESUME_NUDGE = 'Continue where you left off and complete the task.';
 
 /** Read the run's cost + turn count from the fs session store's metadata. */
-async function readRunTotals(storeRoot: string, sessionId: string): Promise<{ costUsd: number; turns: number }> {
+async function readRunTotals(storeRoot: string, sessionId: string): Promise<{ costUsd: number; turns: number; durationMs: number; tokens?: { input: number; output: number; cacheRead: number; cacheCreate: number } }> {
   const dir = sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_');
   try {
-    const m = JSON.parse(await readFile(`${storeRoot}/${dir}/metadata.json`, 'utf8')) as { costUsd?: number; messageCount?: number };
-    return { costUsd: m.costUsd ?? 0, turns: m.messageCount ?? 0 };
+    const m = JSON.parse(await readFile(`${storeRoot}/${dir}/metadata.json`, 'utf8')) as {
+      costUsd?: number; messageCount?: number; created?: number; updated?: number;
+      promptTokens?: number; completionTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number;
+    };
+    const hasTokens = m.promptTokens != null || m.completionTokens != null || m.cacheReadTokens != null;
+    return {
+      costUsd: m.costUsd ?? 0,
+      turns: m.messageCount ?? 0,
+      durationMs: m.created != null && m.updated != null ? Math.max(0, m.updated - m.created) : 0,
+      ...(hasTokens ? { tokens: { input: m.promptTokens ?? 0, output: m.completionTokens ?? 0, cacheRead: m.cacheReadTokens ?? 0, cacheCreate: m.cacheCreationTokens ?? 0 } } : {}),
+    };
   } catch {
-    return { costUsd: 0, turns: 0 };
+    return { costUsd: 0, turns: 0, durationMs: 0 };
   }
 }
 
@@ -228,7 +252,14 @@ export async function runEval(cfg: {
   // a task the model was actively solving scores 0 purely on transport luck. Resume
   // the crashed session up to 3× (claude-cli manages its own retries, so skip it).
   const usingClaudeCli = !!cfg.model && isClaudeCliModel(cfg.model);
-  for (let attempt = 1; !usingClaudeCli && attempt <= 3 && turnState.errored; attempt++) {
+  // Transport-failure guard: if the provider never produced a single assistant
+  // turn (a full outage), resume + no-edit nudges can't help — they just burn
+  // no-op turns against a dead endpoint (an outage batch fired 15–18 pointless
+  // resumes). Detect zero-assistant-turns and skip both recovery paths; the cell
+  // is flagged transportFailure in history so it can be filtered/re-queued.
+  const transportDead = !usingClaudeCli && analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).assistantTurns === 0;
+  if (transportDead) process.stderr.write(`[eval] ${task.name}: transport failure (0 assistant turns) — skipping resume/nudge\n`);
+  for (let attempt = 1; !usingClaudeCli && !transportDead && attempt <= 3 && turnState.errored; attempt++) {
     process.stderr.write(`[eval] ${task.name}: turn crashed — resume attempt ${attempt}/3\n`);
     turnState.errored = false;
     await runTurn(sessionId, RESUME_NUDGE, onMsg, selection);
@@ -241,7 +272,7 @@ export async function runEval(cfg: {
   // the CLI persists its transcript after returning, so an edit-count check here races
   // the flush and always reads 0 → a spurious extra invocation that inflates cost/turns.
   // claude-cli (the Opus baseline) reliably edits and never needs the nudge anyway.
-  if (!usingClaudeCli && shouldNudgeForNoEdit(task.kind, analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).edits)) {
+  if (!usingClaudeCli && !transportDead && shouldNudgeForNoEdit(task.kind, analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).edits)) {
     process.stderr.write(`[eval] ${task.name}: 0 edits after turns — sending no-edit nudge\n`);
     await runTurn(sessionId, NO_EDIT_NUDGE, onMsg, selection);
   }
@@ -259,6 +290,7 @@ export async function runEval(cfg: {
     ? await gradeSbp(gradeInput, cliGradeDeps)
     : await gradeProject(gradeInput, cliGradeDeps);
   const totals = await readRunTotals(storeRoot, sessionId);
+  const assistantTurns = analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).assistantTurns;
   const nowIso = new Date().toISOString();
   await appendRunHistory({
     taskName: task.name,
@@ -271,7 +303,11 @@ export async function runEval(cfg: {
     scoreMax: result.scoreMax ?? 0,
     costUsd: totals.costUsd,
     turns: totals.turns,
+    assistantTurns,
+    ...(totals.tokens ? { tokens: totals.tokens } : {}),
+    durationMs: totals.durationMs,
+    ...(transportDead ? { transportFailure: true } : {}),
     config: [cfg.model, cfg.pattern, cfg.modelMode?.kind, cfg.toolset].filter(Boolean).join('/') || 'default',
   }).catch(() => undefined);
-  return { score: result.score ?? 0, scoreMax: result.scoreMax ?? 0, ...totals, resolvedPattern };
+  return { score: result.score ?? 0, scoreMax: result.scoreMax ?? 0, costUsd: totals.costUsd, turns: totals.turns, resolvedPattern };
 }

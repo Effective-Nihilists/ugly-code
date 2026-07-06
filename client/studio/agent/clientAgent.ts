@@ -453,6 +453,10 @@ function persistMeta(s: SessionAgentState, sessionId: string, status: 'running' 
     status,
     messageCount: s.messageCount,
     costUsd: s.cost,
+    promptTokens: s.promptTokens,
+    completionTokens: s.completionTokens,
+    cacheReadTokens: s.cacheReadTokens,
+    cacheCreationTokens: s.cacheCreationTokens,
   });
 }
 

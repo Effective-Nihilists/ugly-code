@@ -1,6 +1,6 @@
 {
   "name": "ugly-code",
-  "version": "0.1.98",
+  "version": "0.1.99",
   "type": "module",
   "bin": {
     "ugly-code": "bin/ugly-code.mjs"

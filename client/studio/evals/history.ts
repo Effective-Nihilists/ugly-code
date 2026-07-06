@@ -15,7 +15,16 @@ export interface RunHistoryEntry {
   score?: number;
   scoreMax?: number;
   costUsd?: number;
+  /** Total messages (back-compat). Inflated by harness-injected nudges/resumes. */
   turns?: number;
+  /** Honest model turn count — assistant messages only, excludes injected nudges. */
+  assistantTurns?: number;
+  /** Token usage when the session store captured it (input/output/cache). */
+  tokens?: { input: number; output: number; cacheRead: number; cacheCreate: number };
+  /** Wall-clock of the run in ms (session updated − created). */
+  durationMs?: number;
+  /** True when the provider produced zero assistant turns (outage), not a real 0-score. */
+  transportFailure?: boolean;
   config?: string;
 }
 

@@ -141,7 +141,8 @@ describe('eval grader — deterministic gates', () => {
       },
       d,
     );
-    expect(calls).toContainEqual(['git', 'add', '-A']); // staged before diffing
+    expect(calls.some((c) => c[0] === 'git' && c[1] === 'add' && c.includes('-A'))).toBe(true); // staged before diffing
+    expect(calls.some((c) => c.includes(':(exclude)node_modules'))).toBe(true); // junk excluded from evidence
     expect(seen[0]).toContain('my design'); // new-file content reached the judge
     expect(r.score).toBe(5);
   });

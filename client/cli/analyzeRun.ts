@@ -4,8 +4,12 @@
 // compaction count, and (from persisted telemetry) cache-hit rate + per-model cost.
 import { readFile } from 'node:fs/promises';
 
-const READ_TOOLS = new Set(['read', 'grep', 'glob', 'todos']);
-const EDIT_TOOLS = new Set(['edit', 'write', 'multiedit']);
+// Matched case-insensitively — claude-cli emits capitalized tool names
+// (Read/Edit/Write/Grep/Glob) while the ugly.bot client agent emits lowercase.
+// Without normalizing, the entire opus (claude-cli) baseline showed reads:0
+// edits:0 turns-to-first-edit:never. Aliases cover both agents' vocabularies.
+const READ_TOOLS = new Set(['read', 'grep', 'glob', 'todos', 'ls', 'codebase_search', 'read_file']);
+const EDIT_TOOLS = new Set(['edit', 'write', 'multiedit', 'edit_file', 'write_file', 'apply_patch', 'str_replace']);
 
 interface Row { seq: number; role: string; kind: string; content: string }
 interface AssistantContent { content?: { type?: string; name?: string; text?: string }[] }
@@ -44,10 +48,11 @@ export function analyzeTranscript(rows: Row[]): Omit<RunAnalysis, 'costUsd' | 'c
       if (uses.length === 0) narration++;
       for (const u of uses) {
         const name = u.name ?? 'unknown';
+        const norm = name.toLowerCase();
         toolCalls[name] = (toolCalls[name] ?? 0) + 1;
         totalToolCalls++;
-        if (READ_TOOLS.has(name)) reads++;
-        if (EDIT_TOOLS.has(name)) { edits++; turnsToFirstEdit ??= assistantIdx; }
+        if (READ_TOOLS.has(norm)) reads++;
+        if (EDIT_TOOLS.has(norm)) { edits++; turnsToFirstEdit ??= assistantIdx; }
       }
     } else if (r.role === 'tool') {
       for (const res of (c as ToolContent).results ?? []) if (res.is_error) toolErrors++;

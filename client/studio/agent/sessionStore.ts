@@ -13,6 +13,13 @@ export interface SessionStore {
     status?: 'running' | 'idle' | 'done' | 'error';
     messageCount?: number;
     costUsd?: number;
+    // Cumulative token usage, persisted so analyzeRun/scorecards can report
+    // cache-hit rate + tokens (the CLI fs store keeps these; the server store
+    // may ignore them). Optional — not every agent path tracks tokens.
+    promptTokens?: number;
+    completionTokens?: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
   }): Promise<{ ok: boolean } | null>;
   appendMessage(i: { sessionId: string; seq: number; role: StoredRole; content: string }): Promise<{ ok: boolean } | null>;
   compact(i: { sessionId: string; droppedIds: string[]; summaryId: string; summarySeq: number; summaryText: string }): Promise<{ ok: boolean } | null>;
