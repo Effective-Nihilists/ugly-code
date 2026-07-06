@@ -1,11 +1,13 @@
 // One-shot Python runner — write the snippet to a temp file and `uv run --script`.
 // Ported from ugly-studio python-runtime/one-shot.ts, adapted to native.process/fs
 // and the ~/.ugly-bot/binaries uv resolver. Guard-mode + recursive_llm are Plan 2b.
+import { fileURLToPath } from 'node:url';
 import { native } from 'ugly-app/native';
 import { ensureUv } from '../binaries/resolve';
 import { truncateOutput } from './outputTruncate';
 
-export interface OneShotOptions { code: string; cwd?: string; timeoutMs?: number; signal?: AbortSignal }
+export type PythonGuardMode = 'spec' | 'edit';
+export interface OneShotOptions { code: string; cwd?: string; timeoutMs?: number; signal?: AbortSignal; mode?: PythonGuardMode }
 export interface OneShotResult { output: string; isError: boolean; timedOut: boolean; exitCode: number | null }
 
 const MAX_BUF = 400_000;
@@ -16,15 +18,33 @@ function tmpDir(): string {
   return env.TMPDIR ?? '/tmp';
 }
 
+/** Absolute path to the bundled Python package dir (contains ugly_studio/). */
+export function bridgeLibPath(): string {
+  return fileURLToPath(new URL('../python-lib', import.meta.url));
+}
+
 export async function runPythonOneShot(opts: OneShotOptions): Promise<OneShotResult> {
   const uv = await ensureUv();
   const pid = (globalThis as { process?: { pid?: number } }).process?.pid ?? 0;
   const tmpFile = `${tmpDir()}/ugly-code-pyexec-${pid}-${Date.now()}.py`;
-  await native.fs.writeFile(tmpFile, opts.code);
+  // In a guarded step, prepend the import that installs the write hooks before
+  // the user's code runs. The guard reads UGLY_STUDIO_GUARD_MODE/_CWD from env.
+  const guardActive = opts.mode !== undefined;
+  const scriptContent = guardActive ? `import ugly_studio._guard  # ugly-studio guard\n${opts.code}` : opts.code;
+  await native.fs.writeFile(tmpFile, scriptContent);
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT;
   try {
     return await new Promise<OneShotResult>((resolve) => {
-      const proc = native.process.spawn(uv, ['run', '--script', tmpFile], opts.cwd ? { cwd: opts.cwd } : {});
+      const spawnOpts: { cwd?: string; env?: Record<string, string> } = opts.cwd ? { cwd: opts.cwd } : {};
+      if (guardActive) {
+        const existing = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PYTHONPATH;
+        spawnOpts.env = {
+          UGLY_STUDIO_GUARD_MODE: opts.mode!,
+          UGLY_STUDIO_GUARD_CWD: opts.cwd ?? '',
+          PYTHONPATH: existing ? `${bridgeLibPath()}:${existing}` : bridgeLibPath(),
+        };
+      }
+      const proc = native.process.spawn(uv, ['run', '--script', tmpFile], spawnOpts);
       let stdout = '';
       let stderr = '';
       let timedOut = false;
