@@ -11,6 +11,7 @@ import { spawnCollect } from '../agent/tools/spawn';
 import { bootDriver, runTurn } from './taskDriver';
 import { setSessionToolset } from '../studio/agent/clientAgent';
 import { isToolset } from '../studio/agent/toolsets';
+import { appendRunHistory } from '../studio/evals/history';
 
 const execFileP = promisify(execFile);
 
@@ -97,5 +98,19 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
     cliGradeDeps,
   );
   const totals = await readRunTotals(storeRoot, sessionId);
+  const nowIso = new Date().toISOString();
+  await appendRunHistory({
+    taskName: task.name,
+    projectName: projectPath.split('/').pop() ?? task.name,
+    projectPath,
+    sessionId,
+    createdAt: nowIso,
+    gradedAt: nowIso,
+    score: result.score ?? 0,
+    scoreMax: result.scoreMax ?? 0,
+    costUsd: totals.costUsd,
+    turns: totals.turns,
+    config: [cfg.model, cfg.pattern, cfg.toolset].filter(Boolean).join('/') || 'default',
+  }).catch(() => undefined);
   return { score: result.score ?? 0, scoreMax: result.scoreMax ?? 0, ...totals };
 }

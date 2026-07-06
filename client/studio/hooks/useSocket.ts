@@ -22,6 +22,7 @@ import { composeSessionSnapshot } from '../agent/sessionSnapshot';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 import { gradeProject, type GradeDeps } from '../evals/grader';
+import { listRunHistory, deleteRunFromHistory } from '../evals/history';
 import { sessionApi, resolveProjectId } from '../agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
 import { DB_SCRIPT } from '../db/dbScript';
@@ -1005,8 +1006,11 @@ const handlers: Record<string, Handler> = {
   // The eval picker: all 59 task defs (ported from app/studio/evals/tasks) with
   // derived difficulty + "why interesting". See client/studio/evals/registry.ts.
   evalListTasks: () => Promise.resolve(listEvalTasks()),
-  evalListHistory: () => Promise.resolve({ runs: [] }),
-  evalDeleteRun: () => Promise.resolve({}),
+  // Read the shared eval-run ledger (~/.ugly-code/eval-history.jsonl) that the CLI
+  // also writes — so a run produced on either surface shows up here. (Studio-side
+  // WRITE on grade is a follow-up; needs host-HOME path resolution — see history.ts.)
+  evalListHistory: () => listRunHistory(),
+  evalDeleteRun: (i) => deleteRunFromHistory(str((i as { projectName?: string }).projectName ?? '')),
   // The eval picker pre-fills a task's turn prompts. Read straight from the
   // local eval registry (same source as evalListTasks/evalCreateProject).
   evalGetTask: (i) => {

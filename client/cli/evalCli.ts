@@ -6,6 +6,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolveAuth } from './auth';
 import { runEval } from './evalRun';
 import { runComparison, renderScoreboard, type CompareSpec } from './compare';
+import { historyPath, type RunHistoryEntry } from '../studio/evals/history';
 
 function flag(argv: string[], name: string): string | undefined {
   const i = argv.indexOf(name);
@@ -21,6 +22,17 @@ export async function main(argv: string[]): Promise<number> {
       const r = await spawnCollect('ugly-app', ['login'], {});
       process.stdout.write(r.stdout);
       return r.code ?? 0;
+    }
+
+    if (argv.includes('--history')) {
+      let raw = '';
+      try { raw = await readFile(historyPath(), 'utf8'); } catch { /* none yet */ }
+      const runs = raw.split('\n').filter(Boolean).map((l) => JSON.parse(l) as RunHistoryEntry).reverse();
+      if (runs.length === 0) { process.stdout.write('no eval runs recorded yet.\n'); return 0; }
+      for (const r of runs.slice(0, 50)) {
+        process.stdout.write(`${r.gradedAt ?? r.createdAt}  ${r.taskName}  [${r.config ?? 'default'}]  ${r.score ?? 0}/${r.scoreMax ?? 0}  $${(r.costUsd ?? 0).toFixed(4)}  ${r.turns ?? 0}t\n`);
+      }
+      return 0;
     }
 
     // A/B comparison: `--compare <spec.json>` (custom matrix) or
