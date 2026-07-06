@@ -8,6 +8,7 @@ import { getEvalTask, firstTurnPrompt } from '../studio/evals/registry';
 import { gradeProject, type GradeDeps } from '../studio/evals/grader';
 import { isSbpTask } from '../studio/evals/sbp/registry';
 import { gradeSbp } from '../studio/evals/sbpGrader';
+import { analyzeTranscript } from './analyzeRun';
 import { ensureUv } from '../agent/binaries/resolve';
 import type { EvalGradeResult, SessionSnapshot } from '../studio/shared/api';
 import { spawnCollect } from '../agent/tools/spawn';
@@ -99,6 +100,36 @@ async function claudeJudge(system: string, user: string): Promise<string> {
   }
 }
 
+/** The single follow-up sent when an implementation run ends with zero edits. */
+const NO_EDIT_NUDGE =
+  'You ended your turn without editing any files. This task requires implementing a code ' +
+  'change — edit/write the source (not just read it) so the failing tests pass. Continue now ' +
+  'and make the necessary edits; do not end your turn until the change is implemented.';
+
+/**
+ * True when a run produced zero file edits but the task is an implementation task
+ * (bug-fix / feature). Phase-5 telemetry lever: the cheap model sometimes investigates
+ * a hard task then ends its turn (or crashes) with `turns-to-first-edit: never` → 0 diff
+ * → 0 score. Planning tasks legitimately produce no diff, so they are never nudged.
+ */
+export function shouldNudgeForNoEdit(kind: string, editCount: number): boolean {
+  return editCount === 0 && kind !== 'planning';
+}
+
+/** Parse a session's messages.jsonl into the row shape the analyzer/nudge consume. */
+async function readTranscriptRows(
+  storeRoot: string,
+  sessionId: string,
+): Promise<Array<{ seq: number; role: string; kind: string; content: string }>> {
+  const dir = sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_');
+  try {
+    const raw = await readFile(`${storeRoot}/${dir}/messages.jsonl`, 'utf8');
+    return raw.split('\n').filter(Boolean).map((l) => JSON.parse(l) as { seq: number; role: string; kind: string; content: string });
+  } catch {
+    return [];
+  }
+}
+
 /** The agent's last assistant message text — evidence for judge grading of
  *  planning / write-to-spec tasks whose output isn't a code diff. */
 async function readFinalText(storeRoot: string, sessionId: string): Promise<string | undefined> {
@@ -167,6 +198,15 @@ export async function runEval(cfg: {
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
   for (const turn of turns) {
     await runTurn(sessionId, turn, onMsg, selection);
+  }
+  // No-edit persistence guard (Phase-5 telemetry lever). Telemetry showed the cheap
+  // model can investigate a hard task then end its turn — or crash mid-run — with
+  // `turns-to-first-edit: never` (0 diff → 0 score) while passing cells all made edits.
+  // One bounded nudge, applied to every model, resumes the session and drives it to
+  // edit. A no-op when the agent already edited or the task is planning (no diff).
+  if (shouldNudgeForNoEdit(task.kind, analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).edits)) {
+    process.stderr.write(`[eval] ${task.name}: 0 edits after turns — sending no-edit nudge\n`);
+    await runTurn(sessionId, NO_EDIT_NUDGE, onMsg, selection);
   }
   const finalText = await readFinalText(storeRoot, sessionId);
   const gradeInput = {

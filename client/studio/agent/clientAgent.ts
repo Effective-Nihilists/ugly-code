@@ -84,7 +84,9 @@ const agentStepJudge: Judge = async (system, user, maxTokens = 512) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ input: { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], options: { maxTokens } } }),
+    // noTools → clean completion (no injected agent system prompt, no tools) so the
+    // judge/classifier get exactly the JSON/prose their own prompt asks for.
+    body: JSON.stringify({ input: { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], noTools: true, maxTokens } }),
   });
   const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
   if (json.error) throw new Error(json.error);
@@ -1332,11 +1334,9 @@ export function makePeerProvider(): import('./patterns/peerTypes').PeerProvider 
         body: JSON.stringify({
           input: {
             messages: req.messages,
-            options: {
-              ...(req.model ? { model: req.model } : {}),
-              ...(req.maxTokens ? { maxTokens: req.maxTokens } : {}),
-              ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-            },
+            noTools: true, // synthesis / insights / picker want a clean completion
+            ...(req.model ? { model: req.model } : {}),
+            ...(req.maxTokens ? { maxTokens: req.maxTokens } : {}),
           },
         }),
         ...(signal ? { signal } : {}),

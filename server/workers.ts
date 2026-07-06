@@ -31,6 +31,7 @@ import type { RecentProject } from '../shared/collections';
 import { cronTasks } from '../shared/cron';
 import { agentTurnHandler } from 'ugly-app/agent/server';
 import { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } from '../shared/agent';
+import { agentStepHandler } from './agentStepHandler';
 import { makeCodingSessionHandlers } from './codingSessionHandlers';
 
 // The per-request TypedDB is set on the app context before each fetch handler
@@ -46,6 +47,9 @@ const workersDb = (): TypedDB => {
 // reload) is the codingSession* set, shared with the Node entry (server/index.ts).
 const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
   agentTurn: agentTurnHandler({ tools: AGENT_TOOLS, systemPrompt: AGENT_SYSTEM_PROMPT }),
+  // The pattern engine's aux calls (classifier / judge / synthesis / picker) hit
+  // /api/agentStep with `noTools` — must be served by the Worker, not just Node.
+  agentStep: agentStepHandler,
   ...makeCodingSessionHandlers(workersDb),
 
   // Recent projects — synced across the user's devices/sessions. Mirrors the

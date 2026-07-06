@@ -23,6 +23,10 @@ export const requests = defineRequests({
     input: z.object({
       messages: z.array(agentMessageSchema),
       model: z.string().optional(),
+      // `noTools` → clean completion (no injected system prompt, no tools) for the
+      // pattern engine's aux calls (classifier / judge / synthesis / picker).
+      noTools: z.boolean().optional(),
+      maxTokens: z.number().optional(),
     }),
     output: z.object({ message: agentMessageSchema }),
     rateLimit: { max: 60, window: 60 },
