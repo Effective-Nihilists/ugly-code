@@ -34,7 +34,8 @@ export async function main(argv: string[]): Promise<number> {
         testUser: argv.includes('--test-user'),
       });
       const model = flag(argv, '--model');
-      const res = await runEval({ taskName, origin: auth.origin, token: auth.token, ...(model ? { model } : {}) });
+      const pattern = flag(argv, '--pattern');
+      const res = await runEval({ taskName, origin: auth.origin, token: auth.token, ...(model ? { model } : {}), ...(pattern ? { pattern } : {}) });
       process.stdout.write(`${taskName}: ${res.score}/${res.scoreMax}\n`);
       return res.score >= res.scoreMax ? 0 : 1;
     }

@@ -57,16 +57,17 @@ const cliGradeDeps: GradeDeps = {
   // judge omitted for Plan 1 (judge: gates stay pending); Plan 4 wires the /api/agentStep judge.
 };
 
-export async function runEval(cfg: { taskName: string; origin: string; token: string; model?: string }): Promise<{ score: number; scoreMax: number }> {
+export async function runEval(cfg: { taskName: string; origin: string; token: string; model?: string; pattern?: string }): Promise<{ score: number; scoreMax: number }> {
   const task = getEvalTask(cfg.taskName);
   if (!task) throw new Error(`Unknown eval task: ${cfg.taskName}`);
   const projectPath = await cloneFixture(task.name, task.repoUrl);
   const sessionId = `cli:${task.name}:${Date.now()}`;
   const storeRoot = `${process.env.HOME ?? '.'}/.ugly-code/session`;
   await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
+  const selection = cfg.pattern ? { patternMode: cfg.pattern as never } : undefined;
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
   for (const turn of turns) {
-    await runTurn(sessionId, turn, () => { /* transcript persisted by the fs store */ });
+    await runTurn(sessionId, turn, () => { /* transcript persisted by the fs store */ }, selection);
   }
   const result = await gradeProject(
     {

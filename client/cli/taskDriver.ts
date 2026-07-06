@@ -42,6 +42,11 @@ export async function bootDriver(cfg: DriverCfg): Promise<void> {
   }) as typeof fetch;
 }
 
-export async function runTurn(sessionId: string, text: string, onMsg: (m: unknown) => void): Promise<void> {
-  await runClientAgentTurn(sessionId, text, onMsg);
+export async function runTurn(
+  sessionId: string,
+  text: string,
+  onMsg: (m: unknown) => void,
+  selection?: Parameters<typeof runClientAgentTurn>[3],
+): Promise<void> {
+  await runClientAgentTurn(sessionId, text, onMsg, selection);
 }

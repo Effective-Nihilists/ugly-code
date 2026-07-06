@@ -24,7 +24,7 @@ describe('taskDriver', () => {
     expect(permsRequest.mock.calls[0][0]).toMatchObject({ fs: 'full', process: 'full' });
     const msgs: unknown[] = [];
     await runTurn('s', 'hi', (m) => msgs.push(m));
-    expect(runClientAgentTurn).toHaveBeenCalledWith('s', 'hi', expect.any(Function));
+    expect(runClientAgentTurn).toHaveBeenCalledWith('s', 'hi', expect.any(Function), undefined);
     expect(msgs).toEqual([{ type: 'x' }]);
   });
 
