@@ -1,7 +1,6 @@
 // One-shot Python runner — write the snippet to a temp file and `uv run --script`.
 // Ported from ugly-studio python-runtime/one-shot.ts, adapted to native.process/fs
 // and the ~/.ugly-bot/binaries uv resolver. Guard-mode + recursive_llm are Plan 2b.
-import { fileURLToPath } from 'node:url';
 import { native } from 'ugly-app/native';
 import { ensureUv } from '../binaries/resolve';
 import { truncateOutput } from './outputTruncate';
@@ -18,9 +17,13 @@ function tmpDir(): string {
   return env.TMPDIR ?? '/tmp';
 }
 
-/** Absolute path to the bundled Python package dir (contains ugly_studio/). */
+/** Absolute path to the bundled Python package dir (contains ugly_studio/).
+ *  Converts the module-relative file: URL to a filesystem path WITHOUT importing
+ *  node:url (which Vite can't bundle into the client build). */
 export function bridgeLibPath(): string {
-  return fileURLToPath(new URL('../python-lib', import.meta.url));
+  const u = new URL('../python-lib', import.meta.url);
+  // file:///C:/… → C:/… on Windows; file:///Users/… → /Users/… on posix.
+  return decodeURIComponent(u.pathname.replace(/^\/([A-Za-z]:)/, '$1'));
 }
 
 export async function runPythonOneShot(opts: OneShotOptions): Promise<OneShotResult> {
