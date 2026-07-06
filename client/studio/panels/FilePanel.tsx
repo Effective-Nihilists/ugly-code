@@ -32,6 +32,25 @@ function isMarkdown(path: string): boolean {
   return ext === 'md' || ext === 'markdown';
 }
 
+type MediaKind = 'image' | 'video' | 'audio';
+const MEDIA_EXT: Record<string, { kind: MediaKind; mime: string }> = {
+  png: { kind: 'image', mime: 'image/png' }, jpg: { kind: 'image', mime: 'image/jpeg' },
+  jpeg: { kind: 'image', mime: 'image/jpeg' }, gif: { kind: 'image', mime: 'image/gif' },
+  webp: { kind: 'image', mime: 'image/webp' }, bmp: { kind: 'image', mime: 'image/bmp' },
+  ico: { kind: 'image', mime: 'image/x-icon' }, avif: { kind: 'image', mime: 'image/avif' },
+  svg: { kind: 'image', mime: 'image/svg+xml' },
+  mp4: { kind: 'video', mime: 'video/mp4' }, webm: { kind: 'video', mime: 'video/webm' },
+  mov: { kind: 'video', mime: 'video/quicktime' }, m4v: { kind: 'video', mime: 'video/x-m4v' },
+  ogv: { kind: 'video', mime: 'video/ogg' },
+  mp3: { kind: 'audio', mime: 'audio/mpeg' }, wav: { kind: 'audio', mime: 'audio/wav' },
+  ogg: { kind: 'audio', mime: 'audio/ogg' }, m4a: { kind: 'audio', mime: 'audio/mp4' },
+  aac: { kind: 'audio', mime: 'audio/aac' }, flac: { kind: 'audio', mime: 'audio/flac' },
+};
+/** Media type for a path by extension, or null for a normal (text) file. */
+function mediaInfo(path: string): { kind: MediaKind; mime: string } | null {
+  return MEDIA_EXT[path.split('.').pop()?.toLowerCase() ?? ''] ?? null;
+}
+
 /** Rendered markdown via ugly-app's MdastViewer (needs an explicit measured width;
  *  mirrors CodingAgentChat's ChatMarkdown so it renders identically + safely). */
 function MarkdownView({ text }: { text: string }): React.ReactElement {
@@ -114,6 +133,16 @@ export function FilePanel({
   const [selected, setSelected] = React.useState<string | null>(null);
   const [content, setContent] = React.useState<string>('');
   const [contentHtml, setContentHtml] = React.useState<string>('');
+  // Object URL for an open image/video/audio file (null for text files). Revoked
+  // when the selection changes or the panel unmounts so blobs don't leak.
+  const [media, setMedia] = React.useState<{ url: string; kind: MediaKind } | null>(null);
+  const mediaUrlRef = React.useRef<string | null>(null);
+  const setMediaUrl = React.useCallback((next: { url: string; kind: MediaKind } | null) => {
+    if (mediaUrlRef.current) URL.revokeObjectURL(mediaUrlRef.current);
+    mediaUrlRef.current = next?.url ?? null;
+    setMedia(next);
+  }, []);
+  React.useEffect(() => () => { if (mediaUrlRef.current) URL.revokeObjectURL(mediaUrlRef.current); }, []);
   const [loadingFile, setLoadingFile] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   // Markdown files default to the rendered view, toggleable to raw source.
@@ -189,9 +218,21 @@ export function FilePanel({
     setBanner(false);
     setRefs(null);
     try {
-      const text = await native.fs.readFile(path);
-      setContent(text);
-      setContentHtml(highlightFile(path, text));
+      const mi = mediaInfo(path);
+      if (mi) {
+        // Binary media: read bytes and show it as an <img>/<video>/<audio> via an
+        // object URL, rather than the utf-8 text path (which renders garbage).
+        const bytes = await native.fs.readFileBytes(path);
+        const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mi.mime }));
+        setMediaUrl({ url, kind: mi.kind });
+        setContent('');
+        setContentHtml('');
+      } else {
+        setMediaUrl(null);
+        const text = await native.fs.readFile(path);
+        setContent(text);
+        setContentHtml(highlightFile(path, text));
+      }
       setMdRaw(false); // markdown opens in rendered view
       try {
         const s = await native.fs.stat(path);
@@ -203,11 +244,12 @@ export function FilePanel({
       console.error('[FilePanel:openFile]', JSON.stringify({ path, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       setContent('');
       setContentHtml('');
+      setMediaUrl(null);
       setError(`Could not read ${path}: ${String(e)}`);
     } finally {
       setLoadingFile(false);
     }
-  }, []);
+  }, [setMediaUrl]);
 
   // Open a file requested from another panel (e.g. a clicked tool-card path).
   // Runs whenever the target changes; reveals the requested line, then clears
@@ -298,9 +340,15 @@ export function FilePanel({
 
   const reloadFromDisk = React.useCallback(async () => {
     if (!selected) return;
-    const text = await native.fs.readFile(selected);
-    setContent(text);
-    setContentHtml(highlightFile(selected, text));
+    const mi = mediaInfo(selected);
+    if (mi) {
+      const bytes = await native.fs.readFileBytes(selected);
+      setMediaUrl({ url: URL.createObjectURL(new Blob([bytes as BlobPart], { type: mi.mime })), kind: mi.kind });
+    } else {
+      const text = await native.fs.readFile(selected);
+      setContent(text);
+      setContentHtml(highlightFile(selected, text));
+    }
     setDirtyValue(null);
     setBanner(false);
     try {
@@ -309,7 +357,7 @@ export function FilePanel({
     } catch {
       /* ignore */
     }
-  }, [selected]);
+  }, [selected, setMediaUrl]);
 
   const keepMine = React.useCallback(async () => {
     if (!selected) return;
@@ -528,6 +576,16 @@ export function FilePanel({
         {selected ? (
           loadingFile ? (
             <pre style={S.code}>Loading…</pre>
+          ) : media ? (
+            <div style={S.mediaWrap}>
+              {media.kind === 'image' ? (
+                <img data-id="file-media-image" src={media.url} alt={selected} style={S.mediaImg} />
+              ) : media.kind === 'video' ? (
+                <video data-id="file-media-video" src={media.url} controls style={S.mediaImg} />
+              ) : (
+                <audio data-id="file-media-audio" src={media.url} controls style={{ width: '100%', maxWidth: 480 }} />
+              )}
+            </div>
           ) : isMarkdown(selected) && !mdRaw ? (
             content ? <MarkdownView text={content} /> : <div style={S.empty}>(empty file)</div>
           ) : content.length > MAX_EDITABLE_BYTES ? (
@@ -580,6 +638,8 @@ export function FilePanel({
 
 const S: Record<string, React.CSSProperties> = {
   root: { display: 'flex', height: '100%', minHeight: 0, background: 'var(--bg-primary)' },
+  mediaWrap: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', overflow: 'auto', padding: 16, boxSizing: 'border-box' },
+  mediaImg: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
   tree: { width: 280, flexShrink: 0, overflow: 'auto', borderRight: '1px solid var(--border)', padding: '6px 0', fontFamily: 'var(--font-mono)', fontSize: 12.5 },
   backdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1290 },
   treeDrawer: { position: 'fixed', top: 0, left: 0, bottom: 0, width: 'min(86vw, 320px)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', borderRight: '1px solid var(--border)', zIndex: 1300, boxSizing: 'border-box', paddingTop: 'var(--safe-area-inset-top)', paddingBottom: 'var(--safe-area-inset-bottom)', fontFamily: 'var(--font-mono)', fontSize: 12.5 },

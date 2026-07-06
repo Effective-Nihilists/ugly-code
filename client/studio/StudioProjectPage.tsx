@@ -156,7 +156,12 @@ export default function StudioProjectPage({
   // File panel (was: OS default editor) so clicking a tool's path stays inside Studio.
   const openUri = React.useCallback((uri: string) => {
     if (/^https?:\/\//i.test(uri)) {
-      void native.system.openExternal({ url: uri });
+      // Open web links in a NEW TAB of this browser (the Studio host intercepts
+      // window.open as a new tab) rather than kicking out to the OS default
+      // browser. Fall back to openExternal only if the tab was blocked (popup
+      // blocker / host denied → null), so the link still opens somewhere.
+      const opened = window.open(uri, '_blank', 'noopener,noreferrer');
+      if (!opened) void native.system.openExternal({ url: uri });
       return;
     }
     // File path, possibly `file://`-prefixed and/or with a trailing :line[-endLine].
