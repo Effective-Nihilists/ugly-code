@@ -45,6 +45,9 @@ import {
 } from './serverSessionApi';
 import { assistantParts, type Part } from './sessionDisplay';
 import { ensureSessionWorkspace, getSessionWorkspace } from './sessionWorkspace';
+import { getPattern } from './patterns/registry';
+import { decorateForStep, renderStepDecoration, filterToolsForStep } from './patterns/decorate';
+import type { Step } from './patterns/types';
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
 import { composeSessionSnapshot, type PerModelAcc } from './sessionSnapshot';
 export { composeSessionSnapshot };
@@ -216,6 +219,9 @@ interface SessionAgentState {
   permissionMode: SessionSnapshot['permissionMode'];
   modelMode: SessionSnapshot['modelMode'];
   patternMode: SessionSnapshot['patternMode'];
+  /** The active SBV step during a pattern-driven turn (null otherwise). Read by
+   *  the live `tools` getter to gate the model's tool list per step. */
+  currentStep: Step | null;
 }
 
 // Codebase analysis (semantic index + architecture doc) runs per SESSION, decoupled from the
@@ -573,6 +579,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     permissionMode: 'edit',
     modelMode: { kind: 'auto' },
     patternMode: 'auto',
+    currentStep: null,
   };
   applySelection(state, selection);
   state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: state.model });
@@ -616,7 +623,8 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     get tools() {
       const mode = state.modelMode.kind === 'group' ? 'group' : 'single';
       const isUglyApp = uglyAppBySession.get(sessionId) ?? false;
-      return sessionToolSpecs({ mode, isUglyApp });
+      // Gate to the current SBV step's allow-list (no-op when no pattern step is active).
+      return filterToolsForStep(sessionToolSpecs({ mode, isUglyApp }), state.currentStep);
     },
     toolHandlers: makeToolHandlers(sessionId),
     budget: { maxTurns: 12 },
@@ -778,7 +786,24 @@ export async function runClientAgentTurn(
     action: 'created',
   });
   persistMeta(state, sessionId, 'running');
-  await state.controller.send(userText);
+  // Pattern-driven turn: run SBV as sequential, tool-gated, decorated sends —
+  // each step ends on natural stop, then the driver advances. The step
+  // instruction rides on the (synthetic) user message; the live `tools` getter
+  // reads `state.currentStep` to gate the model's tool list per step.
+  const pattern = state.patternMode === 'spec-build-verify' ? getPattern('spec-build-verify') : undefined;
+  if (pattern) {
+    try {
+      for (let i = 0; i < pattern.steps.length; i++) {
+        state.currentStep = pattern.steps[i];
+        const message = i === 0 ? decorateForStep(userText, pattern.steps[i]) : renderStepDecoration(pattern.steps[i]);
+        await state.controller.send(message);
+      }
+    } finally {
+      state.currentStep = null;
+    }
+  } else {
+    await state.controller.send(userText);
+  }
 }
 
 /** Cancel the in-flight turn for a session (the chat's Stop button). */
