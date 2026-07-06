@@ -31,6 +31,19 @@ function countTscErrors(out: string): number {
   return (out.match(COUNT_TS_ERRORS) ?? []).length;
 }
 
+/** Parse a vitest run's summary line into pass/total counts, for proportional
+ *  (0–N) scoring of a fixture's own vector suite. Reads the last `Tests …` line:
+ *  `Tests  30 passed | 20 failed (50)` → {30, 50}. Total falls back to
+ *  passed+failed when the `(N)` is absent; {0,0} when no suite ran. */
+export function parseVitestCounts(out: string): { passed: number; total: number } {
+  const line = out.split('\n').reverse().find((l) => /Tests\s+\d+\s+(passed|failed)/.test(l)) ?? '';
+  const passed = Number(/(\d+)\s+passed/.exec(line)?.[1] ?? 0);
+  const failed = Number(/(\d+)\s+failed/.exec(line)?.[1] ?? 0);
+  const totalMatch = /\((\d+)\)/.exec(line);
+  const total = totalMatch ? Number(totalMatch[1]) : passed + failed;
+  return { passed, total };
+}
+
 /** `fileMatches:<path>:<regex>` — split off the path, the rest is the regex
  *  (which may itself contain colons). */
 function splitFileMatches(rest: string): { path: string; regex: string } {
@@ -118,6 +131,17 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
       checks.push({ name: gate.name, passed, detail: passed ? undefined : `vitest exit ${r.code ?? 'null'}` });
       detMax += pts;
       if (passed) detScore += pts;
+    } else if (kind === 'vitestScore' || kind.startsWith('vitestScore:')) {
+      // Proportional pass-rate scoring against the fixture's own vitest suite
+      // (e.g. rrule's 50 RFC-5545 vectors): award round(pts · passed/total) so a
+      // partial implementation earns partial credit and improvements are visible.
+      const file = kind.startsWith('vitestScore:') ? kind.slice('vitestScore:'.length) : '';
+      const r = await deps.run('npx', ['vitest', 'run', ...(file ? [file] : [])], input.projectPath);
+      const { passed: np, total: nt } = parseVitestCounts(r.out);
+      const awarded = nt > 0 ? Math.round((pts * np) / nt) : 0;
+      checks.push({ name: `${gate.name} (${np}/${nt})`, passed: nt > 0 && np === nt, detail: nt > 0 ? undefined : `no vitest suite ran (exit ${r.code ?? 'null'})` });
+      detMax += pts;
+      detScore += awarded;
     } else if (kind.startsWith('fileExists:')) {
       const rel = kind.slice('fileExists:'.length);
       const passed = await deps.exists(joinPath(input.projectPath, rel));
