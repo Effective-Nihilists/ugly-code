@@ -1,8 +1,12 @@
 {
   "name": "ugly-code",
-  "version": "0.1.93",
+  "version": "0.1.94",
   "type": "module",
+  "bin": {
+    "ugly-code": "bin/ugly-code.mjs"
+  },
   "scripts": {
+    "cli": "tsx client/cli/index.ts",
     "dev": "ugly-app dev --watch",
     "build": "ugly-app build",
     "build:workers": "ugly-app build:workers",
