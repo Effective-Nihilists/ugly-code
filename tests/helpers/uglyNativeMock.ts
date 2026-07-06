@@ -15,6 +15,9 @@ export interface ProcResult {
   stderr?: string;
   code?: number | null;
   error?: string;
+  /** When true the proc never exits on its own (models a blocking dev server /
+   *  hung command) — it only ends when `process.kill` is invoked. */
+  hang?: boolean;
 }
 export type ProcFn = (cmd: string, args: string[]) => ProcResult;
 
@@ -135,14 +138,20 @@ const invoke = (channel: string, payload: unknown): Promise<unknown> => {
         if (res.error) emit(`process.error:${id}`, { err: res.error });
         if (res.stdout) emit(`process.stdout:${id}`, { chunk: res.stdout });
         if (res.stderr) emit(`process.stderr:${id}`, { chunk: res.stderr });
-        emit(`process.exit:${id}`, { code: res.code ?? 0 });
+        // A hung proc emits nothing and never exits until it's killed.
+        if (!res.hang) emit(`process.exit:${id}`, { code: res.code ?? 0 });
       }, 0);
       return Promise.resolve({ id, pid: 1000 + state.seq });
     }
     case 'process.write':
     case 'process.closeStdin':
-    case 'process.kill':
       return Promise.resolve(undefined);
+    case 'process.kill': {
+      // Killing a proc ends it — emit an exit so callers awaiting it resolve.
+      const id = String((p as { id?: unknown }).id ?? '');
+      if (id) emit(`process.exit:${id}`, { code: null });
+      return Promise.resolve(undefined);
+    }
 
     default:
       return Promise.resolve(undefined);

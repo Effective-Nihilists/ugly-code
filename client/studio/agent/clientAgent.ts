@@ -21,7 +21,7 @@ import {
   type MsgTelemetry,
   type RunAgentSocket,
 } from 'ugly-app/agent/client';
-import { dispatchTool, isUglyAppProject } from '../../agent/tools';
+import { dispatchTool, isUglyAppProject, killSessionBashProcs } from '../../agent/tools';
 import { registeredToolSpecs } from '../../agent/tools/registry';
 import { sessionToolSpecs } from '../../agent/tools/gating';
 import { discoverSkills, formatAvailableSkills } from '../hooks/skillDiscovery';
@@ -44,12 +44,18 @@ import {
   type ToolRowPayload,
 } from './serverSessionApi';
 import { assistantParts, type Part } from './sessionDisplay';
-import { ensureSessionWorkspace, getSessionWorkspace } from './sessionWorkspace';
+import { ensureSessionWorkspace, getSessionWorkspace, removeSessionWorkspace } from './sessionWorkspace';
+import type { ToolName } from '../../../shared/agent';
 import { getPattern } from './patterns/registry';
 import { decorateForStep, renderStepDecoration, filterToolsForStep } from './patterns/decorate';
-import type { Step } from './patterns/types';
+import { type Step, type Pattern, type PatternId, isPatternId, isSuperPattern, superToBasePattern } from './patterns/types';
 import { deriveCriteria, gradeAgainstCriteria, buildRevisePrompt, type Judge } from './patterns/judge';
-import { classifyForAuto, shouldRunEngine } from './patterns/classify';
+import { classifyForAuto, isClassificationConfident } from './patterns/classify';
+import { runMidFanout } from './patterns/mid-mode-host';
+import { runMaxMode } from './patterns/max-mode-host';
+import { runGroupMode } from './patterns/group-mode-host';
+import { awaitStepReview, rejectStepReviewsForSession } from './stepReviewBroker';
+import { native } from 'ugly-app/native';
 import { filterToolsByToolset, type Toolset } from './toolsets';
 import { spawnCollect } from '../../agent/tools/spawn';
 
@@ -266,9 +272,17 @@ interface SessionAgentState {
   permissionMode: SessionSnapshot['permissionMode'];
   modelMode: SessionSnapshot['modelMode'];
   patternMode: SessionSnapshot['patternMode'];
-  /** The active SBV step during a pattern-driven turn (null otherwise). Read by
+  /** The active step during a pattern-driven turn (null otherwise). Read by
    *  the live `tools` getter to gate the model's tool list per step. */
   currentStep: Step | null;
+  /** The resolved pattern id for the current/last turn (post-classifier, may be
+   *  a `super-*` id). Echoed in `session_state` so PatternStrip renders the strip. */
+  resolvedPattern: SessionSnapshot['resolvedPattern'];
+  /** Revise-iteration index within the active step (0-based). Echoed to the UI. */
+  currentStepIter: number;
+  /** Parked `pauseForUserReviewAfter` gates awaiting the user's approve/iterate
+   *  reply. Echoed in `session_state` so the IDE renders the StepReviewCard. */
+  pendingStepReviews: SessionSnapshot['pendingStepReviews'];
 }
 
 // Codebase analysis (semantic index + architecture doc) runs per SESSION, decoupled from the
@@ -536,6 +550,10 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
     permissionMode: s.permissionMode,
     modelMode: s.modelMode,
     patternMode: s.patternMode,
+    resolvedPattern: s.resolvedPattern,
+    currentStepId: s.currentStep?.id ?? null,
+    currentStepIter: s.currentStepIter,
+    pendingStepReviews: s.pendingStepReviews,
     cost: s.cost,
     promptTokens: s.promptTokens,
     completionTokens: s.completionTokens,
@@ -589,7 +607,7 @@ export function ensureCodebaseAnalysis(sessionId: string, emit: Emit): void {
   }, worktreeRoot);
 }
 
-function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection): SessionAgentState {
+function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, opts?: { peer?: boolean }): SessionAgentState {
   const existing = sessions.get(sessionId);
   if (existing) {
     existing.emitRef.current = emit;
@@ -627,16 +645,22 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     modelMode: { kind: 'auto' },
     patternMode: 'auto',
     currentStep: null,
+    resolvedPattern: null,
+    currentStepIter: 0,
+    pendingStepReviews: [],
   };
   applySelection(state, selection);
   state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: state.model });
 
   // Kick off (idempotently) the host's semantic index + architecture doc and stream readiness
   // to the header pill. Also runs at task boot (coding-task) so the pill fills in BEFORE the
-  // first turn — see ensureCodebaseAnalysis.
-  ensureCodebaseAnalysis(sessionId, emitRef.current);
-  ensureSkillsDiscovered(sessionId);
-  ensureUglyAppFlag(sessionId);
+  // first turn — see ensureCodebaseAnalysis. Peer sub-sessions (model axis) skip this: they run
+  // vanilla and share the parent's project, so re-indexing per peer is wasteful.
+  if (!opts?.peer) {
+    ensureCodebaseAnalysis(sessionId, emitRef.current);
+    ensureSkillsDiscovered(sessionId);
+    ensureUglyAppFlag(sessionId);
+  }
 
   state.controller = runAgent({
     socket: fetchSocket,
@@ -835,58 +859,295 @@ export async function runClientAgentTurn(
     action: 'created',
   });
   persistMeta(state, sessionId, 'running');
-  // Pattern-driven turn: run SBV as sequential, tool-gated, decorated sends —
-  // each step ends on natural stop, then the driver advances. The step
-  // instruction rides on the (synthetic) user message; the live `tools` getter
-  // reads `state.currentStep` to gate the model's tool list per step.
-  // Resolve whether to run the SBV engine: an explicit pin always runs it; `auto`
-  // classifies and runs it only for genuinely-novel, non-trivial work (else the
-  // engine is skipped and the turn is a plain single-send — the monolith's
-  // engine-skip-below-0.65 rationale, which avoids SBV overhead on easy tasks).
-  let runSbv = state.patternMode === 'spec-build-verify';
-  if (state.patternMode === 'auto') {
-    const cls = await classifyForAuto(userText, agentStepJudge).catch(() => null);
-    runSbv = cls ? shouldRunEngine(cls) : false;
-  }
-  const pattern = runSbv ? getPattern('spec-build-verify') : undefined;
-  if (pattern) {
-    const ws = getSessionWorkspace(sessionId);
-    const projectDir = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? null;
-    // The criteria-grader runs ONLY for eval-flow sessions (CLI / eval popup) —
-    // it's a measurement + REVISE-pressure mechanism, not a per-user-turn cost.
-    // Normal SBV sessions leave `criteria` empty → the BUILD gate is a no-op.
-    const criteria = evalSessions.has(sessionId)
-      ? await deriveCriteria(userText, '', agentStepJudge).catch(() => [])
-      : [];
-    try {
-      for (let i = 0; i < pattern.steps.length; i++) {
-        const step = pattern.steps[i];
-        state.currentStep = step;
-        await state.controller.send(i === 0 ? decorateForStep(userText, step) : renderStepDecoration(step));
-        // Governed judge at BUILD→VERIFY: grade the diff against the rubric; if
-        // criteria fail, loop BUILD with a targeted REVISE (bounded) before VERIFY.
-        if (step.id === 'build' && criteria.length > 0) {
-          for (let r = 0; r < MAX_REVISE; r++) {
-            const diff = await sessionGitDiff(projectDir);
-            const grade = await gradeAgainstCriteria(userText, criteria, diff, agentStepJudge);
-            // Surface the per-criterion verdicts so the eval scorecard can render
-            // them (the monolith kept these internal; here they're first-class).
-            emit({ type: 'codingAgent:event', sessionId, event: { type: 'criteria_verdicts', payload: { verdicts: grade.verdicts, failing: grade.failing } } } as unknown as Parameters<typeof emit>[0]);
-            if (!grade.parsed || grade.failing.length === 0) break;
-            await state.controller.send(`${renderStepDecoration(step)}\n\n${buildRevisePrompt(grade.failing)}`);
-          }
-        }
-      }
-    } finally {
-      state.currentStep = null;
+  // Resolve the pattern axis: `none` → plain single-send; an explicit PatternId
+  // pin runs that pattern; `auto` classifies and runs the routed pattern (or, when
+  // the classifier isn't confident, falls through to a plain send). `super-*` ids
+  // share their base pattern's steps; the super id is retained for the model axis.
+  const resolvedId = await resolvePatternForTurn(state, userText);
+  state.resolvedPattern = resolvedId;
+  const pattern = resolvedId ? getPattern(superToBasePattern(resolvedId)) : undefined;
+  const projectDir = mainProjectDir(sessionId);
+  try {
+    // Model axis dispatch. Priority: group (own peers, no steps) → max (peers run
+    // the base pattern, picker) → super-* (mid-mode parent-as-survivor fan-out) →
+    // single-controller step loop → plain send.
+    if (state.modelMode.kind === 'group') {
+      await runGroupModeTurn(state, sessionId, emit, userText, projectDir);
+    } else if (state.modelMode.kind === 'max' && pattern) {
+      await runMaxModeTurn(state, sessionId, emit, userText, pattern, projectDir);
+    } else if (pattern && isSuperPattern(resolvedId)) {
+      await runMidModeTurn(state, sessionId, emit, userText, pattern, resolvedId, projectDir);
+    } else if (pattern) {
+      await runPatternStepsOnMain({ state, sessionId, emit, userText, pattern, resolvedId, startIdx: 0, injection: null, projectDir });
+    } else {
+      await state.controller.send(userText);
     }
-  } else {
+  } finally {
+    state.currentStep = null;
+    state.currentStepIter = 0;
+    state.pendingStepReviews = [];
+    emitTelemetry(state, sessionId); // clear the active-step highlight + any gate
+  }
+}
+
+/** The parent session's working directory (worktree dir, or the project root). */
+function mainProjectDir(sessionId: string): string | null {
+  const ws = getSessionWorkspace(sessionId);
+  return (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? null;
+}
+
+/** Emit a one-off assistant progress bubble (model-axis narration). */
+function emitProgress(emit: Emit, sessionId: string, text: string): void {
+  emitMessage(emit, sessionId, 'assistant', [{ type: 'text', data: { text } }, { type: 'finish' }]);
+}
+
+/**
+ * Run a pattern's steps on the MAIN controller from `startIdx`, natural-stop
+ * advance, with per-step tool gating, the eval-only rubric grade loop after
+ * write-steps, and the SPEC/DIAGNOSE review gate. `injection` (mid-mode) is
+ * appended to the first executed step's message (the survivor's super-spec).
+ */
+async function runPatternStepsOnMain(args: {
+  state: SessionAgentState;
+  sessionId: string;
+  emit: Emit;
+  userText: string;
+  pattern: Pattern;
+  resolvedId: PatternId | null;
+  startIdx: number;
+  injection: string | null;
+  projectDir: string | null;
+}): Promise<void> {
+  const { state, sessionId, emit, userText, pattern, resolvedId, startIdx, injection, projectDir } = args;
+  // The criteria-grader runs ONLY for eval-flow sessions — it's a measurement +
+  // REVISE-pressure mechanism, not a per-user-turn cost. Normal sessions leave
+  // `criteria` empty → the write-step gate is a no-op.
+  const criteria = evalSessions.has(sessionId)
+    ? await deriveCriteria(userText, '', agentStepJudge).catch(() => [])
+    : [];
+  let reviewFeedback: string | null = null;
+  for (let i = Math.max(0, startIdx); i < pattern.steps.length; i++) {
+    const step = pattern.steps[i];
+    state.currentStep = step;
+    state.currentStepIter = 0;
+    emitTelemetry(state, sessionId); // live PatternStrip: highlight this step
+    const isFirstExecuted = i === Math.max(0, startIdx);
+    const base = isFirstExecuted ? decorateForStep(userText, step) : renderStepDecoration(step);
+    const withInjection = isFirstExecuted && injection ? `${base}\n\n${injection}` : base;
+    const msg = reviewFeedback
+      ? `${withInjection}\n\n---\n\nUSER REVIEW FEEDBACK (revise this step accordingly):\n${reviewFeedback}`
+      : withInjection;
+    reviewFeedback = null;
+    await state.controller.send(msg);
+    // Governed judge after a write-capable step (BUILD / FIX / EDIT): grade the
+    // diff against the rubric; if criteria fail, loop the same step with a
+    // targeted REVISE (bounded) before advancing. `one-shot` steps never grade.
+    if (step.gradeAfter && step.loops !== 'one-shot' && criteria.length > 0) {
+      for (let r = 0; r < MAX_REVISE; r++) {
+        const diff = await sessionGitDiff(projectDir);
+        const grade = await gradeAgainstCriteria(userText, criteria, diff, agentStepJudge);
+        emit({ type: 'codingAgent:event', sessionId, event: { type: 'criteria_verdicts', payload: { verdicts: grade.verdicts, failing: grade.failing } } } as unknown as Parameters<typeof emit>[0]);
+        if (!grade.parsed || grade.failing.length === 0) break;
+        state.currentStepIter = r + 1;
+        emitTelemetry(state, sessionId);
+        await state.controller.send(`${renderStepDecoration(step)}\n\n${buildRevisePrompt(grade.failing)}`);
+      }
+    }
+    // Review gate: after a `pauseForUserReviewAfter` step (SPEC / DIAGNOSE), park
+    // for the user's approve/iterate reply. Skipped on terminal + eval sessions.
+    if (step.pauseForUserReviewAfter && !step.isTerminal && !evalSessions.has(sessionId)) {
+      const reply = await parkForStepReview(state, sessionId, step, resolvedId);
+      if (reply.action === 'iterate') {
+        reviewFeedback = reply.feedback ?? '(no specific feedback provided)';
+        i -= 1; // re-run this step (the for-loop's i++ returns to it)
+      }
+    }
+  }
+}
+
+/** Default cheap peer pool for the model axis (max / mid / group) — mirrors the
+ *  monolith's known-good super-spec trio. Overridable via env in a follow-up. */
+const DEFAULT_PEER_POOL = ['deepseek_v4_flash', 'glm_5_1', 'minimax_m2_7'];
+const SYNTHESIS_MODEL = 'deepseek_v4_pro';
+const AUX_MODEL = 'deepseek_v4_flash';
+
+/** Mid-mode (super-*): fan out the pre-edit phase to cheap peers, synthesize a
+ *  super-spec, then run the remaining steps on the parent (the survivor). */
+async function runMidModeTurn(
+  state: SessionAgentState,
+  sessionId: string,
+  emit: Emit,
+  userText: string,
+  pattern: Pattern,
+  resolvedId: PatternId | null,
+  projectDir: string | null,
+): Promise<void> {
+  const pool = DEFAULT_PEER_POOL.filter((m) => m !== state.model);
+  let result: Awaited<ReturnType<typeof runMidFanout>> | null = null;
+  try {
+    result = await runMidFanout({
+      pattern,
+      userRequest: userText,
+      peerModels: pool,
+      callbacks: makePeerCallbacks(sessionId),
+      provider: makePeerProvider(),
+      synthesisModel: SYNTHESIS_MODEL,
+      injectionStyle: resolvedId === 'super-investigate-fix' ? 'imperative' : 'advisory',
+      onProgress: (m) => emitProgress(emit, sessionId, m),
+    });
+  } catch (e) {
+    emitProgress(emit, sessionId, `Wide fan-out failed (${(e as Error).message}); running the base pattern directly.`);
+  }
+  if (!result || result.synthBoundary === 0 || !result.injection) {
+    await runPatternStepsOnMain({ state, sessionId, emit, userText, pattern, resolvedId, startIdx: 0, injection: null, projectDir });
+    return;
+  }
+  await runPatternStepsOnMain({ state, sessionId, emit, userText, pattern, resolvedId, startIdx: result.synthBoundary, injection: result.injection, projectDir });
+}
+
+/** Max-mode: run the base pattern across N peers with cross-pollination, pick a
+ *  winner, and apply its diff to the parent project. */
+async function runMaxModeTurn(
+  state: SessionAgentState,
+  sessionId: string,
+  emit: Emit,
+  userText: string,
+  pattern: Pattern,
+  projectDir: string | null,
+): Promise<void> {
+  try {
+    const res = await runMaxMode({
+      pattern,
+      userRequest: userText,
+      peerModels: DEFAULT_PEER_POOL,
+      callbacks: makePeerCallbacks(sessionId),
+      provider: makePeerProvider(),
+      pollinator: AUX_MODEL,
+      pickerModel: AUX_MODEL,
+      onProgress: (m) => emitProgress(emit, sessionId, m),
+    });
+    emitProgress(emit, sessionId, `Winner: ${res.winner.modelId} — ${res.reason}`);
+    await applyWinnerDiff(sessionId, projectDir, res.winnerDiff, emit);
+    accruePeerCostToParent(sessionId, res.winner.id);
+    await disposePeerSession(res.winner.id);
+  } catch (e) {
+    emitProgress(emit, sessionId, `Max-mode failed (${(e as Error).message}); running a single pass.`);
+    await runPatternStepsOnMain({ state, sessionId, emit, userText, pattern, resolvedId: pattern.id, startIdx: 0, injection: null, projectDir });
+  }
+}
+
+/** Group-mode: persona peers work the task concurrently; a picker chooses the
+ *  winner over their diffs, which is applied to the parent. */
+async function runGroupModeTurn(
+  state: SessionAgentState,
+  sessionId: string,
+  emit: Emit,
+  userText: string,
+  projectDir: string | null,
+): Promise<void> {
+  const mm = state.modelMode;
+  const models = mm.kind === 'group' && mm.models.length > 0 ? mm.models : DEFAULT_PEER_POOL;
+  const personas = mm.kind === 'group' ? mm.personas : undefined;
+  try {
+    const res = await runGroupMode({
+      userRequest: userText,
+      peerModels: models,
+      ...(personas ? { personas } : {}),
+      callbacks: makePeerCallbacks(sessionId),
+      provider: makePeerProvider(),
+      pickerModel: AUX_MODEL,
+      onProgress: (m) => emitProgress(emit, sessionId, m),
+    });
+    emitProgress(emit, sessionId, `Winner: ${res.winner.modelId} (${res.reason})`);
+    await applyWinnerDiff(sessionId, projectDir, res.winnerDiff, emit);
+    accruePeerCostToParent(sessionId, res.winner.id);
+    await disposePeerSession(res.winner.id);
+  } catch (e) {
+    emitProgress(emit, sessionId, `Group-mode failed (${(e as Error).message}); running a single pass.`);
     await state.controller.send(userText);
   }
 }
 
-/** Cancel the in-flight turn for a session (the chat's Stop button). */
+/** Apply a winning peer's diff to the parent project via `git apply`. Best-effort;
+ *  narrates success/failure into the chat (never silent). */
+async function applyWinnerDiff(sessionId: string, projectDir: string | null, diff: string, emit: Emit): Promise<void> {
+  if (!projectDir) { emitProgress(emit, sessionId, 'No project directory — cannot apply the winning changes.'); return; }
+  if (!diff.trim()) { emitProgress(emit, sessionId, 'The winner made no file changes.'); return; }
+  const patchPath = `${projectDir}/.ugly-winner.patch`;
+  try {
+    await native.fs.writeFile(patchPath, diff);
+    const r = await spawnCollect('git', ['-C', projectDir, 'apply', '--reject', '--whitespace=nowarn', patchPath], {});
+    await spawnCollect('bash', ['-lc', `rm -f ${JSON.stringify(patchPath)}`], {}).catch(() => undefined);
+    if ((r.code ?? 0) !== 0) {
+      emitProgress(emit, sessionId, `Could not cleanly apply the winner's diff (some hunks may be in .rej files):\n${r.stderr.slice(-800)}`);
+    } else {
+      emitProgress(emit, sessionId, "Applied the winning peer's changes to your project.");
+    }
+  } catch (e) {
+    emitProgress(emit, sessionId, `Failed to apply the winner's diff: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Resolve which pattern (if any) drives this turn from the session's
+ * `patternMode`: `none` → null (plain send); an explicit PatternId → that
+ * pattern; `auto` → the classifier's routed pattern, or null when the
+ * classifier isn't confident (plain send fallback). Returns the possibly-super
+ * id so the caller can echo `resolvedPattern` and dispatch the model axis.
+ */
+async function resolvePatternForTurn(
+  state: SessionAgentState,
+  userText: string,
+): Promise<PatternId | null> {
+  const mode = state.patternMode;
+  if (mode === 'none') return null;
+  if (mode === 'auto') {
+    const cls = await classifyForAuto(userText, agentStepJudge).catch(() => null);
+    return cls && isClassificationConfident(cls) ? cls.pattern : null;
+  }
+  return isPatternId(mode) ? mode : null;
+}
+
+/**
+ * Park the driver after a `pauseForUserReviewAfter` step: publish a pending
+ * step-review into the snapshot (so the IDE renders the StepReviewCard) and
+ * await the user's approve/iterate reply via the broker. Clears the pending
+ * entry before returning.
+ */
+async function parkForStepReview(
+  state: SessionAgentState,
+  sessionId: string,
+  step: Step,
+  patternId: PatternId | null,
+): Promise<import('./stepReviewBroker').StepReviewReply> {
+  const id = rid();
+  state.pendingStepReviews = [
+    ...state.pendingStepReviews,
+    {
+      id,
+      sessionId,
+      stepId: step.id,
+      stepLabel: step.label,
+      patternId: patternId ?? '',
+      createdAt: Date.now(),
+    },
+  ];
+  emitTelemetry(state, sessionId);
+  try {
+    return await awaitStepReview(id, sessionId);
+  } finally {
+    state.pendingStepReviews = state.pendingStepReviews.filter((p) => p.id !== id);
+    emitTelemetry(state, sessionId);
+  }
+}
+
+/** Cancel the in-flight turn for a session (the chat's Stop button). Also kills
+ *  any live `bash` subprocess — aborting the model loop alone leaves the spawned
+ *  shell running on the host ("clicked stop, bash still running"). */
 export function abortClientAgent(sessionId: string): void {
+  rejectStepReviewsForSession(sessionId); // release any parked review gate first
+  const killed = killSessionBashProcs(sessionId);
+  if (killed) console.info('[clientAgent:abort]', JSON.stringify({ sessionId, killedBashProcs: killed }));
   sessions.get(sessionId)?.controller.abort();
 }
 
@@ -904,9 +1165,188 @@ export function clearClientAgentSession(sessionId: string): void {
   // no turn (and so no session state) exists yet. The readiness/architecture maps are kept:
   // the project is unchanged, so the pill stays accurate and the next turn reuses them.
   stopCodebasePoll(sessionId);
+  rejectStepReviewsForSession(sessionId); // release any parked review gate
+  killSessionBashProcs(sessionId); // stop any shell work before we drop the session
   const s = sessions.get(sessionId);
   if (!s) return;
   try { s.controller.abort(); } catch { /* no in-flight turn */ }
   try { s.controller.dispose(); } catch { /* already torn down */ }
   sessions.delete(sessionId);
+}
+
+// ── Model-axis peer primitives (composed by peerHost.ts) ─────────────────────
+// A peer is a first-class coding-agent sub-session (its own runAgent controller +
+// git worktree) keyed by `<parentSessionId>:peer<i>`. These primitives expose the
+// module-private session/workspace surface so peerHost can implement MaxModeCallbacks
+// without reaching into `sessions`. Peers run vanilla (`patternMode: 'none'`); the
+// host owns step decomposition and sends one instruction message per step.
+
+const noopEmit: Emit = () => { /* peers are internal — no studio UI emission */ };
+
+/** Spawn (idempotently) a peer sub-session pinned to `modelId`, provisioning its
+ *  worktree. `group` registers the blackboard/ask_peer tools for the peer. Returns
+ *  the peer's working directory (worktree dir, or project root on fallback). */
+export async function spawnPeerSession(
+  peerId: string,
+  modelId: string,
+  opts?: { group?: boolean },
+): Promise<{ id: string; modelId: string; cwd: string }> {
+  const selection: AgentSelection = {
+    model: modelId,
+    patternMode: 'none',
+    modelMode: opts?.group ? { kind: 'group', models: [modelId] } : { kind: 'single', model: modelId },
+  };
+  getOrCreate(peerId, noopEmit, selection, { peer: true });
+  const projectPath = getActiveProjectPath();
+  const ws = await ensureSessionWorkspace(peerId, projectPath);
+  return { id: peerId, modelId, cwd: ws.dir || projectPath || '' };
+}
+
+/** Deliver one synthetic user message to a peer and await turn settle. `policy`
+ *  gates the peer's tool list for this turn (read-only steps), reusing the same
+ *  per-step gating path as the main driver (the live `tools` getter reads
+ *  `state.currentStep`). */
+export async function sendPeerSession(
+  peerId: string,
+  text: string,
+  policy?: { allowedTools?: readonly ToolName[]; descriptionSuffixes?: Partial<Record<ToolName, string>> },
+): Promise<void> {
+  const s = sessions.get(peerId);
+  if (!s) throw new Error(`peer session not found: ${peerId}`);
+  s.currentStep = policy?.allowedTools
+    ? ({ allowedTools: policy.allowedTools, toolDescriptionSuffixes: policy.descriptionSuffixes } as unknown as Step)
+    : null;
+  try {
+    await s.controller.send(text);
+  } finally {
+    s.currentStep = null;
+  }
+}
+
+/** The peer's last assistant text (artifact extraction / synthesis input). */
+export function peerHistoryText(peerId: string): string {
+  const s = sessions.get(peerId);
+  if (!s) return '';
+  const msgs = s.controller.getMessages();
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i] as { role?: string; content?: unknown };
+    if (m.role !== 'assistant') continue;
+    if (typeof m.content === 'string') return m.content;
+    if (Array.isArray(m.content)) return m.content.map((b) => (b as { text?: string }).text ?? '').join('');
+  }
+  return '';
+}
+
+/** The peer's uncommitted diff vs its worktree baseline. */
+export async function peerSessionDiff(peerId: string): Promise<string> {
+  return sessionGitDiff(getSessionWorkspace(peerId)?.dir ?? null);
+}
+
+/** Cumulative cost the peer has accrued (for parent telemetry aggregation). */
+export function peerSessionCost(peerId: string): number {
+  return sessions.get(peerId)?.cost ?? 0;
+}
+
+/** Tear down a peer sub-session: abort + dispose the controller, drop the session,
+ *  and remove its worktree. Best-effort. */
+export async function disposePeerSession(peerId: string): Promise<void> {
+  killSessionBashProcs(peerId);
+  const s = sessions.get(peerId);
+  if (s) {
+    try { s.controller.abort(); } catch { /* no in-flight turn */ }
+    try { s.controller.dispose(); } catch { /* already torn down */ }
+    sessions.delete(peerId);
+  }
+  try { await removeSessionWorkspace(peerId, getActiveProjectPath()); } catch { /* best effort */ }
+}
+
+/** The main session's controller (the mid-mode survivor) — lets peerHost inject the
+ *  synthesized super-spec into the parent and run the remaining steps on it. */
+export function getMainController(sessionId: string): AgentController | null {
+  return sessions.get(sessionId)?.controller ?? null;
+}
+
+/** The parent session's live diff (for merge/winner bookkeeping). */
+export async function mainSessionDiff(sessionId: string): Promise<string> {
+  const ws = getSessionWorkspace(sessionId);
+  return sessionGitDiff((ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? null);
+}
+
+/** Aggregate a peer's accrued cost onto the parent session's telemetry + emit. */
+export function accruePeerCostToParent(parentSessionId: string, peerId: string): void {
+  const parent = sessions.get(parentSessionId);
+  if (!parent) return;
+  parent.cost += peerSessionCost(peerId);
+  emitTelemetry(parent, parentSessionId);
+}
+
+/**
+ * Build the `MaxModeCallbacks` bundle bound to a parent session — the ugly-code
+ * implementation the model-axis hosts (mid/max/group) drive peers through. Lives
+ * here (not a separate peerHost.ts) so it can reach the module-private peer
+ * primitives without an import cycle (clientAgent → host → peerHost → clientAgent).
+ */
+export function makePeerCallbacks(parentSessionId: string): import('./patterns/peerTypes').MaxModeCallbacks {
+  const peerId = (i: number): string => `${parentSessionId}:peer${i}`;
+  return {
+    async spawnPeers(modelIds, opts) {
+      const group = opts?.peerKind === 'group';
+      const peers = await Promise.all(
+        modelIds.map(async (modelId, i) => {
+          // A survivor peer (mid mode) is handled by the parent controller, not here;
+          // spawnPeers only ever receives loser/participant model ids.
+          const { id, cwd } = await spawnPeerSession(peerId(i), modelId, { group });
+          const persona = opts?.personas?.[i];
+          return { id, modelId, cwd, ...(persona ? { persona } : {}) };
+        }),
+      );
+      return peers;
+    },
+    async sendToPeerAndSettle(peer, text, policy) {
+      await sendPeerSession(peer.id, text, policy);
+    },
+    async tearDownPeer(peer) {
+      accruePeerCostToParent(parentSessionId, peer.id); // fold peer spend onto the parent
+      await disposePeerSession(peer.id);
+    },
+    async getPeerDiff(peer) {
+      return peerSessionDiff(peer.id);
+    },
+    async getPeerSpec(peer) {
+      // The peer's last assistant text stands in for its spec/diagnosis artifact
+      // (spec_write persists remotely; the summary text is the synthesis input).
+      return peerHistoryText(peer.id);
+    },
+  };
+}
+
+/** No-tools completion provider for the aux calls (synthesis / insights / picker),
+ *  routed through the same governed /api/agentStep endpoint as the judge. */
+export function makePeerProvider(): import('./patterns/peerTypes').PeerProvider {
+  return {
+    async complete(req, signal) {
+      const res = await fetch('/api/agentStep', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          input: {
+            messages: req.messages,
+            options: {
+              ...(req.model ? { model: req.model } : {}),
+              ...(req.maxTokens ? { maxTokens: req.maxTokens } : {}),
+              ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+            },
+          },
+        }),
+        ...(signal ? { signal } : {}),
+      });
+      const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
+      if (json.error) throw new Error(json.error);
+      const content = json.result?.message?.content;
+      if (typeof content === 'string') return content;
+      if (Array.isArray(content)) return content.map((b) => (b as { text?: string }).text ?? '').join('');
+      return '';
+    },
+  };
 }

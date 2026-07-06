@@ -3,7 +3,7 @@
 // desktop daemon). Returns a string the agent loop feeds back as `tool_result`.
 
 import { native } from 'ugly-app/native';
-import type { SandboxMode } from 'ugly-app/native';
+import type { SandboxMode, UglyProcess } from 'ugly-app/native';
 import type { AgentToolName } from '../../shared/agent';
 import type { StepFn } from './engine';
 import { DB_SCRIPT } from '../studio/db/dbScript';
@@ -193,7 +193,8 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       const command = str(p.command ?? '');
       const guard = await devServerBashGuard(command, ctx);
       if (guard) return guard;
-      return runBash(command, await sandboxOptFor(ctx), ctx, p.working_dir != null ? str(p.working_dir) : undefined);
+      const timeoutMs = typeof p.timeout_ms === 'number' && p.timeout_ms > 0 ? p.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;
+      return runBash(command, await sandboxOptFor(ctx), ctx, p.working_dir != null ? str(p.working_dir) : undefined, timeoutMs);
     }
     case 'database':
       return runDb(ctx, 'getQuery', {
@@ -334,16 +335,56 @@ async function devServerBashGuard(command: string, ctx?: ToolContext): Promise<s
   );
 }
 
+/** Default wall-clock cap for a `bash` call — the spec advertises this, and
+ *  without it a blocking command (a dev server, a hung install) runs forever and
+ *  wedges the turn. Overridable per-call via the tool's `timeout_ms` param. */
+export const DEFAULT_BASH_TIMEOUT_MS = 120_000;
+
+/** Live `bash` subprocesses keyed by session — so `stop` (agent abort) can kill
+ *  them. Without this the model loop stops but the spawned process keeps running
+ *  on the host, which is exactly the "clicked stop, bash still running" report. */
+const runningBashProcs = new Map<string, Set<UglyProcess>>();
+
+/** Kill every live `bash` subprocess for a session. Called from the agent-abort
+ *  path (clientAgent.abortClientAgent / reset) so stopping a turn also stops its
+ *  shell work. Returns how many procs were signalled. */
+export function killSessionBashProcs(sessionId: string): number {
+  const set = runningBashProcs.get(sessionId);
+  if (!set || set.size === 0) return 0;
+  let n = 0;
+  for (const proc of set) {
+    try { proc.kill(); n += 1; } catch { /* already exited */ }
+  }
+  set.clear();
+  runningBashProcs.delete(sessionId);
+  return n;
+}
+
+function trackBashProc(sessionId: string | undefined, proc: UglyProcess): () => void {
+  if (!sessionId) return () => undefined;
+  let set = runningBashProcs.get(sessionId);
+  if (!set) { set = new Set(); runningBashProcs.set(sessionId, set); }
+  set.add(proc);
+  return () => {
+    const s = runningBashProcs.get(sessionId);
+    if (!s) return;
+    s.delete(proc);
+    if (s.size === 0) runningBashProcs.delete(sessionId);
+  };
+}
+
 /** Run a shell command through the daemon (POSIX `sh -c`), resolving with the
  *  combined output. The daemon OS-user-sandboxes the subprocess when `sandbox`
  *  is provided; PORT (so `pnpm dev` binds the session's port → Preview loads it)
  *  and DATABASE_URL (so the dev server boots against the bundled local DB) are
- *  injected. `workingDir` overrides the cwd (else the worktree/project root). */
+ *  injected. `workingDir` overrides the cwd (else the worktree/project root).
+ *  `timeoutMs` kills the proc after that wall-clock (default DEFAULT_BASH_TIMEOUT_MS). */
 function runBash(
   command: string,
   sandbox: { projectId: string; mode: SandboxMode; projectDir: string } | undefined,
   ctx: ToolContext | undefined,
   workingDir?: string,
+  timeoutMs: number = DEFAULT_BASH_TIMEOUT_MS,
 ): Promise<string> {
   return new Promise((resolve) => {
     let out = '';
@@ -361,10 +402,26 @@ function runBash(
         ...(Object.keys(env).length ? { env } : {}),
       };
       const proc = native.process.spawn('sh', ['-c', command], opts);
+      const untrack = trackBashProc(ctx?.sessionId, proc);
+      // Single-shot settle: whichever of exit / error / timeout fires first wins,
+      // then we stop tracking + clear the timer so nothing double-resolves.
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const settle = (text: string): void => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        untrack();
+        resolve(text);
+      };
+      timer = setTimeout(() => {
+        try { proc.kill(); } catch { /* already gone */ }
+        settle(`${out.trimEnd()}\n[timed out after ${Math.round(timeoutMs / 1000)}s — process killed. For a long-running dev server use the dev_server_start tool; otherwise pass a larger timeout_ms.]`);
+      }, timeoutMs);
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (out += c));
-      proc.onError((e) => { resolve(`${out}\n[error: ${e}]`); });
-      proc.onExit((code) => { resolve(`${out.trimEnd()}\n[exit ${code ?? 'null'}]`); });
+      proc.onError((e) => { settle(`${out}\n[error: ${e}]`); });
+      proc.onExit((code) => { settle(`${out.trimEnd()}\n[exit ${code ?? 'null'}]`); });
     } catch (e) {
       console.error('[agentTools:runBash]', JSON.stringify({ command, workingDir, projectDir: ctx?.projectDir, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       resolve(`[error: ${(e as Error).message}]`);

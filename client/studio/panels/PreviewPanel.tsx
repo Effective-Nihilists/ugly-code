@@ -64,6 +64,10 @@ function notify(d: DevServer): void { for (const fn of d.subs) fn(); }
 
 const TUNNEL_RE = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
 
+/** A trycloudflare quick-tunnel URL gets a fresh random subdomain every run, so a
+ *  persisted one is dead on the next launch (→ blank preview). Never restore it. */
+const isTunnelUrl = (u: string): boolean => /\.trycloudflare\.com/.test(u);
+
 /** Expose localhost:port at a public https URL via a cloudflared quick tunnel (no CF account),
  *  so the mobile preview can reach the host's dev server. Best-effort — if cloudflared isn't
  *  present the preview just stays on localhost (works on the desktop host). */
@@ -174,7 +178,10 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   const defaultUrl = `http://localhost:${port}`;
   const devKey = sessionId ?? 'root';
   const [url, setUrl] = React.useState<string>(() => {
-    try { return localStorage.getItem(keyFor(sessionId ?? null)) ?? defaultUrl; } catch { return defaultUrl; }
+    try {
+      const saved = localStorage.getItem(keyFor(sessionId ?? null));
+      return saved && !isTunnelUrl(saved) ? saved : defaultUrl;
+    } catch { return defaultUrl; }
   });
   const [committed, setCommitted] = React.useState<string>(url);
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -253,22 +260,17 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   React.useEffect(() => {
     try {
       const saved = localStorage.getItem(keyFor(sessionId ?? null));
-      if (saved) { setUrl(saved); setCommitted(saved); }
+      if (saved && !isTunnelUrl(saved)) { setUrl(saved); setCommitted(saved); }
     } catch { /* ignore */ }
   }, [sessionId]);
 
-  // Once the cloudflared tunnel is up, point the preview at its public https URL so it works
-  // on mobile (localhost only resolves on the desktop host). Reload the iframe onto it.
-  React.useEffect(() => {
-    const t = dev.tunnelUrl;
-    if (t && t !== committed) {
-      setUrl(t);
-      setCommitted(t);
-      setReloadKey((k) => k + 1);
-      try { localStorage.setItem(keyFor(sessionId ?? null), t); } catch { /* ignore */ }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dev.tunnelUrl]);
+  // The cloudflared tunnel URL is for opening the preview on a PHONE (localhost
+  // won't resolve there) — it's surfaced in the log as `[tunnel: …]`. This iframe
+  // always runs on the desktop Electron host (browser mode early-returns
+  // NativeHostRequired), where localhost is faster and reliable, so we do NOT
+  // hijack the iframe onto the tunnel: doing so swapped a working preview for a
+  // slower, DNS-flaky trycloudflare URL ("briefly showed the app, then switched
+  // to the cloudflare url; DNS issue in the logs"). Stay on localhost.
 
   const commit = React.useCallback(() => {
     const u = url.trim();

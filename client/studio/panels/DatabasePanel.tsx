@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { native } from 'ugly-app/native';
 import { DevProdToggle } from '../components/DevProdToggle';
 import { CodeEditor } from '../components/CodeEditor';
@@ -282,14 +283,54 @@ function BrowseView({ mode, writes }: { mode: DbMode; writes: boolean }) {
 
   useEffect(() => { setSelected(null); reload(); }, [reload]);
 
+  // Re-query when the window regains focus. The collection list is populated by
+  // the running dev DB, so a panel opened BEFORE the app's first `pnpm dev`
+  // created the tables would otherwise stay "No collections found" forever —
+  // the "started the app, DB panel still empty" report. Coming back to the
+  // Studio window after starting the app now refreshes the list.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onFocus = (): void => { reload(); };
+    window.addEventListener('focus', onFocus);
+    return () => { window.removeEventListener('focus', onFocus); };
+  }, [reload]);
+
   if (selected) {
     return <CollectionDetail mode={mode} writes={writes} collection={selected} onBack={() => { setSelected(null); }} />;
   }
-  if (loading) return <Centered>Loading…</Centered>;
-  if (error) return <div style={errorBoxStyle}>{error}</div>;
-  if (collections.length === 0) return <Centered>No collections found</Centered>;
+  const refreshBtn = (
+    <button
+      data-id="db-collections-refresh"
+      onClick={() => { reload(); }}
+      disabled={loading}
+      title="Re-query collections (after the app creates its tables)"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px',
+        fontSize: 12, background: 'var(--bg-secondary)', color: 'var(--text-primary)',
+        border: '1px solid var(--border-primary)', borderRadius: 4,
+        cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1, alignSelf: 'flex-start',
+      }}
+    >
+      <RefreshCw size={12} style={loading ? { animation: 'us-readiness-pulse 1.4s ease-in-out infinite' } : undefined} />
+      Refresh
+    </button>
+  );
+  if (loading && collections.length === 0) return <Centered>Loading…</Centered>;
+  if (error) return <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{refreshBtn}<div style={errorBoxStyle}>{error}</div></div>;
+  if (collections.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', paddingTop: 24 }}>
+        <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No collections found</span>
+        <span style={{ color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', maxWidth: 280 }}>
+          Tables are created when the app first runs its migrations (start it from the Preview panel). Then refresh.
+        </span>
+        {refreshBtn}
+      </div>
+    );
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {refreshBtn}
       {collections.map((c) => (
         <div
           key={c.name}

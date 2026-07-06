@@ -32,6 +32,10 @@ export function composeSessionSnapshot(args: {
   permissionMode: SessionSnapshot['permissionMode'];
   modelMode: SessionSnapshot['modelMode'];
   patternMode: SessionSnapshot['patternMode'];
+  resolvedPattern?: SessionSnapshot['resolvedPattern'];
+  currentStepId?: SessionSnapshot['currentStepId'];
+  currentStepIter?: number;
+  pendingStepReviews?: SessionSnapshot['pendingStepReviews'];
   cost: number;
   promptTokens: number;
   completionTokens: number;
@@ -55,9 +59,9 @@ export function composeSessionSnapshot(args: {
     permissionMode: args.permissionMode,
     modelMode: args.modelMode,
     patternMode: args.patternMode,
-    resolvedPattern: null,
-    currentStepId: null,
-    currentStepIter: 0,
+    resolvedPattern: args.resolvedPattern ?? null,
+    currentStepId: args.currentStepId ?? null,
+    currentStepIter: args.currentStepIter ?? 0,
     currentStepFinished: false,
     worktree: null,
     worktreeBlocked: false,
@@ -78,7 +82,7 @@ export function composeSessionSnapshot(args: {
     lastViewedAt: 0,
     pendingPermissions: [],
     pendingAskUsers: [],
-    pendingStepReviews: [],
+    pendingStepReviews: args.pendingStepReviews ?? [],
     eval: null,
   };
 }

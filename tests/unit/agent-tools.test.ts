@@ -6,8 +6,8 @@
 // ran tools against an in-memory UglyHost. Tool names match the monolith
 // (read/write/edit/bash), not the earlier read_file/run_command port.
 
-import { beforeEach, describe, expect, it } from 'vitest';
-import { dispatchTool } from '../../client/agent/tools';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { dispatchTool, killSessionBashProcs } from '../../client/agent/tools';
 import { annotateLines } from '../../client/agent/tools/hashline';
 import { runAgent, type StepFn } from '../../client/agent/engine';
 import type { AgentMessage } from '../../shared/agent';
@@ -163,6 +163,40 @@ describe('bash dev-server guard', () => {
     resetMock({ files: { [`${dir}/package.json`]: '{}' }, proc: () => ({ stdout: 'ok\n', code: 0 }) });
     await dispatchTool('bash', { command: 'pnpm dev', description: 'run dev' }, { projectDir: dir });
     expect(mockCalls().find((c) => c.channel === 'process.spawn')).toBeDefined();
+  });
+});
+
+describe('bash timeout + stop', () => {
+  it('kills a hung command after its timeout and reports it', async () => {
+    vi.useFakeTimers();
+    try {
+      resetMock({ proc: () => ({ hang: true }) });
+      const p = dispatchTool(
+        'bash',
+        { command: 'sleep 999', description: 'hang', timeout_ms: 5000 },
+        { sessionId: 'timeout-s1' },
+      );
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(await p).toMatch(/timed out after 5s/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('killSessionBashProcs ends a running bash for that session', async () => {
+    resetMock({ proc: () => ({ hang: true }) });
+    let done = false;
+    const p = dispatchTool('bash', { command: 'sleep 999', description: 'hang' }, { sessionId: 'kill-s2' })
+      .then((r) => { done = true; return r; });
+    await new Promise((r) => setTimeout(r, 5)); // let the spawn register
+    expect(done).toBe(false);
+    expect(killSessionBashProcs('kill-s2')).toBe(1);
+    expect(await p).toMatch(/\[exit null\]/);
+    expect(done).toBe(true);
+  });
+
+  it('killSessionBashProcs returns 0 when the session has no live procs', () => {
+    expect(killSessionBashProcs('no-such-session')).toBe(0);
   });
 });
 

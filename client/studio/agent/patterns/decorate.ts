@@ -7,7 +7,8 @@ import type { Step } from './types';
 const SEP = '\n\n---\n\n';
 
 export function renderStepDecoration(step: Step): string {
-  return `# Step: ${step.label}\n\n${step.systemPromptTail}\n\nWhen this step is complete, end your turn — the orchestrator advances on its own.`;
+  const askUser = step.askUserClause ? `\n\n${step.askUserClause}` : '';
+  return `# Step: ${step.label}\n\n${step.systemPromptTail}${askUser}\n\nWhen this step is complete, end your turn — the orchestrator advances on its own.`;
 }
 
 export function decorateForStep(userText: string, step: Step): string {

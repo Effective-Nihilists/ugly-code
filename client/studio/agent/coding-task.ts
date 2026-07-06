@@ -7,6 +7,7 @@
 import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
 import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, ensureCodebaseAnalysis, type AgentSelection } from './clientAgent';
+import { killSessionBashProcs } from '../../agent/tools';
 import { installTaskErrorLog } from './taskErrorLog';
 import {
   abandonSession,
@@ -20,6 +21,7 @@ import {
   type FinishStage,
 } from './finish';
 import { answerPendingAskUser } from './askUserBroker';
+import { answerPendingStepReview } from './stepReviewBroker';
 
 const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
 
@@ -78,9 +80,16 @@ defineTask({
       await runClientAgentTurn(sessionId, p.text, (msg) => { t.emit('msg', msg); }, p.selection);
       return { ok: true };
     },
-    // Interrupt the running turn (chatStop → task.call('interrupt')).
+    // Interrupt the running turn (chatStop → task.call('interrupt')). Kill any
+    // live bash first — aborting the model loop alone leaves the spawned shell
+    // running on the host ("clicked stop, bash still running").
     // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
-    interrupt: async () => { abortClientAgent(sessionId); return { ok: true }; },
+    interrupt: async () => { killSessionBashProcs(sessionId); abortClientAgent(sessionId); return { ok: true }; },
+    // Stop a single running tool (a bash card's Stop button → task.call('toolStop')).
+    // Tools run sequentially within a turn, so at most one bash proc is live per
+    // session — killing the session's bash procs stops exactly the one shown.
+    // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
+    toolStop: async () => { const killed = killSessionBashProcs(sessionId); return { ok: true, killed }; },
     // `/clear`: drop the in-memory agent context (keeps the worktree); the renderer
     // wipes the persisted transcript separately so the next turn starts empty.
     // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
@@ -135,17 +144,15 @@ defineTask({
     worktreeBehind: async () => ({ behind: await behindCount(sessionId, t.params.projectPath ?? null) }),
 
     // ── Interactive turn controls (C1) ─────────────────────────────────
-    // BY DESIGN in ugly-code these are card-inactive: the `ask_user` tool
-    // (client/agent/tools/askUser.ts) is chat-based — it ends the turn with the
-    // question and the user answers in their next message, rather than the
-    // monolith's pending-card + answer-RPC flow. composeSessionSnapshot always
-    // emits pendingAskUsers/pendingStepReviews = [], so those cards never render
-    // and these answer RPCs are never invoked in practice. They're wired as
-    // correct safe responses so the shim names resolve (no "not yet wired"
-    // reject) IF the card UI is ever activated:
+    // The `ask_user` tool (client/agent/tools/askUser.ts) is chat-based — it ends
+    // the turn with the question and the user answers in their next message,
+    // rather than the monolith's pending-card + answer-RPC flow, so answerAskUser
+    // stays card-inactive. The step-review gate IS live: the pattern driver emits
+    // pendingStepReviews and parks on SPEC / DIAGNOSE (pauseForUserReviewAfter),
+    // and answerStepReview resolves that parked gate.
     //   • answerAskUser → resolves a broker request when one is pending (ready for
     //     a future card-based ask_user), else ok:false (phantom card).
-    //   • answerStepReview → ack (step-review gating is not enabled in this design).
+    //   • answerStepReview → resolves the driver's parked review gate (broker).
     //   • compact → ack; the agent framework's AgentController auto-compacts at
     //     maxContextTokens and exposes no manual compaction, so there's nothing to
     //     force — returning ok avoids a spurious error banner.
@@ -155,8 +162,15 @@ defineTask({
     answerAskUser: async (p: { toolCallId?: string; answer?: string }) => ({
       ok: answerPendingAskUser(p.toolCallId ?? '', p.answer ?? ''),
     }),
+    // Resolve a parked `pauseForUserReviewAfter` gate (SPEC / DIAGNOSE): the
+    // driver is awaiting this reply to either advance (continue) or re-run the
+    // step with feedback (iterate). Returns `already_answered` for a duplicate
+    // click (benign — no banner).
     // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
-    answerStepReview: async () => ({ ok: true }),
+    answerStepReview: async (p: { id?: string; action?: 'continue' | 'iterate'; feedback?: string }) => {
+      const outcome = answerPendingStepReview(p.id ?? '', p.action ?? 'continue', p.feedback);
+      return { ok: outcome === 'ok', outcome };
+    },
     // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
     compact: async () => ({ ok: true }),
     // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)

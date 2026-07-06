@@ -258,14 +258,34 @@ interface SessionAxes {
   reasoningEffort?: string;
 }
 const sessionAxes = new Map<string, SessionAxes>();
+const axesKey = (sid: string): string => `ugly-studio:axes:${sid}`;
 function patchSessionAxes(sessionId: string, patch: SessionAxes): void {
   if (!sessionId) return;
-  sessionAxes.set(sessionId, { ...(sessionAxes.get(sessionId) ?? {}), ...patch });
+  const merged = { ...(sessionAxes.get(sessionId) ?? {}), ...patch };
+  sessionAxes.set(sessionId, merged);
+  // Survive reload: without this the axes map resets on remount and the mount
+  // snapshot falls back to defaults — the "picked deepseek, reloaded, back to
+  // auto" report. localStorage mirrors sessionModels' own persistence.
+  try { localStorage.setItem(axesKey(sessionId), JSON.stringify(merged)); } catch { /* ignore */ }
+}
+/** Session axes, hydrated from localStorage on the first read after a reload. */
+function getSessionAxes(sessionId: string): SessionAxes {
+  const inMem = sessionAxes.get(sessionId);
+  if (inMem) return inMem;
+  try {
+    const saved = localStorage.getItem(axesKey(sessionId));
+    if (saved) {
+      const parsed = JSON.parse(saved) as SessionAxes;
+      sessionAxes.set(sessionId, parsed);
+      return parsed;
+    }
+  } catch { /* ignore */ }
+  return {};
 }
 /** Compose the full selection the coding task needs for a turn: the routed
  *  model plus the user-picked axes. Passed verbatim into `runClientAgentTurn`. */
 function buildSelection(sessionId: string): Record<string, unknown> {
-  const axes = sessionAxes.get(sessionId) ?? {};
+  const axes = getSessionAxes(sessionId);
   const model = getSessionModel(sessionId);
   return { ...(model ? { model } : {}), ...axes };
 }
@@ -803,7 +823,7 @@ const handlers: Record<string, Handler> = {
   getCodingAgentSnapshot: (i) => {
     const sessionId = str(i.compositeId ?? i.sessionId ?? '');
     if (!sessionId) return Promise.resolve({ snapshot: null });
-    const axes = sessionAxes.get(sessionId) ?? {};
+    const axes = getSessionAxes(sessionId);
     const model = getSessionModel(sessionId) ?? 'auto';
     const now = Date.now();
     const snapshot = composeSessionSnapshot({
@@ -902,7 +922,14 @@ const handlers: Record<string, Handler> = {
     void sessionApi.clearMessages({ sessionId }).catch(() => {/* noop */});
     return Promise.resolve({ ok: true });
   },
-  codingAgentToolStop: () => Promise.resolve({}),
+  // A bash card's Stop button → kill the running tool's process in the task
+  // (was a no-op, so "clicked stop, bash still running"). Sessions run as a
+  // task; the proc registry lives there, so forward the kill.
+  codingAgentToolStop: (i) => {
+    const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
+    if (!taskId) return Promise.resolve({ ok: false });
+    return native.task.call(taskId, 'toolStop', { toolCallId: str(i.toolCallId ?? '') });
+  },
   // ── Interactive turn controls (C1) — forward to the coding task. The task
   //    acks safely today (the ask-user / step-review CARDS render from
   //    session_state snapshots the task loop doesn't emit yet, and the agent
@@ -917,7 +944,7 @@ const handlers: Record<string, Handler> = {
   codingAgentAnswerStepReview: (i) => {
     const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
     if (!taskId) return Promise.resolve({ ok: false });
-    return native.task.call(taskId, 'answerStepReview', { id: i.id, action: i.action });
+    return native.task.call(taskId, 'answerStepReview', { id: i.id, action: i.action, feedback: i.feedback });
   },
   codingAgentCompactNow: (i) => {
     const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));

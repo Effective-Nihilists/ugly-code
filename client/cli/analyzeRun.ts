@@ -73,7 +73,7 @@ export async function analyzeRun(sessionId: string): Promise<RunAnalysis> {
   const raw = await readFile(`${dir}/messages.jsonl`, 'utf8').catch(() => '');
   const rows = raw.split('\n').filter(Boolean).map((l) => JSON.parse(l) as Row);
   const base = analyzeTranscript(rows);
-  const meta = await readFile(`${dir}/metadata.json`, 'utf8').then((s) => JSON.parse(s) as Record<string, unknown>).catch(() => ({}));
+  const meta = await readFile(`${dir}/metadata.json`, 'utf8').then((s) => JSON.parse(s) as Record<string, unknown>).catch((): Record<string, unknown> => ({}));
   const cacheRead = Number(meta.cacheReadTokens ?? 0);
   const input = Number(meta.promptTokens ?? 0);
   return {
