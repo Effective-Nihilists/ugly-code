@@ -58,27 +58,30 @@ const cliGradeDeps: GradeDeps = {
     const { native } = await import('ugly-app/native');
     return native.fs.exists(p);
   },
-  // 5-level grader judge — a STRONG model (Sonnet) grades the rubric, per CODING.md
-  // §17.13 ("critic quality is load-bearing"). Routed through /api/agentStep (the
-  // fetch shim absolutizes + auth's it); billed to the user, separate from agent cost.
-  judge: async (system, user) => {
-    const res = await fetch('/api/agentStep', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ input: { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], model: GRADER_JUDGE_MODEL } }),
-    });
-    const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
-    if (json.error) throw new Error(json.error);
-    const content = json.result?.message?.content;
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) return content.map((b) => (b as { text?: string }).text ?? '').join('');
-    return '';
-  },
+  // 5-level grader judge — a STRONG LOCAL critic (claude-cli, default Sonnet) grades
+  // the rubric, per CODING.md §17.13 ("critic quality is load-bearing"). Local so it
+  // doesn't depend on the deployed server exposing /api/agentStep (which the current
+  // deploy does not). One-shot `claude --print`; billed to the user's Claude plan.
+  judge: claudeJudge,
 };
 
-/** Strong grader-judge model (overridable via env for cost experiments). */
-const GRADER_JUDGE_MODEL = process.env.UGLY_GRADER_MODEL ?? 'claude_sonnet_4_6';
+/** Grader-judge model tier (claude-cli): sonnet by default; override via env. */
+const GRADER_JUDGE_MODEL = process.env.UGLY_GRADER_MODEL ?? 'sonnet';
+
+async function claudeJudge(system: string, user: string): Promise<string> {
+  const prompt = `${system}\n\n${user}`;
+  try {
+    const { stdout } = await execFileP(
+      'claude',
+      ['--print', '--output-format', 'json', '--model', GRADER_JUDGE_MODEL, prompt],
+      { maxBuffer: 32 * 1024 * 1024, timeout: 180_000 },
+    );
+    return (JSON.parse(stdout) as { result?: string }).result ?? '';
+  } catch (e) {
+    process.stderr.write(`[claudeJudge] FAILED (${GRADER_JUDGE_MODEL}): ${e instanceof Error ? e.message : String(e)}\n`);
+    throw e;
+  }
+}
 
 /** The agent's last assistant message text — evidence for judge grading of
  *  planning / write-to-spec tasks whose output isn't a code diff. */

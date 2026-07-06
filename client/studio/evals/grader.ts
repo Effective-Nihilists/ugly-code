@@ -183,13 +183,13 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
     let graded = false;
     if (deps.judge && input.successCriteria && input.successCriteria.trim().length > 0) {
       const judgeFn: JudgeFn = (system, user) => deps.judge!(system, user);
+      const diff = await collectDiff(input.projectPath, deps);
+      const evidence = input.finalText
+        ? `${diff}\n\n## Agent's final message\n${input.finalText.slice(0, 8000)}`
+        : diff;
       try {
         const criteria = await deriveCriteria(input.successCriteria, '', judgeFn);
         if (criteria.length >= 2) {
-          const diff = await collectDiff(input.projectPath, deps);
-          const evidence = input.finalText
-            ? `${diff}\n\n## Agent's final message\n${input.finalText.slice(0, 8000)}`
-            : diff;
           const g = await gradeAgainstCriteria(input.successCriteria, criteria, evidence, judgeFn);
           if (g.parsed && g.verdicts.length > 0) {
             const stmt = new Map(criteria.map((c) => [c.id, c.statement]));
@@ -205,6 +205,20 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
             detMax = 5;
             graded = true;
           }
+        }
+        if (!graded) {
+          // Per-criterion derivation was too thin to grade — score the whole rubric
+          // in one 0–5 call so every judge-capable run still yields a /5 (no /2 blip).
+          const system =
+            'You are a strict automated code-eval judge. Award an INTEGER from 0 to 5 for how fully ' +
+            'the change satisfies the success criteria (5 = fully; 3 = mostly; 0 = not at all). ' +
+            'Respond with JSON only: {"points": <int 0-5>, "verdict": "<one sentence>"}.';
+          const user = `## Success criteria\n${input.successCriteria}\n\n## The agent's change + final message\n${evidence || '(no changes detected)'}`;
+          const awarded = parseJudge(await deps.judge(system, user), 5);
+          checks.push({ name: 'rubric (0–5)', passed: awarded.points >= 3, detail: awarded.verdict });
+          detScore = awarded.points;
+          detMax = 5;
+          graded = true;
         }
       } catch (e) {
         console.error('[grader:judge0to5]', JSON.stringify({ taskName: input.taskName, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
