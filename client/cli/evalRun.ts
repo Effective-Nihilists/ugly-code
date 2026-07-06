@@ -2,6 +2,7 @@
 // grade the on-disk project with the existing gradeProject. Turn data is persisted
 // by the CLI's filesystem session store (installed in bootDriver), not the server.
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { getEvalTask, firstTurnPrompt } from '../studio/evals/registry';
 import { gradeProject, type GradeDeps } from '../studio/evals/grader';
@@ -57,7 +58,20 @@ const cliGradeDeps: GradeDeps = {
   // judge omitted for Plan 1 (judge: gates stay pending); Plan 4 wires the /api/agentStep judge.
 };
 
-export async function runEval(cfg: { taskName: string; origin: string; token: string; model?: string; pattern?: string }): Promise<{ score: number; scoreMax: number }> {
+export interface EvalRunResult { score: number; scoreMax: number; costUsd: number; turns: number }
+
+/** Read the run's cost + turn count from the fs session store's metadata. */
+async function readRunTotals(storeRoot: string, sessionId: string): Promise<{ costUsd: number; turns: number }> {
+  const dir = sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_');
+  try {
+    const m = JSON.parse(await readFile(`${storeRoot}/${dir}/metadata.json`, 'utf8')) as { costUsd?: number; messageCount?: number };
+    return { costUsd: m.costUsd ?? 0, turns: m.messageCount ?? 0 };
+  } catch {
+    return { costUsd: 0, turns: 0 };
+  }
+}
+
+export async function runEval(cfg: { taskName: string; origin: string; token: string; model?: string; pattern?: string }): Promise<EvalRunResult> {
   const task = getEvalTask(cfg.taskName);
   if (!task) throw new Error(`Unknown eval task: ${cfg.taskName}`);
   const projectPath = await cloneFixture(task.name, task.repoUrl);
@@ -79,5 +93,6 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
     },
     cliGradeDeps,
   );
-  return { score: result.score ?? 0, scoreMax: result.scoreMax ?? 0 };
+  const totals = await readRunTotals(storeRoot, sessionId);
+  return { score: result.score ?? 0, scoreMax: result.scoreMax ?? 0, ...totals };
 }

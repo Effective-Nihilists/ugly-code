@@ -18,6 +18,7 @@ vi.mock('../../../client/studio/evals/grader', () => ({ gradeProject }));
 vi.mock('../../../client/cli/taskDriver', () => ({ bootDriver, runTurn }));
 vi.mock('../../../client/agent/tools/spawn', () => ({ spawnCollect: vi.fn() }));
 vi.mock('node:child_process', () => ({ execFile }));
+vi.mock('node:fs/promises', () => ({ readFile: async () => { throw new Error('ENOENT'); } }));
 vi.mock('ugly-app/native', () => ({ native: { fs: {} } }));
 
 import { runEval } from '../../../client/cli/evalRun';
@@ -29,7 +30,7 @@ describe('runEval', () => {
     expect(bootDriver).toHaveBeenCalled();
     expect(runTurn).toHaveBeenCalledWith(expect.any(String), 'do it', expect.any(Function), undefined);
     expect(gradeProject).toHaveBeenCalled();
-    expect(res).toEqual({ score: 1, scoreMax: 1 });
+    expect(res).toEqual({ score: 1, scoreMax: 1, costUsd: 0, turns: 0 });
   });
 
   it('errors on unknown task', async () => {
