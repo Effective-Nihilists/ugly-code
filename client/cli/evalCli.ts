@@ -24,6 +24,13 @@ export async function main(argv: string[]): Promise<number> {
       return r.code ?? 0;
     }
 
+    const analyzeId = flag(argv, '--analyze');
+    if (analyzeId) {
+      const { analyzeRun, renderAnalysis } = await import('./analyzeRun');
+      process.stdout.write(renderAnalysis(analyzeId, await analyzeRun(analyzeId)) + '\n');
+      return 0;
+    }
+
     if (argv.includes('--history')) {
       let raw = '';
       try { raw = await readFile(historyPath(), 'utf8'); } catch { /* none yet */ }
