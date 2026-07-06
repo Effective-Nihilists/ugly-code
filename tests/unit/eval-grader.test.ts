@@ -111,6 +111,41 @@ describe('eval grader — deterministic gates', () => {
     expect(r.scoreMax).toBe(4);
   });
 
+  it('judge evidence stages new files (git add -A) so untracked DESIGN.md-style output is seen', async () => {
+    const calls: string[][] = [];
+    const seen: string[] = [];
+    const d: GradeDeps = {
+      ...deps({
+        run: (cmd, args) => {
+          calls.push([cmd, ...args]);
+          // Plain `git diff` sees nothing (new file is untracked); only the staged
+          // diff reveals it — proving the grader stages before diffing.
+          if (cmd === 'git' && args[0] === 'diff' && args.includes('--cached')) {
+            return { out: 'diff --git a/DESIGN.md b/DESIGN.md\n+++ b/DESIGN.md\n+my design', code: 0 };
+          }
+          return { out: '', code: 0 };
+        },
+      }),
+      judge: async (_system, user) => {
+        seen.push(user);
+        return '{"points": 5, "verdict": "ok"}';
+      },
+    };
+    const r = await gradeProject(
+      {
+        taskName: 't',
+        projectPath: '/proj',
+        gates: [{ name: 'design', points: 5, kind: 'judge:design-rubric' }],
+        successCriteria: 'Write a good DESIGN.md.',
+        runTotals: RUN_TOTALS,
+      },
+      d,
+    );
+    expect(calls).toContainEqual(['git', 'add', '-A']); // staged before diffing
+    expect(seen[0]).toContain('my design'); // new-file content reached the judge
+    expect(r.score).toBe(5);
+  });
+
   it('judge points are clamped to the gate max', async () => {
     const d: GradeDeps = { ...deps({}), judge: async () => '{"points": 99, "verdict": "great"}' };
     const r = await gradeProject(

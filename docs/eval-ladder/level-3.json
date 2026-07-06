@@ -1,0 +1,23 @@
+{
+  "tasks": [
+    "breaking-change-find-callers",
+    "multi-file-refactor-ordered",
+    "bug-fix-passes-but-breaks-sibling",
+    "refactor-preserve-api",
+    "divergent-strategy-sql-perf"
+  ],
+  "configs": [
+    {
+      "label": "opus",
+      "model": "claude-code:opus"
+    },
+    {
+      "label": "deepseek",
+      "model": "deepseek_v4_pro"
+    },
+    {
+      "label": "glm",
+      "model": "glm_5_2"
+    }
+  ]
+}

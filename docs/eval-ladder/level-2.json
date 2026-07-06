@@ -1,0 +1,23 @@
+{
+  "tasks": [
+    "bug-fix-indirect-cause",
+    "bug-fix-misleading-stack",
+    "adversarial-config",
+    "debug-flaky-async",
+    "feature-add-endpoint"
+  ],
+  "configs": [
+    {
+      "label": "opus",
+      "model": "claude-code:opus"
+    },
+    {
+      "label": "deepseek",
+      "model": "deepseek_v4_pro"
+    },
+    {
+      "label": "glm",
+      "model": "glm_5_2"
+    }
+  ]
+}

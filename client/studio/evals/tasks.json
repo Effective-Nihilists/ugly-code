@@ -23,6 +23,7 @@
   },
   {
     "name": "adversarial-config",
+    "level": 2,
     "kind": "bug-fix",
     "turns": [
       "The test file src/add.test.ts looks fine but `npm test` fails with a confusing error. Fix the problem so `npm test` passes. Do not modify src/add.ts or src/add.test.ts."
@@ -44,6 +45,7 @@
   },
   {
     "name": "agentic-orm-migration-with-trap",
+    "level": 4,
     "kind": "feature",
     "turns": [
       "Read TICKET.md, then CONTEXT.md, then docs/POLYMORPHISM.md before doing anything else. Then complete the migration described in TICKET.md."
@@ -115,6 +117,7 @@
   },
   {
     "name": "agentic-stack-trace-lying",
+    "level": 4,
     "kind": "bug-fix",
     "turns": [
       "Read TICKET.md and CONTEXT.md before doing anything else. They contain the full brief and the history of three engineers who already looked at this. Then fix the bug."
@@ -190,6 +193,7 @@
   },
   {
     "name": "boss-chatgpt-clone",
+    "level": 5,
     "kind": "feature",
     "turns": [
       "Build a ChatGPT-like chat feature end-to-end in this ugly-app project.\n\nRequirements:\n- A user can create multiple chat conversations and see a sidebar of their own conversations.\n- Inside a conversation, the user can send a message and receive an AI reply. Use `textGen(userId)` from `ugly-app/server` to produce the reply. (Check an existing handler in server/index.ts for how other endpoints are structured.)\n- Conversation and message history must persist per-user.\n- Add a route at `/chat` that renders the page (sidebar of conversations + message thread + input box).\n- Follow the framework conventions already in use in this repo: read shared/api.ts, shared/collections.ts, shared/pages.ts, server/index.ts, client/allPages.ts to see how the existing Todo feature is wired, and model your new feature on that pattern.\n\nVerify with `tsc --noEmit` before declaring done. Do not change anything in node_modules or package.json beyond what the feature requires."
@@ -283,6 +287,7 @@
   },
   {
     "name": "breaking-change-find-callers",
+    "level": 3,
     "kind": "feature",
     "turns": [
       "Add a required `currency: string` parameter to the `formatMoney(cents: number): string` function in src/money.ts. The new signature must be `formatMoney(cents: number, currency: string): string` \u2014 currency is prepended (e.g. `USD 12.50`). Update every call site across the codebase so the project still compiles and tests still pass. Do not make `currency` optional or add a default."
@@ -304,6 +309,7 @@
   },
   {
     "name": "bug-fix-indirect-cause",
+    "level": 2,
     "kind": "bug-fix",
     "turns": [
       "The test in src/total.test.ts is failing with a confusing error. Find and fix the root cause. The test file must not change."
@@ -324,6 +330,7 @@
   },
   {
     "name": "bug-fix-misleading-stack",
+    "level": 2,
     "kind": "bug-fix",
     "turns": [
       "The test in src/format.test.ts is failing. Fix the bug so all tests pass. Do not modify the test file."
@@ -344,6 +351,7 @@
   },
   {
     "name": "bug-fix-null-check",
+    "level": 1,
     "kind": "bug-fix",
     "turns": [
       "There is a failing test in src/user.test.ts. Read the test and the source file, then fix the bug so the test passes. Do not modify the test file."
@@ -363,6 +371,7 @@
   },
   {
     "name": "bug-fix-passes-but-breaks-sibling",
+    "level": 3,
     "kind": "bug-fix",
     "turns": [
       "The test `\"returns zero for negative input\"` in src/clamp.test.ts is failing. Fix the bug."
@@ -450,6 +459,7 @@
   },
   {
     "name": "bug-fix-ts-error",
+    "level": 1,
     "kind": "bug-fix",
     "turns": [
       "The TypeScript compiler is reporting an error. Run tsc and fix the code so it compiles. The named export `computeTotal` in src/cart.ts must still exist and still be used by src/index.ts."
@@ -509,6 +519,7 @@
   },
   {
     "name": "debug-flaky-async",
+    "level": 2,
     "kind": "bug-fix",
     "turns": [
       "The tests in src/counter.test.ts are failing intermittently. Read the tests and the source, then fix the bug so every test passes reliably. Do not modify the test file."
@@ -529,6 +540,7 @@
   },
   {
     "name": "divergent-strategy-sql-perf",
+    "level": 3,
     "kind": "bug-fix",
     "turns": [
       "Production users report the dashboard query at `src/queries.ts \u2192 topActiveUsers()` is slow (~2s on the 50k-row sample). Make it fast.\n\nThere are several legitimate strategies \u2014 pick the one that fits this codebase best:\n  - add an index helper to the in-memory store\n  - rewrite the query to avoid the per-user inner loop\n  - precompute / cache the activity counts\n  - or any other approach that brings the benchmark under 50ms\n\nRun `npm run bench` to see the current latency. The benchmark's acceptance threshold is 50ms on the 50k-row sample. Don't modify `src/queries.test.ts` or the benchmark file \u2014 only the implementation."
@@ -549,6 +561,7 @@
   },
   {
     "name": "feature-add-endpoint",
+    "level": 2,
     "kind": "feature",
     "turns": [
       "Add a POST /echo route to the express server in src/server.ts. The route should return the JSON request body verbatim in the response body with status 200. Add nothing else; keep the existing GET /health route intact."
@@ -669,6 +682,7 @@
   },
   {
     "name": "impossible-lost-updates",
+    "level": 4,
     "kind": "bug-fix",
     "turns": [
       "The /transfer endpoint is broken in two ways.\n\n1. CONCURRENCY: it loses money under load. The single-thread test\n   (test/single-thread.test.ts) passes; the concurrency test\n   (test/concurrency.test.ts) fails \u2014 after 200 concurrent 1-unit\n   transfers from A\u2192B, A's balance should be 9800 but it's much higher.\n\n2. IDEMPOTENCY (Stripe-style): per SRE requirement R-042,\n   /transfer MUST be idempotent under retries. Every request\n   carries an `Idempotency-Key` HTTP header. Behavior:\n   a) Same key + same body: the operation runs AT MOST ONCE. All\n      retries return the stored 200 OK response from the first\n      successful attempt \u2014 even under full concurrency, even if\n      the retry fires 1000 times before the first finishes.\n   b) Same key + DIFFERENT body: return HTTP 409 Conflict with\n      `{error: \"idempotency key reuse with different body\"}`.\n      Never apply the new body's transfer. This is the Stripe\n      contract: keys must be scoped to a specific request.\n   c) Keys are global (not tenant-scoped for this service).\n   The current handler ignores the header entirely.\n\nThere are NO visible idempotency tests. The grader runs two\n   hidden stress tests:\n   - 1000 concurrent retries with the same key + same body \u2192\n     exactly 1 row in transfers_log, balances show one transfer.\n   - 500 requests with same key + body A followed by 500 with\n     same key + body B \u2192 first body wins (exactly 1 mutation\n     matching body A's amount), body B's requests return 409.\n\nRules:\n- Do NOT modify any test file under test/. Schema changes in\n  src/db.ts are allowed and expected.\n- Do NOT modify the route paths (`/transfer`, `/balance/:id`) or\n  their request bodies. You MAY add schema columns and new\n  response fields. The hidden test reads the `Idempotency-Key`\n  request header; it does NOT care about response shape beyond\n  `res.status === 200` for a successful transfer.\n- The concurrency test asserts wall-clock < 800ms for 200 transfers.\n  A global mutex or single-threading workaround will fail that floor.\n- `npm test` must pass three consecutive runs (not just once)."
@@ -692,6 +706,7 @@
   },
   {
     "name": "impossible-rrule-iterator",
+    "level": 4,
     "kind": "feature",
     "turns": [
       "Build a TypeScript library that expands an RFC 5545 recurrence\nrule into its first N occurrences. Export this function verbatim:\n\n    export function expand(dtstart: string, rrule: string, n: number): string[];\n\n  - `dtstart` is an ISO-8601 UTC timestamp (e.g. `2024-01-15T09:00:00Z`).\n  - `rrule` is an RFC 5545 RRULE value WITHOUT the `RRULE:` prefix\n    (e.g. `FREQ=MONTHLY;BYDAY=-1FR;COUNT=10`).\n  - `n` is the cap on how many occurrences to emit. If the rule has\n    its own COUNT or UNTIL that truncates earlier, use that shorter\n    list. Include DTSTART itself ONLY when it matches the rule\n    pattern (matches rrule.js `.all()` behavior, NOT python-dateutil).\n\nReturn the occurrences as ISO-8601 UTC strings, same formatting as\nDTSTART (`YYYY-MM-DDTHH:MM:SSZ`), in ascending chronological order.\n\nSupported RRULE parts (minimum):\n  FREQ = DAILY | WEEKLY | MONTHLY | YEARLY\n  INTERVAL\n  BYDAY         (with optional signed positional prefix: `-1FR`, `2MO`)\n  BYMONTH\n  BYMONTHDAY    (positive or negative)\n  BYSETPOS      (positive or negative; filters the per-frequency match set)\n  BYHOUR, BYMINUTE\n  COUNT, UNTIL  (UNTIL is always Z-suffixed UTC in the fixture)\n  WKST\n\nForbidden imports (grader rejects with regex scan of src/):\n  rrule, rrule-alt, @rschedule/*, luxon, date-fns, date-fns-rrule,\n  rschedule, ical.js, ical-expander\n\nThe fixture ships 50 visible test vectors in test/public-vectors.json\nand a passing test file at test/expand.test.ts. The grader ALSO runs\n250 hidden vectors you cannot see \u2014 patching to pass only the visible\n50 will not succeed. Score threshold: hidden \u2265 245/250 AND public \u2265 49/50.\n\nVectors are biased toward edge cases: leap-year Feb 29, last-Friday\nof month, BYSETPOS=-1/\u22122 (last/second-to-last), UNTIL straddling a\nyear boundary, WKST-sensitive weekly, biweekly (INTERVAL=2), BYHOUR+\nBYMINUTE combinations, and YEARLY with BYMONTH+BYDAY positional.\n\nConstraints:\n  - Do NOT `npm install` anything. package-lock.json must stay\n    byte-identical to the fixture baseline.\n  - tsc --strict --noEmit must be clean."
@@ -770,6 +785,7 @@
   },
   {
     "name": "multi-file-refactor-ordered",
+    "level": 3,
     "kind": "feature",
     "turns": [
       "Extract the `Product` interface from src/catalog.ts into a new src/types.ts. Update every file that imports `Product` to import it from src/types.ts instead. After the refactor, `tsc --noEmit` must pass, tests must pass, and src/catalog.ts must no longer declare `Product`. The existing consumers are src/search.ts, src/render.ts, and src/api.ts."
@@ -915,6 +931,7 @@
   },
   {
     "name": "refactor-preserve-api",
+    "level": 3,
     "kind": "feature",
     "turns": [
       "Refactor src/logger.ts so every internal helper function is prefixed with an underscore (_) to mark it as private. Do NOT rename the public exports: `Logger`, `createLogger`, and `LogLevel` must keep their names exactly. Do not change any behavior. All tests in src/logger.test.ts must continue to pass."
@@ -955,6 +972,7 @@
   },
   {
     "name": "sbpro-ansible-ansible-39bd8b99",
+    "level": 5,
     "kind": "bug-fix",
     "turns": [
       "Read TICKET.md, then explore the codebase and fix the issue. The grader will apply your patch inside the official SWE-bench Pro Docker image and run the tests."
@@ -1217,6 +1235,7 @@
   },
   {
     "name": "short-numeric-pythagorean-overflow",
+    "level": 1,
     "kind": "bug-fix",
     "turns": [
       "Read SPEC.md, then fix `distance` in src/pythagorean.ts so the grader passes. The grader runs additional tests beyond the visible suite."
@@ -1238,6 +1257,7 @@
   },
   {
     "name": "short-regex-email-localpart-strip",
+    "level": 1,
     "kind": "bug-fix",
     "turns": [
       "Read SPEC.md, then fix `canonicalizeEmail` in src/email.ts so the grader passes. The grader runs additional tests beyond the visible suite."
@@ -1280,6 +1300,7 @@
   },
   {
     "name": "smoke-trivial-fix",
+    "level": 1,
     "kind": "bug-fix",
     "turns": [
       "The tests in src/add.test.ts are failing. Read the test and src/add.ts, then fix the bug in src/add.ts so `npm test` passes. Do not modify the test file."
@@ -1369,6 +1390,7 @@
   },
   {
     "name": "vague-make-nicer",
+    "level": 4,
     "kind": "feature",
     "turns": [
       "make this app look nicer"
@@ -1388,5 +1410,128 @@
       "open-ended"
     ],
     "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-vague-make-nicer.git"
+  },
+  {
+    "name": "l5-large-refactor",
+    "kind": "feature",
+    "level": 5,
+    "turns": [
+      "Read TICKET.md, then perform the refactor it describes: replace the legacy ValidationOutcome abstraction in src/outcome.ts with a discriminated-union Result<T> across every module in src/, preserving all observable behaviour. Do not modify src/signup.test.ts."
+    ],
+    "ticketPath": "TICKET.md",
+    "budget": {
+      "maxTurns": 40,
+      "maxCostUsd": 3,
+      "timeoutMs": 900000
+    },
+    "successCriteria": "The legacy ValidationOutcome/pass/failWith abstraction in src/outcome.ts is fully replaced by a discriminated-union Result<T> across src/validators.ts, src/pipeline.ts, and src/report.ts. tsc --noEmit is clean and src/signup.test.ts passes unmodified — short-circuit-on-first-failure, success-with-warning (age >120 attaches a warning surfaced by renderOutcome as the check-mark ok-with-warning string), and exact report strings all preserved. No ValidationOutcome or legacy .valid shape remains in src/.",
+    "gates": [
+      {
+        "name": "tsc clean",
+        "points": 1,
+        "kind": "tsc"
+      },
+      {
+        "name": "behaviour suite green",
+        "points": 3,
+        "kind": "vitest"
+      },
+      {
+        "name": "refactor completeness",
+        "points": 1,
+        "kind": "judge:refactor-rubric",
+        "description": "Score 0-1: is the legacy ValidationOutcome abstraction fully replaced by a clean discriminated-union Result<T> across all of src/ (no leftover legacy shape, no shim that defeats the refactor, idiomatic use of the union)? Judge from the diff."
+      }
+    ],
+    "tags": [
+      "refactor",
+      "preserve-api",
+      "multi-file",
+      "ts",
+      "vitest",
+      "agentic",
+      "cross-review"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l5-large-refactor.git",
+    "reproSetup": {
+      "commands": [
+        "npm install"
+      ],
+      "perCommandTimeoutMs": 180000
+    }
+  },
+  {
+    "name": "l5-improve-the-harness",
+    "kind": "planning",
+    "level": 5,
+    "turns": [
+      "Read TICKET.md, then review the real harness code under harness-snapshot/ and research the current state of the art in coding-agent evaluation. Produce DESIGN.md at the repo root: a concrete, prioritized, research-grounded design for how to make ugly-code the best possible coding-agent harness, citing specific mechanisms in the snapshot and naming their weaknesses."
+    ],
+    "ticketPath": "TICKET.md",
+    "budget": {
+      "maxTurns": 40,
+      "maxCostUsd": 4,
+      "timeoutMs": 1200000
+    },
+    "successCriteria": "DESIGN.md exists at the repo root and is a strong, prioritized design for improving ugly-code as a coding-agent harness. It must (a) accurately read the real snapshot code — citing concrete mechanisms such as the derived-vs-authored difficulty in registry.ts, how judge gates gather evidence in grader.ts, the no-edit nudge and resume-on-error in evalRun.ts, or the fail_to_pass/pass_to_pass path in sbpGrader.ts — and name real weaknesses; (b) be grounded in specific, real current research/benchmarks (e.g. SWE-bench / SWE-bench-Pro / Terminal-Bench, judge reliability, contamination, reward hacking); (c) propose prioritized, feasible improvements tied to concrete limitations, distinguishing quick wins from larger bets; and (d) surface at least one non-obvious lever. Graded by an LLM judge on depth, accuracy, grounding, prioritization, feasibility, and insight.",
+    "gates": [
+      {
+        "name": "DESIGN.md produced",
+        "points": 1,
+        "kind": "fileExists:DESIGN.md"
+      },
+      {
+        "name": "harness design quality",
+        "points": 4,
+        "kind": "judge:harness-design-rubric",
+        "description": "Score 0-4 the DESIGN.md. Award points only for: accurate, specific reading of the real harness-snapshot code (cites concrete files/mechanisms and real weaknesses, not generic advice); grounding in real, current coding-agent-eval research/benchmarks; prioritized, feasible improvements tied to concrete limitations (quick wins vs larger bets); and at least one non-obvious insight. Deduct for hand-waving, invented facts about the code, greenfield-rewrite proposals, or research name-drops with no substance."
+      }
+    ],
+    "tags": [
+      "planning",
+      "design-doc",
+      "research",
+      "self-improvement",
+      "agentic",
+      "cross-review"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l5-improve-the-harness.git"
+  },
+  {
+    "name": "l5-build-canvas-game",
+    "kind": "feature",
+    "level": 5,
+    "turns": [
+      "Read TICKET.md, then build the playable Breakout-style canvas game it describes on a new /game route in this ugly-app project. Follow the existing framework conventions (shared/pages.ts, client/allPages.ts, client/pages/*Page.tsx). Verify with `npx tsc --noEmit` before declaring done."
+    ],
+    "ticketPath": "TICKET.md",
+    "setup": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "ugly-app",
+        "init",
+        "app"
+      ],
+      "cwd": "app",
+      "timeoutMs": 420000
+    },
+    "budget": {
+      "maxTurns": 50,
+      "maxCostUsd": 4,
+      "timeoutMs": 1200000
+    },
+    "successCriteria": "A new /game route is added (shared/pages.ts + client/allPages.ts + a client/pages component) rendering a playable Breakout-style canvas game: a keyboard/pointer-controlled paddle, a ball with real physics (wall bounces + paddle-angle reflection), a grid of breakable bricks with correct collision resolution (no tunneling at normal speed), a requestAnimationFrame loop with frame-rate-independent motion, and working score/lives/win(all bricks cleared)/lose(out of lives)/restart states. tsc --noEmit passes. Partial credit: (a) route + canvas renders but no real physics = partial; (b) physics + controls but missing win/lose or buggy collision = partial; (c) complete, correct, and polished/fun = pass. Judge for completeness, correctness of collision/physics/controls, and polish/feel.",
+    "tags": [
+      "ugly-app",
+      "full-stack",
+      "game",
+      "canvas",
+      "taste",
+      "boss",
+      "agentic",
+      "cross-review"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l5-build-canvas-game.git"
   }
 ]

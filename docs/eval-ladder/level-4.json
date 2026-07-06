@@ -1,0 +1,23 @@
+{
+  "tasks": [
+    "agentic-orm-migration-with-trap",
+    "agentic-stack-trace-lying",
+    "impossible-rrule-iterator",
+    "impossible-lost-updates",
+    "vague-make-nicer"
+  ],
+  "configs": [
+    {
+      "label": "opus",
+      "model": "claude-code:opus"
+    },
+    {
+      "label": "deepseek",
+      "model": "deepseek_v4_pro"
+    },
+    {
+      "label": "glm",
+      "model": "glm_5_2"
+    }
+  ]
+}

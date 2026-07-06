@@ -1,0 +1,23 @@
+{
+  "tasks": [
+    "sbpro-ansible-ansible-39bd8b99",
+    "boss-chatgpt-clone",
+    "l5-large-refactor",
+    "l5-improve-the-harness",
+    "l5-build-canvas-game"
+  ],
+  "configs": [
+    {
+      "label": "opus",
+      "model": "claude-code:opus"
+    },
+    {
+      "label": "deepseek",
+      "model": "deepseek_v4_pro"
+    },
+    {
+      "label": "glm",
+      "model": "glm_5_2"
+    }
+  ]
+}

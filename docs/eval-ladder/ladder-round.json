@@ -1,0 +1,43 @@
+{
+  "tasks": [
+    "smoke-trivial-fix",
+    "bug-fix-null-check",
+    "bug-fix-ts-error",
+    "short-numeric-pythagorean-overflow",
+    "short-regex-email-localpart-strip",
+    "bug-fix-indirect-cause",
+    "bug-fix-misleading-stack",
+    "adversarial-config",
+    "debug-flaky-async",
+    "feature-add-endpoint",
+    "breaking-change-find-callers",
+    "multi-file-refactor-ordered",
+    "bug-fix-passes-but-breaks-sibling",
+    "refactor-preserve-api",
+    "divergent-strategy-sql-perf",
+    "agentic-orm-migration-with-trap",
+    "agentic-stack-trace-lying",
+    "impossible-rrule-iterator",
+    "impossible-lost-updates",
+    "vague-make-nicer",
+    "sbpro-ansible-ansible-39bd8b99",
+    "boss-chatgpt-clone",
+    "l5-large-refactor",
+    "l5-improve-the-harness",
+    "l5-build-canvas-game"
+  ],
+  "configs": [
+    {
+      "label": "opus",
+      "model": "claude-code:opus"
+    },
+    {
+      "label": "deepseek",
+      "model": "deepseek_v4_pro"
+    },
+    {
+      "label": "glm",
+      "model": "glm_5_2"
+    }
+  ]
+}

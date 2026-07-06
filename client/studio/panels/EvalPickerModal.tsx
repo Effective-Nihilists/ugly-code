@@ -28,9 +28,20 @@ interface TaskListItem {
   tags?: string[];
   /** 1 = smoke, 5 = boss-level. Server-derived; see eval-bridge. */
   difficulty: number;
+  /** Curated ladder level 1-5 (authored, falls back to difficulty). Groups the list. */
+  level: number;
   /** One-line "why this is interesting" blurb. */
   whyInteresting: string;
 }
+
+/** Ladder level → section-header label (see the eval level-ladder design). */
+const LEVEL_LABELS: Record<number, string> = {
+  1: 'Level 1 — Simple bug fix',
+  2: 'Level 2 — Harder bug fix / small feature',
+  3: 'Level 3 — Multi-file / discipline',
+  4: 'Level 4 — Agentic long-horizon',
+  5: 'Level 5 — Real-world agentic',
+};
 
 interface HistoryRun {
   taskName: string;
@@ -98,7 +109,7 @@ export function EvalPickerModal({
   // Escape + backdrop dismissal flow through <Modal>'s `closeOnEscape` /
   // `closeOnBackdrop`, both gated on whether a pick is mid-submit.
 
-  // Single sorted list, easy → hard. Server pre-sorts by difficulty;
+  // Single list, easy → hard. Server pre-sorts by ladder level then difficulty;
   // we only need to apply the search filter here.
   const filtered = useMemo(() => {
     if (!tasks) return null;
@@ -111,6 +122,22 @@ export function EvalPickerModal({
         t.successCriteria.toLowerCase().includes(q),
     );
   }, [tasks, query]);
+
+  // Bucket the (filtered) list into ladder levels so the picker renders a
+  // "Level N — …" section header before each group. Preserves the server's
+  // easy → hard ordering within and across groups.
+  const grouped = useMemo(() => {
+    if (!filtered) return null;
+    const buckets = new Map<number, TaskListItem[]>();
+    for (const t of filtered) {
+      // `level` is always populated server-side (authored, else derived difficulty).
+      const lvl = t.level;
+      const list = buckets.get(lvl);
+      if (list) list.push(t);
+      else buckets.set(lvl, [t]);
+    }
+    return [...buckets.entries()].sort((a, b) => a[0] - b[0]);
+  }, [filtered]);
 
   // Group history runs by taskName so each task row can render its
   // own sub-list of prior runs (newest first — the server hands them
@@ -222,19 +249,37 @@ export function EvalPickerModal({
               No tasks match the current filter.
             </div>
           )}
-          {filtered && filtered.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {filtered.map((t) => (
-                <TaskRow
-                  key={t.name}
-                  task={t}
-                  history={historyByTask.get(t.name) ?? []}
-                  disabled={submittingFor !== null && submittingFor !== t.name}
-                  isSubmitting={submittingFor === t.name}
-                  onPick={() => { handlePick(t.name); }}
-                  onOpenRun={onOpenRun}
-                  onDeleteRun={(p) => void handleDeleteRun(p)}
-                />
+          {grouped && grouped.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {grouped.map(([level, rows]) => (
+                <div key={level} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-label)',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: 'var(--text-secondary)',
+                      borderBottom: '1px solid var(--border)',
+                      paddingBottom: 4,
+                    }}
+                  >
+                    {LEVEL_LABELS[level] ?? `Level ${level}`} · {rows.length}
+                  </div>
+                  {rows.map((t) => (
+                    <TaskRow
+                      key={t.name}
+                      task={t}
+                      history={historyByTask.get(t.name) ?? []}
+                      disabled={submittingFor !== null && submittingFor !== t.name}
+                      isSubmitting={submittingFor === t.name}
+                      onPick={() => { handlePick(t.name); }}
+                      onOpenRun={onOpenRun}
+                      onDeleteRun={(p) => void handleDeleteRun(p)}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
           )}

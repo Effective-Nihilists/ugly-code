@@ -1,0 +1,23 @@
+{
+  "tasks": [
+    "smoke-trivial-fix",
+    "bug-fix-null-check",
+    "bug-fix-ts-error",
+    "short-numeric-pythagorean-overflow",
+    "short-regex-email-localpart-strip"
+  ],
+  "configs": [
+    {
+      "label": "opus",
+      "model": "claude-code:opus"
+    },
+    {
+      "label": "deepseek",
+      "model": "deepseek_v4_pro"
+    },
+    {
+      "label": "glm",
+      "model": "glm_5_2"
+    }
+  ]
+}

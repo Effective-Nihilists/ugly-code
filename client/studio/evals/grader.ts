@@ -302,9 +302,16 @@ function joinPath(base: string, rel: string): string {
   return `${base.replace(/\/$/, '')}/${rel.replace(/^\//, '')}`;
 }
 
-/** The agent's working-tree diff (capped) — evidence for the LLM judge. */
+/** The agent's changes (capped) — evidence for the LLM judge. Stages everything
+ *  first (`git add -A`) then diffs the index, so NEW/untracked files the agent
+ *  wrote (e.g. DESIGN.md / DECISION.md for planning + write-to-spec tasks) are
+ *  included — plain `git diff` only shows modified tracked files and would feed
+ *  the judge an empty diff for doc-producing tasks. `cloneFixture` commits a
+ *  baseline seed, so `--cached` diffs against that; with no baseline commit it
+ *  diffs against the empty tree (still shows the new files). */
 async function collectDiff(projectPath: string, deps: GradeDeps): Promise<string> {
-  const r = await deps.run('git', ['diff', '--no-color'], projectPath);
+  await deps.run('git', ['add', '-A'], projectPath);
+  const r = await deps.run('git', ['diff', '--cached', '--no-color'], projectPath);
   const out = r.out;
   return out.length > 20_000 ? out.slice(0, 20_000) + '\n…(diff truncated)' : out;
 }

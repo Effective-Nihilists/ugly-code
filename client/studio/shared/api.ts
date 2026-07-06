@@ -3844,6 +3844,12 @@ export const requests = defineRequests({
            */
           difficulty: z.number().int().min(1).max(5),
           /**
+           * Curated capability-ladder level 1-5 (simple bug fix → real-world
+           * agentic). Authored on the 25 ladder tasks; falls back to
+           * `difficulty` otherwise. The picker groups rows into level sections.
+           */
+          level: z.number().int().min(1).max(5),
+          /**
            * One-line "why this test is interesting" blurb derived from
            * tags. Renders beneath the task name in the picker — gives
            * the user a reason to pick a specific eval rather than a

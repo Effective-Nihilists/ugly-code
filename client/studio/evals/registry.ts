@@ -36,6 +36,10 @@ export interface RawEvalTask {
   /** Host-side workspace prep run after clone (SBP tasks: uv venv + pip install)
    *  so the agent + grader can run the repo's tests. */
   reproSetup?: { commands: string[]; perCommandTimeoutMs?: number; env?: Record<string, string> };
+  /** Curated capability-ladder level 1-5 (simple bug fix → real-world agentic).
+   *  Authored on the 25 ladder tasks; when absent the picker falls back to the
+   *  derived `difficulty`. Purely a UI grouping signal — the CLI ignores it. */
+  level?: number;
 }
 
 export interface ListedEvalTask {
@@ -50,6 +54,9 @@ export interface ListedEvalTask {
   gates?: EvalGate[];
   tags?: string[];
   difficulty: number;
+  /** Curated ladder level 1-5 for grouping in the picker. Authored `level` when
+   *  present, else the derived `difficulty` so every task still buckets. */
+  level: number;
   whyInteresting: string;
 }
 
@@ -135,9 +142,13 @@ export function listEvalTasks(): { tasks: ListedEvalTask[]; dockerOnlyHidden: nu
     ...(t.gates ? { gates: t.gates } : {}),
     ...(t.tags ? { tags: t.tags } : {}),
     difficulty: describeTaskDifficulty(t),
+    level: t.level ?? describeTaskDifficulty(t),
     whyInteresting: describeTaskInterest(t),
   }));
-  tasks.sort((a, b) => (a.difficulty !== b.difficulty ? a.difficulty - b.difficulty : a.name.localeCompare(b.name)));
+  // Group easy → hard by ladder level, then by derived difficulty, then name.
+  tasks.sort((a, b) =>
+    a.level !== b.level ? a.level - b.level : a.difficulty !== b.difficulty ? a.difficulty - b.difficulty : a.name.localeCompare(b.name),
+  );
   return { tasks, dockerOnlyHidden: 0 };
 }
 
