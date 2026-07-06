@@ -1,5 +1,9 @@
 // Task B2.2 python_exec + B2.3 python_libraries.
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+// python_exec now provisions a runtime via ensurePython (uv-managed under
+// ~/.ugly-bot/binaries); stub it to the plain `python` command so these tests
+// exercise python_exec's own output handling, not binary provisioning.
+vi.mock('../../../client/agent/binaries/resolve', () => ({ ensurePython: () => Promise.resolve('python') }));
 import { resetMock, mockCalls } from '../../helpers/uglyNativeMock';
 import { pythonExecTool } from '../../../client/agent/tools/pythonExec';
 import { pythonLibrariesTool } from '../../../client/agent/tools/pythonLibraries';

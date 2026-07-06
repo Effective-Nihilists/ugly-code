@@ -5,6 +5,7 @@ import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
 import { projectRoot } from './lspForProject';
 import { spawnCollect } from './spawn';
+import { ensurePython } from '../binaries/resolve';
 
 const SPEC: TextGenTool = {
   name: 'python_exec',
@@ -29,7 +30,8 @@ export const pythonExecTool: ToolModule = {
     const code = (typeof input.code === 'string' ? input.code : '');
     if (!code) return 'python_exec: `code` is required';
     const root = projectRoot(ctx) ?? undefined;
-    const { stdout, stderr, code: exit } = await spawnCollect('python', ['-c', code], {
+    const python = await ensurePython();
+    const { stdout, stderr, code: exit } = await spawnCollect(python, ['-c', code], {
       ...(root ? { cwd: root } : {}),
     });
     const parts = [stdout.trimEnd()];
