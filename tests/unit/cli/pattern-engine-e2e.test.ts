@@ -47,14 +47,16 @@ interface CliJson {
 
 /** Spawn the CLI as a subprocess with `--json` and parse the structured result. */
 async function runCli(extraArgs: string[]): Promise<{ code: number; json: CliJson | null; stdout: string; stderr: string }> {
+  // Prefer the developer's real token (validated working); fall back to --test-user
+  // when no auth.json is present. Real token bills AI to the logged-in user.
+  const authArgs = AUTH?.token ? ['--token', AUTH.token] : ['--test-user'];
   const args = [
     'exec', 'tsx', 'client/cli/index.ts',
     '--eval', ...extraArgs,
     '--model', CHEAP_MODEL,
     '--json',
     '--origin', ORIGIN,
-    '--test-user',
-    ...(AUTH?.token ? ['--token', AUTH.token] : []),
+    ...authArgs,
   ];
   try {
     const { stdout, stderr } = await execFileP('pnpm', args, { cwd: process.cwd(), maxBuffer: 32 * 1024 * 1024, timeout: CASE_TIMEOUT_MS });

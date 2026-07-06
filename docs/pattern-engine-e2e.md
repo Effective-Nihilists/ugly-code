@@ -48,6 +48,20 @@ ugly-code --eval <task> [--model <id>] [--pattern <id>]
 3. **Budget discipline** — watch `turns`/`costUsd`; a pattern consistently near `maxTurns` without solving points at a weak step gate.
 4. **Extend the matrix** — add `{ task, pattern|model-mode, expect }` rows. Task names come from `client/studio/evals/tasks.json` (59 tasks across `bug-fix` / `feature` / `planning`). Grading is deterministic via the same graders the nightly uses, so "solved" never drifts from the beat-Opus scoreboard.
 
+## Origin caveat: node vs Worker (aux calls)
+
+The engine's **aux** calls (classifier / criteria judge / synthesize-spec / peer
+insights / picker) hit `/api/agentStep`, which is **only served by a Node origin**
+(local `pnpm dev`, desktop) — NOT the deployed Cloudflare Worker (`uglyBotRequest`
+can't bundle for Workers; see the note in `server/workers.ts`). Consequences when
+running against `https://code.ugly.bot`:
+
+- **Group B (pinned patterns)** — fully valid: steps run via `agentTurn`. ✅ (verified: `quick-edit`→5/5, `investigate-fix` runs its full step machine.)
+- **Group A (auto routing)** — the LLM classifier degrades to plain-send; `resolvedPattern` is `null` unless a heuristic fires. To validate LLM routing, run against a **Node origin**.
+- **Group C (max/group)** — synthesis/picker degrade to base-pattern fallback. To validate the real model axis, run against a **Node origin**.
+
+For full-fidelity A/C runs: `pnpm dev` locally and point `UGLY_CODE_ORIGIN=http://localhost:<port>`.
+
 ## Scope notes
 
 - These are session-level, real-money (though cheap) cells — run on demand, not per-PR. The per-PR guardrails are the pure-unit tests: `tests/unit/agent/{patterns,classify,modelAxis}.test.ts`.
