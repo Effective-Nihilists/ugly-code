@@ -173,14 +173,19 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
           `## Success criteria\n${input.successCriteria ?? '(none provided)'}\n\n` +
           `## Gate: ${gate.name} (max ${pts} points)\n${gate.description ?? rubricKey}\n\n` +
           `## The agent's diff\n${diff || '(no changes detected)'}`;
-        let awarded = { points: 0, verdict: '' };
         try {
-          awarded = parseJudge(await deps.judge(system, user), pts);
+          const awarded = parseJudge(await deps.judge(system, user), pts);
+          judgeResults.push({ gateName: gate.name, points: pts, pointsAwarded: awarded.points, rubricKey, verdict: awarded.verdict });
         } catch (e) {
+          // A judge that THROWS (transport/parse failure after retries) is
+          // UNGRADED, not a genuine 0 — award 0 out of 0 so the gate is excluded
+          // from the score max instead of silently docking the cell. Otherwise a
+          // flaky judge call turns a correct solution into a spurious -1 point
+          // (this is exactly what made glm's correct breaking-change fix read 4/5).
           console.error('[grader:judge]', JSON.stringify({ gateName: gate.name, rubricKey, points: pts, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
-          awarded = { points: 0, verdict: `judge call failed: ${(e as Error).message}` };
+          judgeResults.push({ gateName: gate.name, points: 0, pointsAwarded: 0, rubricKey, verdict: `ungraded — judge unreachable, gate excluded from score: ${(e as Error).message}` });
+          manual.push(`${gate.name} (judge unreachable)`);
         }
-        judgeResults.push({ gateName: gate.name, points: pts, pointsAwarded: awarded.points, rubricKey, verdict: awarded.verdict });
       } else {
         // No judge available (unit tests) — surface as pending.
         judgeResults.push({

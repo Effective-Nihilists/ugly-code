@@ -157,6 +157,28 @@ describe('eval grader — deterministic gates', () => {
     expect(r.score).toBe(2);
   });
 
+  it('a judge gate that THROWS is excluded from the score max (ungraded, not a 0 that docks the cell)', async () => {
+    const d: GradeDeps = {
+      ...deps({}), // default run → code 0, so the vitest gate passes
+      judge: async () => { throw new Error('judge unreachable'); },
+    };
+    const r = await gradeProject(
+      {
+        taskName: 't',
+        projectPath: '/p',
+        gates: [{ name: 'tests', points: 4, kind: 'vitest' }, { name: 'quality', points: 1, kind: 'judge:x' }],
+        successCriteria: 'do it well',
+        runTotals: RUN_TOTALS,
+      },
+      d,
+    );
+    // vitest passed (4). The judge threw → its gate is excluded, so the cell scores
+    // 4/4 (full), NOT 4/5 — a flaky judge must not silently dock a correct solution.
+    expect(r.score).toBe(4);
+    expect(r.scoreMax).toBe(4);
+    expect(r.judgeResults?.[0]?.verdict).toMatch(/ungraded/i);
+  });
+
   it('custom gates become manual checks', async () => {
     const r = await grade([{ name: 'seed runs', points: 2, kind: 'custom:seed' }], deps({}));
     expect(r.checks?.[0]).toMatchObject({ name: 'seed runs', passed: false });

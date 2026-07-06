@@ -11,7 +11,7 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 |---|---|---|---|---|
 | **L1** Simple bug fix | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L2** Harder bug fix / small feature | 5.0 | 5.0 | 5.0 | 5/5 |
-| **L3** Multi-file / discipline | — | — | — | 0/5 |
+| **L3** Multi-file / discipline | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L4** Agentic long-horizon | — | — | — | 0/5 |
 | **L5** Real-world agentic | — | — | — | 0/5 |
 
@@ -19,12 +19,12 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 
 | Metric | opus | deepseek | glm |
 |---|---|---|---|
-| **Total cost** | $2.4794 | $0.0302 | $0.1318 |
-| **Total time** | 6m05s | 5m59s | 6m13s |
-| **Tokens (in / out)** | n/a | 27k / 19k | 308k / 16k |
-| **Cache-hit rate** | n/a | 95% | 49% |
+| **Total cost** | $3.8910 | $0.0539 | $0.2211 |
+| **Total time** | 9m12s | 9m03s | 11m05s |
+| **Tokens (in / out)** | n/a | 57k / 30k | 29k / 25k |
+| **Cache-hit rate** | n/a | 94% | 95% |
 
-**Grand total spend:** $2.6414
+**Grand total spend:** $4.1659
 
 ## Level 1 — Simple bug fix
 
@@ -52,12 +52,12 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 
 | Task | opus | deepseek | glm |
 |---|---|---|---|
-| `breaking-change-find-callers` | — | — | — |
-| `multi-file-refactor-ordered` | — | — | — |
-| `bug-fix-passes-but-breaks-sibling` | — | — | — |
-| `refactor-preserve-api` | — | — | — |
-| `divergent-strategy-sql-perf` | — | — | — |
-| **mean** | — | — | — |
+| `breaking-change-find-callers` | 5/5 · $0.4140 · 18t · 53s | 5/5 · $0.0037 · 12t · 42s | 5/5 · $0.0149 · 7t · 49s |
+| `multi-file-refactor-ordered` | 5/5 · $0.2508 · 7t · 37s | 5/5 · $0.0050 · 12t · 40s | 5/5 · $0.0181 · 8t · 1m01s |
+| `bug-fix-passes-but-breaks-sibling` | 5/5 · $0.2871 · 9t · 36s | 5/5 · $0.0039 · 12t · 34s | 5/5 · $0.0116 · 7t · 43s |
+| `refactor-preserve-api` | 5/5 · $0.1832 · 5t · 26s | 5/5 · $0.0047 · 7t · 31s | 5/5 · $0.0255 · 10t · 1m23s |
+| `divergent-strategy-sql-perf` | 5/5 · $0.2765 · 10t · 35s | 5/5 · $0.0063 · 11t · 37s | 5/5 · $0.0193 · 6t · 56s |
+| **mean** | 5.0/5 | 5.0/5 | 5.0/5 |
 
 ## Level 4 — Agentic long-horizon
 
