@@ -17,6 +17,19 @@ describe('buildScaffoldCommand', () => {
   it('escapes embedded double quotes in the name', () => {
     expect(buildScaffoldCommand('a"b', '~')).toContain('init "a\\"b"');
   });
+
+  it('omits --with when no features are selected', () => {
+    expect(buildScaffoldCommand('a', '~')).not.toContain('--with');
+  });
+
+  it('appends --with for selected features', () => {
+    expect(buildScaffoldCommand('a', '~', ['todo', 'chat'])).toContain('init "a" --with todo,chat');
+  });
+
+  it('drops malformed feature ids (only [a-z] allowed)', () => {
+    expect(buildScaffoldCommand('a', '~', ['todo', 'bad;rm -rf'])).toContain('--with todo');
+    expect(buildScaffoldCommand('a', '~', ['todo', 'bad;rm -rf'])).not.toContain('rm -rf');
+  });
 });
 
 describe('parseScaffoldResult', () => {

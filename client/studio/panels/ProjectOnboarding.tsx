@@ -87,6 +87,15 @@ function useCountUp(target: number, durationMs: number): number {
 // create (previously clone defaulted to `~` and open/clone browsed from `~`).
 const DEFAULT_PARENT_DIR = '~/Documents/Ugly Studio';
 
+// Optional ugly-app scaffold features. Empty selection → a minimal app (fewer DB
+// migrations); each ticked box maps to `ugly-app init --with <id>`.
+const FEATURE_OPTIONS: { id: string; label: string; desc: string }[] = [
+  { id: 'todo', label: 'Todo list', desc: 'Collection + CRUD demo + nightly cleanup cron' },
+  { id: 'chat', label: 'AI chat', desc: 'Conversation/message collections + streaming replies' },
+  { id: 'collab', label: 'Collaborative editing', desc: 'Yjs CRDT document sync' },
+  { id: 'tests', label: 'Test / demo pages', desc: 'Auth, push, email, upload, audio, 3D, … examples' },
+];
+
 interface ProjectOnboardingProps {
   /**
    * Fires when a project has been opened (picked, created, or cloned).
@@ -97,7 +106,7 @@ interface ProjectOnboardingProps {
   onProjectOpen: (name: string, path?: string) => void;
   /** Hand off "Create Project" to the shell's live progress view (which streams
    *  `npx ugly-app init` + `pnpm install` and opens the project on success). */
-  onBeginCreate?: (name: string, parentDir: string) => void;
+  onBeginCreate?: (name: string, parentDir: string, features: string[]) => void;
   /** Platform from electronAPI.getPlatform() — threads into StudioTopBar. */
   platform?: NodeJS.Platform | null;
   /** Open the global settings modal — wired up by the Editor shell. */
@@ -171,6 +180,16 @@ export function ProjectOnboarding({
   const [activeAction, setActiveAction] = useState<ActionTab>('new');
   const [newName, setNewName] = useState('');
   const [newParentDir, setNewParentDir] = useState(DEFAULT_PARENT_DIR);
+  // Optional ugly-app features to scaffold (empty = minimal template). Passed to
+  // `ugly-app init --with …`.
+  const [newFeatures, setNewFeatures] = useState<Set<string>>(() => new Set());
+  const toggleFeature = useCallback((id: string) => {
+    setNewFeatures((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
   const [openPath, setOpenPath] = useState('');
   const [cloneUrl, setCloneUrl] = useState('');
   const [cloneDir, setCloneDir] = useState(DEFAULT_PARENT_DIR);
@@ -389,8 +408,8 @@ export function ProjectOnboarding({
     // scaffold and streams its live CLI output (npx ugly-app init + pnpm
     // install) instead of blocking silently on the button.
     setError(null);
-    onBeginCreate?.(newName.trim(), newParentDir.trim());
-  }, [newName, newParentDir, loading, onBeginCreate]);
+    onBeginCreate?.(newName.trim(), newParentDir.trim(), [...newFeatures]);
+  }, [newName, newParentDir, newFeatures, loading, onBeginCreate]);
 
   const handleOpenFolder = useCallback(async () => {
     if (!openPath.trim() || loading) return;
@@ -657,6 +676,28 @@ export function ProjectOnboarding({
                     browsable={hasElectronAPI}
                     onBrowse={() => { handleBrowse(setNewParentDir, newParentDir); }}
                   />
+                  <div data-id="onboarding-features" style={featuresBoxStyle}>
+                    <div style={featuresLabelStyle}>Optional features</div>
+                    {FEATURE_OPTIONS.map((f) => (
+                      <label key={f.id} data-id={`onboarding-feature-${f.id}`} style={featureRowStyle}>
+                        <input
+                          type="checkbox"
+                          checked={newFeatures.has(f.id)}
+                          onChange={() => { toggleFeature(f.id); }}
+                          style={{ marginTop: 3, cursor: 'pointer' }}
+                        />
+                        <span>
+                          <span style={featureNameStyle}>{f.label}</span>
+                          <span style={featureDescStyle}>{f.desc}</span>
+                        </span>
+                      </label>
+                    ))}
+                    <div style={featureHintStyle}>
+                      {newFeatures.size === 0
+                        ? 'Minimal app — add features later as you need them.'
+                        : `Scaffolds with: ${[...newFeatures].join(', ')}`}
+                    </div>
+                  </div>
                   <button
                     type="button"
                     data-id="onboarding-create-project"
@@ -1596,6 +1637,21 @@ function ProjectRow({
 // Shared styles
 // ──────────────────────────────────────────────────────────────────
 
+const featuresBoxStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4,
+  padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8,
+  background: 'var(--bg-secondary)',
+};
+const featuresLabelStyle: React.CSSProperties = {
+  fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+  color: 'var(--text-muted)',
+};
+const featureRowStyle: React.CSSProperties = {
+  display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 13,
+};
+const featureNameStyle: React.CSSProperties = { display: 'block', color: 'var(--text-primary)', fontWeight: 600 };
+const featureDescStyle: React.CSSProperties = { display: 'block', color: 'var(--text-muted)', fontSize: 11.5 };
+const featureHintStyle: React.CSSProperties = { fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic' };
 const primaryButtonStyle: React.CSSProperties = {
   alignSelf: 'flex-start',
   padding: '12px 20px',

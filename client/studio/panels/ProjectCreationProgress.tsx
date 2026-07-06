@@ -22,11 +22,14 @@ const SCAFFOLD_TOOLS = ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'];
 export function ProjectCreationProgress({
   name,
   parentDir,
+  features = [],
   onDone,
   onCancel,
 }: {
   name: string;
   parentDir: string;
+  /** Optional ugly-app features to scaffold (todo/tests/chat/collab). */
+  features?: string[];
   onDone: (name: string, path: string) => void;
   onCancel: () => void;
 }): React.ReactElement {
@@ -35,7 +38,7 @@ export function ProjectCreationProgress({
   const [error, setError] = React.useState<string | null>(null);
   const [granted, setGranted] = React.useState(false);
 
-  const scaffoldCmd = React.useMemo(() => buildScaffoldCommand(name, parentDir), [name, parentDir]);
+  const scaffoldCmd = React.useMemo(() => buildScaffoldCommand(name, parentDir, features), [name, parentDir, features]);
 
   // Grant the process/fs capability before spawning, or the daemon denies the
   // spawn ("requires the process permission"). Re-request on retry (attempt bump);

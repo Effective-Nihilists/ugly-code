@@ -70,7 +70,7 @@ export default function StudioShell(): React.ReactElement {
   const [open, setOpen] = React.useState<OpenProject | null>(() => projectFromUrl());
   // When set, the picker has handed off to the live "Create Project" progress
   // view (streams `npx ugly-app init` + `pnpm install`); on success it opens.
-  const [creating, setCreating] = React.useState<{ name: string; parentDir: string } | null>(null);
+  const [creating, setCreating] = React.useState<{ name: string; parentDir: string; features: string[] } | null>(null);
   // The ugly-app socket (cross-device sync). Optional: a logged-out shell still
   // renders the picker; it just won't record/sync recents until sign-in.
   const app = useAppOptional();
@@ -168,6 +168,7 @@ export default function StudioShell(): React.ReactElement {
       <ProjectCreationProgress
         name={creating.name}
         parentDir={creating.parentDir}
+        features={creating.features}
         onDone={(name, path) => { openProject(name, path); }}
         onCancel={() => { setCreating(null); }}
       />
@@ -185,7 +186,7 @@ export default function StudioShell(): React.ReactElement {
       <ProjectsProvider>
         <ProjectOnboarding
           onProjectOpen={(name, path) => { openProject(name, path); }}
-          onBeginCreate={(name, parentDir) => { setCreating({ name, parentDir }); }}
+          onBeginCreate={(name, parentDir, features) => { setCreating({ name, parentDir, features }); }}
           platform={null}
           onOpenSettings={() => { setSettingsOpen(true); }}
           leaving={false}

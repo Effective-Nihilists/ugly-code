@@ -10,12 +10,16 @@ export type ScaffoldResult =
  *  double quotes, so map it to `$HOME`. The command mkdir+cd's into the parent
  *  itself (it may not exist yet), runs `ugly-app init`, cd's into the project,
  *  and prints its absolute path via `pwd` (parsed by parseScaffoldResult). */
-export function buildScaffoldCommand(name: string, parentDir: string): string {
+export function buildScaffoldCommand(name: string, parentDir: string, features: string[] = []): string {
   const parent = (parentDir.trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
   const q = (s: string): string => s.replace(/"/g, '\\"');
+  // Only pass `--with` when features are chosen, so the command still works
+  // against an ugly-app version that predates the flag (minimal-only default).
+  const clean = features.filter((f) => /^[a-z]+$/.test(f));
+  const withFlag = clean.length ? ` --with ${clean.join(',')}` : '';
   return (
     `mkdir -p "${q(parent)}" && cd "${q(parent)}" && ` +
-    `npx -y ugly-app@latest init "${q(name)}" && cd "${q(name)}" && pwd`
+    `npx -y ugly-app@latest init "${q(name)}"${withFlag} && cd "${q(name)}" && pwd`
   );
 }
 
