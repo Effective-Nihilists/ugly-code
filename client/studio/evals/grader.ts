@@ -173,14 +173,20 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
 
   // No gates defined → universal signals: tsc clean + the project's test script.
   if (gates.length === 0) {
-    const r = await tsc();
-    tscExit = r.code;
-    tscErrors = countTscErrors(r.out);
-    const tscOk = r.code === 0 && tscErrors === 0;
-    if (!tscOk) tscErrorSample = r.out.slice(0, 800);
-    checks.push({ name: 'tsc clean', passed: tscOk, detail: tscOk ? undefined : `${tscErrors} type error(s)` });
-    detMax += 1;
-    if (tscOk) detScore += 1;
+    // Only count the tsc signal for actual TypeScript projects. A fixture without
+    // a tsconfig.json makes `npx tsc --noEmit` fail spuriously ("this is not the
+    // tsc command…"), which would dock a point the agent legitimately earned.
+    const isTsProject = await deps.exists(`${input.projectPath}/tsconfig.json`);
+    if (isTsProject) {
+      const r = await tsc();
+      tscExit = r.code;
+      tscErrors = countTscErrors(r.out);
+      const tscOk = r.code === 0 && tscErrors === 0;
+      if (!tscOk) tscErrorSample = r.out.slice(0, 800);
+      checks.push({ name: 'tsc clean', passed: tscOk, detail: tscOk ? undefined : `${tscErrors} type error(s)` });
+      detMax += 1;
+      if (tscOk) detScore += 1;
+    }
 
     const t = await deps.run('npm', ['test', '--silent'], input.projectPath);
     const testsOk = t.code === 0;

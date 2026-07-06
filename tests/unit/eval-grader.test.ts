@@ -127,9 +127,10 @@ describe('eval grader — deterministic gates', () => {
     expect(r.checks?.[0]?.detail).toMatch(/manual/i);
   });
 
-  it('no gates → universal tsc + npm test signals', async () => {
+  it('no gates + tsconfig → universal tsc + npm test signals (2 points)', async () => {
     const calls: string[] = [];
     const d = deps({
+      files: { 'tsconfig.json': '{}' },
       run: (cmd, args) => {
         calls.push(`${cmd} ${args.join(' ')}`);
         return { out: '', code: 0 };
@@ -140,5 +141,20 @@ describe('eval grader — deterministic gates', () => {
     expect(calls.some((c) => c.startsWith('npm test'))).toBe(true);
     expect(r.scoreMax).toBe(2);
     expect(r.score).toBe(2);
+  });
+
+  it('no gates + NO tsconfig → skips tsc, scores on tests alone (1 point)', async () => {
+    const calls: string[] = [];
+    const d = deps({
+      run: (cmd, args) => {
+        calls.push(`${cmd} ${args.join(' ')}`);
+        return { out: '', code: 0 };
+      },
+    });
+    const r = await grade([], d);
+    expect(calls.some((c) => c.startsWith('npx tsc'))).toBe(false); // tsc skipped for non-TS fixture
+    expect(calls.some((c) => c.startsWith('npm test'))).toBe(true);
+    expect(r.scoreMax).toBe(1);
+    expect(r.score).toBe(1);
   });
 });
