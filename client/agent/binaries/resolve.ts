@@ -63,6 +63,23 @@ export async function ensureBinary(
   try { return await task; } finally { inflight.delete(destDir); }
 }
 
+let uvIo: BinariesIo | undefined;
+/** Test seam: override the IO used by ensureUv. */
+export function __setUvIo(io: BinariesIo): void { uvIo = io; }
+
+/** Resolve a `uv` executable — PATH first, else install into the shared binaries root. */
+export async function ensureUv(io: BinariesIo = uvIo ?? nativeIo): Promise<string> {
+  const probe = await spawnCollect('uv', ['--version'], {});
+  if (probe.code === 0) return 'uv';
+  const dir = await ensureBinary('uv', async (destDir) => {
+    // Astral installer honors UV_INSTALL_DIR; INSTALLER_NO_MODIFY_PATH keeps it self-contained.
+    const script = `curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="${destDir}" INSTALLER_NO_MODIFY_PATH=1 sh`;
+    const res = await spawnCollect('sh', ['-c', script], {});
+    if (res.code !== 0 && res.code !== null) throw new Error(`uv install failed (exit ${res.code}): ${res.stderr.slice(0, 400)}`);
+  }, io);
+  return `${dir}/uv`;
+}
+
 let pythonIo: BinariesIo | undefined;
 /** Test seam: override the IO used by ensurePython. */
 export function __setPythonIo(io: BinariesIo): void { pythonIo = io; }
