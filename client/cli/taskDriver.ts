@@ -19,6 +19,7 @@ export async function bootDriver(cfg: DriverCfg): Promise<void> {
   // binary paths (e.g. ~/.ugly-bot/binaries/.../uv) a name-based grant can't match.
   type GrantReq = Parameters<typeof permissions.request>[0];
   await permissions.request({ fs: 'full', process: 'full' } as unknown as GrantReq).catch(() => undefined);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- DOM lib types localStorage as always-present, but this runs in a Node CLI where it's genuinely undefined.
   if (!g.localStorage) {
     const mem = new Map<string, string>();
     g.localStorage = {
@@ -40,7 +41,7 @@ export async function bootDriver(cfg: DriverCfg): Promise<void> {
       return realFetch(cfg.origin + input, { ...init, headers });
     }
     return realFetch(input, init);
-  }) as typeof fetch;
+  });
 }
 
 export async function runTurn(
@@ -52,9 +53,9 @@ export async function runTurn(
   // Baseline dispatch: a claude-cli model runs the local Claude Code CLI as the
   // agent (its own tools); anything else runs the ugly.bot agent core. Both write
   // cost/turns to the fs session store, so the comparison metrics stay uniform.
-  const model = (selection as { model?: string } | undefined)?.model;
+  const model = (selection)?.model;
   if (model && isClaudeCliModel(model)) {
-    await runClaudeCliTurn(sessionId, text, model, onMsg as unknown as Parameters<typeof runClaudeCliTurn>[3]);
+    await runClaudeCliTurn(sessionId, text, model, onMsg);
     return;
   }
   await runClientAgentTurn(sessionId, text, onMsg, selection);

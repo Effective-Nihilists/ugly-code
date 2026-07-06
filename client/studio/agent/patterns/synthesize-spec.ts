@@ -128,7 +128,7 @@ export function extractSynthesisInputForPeer(args: {
   recentText?: string;
 }): string {
   const sections: string[] = [];
-  const trimmedSpec = args.spec?.trim();
+  const trimmedSpec = args.spec.trim();
   if (trimmedSpec && trimmedSpec.length > 0) {
     sections.push(`(spec.md)\n${trimmedSpec.slice(0, 4000)}`);
   }

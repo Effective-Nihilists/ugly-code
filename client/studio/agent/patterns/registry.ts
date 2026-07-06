@@ -448,13 +448,11 @@ export function getPattern(id: string): Pattern | undefined {
 }
 
 export function getStep(patternId: PatternId, stepId: string): Step | undefined {
-  return PATTERN_REGISTRY[patternId]?.steps.find((s) => s.id === stepId);
+  return PATTERN_REGISTRY[patternId].steps.find((s) => s.id === stepId);
 }
 
 export function getTerminalStep(patternId: PatternId): Step {
-  const p = PATTERN_REGISTRY[patternId];
-  if (!p) throw new Error(`unknown pattern id: ${patternId}`);
-  const terminal = p.steps.find((s) => s.isTerminal);
+  const terminal = PATTERN_REGISTRY[patternId].steps.find((s) => s.isTerminal);
   if (!terminal) throw new Error(`pattern ${patternId} has no terminal step`);
   return terminal;
 }

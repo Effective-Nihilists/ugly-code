@@ -123,7 +123,7 @@ function parseClassifier(raw: string): ClassifyOutput {
   const runnerUpRaw = o.runnerUp;
   const runnerUp =
     typeof runnerUpRaw === 'string' && isClassifiable(runnerUpRaw) && runnerUpRaw !== patternRaw
-      ? (runnerUpRaw as PatternId)
+      ? (runnerUpRaw)
       : undefined;
   const runnerUpConfRaw = o.runnerUpConfidence;
   const runnerUpConfidence =

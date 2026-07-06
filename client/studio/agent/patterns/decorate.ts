@@ -24,6 +24,6 @@ export function filterToolsForStep(specs: AgentToolSpec[], step: Step | null): A
     .filter((s) => allow.has(s.name))
     .map((s) => {
       const suffix = step.toolDescriptionSuffixes?.[s.name];
-      return suffix ? { ...s, description: `${s.description ?? ''}${suffix}` } : s;
+      return suffix ? { ...s, description: `${s.description}${suffix}` } : s;
     });
 }

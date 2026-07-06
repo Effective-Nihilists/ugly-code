@@ -15,10 +15,10 @@ import {
 import { nanoid } from 'nanoid';
 import { enableConversations } from 'ugly-app/conversation/server';
 import { enableCollab } from 'ugly-app/collab/server';
-import type { WorkerHandlers, TextGenModel } from 'ugly-app/shared';
+import type { WorkerHandlers } from 'ugly-app/shared';
 import { dbDefaults } from 'ugly-app/shared';
 import { messages, requests } from '../shared/api';
-import { AGENT_DEFAULT_MODEL, AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
+import { AGENT_SYSTEM_PROMPT, AGENT_TOOLS } from '../shared/agent';
 import { agentTurnHandler } from 'ugly-app/agent/server';
 import { agentStepHandler } from './agentStepHandler';
 import type { Todo, RecentProject } from '../shared/collections';

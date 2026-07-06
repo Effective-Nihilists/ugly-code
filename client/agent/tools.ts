@@ -406,6 +406,7 @@ function runBash(
       // Single-shot settle: whichever of exit / error / timeout fires first wins,
       // then we stop tracking + clear the timer so nothing double-resolves.
       let settled = false;
+      // eslint-disable-next-line prefer-const -- assigned once, but mutually referenced with settle() below (must be declared before both).
       let timer: ReturnType<typeof setTimeout> | undefined;
       const settle = (text: string): void => {
         if (settled) return;

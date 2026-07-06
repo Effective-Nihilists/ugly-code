@@ -8,8 +8,8 @@ const READ_TOOLS = new Set(['read', 'grep', 'glob', 'todos']);
 const EDIT_TOOLS = new Set(['edit', 'write', 'multiedit']);
 
 interface Row { seq: number; role: string; kind: string; content: string }
-interface AssistantContent { content?: Array<{ type?: string; name?: string; text?: string }> }
-interface ToolContent { results?: Array<{ is_error?: boolean }> }
+interface AssistantContent { content?: { type?: string; name?: string; text?: string }[] }
+interface ToolContent { results?: { is_error?: boolean }[] }
 
 export interface RunAnalysis {
   assistantTurns: number;
@@ -47,7 +47,7 @@ export function analyzeTranscript(rows: Row[]): Omit<RunAnalysis, 'costUsd' | 'c
         toolCalls[name] = (toolCalls[name] ?? 0) + 1;
         totalToolCalls++;
         if (READ_TOOLS.has(name)) reads++;
-        if (EDIT_TOOLS.has(name)) { edits++; if (turnsToFirstEdit === null) turnsToFirstEdit = assistantIdx; }
+        if (EDIT_TOOLS.has(name)) { edits++; turnsToFirstEdit ??= assistantIdx; }
       }
     } else if (r.role === 'tool') {
       for (const res of (c as ToolContent).results ?? []) if (res.is_error) toolErrors++;

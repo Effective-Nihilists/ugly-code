@@ -57,9 +57,9 @@ export async function runPythonOneShot(opts: OneShotOptions): Promise<OneShotRes
       const timer = setTimeout(() => {
         timedOut = true;
         try { proc.kill('SIGTERM'); } catch { /* ignore */ }
-        setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* ignore */ } }, 2000).unref?.();
+        setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* ignore */ } }, 2000).unref();
       }, timeoutMs);
-      timer.unref?.();
+      timer.unref();
       const onAbort = (): void => { try { proc.kill('SIGTERM'); } catch { /* ignore */ } };
       opts.signal?.addEventListener('abort', onAbort);
       const finish = (result: OneShotResult): void => {
@@ -69,7 +69,7 @@ export async function runPythonOneShot(opts: OneShotOptions): Promise<OneShotRes
         opts.signal?.removeEventListener('abort', onAbort);
         resolve(result);
       };
-      proc.onError((err) => finish({ output: `python_exec spawn error: ${err}`, isError: true, timedOut: false, exitCode: null }));
+      proc.onError((err) => { finish({ output: `python_exec spawn error: ${err}`, isError: true, timedOut: false, exitCode: null }); });
       proc.onExit((code) => {
         const parts: string[] = [];
         if (stdout) parts.push(stdout);

@@ -40,7 +40,7 @@ export interface GroupModeResult {
   winnerDiff: string;
   reason: string;
   /** Per-peer diffs captured before teardown (for eval / debugging). */
-  peerDiffs: ReadonlyArray<{ peerId: string; model: string; persona: string; diff: string; isWinner: boolean }>;
+  peerDiffs: readonly { peerId: string; model: string; persona: string; diff: string; isWinner: boolean }[];
 }
 
 export async function runGroupMode(input: GroupModeInput): Promise<GroupModeResult> {
@@ -101,10 +101,10 @@ export async function runGroupMode(input: GroupModeInput): Promise<GroupModeResu
       isWinner: d.peer.id === winner.id,
     }));
     // Tear down losers; keep the winner's worktree for the caller to apply.
-    await Promise.all(peers.filter((p) => p.id !== winner.id).map((p) => input.callbacks.tearDownPeer(p).catch(() => {})));
+    await Promise.all(peers.filter((p) => p.id !== winner.id).map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)));
     return { winner, winnerDiff, reason, peerDiffs };
   } catch (err) {
-    await Promise.all(peers.map((p) => input.callbacks.tearDownPeer(p).catch(() => {})));
+    await Promise.all(peers.map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)));
     throw err;
   }
 }

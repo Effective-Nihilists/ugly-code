@@ -948,7 +948,7 @@ async function runPatternStepsOnMain(args: {
       for (let r = 0; r < MAX_REVISE; r++) {
         const diff = await sessionGitDiff(projectDir);
         const grade = await gradeAgainstCriteria(userText, criteria, diff, agentStepJudge);
-        emit({ type: 'codingAgent:event', sessionId, event: { type: 'criteria_verdicts', payload: { verdicts: grade.verdicts, failing: grade.failing } } } as unknown as Parameters<typeof emit>[0]);
+        emit({ type: 'codingAgent:event', sessionId, event: { type: 'criteria_verdicts', payload: { verdicts: grade.verdicts, failing: grade.failing } } });
         if (!grade.parsed || grade.failing.length === 0) break;
         state.currentStepIter = r + 1;
         emitTelemetry(state, sessionId);
@@ -995,7 +995,7 @@ async function runMidModeTurn(
       provider: makePeerProvider(),
       synthesisModel: SYNTHESIS_MODEL,
       injectionStyle: resolvedId === 'super-investigate-fix' ? 'imperative' : 'advisory',
-      onProgress: (m) => emitProgress(emit, sessionId, m),
+      onProgress: (m) => { emitProgress(emit, sessionId, m); },
     });
   } catch (e) {
     emitProgress(emit, sessionId, `Wide fan-out failed (${(e as Error).message}); running the base pattern directly.`);
@@ -1026,7 +1026,7 @@ async function runMaxModeTurn(
       provider: makePeerProvider(),
       pollinator: AUX_MODEL,
       pickerModel: AUX_MODEL,
-      onProgress: (m) => emitProgress(emit, sessionId, m),
+      onProgress: (m) => { emitProgress(emit, sessionId, m); },
     });
     emitProgress(emit, sessionId, `Winner: ${res.winner.modelId} — ${res.reason}`);
     await applyWinnerDiff(sessionId, projectDir, res.winnerDiff, emit);
@@ -1058,7 +1058,7 @@ async function runGroupModeTurn(
       callbacks: makePeerCallbacks(sessionId),
       provider: makePeerProvider(),
       pickerModel: AUX_MODEL,
-      onProgress: (m) => emitProgress(emit, sessionId, m),
+      onProgress: (m) => { emitProgress(emit, sessionId, m); },
     });
     emitProgress(emit, sessionId, `Winner: ${res.winner.modelId} (${res.reason})`);
     await applyWinnerDiff(sessionId, projectDir, res.winnerDiff, emit);
@@ -1201,7 +1201,8 @@ export async function spawnPeerSession(
   getOrCreate(peerId, noopEmit, selection, { peer: true });
   const projectPath = getActiveProjectPath();
   const ws = await ensureSessionWorkspace(peerId, projectPath);
-  return { id: peerId, modelId, cwd: ws.dir || projectPath || '' };
+  // ws.dir is '' for a non-worktree fallback → use the project root instead.
+  return { id: peerId, modelId, cwd: ws.dir !== '' ? ws.dir : (projectPath ?? '') };
 }
 
 /** Deliver one synthetic user message to a peer and await turn settle. `policy`
@@ -1314,10 +1315,10 @@ export function makePeerCallbacks(parentSessionId: string): import('./patterns/p
     async getPeerDiff(peer) {
       return peerSessionDiff(peer.id);
     },
-    async getPeerSpec(peer) {
+    getPeerSpec(peer) {
       // The peer's last assistant text stands in for its spec/diagnosis artifact
       // (spec_write persists remotely; the summary text is the synthesis input).
-      return peerHistoryText(peer.id);
+      return Promise.resolve(peerHistoryText(peer.id));
     },
   };
 }

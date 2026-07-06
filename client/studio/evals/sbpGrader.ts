@@ -8,7 +8,7 @@
 //   1 — every pass_to_pass test still passes (no regression; empty = free point)
 import type { GradeDeps, GradeInput } from './grader';
 import type { EvalGradeResult } from '../shared/api';
-import { getSbpMeta, parseSbpArray, type SbpMeta } from './sbp/registry';
+import { getSbpMeta, parseSbpArray } from './sbp/registry';
 
 interface Check { name: string; passed: boolean; detail?: string }
 
@@ -34,7 +34,7 @@ function countPass(output: string, names: string[]): { pass: number; failed: str
 }
 
 export async function gradeSbp(input: GradeInput, deps: GradeDeps): Promise<EvalGradeResult> {
-  const meta = getSbpMeta(input.taskName) as SbpMeta;
+  const meta = getSbpMeta(input.taskName)!;
   const checks: Check[] = [];
   const cwd = input.projectPath;
 

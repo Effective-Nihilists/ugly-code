@@ -18,7 +18,7 @@ export interface SbpMeta {
 }
 
 const SBP_META: Record<string, SbpMeta> = {
-  'sbpro-ansible-ansible-39bd8b99': ansible as SbpMeta,
+  'sbpro-ansible-ansible-39bd8b99': ansible,
 };
 
 export function getSbpMeta(taskName: string): SbpMeta | undefined {

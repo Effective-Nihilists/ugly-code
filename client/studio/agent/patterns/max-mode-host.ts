@@ -32,8 +32,8 @@ export interface MaxModeInput {
   peerModels: readonly string[];
   callbacks: MaxModeCallbacks;
   provider: PeerProvider;
-  /** Pollinator model for insight extraction; 'none' disables cross-pollination. */
-  pollinator?: string | 'none';
+  /** Pollinator model id for insight extraction; the literal `'none'` disables cross-pollination. */
+  pollinator?: string;
   pickerModel?: string;
   signal?: AbortSignal;
   onProgress?: (msg: string) => void;
@@ -111,10 +111,10 @@ export async function runMaxMode(input: MaxModeInput): Promise<MaxModeResult> {
     const winner = peers[pick.winnerIndex] ?? peers[0];
     const winnerDiff = await input.callbacks.getPeerDiff(winner);
     // Tear down losers only; the winner's worktree survives for the caller to apply.
-    await Promise.all(peers.filter((p) => p.id !== winner.id).map((p) => input.callbacks.tearDownPeer(p).catch(() => {})));
+    await Promise.all(peers.filter((p) => p.id !== winner.id).map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)));
     return { winner, winnerDiff, reason: pick.reason };
   } catch (err) {
-    await Promise.all(peers.map((p) => input.callbacks.tearDownPeer(p).catch(() => {})));
+    await Promise.all(peers.map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)));
     throw err;
   }
 }

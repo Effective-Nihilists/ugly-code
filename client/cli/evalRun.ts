@@ -120,7 +120,7 @@ export function shouldNudgeForNoEdit(kind: string, editCount: number): boolean {
 async function readTranscriptRows(
   storeRoot: string,
   sessionId: string,
-): Promise<Array<{ seq: number; role: string; kind: string; content: string }>> {
+): Promise<{ seq: number; role: string; kind: string; content: string }[]> {
   const dir = sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_');
   try {
     const raw = await readFile(`${storeRoot}/${dir}/messages.jsonl`, 'utf8');
@@ -139,7 +139,7 @@ async function readFinalText(storeRoot: string, sessionId: string): Promise<stri
     const rows = raw.split('\n').filter(Boolean).map((l) => JSON.parse(l) as { role: string; content: string });
     for (let i = rows.length - 1; i >= 0; i--) {
       if (rows[i].role !== 'assistant') continue;
-      const parsed = JSON.parse(rows[i].content) as { content?: Array<{ type?: string; text?: string }> };
+      const parsed = JSON.parse(rows[i].content) as { content?: { type?: string; text?: string }[] };
       const text = (parsed.content ?? []).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('\n').trim();
       if (text) return text;
     }
@@ -189,10 +189,15 @@ export async function runEval(cfg: {
   // snapshot) so the CLI + e2e tests can assert classifier routing accuracy.
   let resolvedPattern: string | null = null;
   const onMsg = (msg: unknown): void => {
-    const m = msg as { event?: { type?: string; payload?: { payload?: { resolvedPattern?: string | null } } } };
+    const m = msg as { event?: { type?: string; message?: string; error?: string; payload?: { payload?: { resolvedPattern?: string | null } } } };
     if (m.event?.type === 'session_state') {
       const rp = m.event.payload?.payload?.resolvedPattern;
       if (rp != null) resolvedPattern = rp;
+    }
+    // Surface a run-terminating error (why a cell died) — otherwise the runner
+    // swallows it and the cell silently scores 0.
+    if (m.event?.type === 'error') {
+      process.stderr.write(`[eval:error] ${cfg.taskName}: ${m.event.message ?? m.event.error ?? 'agent run error'}\n`);
     }
   };
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];

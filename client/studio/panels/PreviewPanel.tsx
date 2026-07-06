@@ -66,7 +66,7 @@ const TUNNEL_RE = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
 
 /** A trycloudflare quick-tunnel URL gets a fresh random subdomain every run, so a
  *  persisted one is dead on the next launch (→ blank preview). Never restore it. */
-const isTunnelUrl = (u: string): boolean => /\.trycloudflare\.com/.test(u);
+const isTunnelUrl = (u: string): boolean => u.includes('.trycloudflare.com');
 
 /** Expose localhost:port at a public https URL via a cloudflared quick tunnel (no CF account),
  *  so the mobile preview can reach the host's dev server. Best-effort — if cloudflared isn't

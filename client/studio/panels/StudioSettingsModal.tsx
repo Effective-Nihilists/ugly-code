@@ -222,9 +222,10 @@ export function StudioSettingsModal({
 
   const handleGroupPersona = useCallback(
     (modelId: string, persona: PersonaId | '') => {
-      const personas: Record<string, string> = { ...groupPersonas };
-      if (persona === '' || persona === 'default') delete personas[modelId];
-      else personas[modelId] = persona;
+      // Rebuild without the cleared key (no dynamic delete): default/'' → drop it.
+      const personas: Record<string, string> = {};
+      for (const [k, v] of Object.entries(groupPersonas)) if (k !== modelId) personas[k] = v;
+      if (persona !== '' && persona !== 'default') personas[modelId] = persona;
       applyModelMode({
         kind: 'group',
         models: groupModels,

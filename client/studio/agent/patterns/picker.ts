@@ -231,7 +231,7 @@ function renderUserMessage(input: PickerInput): string {
   sections.push(truncate(input.ticket, 2000));
   sections.push('');
   for (let i = 0; i < input.candidates.length; i++) {
-    const c = input.candidates[i]!;
+    const c = input.candidates[i];
     sections.push(`=== CANDIDATE ${i} (model: ${c.model}) ===`);
     sections.push(truncate(c.artifact, MAX_ARTIFACT_CHARS));
     sections.push('');
@@ -246,7 +246,7 @@ function parsePickerResponse(
 ): { winnerIndex: number; reason: string } {
   // Strip optional code fences and find the first JSON object.
   const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
-  const match = stripped.match(/\{[\s\S]*?"winner"[\s\S]*?\}/);
+  const match = /\{[\s\S]*?"winner"[\s\S]*?\}/.exec(stripped);
   const blob = match ? match[0] : stripped;
   try {
     const parsed = JSON.parse(blob) as { winner?: number; reason?: string };
@@ -274,7 +274,7 @@ export async function pickWinner(input: PickerInput): Promise<PickerOutput> {
     throw new Error('pickWinner: candidates[] empty');
   }
   if (input.candidates.length === 1) {
-    const only = input.candidates[0]!;
+    const only = input.candidates[0];
     return {
       winnerIndex: 0,
       winnerModel: only.model,
@@ -304,7 +304,7 @@ export async function pickWinner(input: PickerInput): Promise<PickerOutput> {
   const parsed = parsePickerResponse(raw, input.candidates.length);
   return {
     winnerIndex: parsed.winnerIndex,
-    winnerModel: input.candidates[parsed.winnerIndex]!.model,
+    winnerModel: input.candidates[parsed.winnerIndex].model,
     reason: parsed.reason,
     raw,
   };
