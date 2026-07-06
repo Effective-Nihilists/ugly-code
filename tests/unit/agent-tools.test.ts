@@ -130,6 +130,42 @@ describe('bash', () => {
   });
 });
 
+describe('bash dev-server guard', () => {
+  // Each case uses a distinct projectDir — isUglyAppProject caches per dir.
+  const blocked = ['npx ugly-app dev', 'pnpm dlx ugly-app dev', 'pnpm dev', 'pnpm run dev', 'npm run dev', 'ugly-app dev --watch'];
+  blocked.forEach((command, i) => {
+    it(`redirects \`${command}\` to dev_server_start in an ugly-app project`, async () => {
+      const dir = `/guard-block-${i}`;
+      resetMock({ files: { [`${dir}/.uglyapp`]: '{"projectId":"p"}' } });
+      const out = await dispatchTool('bash', { command, description: 'run dev' }, { projectDir: dir });
+      expect(out).toMatch(/dev_server_start/);
+      // The blocking command must NOT have been spawned.
+      expect(mockCalls().find((c) => c.channel === 'process.spawn')).toBeUndefined();
+    });
+  });
+
+  it('does not block non-dev commands (e.g. `pnpm dlx ugly-app doctor`)', async () => {
+    const dir = '/guard-allow-doctor';
+    resetMock({ files: { [`${dir}/.uglyapp`]: '{"projectId":"p"}' }, proc: () => ({ stdout: 'ok\n', code: 0 }) });
+    await dispatchTool('bash', { command: 'pnpm dlx ugly-app doctor', description: 'doctor' }, { projectDir: dir });
+    expect(mockCalls().find((c) => c.channel === 'process.spawn')).toBeDefined();
+  });
+
+  it('does not block `pnpm run dev-check` (only exact `dev`)', async () => {
+    const dir = '/guard-allow-devcheck';
+    resetMock({ files: { [`${dir}/.uglyapp`]: '{"projectId":"p"}' }, proc: () => ({ stdout: 'ok\n', code: 0 }) });
+    await dispatchTool('bash', { command: 'pnpm run dev-check', description: 'dev-check' }, { projectDir: dir });
+    expect(mockCalls().find((c) => c.channel === 'process.spawn')).toBeDefined();
+  });
+
+  it('does not block dev-server commands in a non-ugly-app project', async () => {
+    const dir = '/guard-plain-project';
+    resetMock({ files: { [`${dir}/package.json`]: '{}' }, proc: () => ({ stdout: 'ok\n', code: 0 }) });
+    await dispatchTool('bash', { command: 'pnpm dev', description: 'run dev' }, { projectDir: dir });
+    expect(mockCalls().find((c) => c.channel === 'process.spawn')).toBeDefined();
+  });
+});
+
 describe('full agent loop over the UglyNative mock', () => {
   it('a scripted write turn actually writes through the native mock', async () => {
     // Scripted model: turn 1 writes a file; turn 2 ends with text.

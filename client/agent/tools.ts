@@ -189,8 +189,12 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       if (ctx?.sessionId) markDirty(ctx.sessionId, path);
       return `Edited ${relativizePath(ctx, path)}`;
     }
-    case 'bash':
-      return runBash(str(p.command ?? ''), await sandboxOptFor(ctx), ctx, p.working_dir != null ? str(p.working_dir) : undefined);
+    case 'bash': {
+      const command = str(p.command ?? '');
+      const guard = await devServerBashGuard(command, ctx);
+      if (guard) return guard;
+      return runBash(command, await sandboxOptFor(ctx), ctx, p.working_dir != null ? str(p.working_dir) : undefined);
+    }
     case 'database':
       return runDb(ctx, 'getQuery', {
         collection: String(p.collection),
@@ -301,6 +305,33 @@ async function sandboxOptFor(
   const projectId = await readProjectId(projectDir);
   if (!projectId) return undefined;
   return { projectId, projectDir, mode };
+}
+
+/** Matches a bash command whose intent is to start the (forever-blocking) dev
+ *  server: `ugly-app dev` (with any `npx` / `pnpm dlx` / `pnpm exec` prefix), or
+ *  the `dev` package script via pnpm / npm / yarn. The `(?![\w-])` tail keeps
+ *  `pnpm run dev-check`, `devDependencies`, etc. from matching. */
+const DEV_SERVER_CMD_RE =
+  /(?:\bugly-app\s+dev(?![\w-]))|(?:\b(?:pnpm|yarn)\s+(?:run\s+)?dev(?![\w-]))|(?:\bnpm\s+run\s+dev(?![\w-]))/;
+
+/** Intercept attempts to launch the dev server via `bash`. Running `ugly-app dev`
+ *  / `pnpm dev` from bash blocks forever (the process never exits) and runs
+ *  without the session's bundled-postgres DATABASE_URL/PORT, so it fails on
+ *  DATABASE_URL or wedges the turn. The `dev_server_start` tool is the supported
+ *  path — non-blocking, and boots via the Preview panel with the right env. Only
+ *  fires for ugly-app projects (where `dev_server_start` exists); returns null
+ *  otherwise so the command runs normally. */
+async function devServerBashGuard(command: string, ctx?: ToolContext): Promise<string | null> {
+  if (!DEV_SERVER_CMD_RE.test(command)) return null;
+  const dir = ctx?.projectDir;
+  if (!dir || !(await isUglyAppProject(dir))) return null;
+  return (
+    'Refusing to start the dev server from bash — it blocks forever (the process ' +
+    "never exits) and runs without this session's DATABASE_URL/PORT, so it fails or " +
+    'hangs the turn. Use the `dev_server_start` tool instead: it boots `pnpm dev` ' +
+    'non-blocking via the Preview panel with the bundled-postgres DATABASE_URL + PORT ' +
+    'already wired, then check `dev_server_logs` / `dev_server_errors` for boot progress.'
+  );
 }
 
 /** Run a shell command through the daemon (POSIX `sh -c`), resolving with the

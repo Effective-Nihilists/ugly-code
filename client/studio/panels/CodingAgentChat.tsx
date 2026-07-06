@@ -5650,6 +5650,15 @@ function CodebaseReadinessPill({
       'reports ready. If it stays here for many minutes, the indexer likely',
       'failed to install; reopen the project or report it from this session.',
     );
+  } else if (tone === 'active') {
+    detailLines.push(
+      '',
+      'Analysis runs on your machine and can take several minutes on a large',
+      'repo (or on Windows, where the indexer is slower). The agent keeps',
+      'working while this runs — semantic search + architecture-aware answers',
+      'sharpen once it reaches ready. If it never gets there, reopen the',
+      'project or report it from this session.',
+    );
   } else if (nativeMissing) {
     detailLines.length = 0;
     detailLines.push(

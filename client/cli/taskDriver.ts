@@ -53,7 +53,7 @@ export async function runTurn(
   // agent (its own tools); anything else runs the ugly.bot agent core. Both write
   // cost/turns to the fs session store, so the comparison metrics stay uniform.
   const model = (selection as { model?: string } | undefined)?.model;
-  if (isClaudeCliModel(model)) {
+  if (model && isClaudeCliModel(model)) {
     await runClaudeCliTurn(sessionId, text, model, onMsg as unknown as Parameters<typeof runClaudeCliTurn>[3]);
     return;
   }
