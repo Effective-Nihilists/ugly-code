@@ -6,7 +6,11 @@ const { runClientAgentTurn, setSessionStore } = vi.hoisted(() => ({
 }));
 vi.mock('../../../client/studio/agent/clientAgent', () => ({ runClientAgentTurn }));
 vi.mock('../../../client/studio/projectPath', () => ({ setActiveProjectPath: vi.fn() }));
-vi.mock('ugly-app/native', () => ({ createNodeUglyNative: () => ({}), native: { fs: {} } }));
+vi.mock('ugly-app/native', () => ({
+  createNodeUglyNative: () => ({}),
+  permissions: { request: vi.fn(async () => ({})) },
+  native: { fs: {} },
+}));
 vi.mock('../../../client/studio/agent/sessionStore', () => ({ setSessionStore }));
 vi.mock('../../../client/studio/agent/fsSessionStore', () => ({ makeFsSessionStore: () => ({ tag: 'fs' }) }));
 
@@ -14,7 +18,7 @@ import { bootDriver, runTurn } from '../../../client/cli/taskDriver';
 
 describe('taskDriver', () => {
   it('installs the fs store on boot and forwards turn messages', async () => {
-    bootDriver({ projectPath: '/p', sessionId: 's', origin: 'https://x', token: 'T', storeRoot: '/root' });
+    await bootDriver({ projectPath: '/p', sessionId: 's', origin: 'https://x', token: 'T', storeRoot: '/root' });
     expect(setSessionStore).toHaveBeenCalledWith({ tag: 'fs' });
     const msgs: unknown[] = [];
     await runTurn('s', 'hi', (m) => msgs.push(m));
@@ -25,7 +29,7 @@ describe('taskDriver', () => {
   it('fetch shim absolutizes /api paths against the origin with the auth cookie', async () => {
     const realFetch = vi.fn(async () => new Response('{}'));
     (globalThis as { fetch: typeof fetch }).fetch = realFetch as unknown as typeof fetch;
-    bootDriver({ projectPath: '/p', sessionId: 's', origin: 'https://api.example', token: 'TOK', storeRoot: '/root' });
+    await bootDriver({ projectPath: '/p', sessionId: 's', origin: 'https://api.example', token: 'TOK', storeRoot: '/root' });
     await globalThis.fetch('/api/agentStep', { method: 'POST' });
     const [url, init] = realFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api.example/api/agentStep');

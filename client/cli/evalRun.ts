@@ -1,11 +1,15 @@
 // The eval run: clone the task's fixture, drive the agent's turns in-process, then
 // grade the on-disk project with the existing gradeProject. Turn data is persisted
 // by the CLI's filesystem session store (installed in bootDriver), not the server.
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { getEvalTask, firstTurnPrompt } from '../studio/evals/registry';
 import { gradeProject, type GradeDeps } from '../studio/evals/grader';
 import type { EvalGradeResult } from '../studio/shared/api';
 import { spawnCollect } from '../agent/tools/spawn';
 import { bootDriver, runTurn } from './taskDriver';
+
+const execFileP = promisify(execFile);
 
 const ZERO_TOTALS: EvalGradeResult['runTotals'] = {
   durationMs: 0,
@@ -29,9 +33,11 @@ async function cloneFixture(taskName: string, repoUrl: string | undefined): Prom
     : `mkdir -p "${base}" && cd "${base}" && ` +
       `printf '{"name":"%s","version":"0.0.0","private":true}\\n' "${safe}" > package.json && ` +
       `${seedGit} && pwd`;
-  const res = await spawnCollect('bash', ['-lc', cmd], {});
-  const path = res.stdout.trim().split('\n').pop() ?? '';
-  if (!path) throw new Error(`fixture clone failed: ${res.stderr.slice(0, 300)}`);
+  // Node child_process (not native.process) — this is CLI infra that runs before
+  // the agent's UglyNative + permissions are installed.
+  const { stdout } = await execFileP('bash', ['-lc', cmd], { maxBuffer: 16 * 1024 * 1024 });
+  const path = stdout.trim().split('\n').pop() ?? '';
+  if (!path) throw new Error('fixture clone failed (no path printed)');
   return path;
 }
 
@@ -57,7 +63,7 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
   const projectPath = await cloneFixture(task.name, task.repoUrl);
   const sessionId = `cli:${task.name}:${Date.now()}`;
   const storeRoot = `${process.env.HOME ?? '.'}/.ugly-code/session`;
-  bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
+  await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
   for (const turn of turns) {
     await runTurn(sessionId, turn, () => { /* transcript persisted by the fs store */ });

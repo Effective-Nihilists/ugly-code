@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
-const { gradeProject, bootDriver, runTurn, spawnCollect } = vi.hoisted(() => ({
+const { gradeProject, bootDriver, runTurn, execFile } = vi.hoisted(() => ({
   gradeProject: vi.fn(async () => ({ score: 1, scoreMax: 1 })),
-  bootDriver: vi.fn(),
+  bootDriver: vi.fn(async () => {}),
   runTurn: vi.fn(async () => {}),
-  spawnCollect: vi.fn(async () => ({ stdout: '/tmp/demo-1', stderr: '', code: 0 })),
+  execFile: vi.fn((_cmd: string, _args: string[], _opts: unknown, cb: (e: unknown, r: { stdout: string; stderr: string }) => void) => cb(null, { stdout: '/tmp/demo-1', stderr: '' })),
 }));
 
 vi.mock('../../../client/studio/evals/registry', () => ({
@@ -16,7 +16,8 @@ vi.mock('../../../client/studio/evals/registry', () => ({
 }));
 vi.mock('../../../client/studio/evals/grader', () => ({ gradeProject }));
 vi.mock('../../../client/cli/taskDriver', () => ({ bootDriver, runTurn }));
-vi.mock('../../../client/agent/tools/spawn', () => ({ spawnCollect }));
+vi.mock('../../../client/agent/tools/spawn', () => ({ spawnCollect: vi.fn() }));
+vi.mock('node:child_process', () => ({ execFile }));
 vi.mock('ugly-app/native', () => ({ native: { fs: {} } }));
 
 import { runEval } from '../../../client/cli/evalRun';
@@ -24,7 +25,7 @@ import { runEval } from '../../../client/cli/evalRun';
 describe('runEval', () => {
   it('clones, runs the first turn, and grades', async () => {
     const res = await runEval({ taskName: 'demo', origin: 'https://x', token: 'T' });
-    expect(spawnCollect).toHaveBeenCalled();
+    expect(execFile).toHaveBeenCalled();                     // fixture clone (node child_process)
     expect(bootDriver).toHaveBeenCalled();
     expect(runTurn).toHaveBeenCalledWith(expect.any(String), 'do it', expect.any(Function));
     expect(gradeProject).toHaveBeenCalled();

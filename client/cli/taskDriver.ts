@@ -1,7 +1,7 @@
 // In-process boot of the coding-agent for the CLI — mirrors coding-task.ts's setup
 // (Node UglyNative + /api/* fetch shim + session store) but runs in the CLI process
 // instead of a task child. No Electron, no Studio host.
-import { createNodeUglyNative } from 'ugly-app/native';
+import { createNodeUglyNative, permissions } from 'ugly-app/native';
 import { setActiveProjectPath } from '../studio/projectPath';
 import { runClientAgentTurn } from '../studio/agent/clientAgent';
 import { setSessionStore } from '../studio/agent/sessionStore';
@@ -9,9 +9,17 @@ import { makeFsSessionStore } from '../studio/agent/fsSessionStore';
 
 export interface DriverCfg { projectPath: string; sessionId: string; origin: string; token: string; storeRoot: string }
 
-export function bootDriver(cfg: DriverCfg): void {
+// The dev tools the agent's tools (bash/grep/lsp/finish) spawn. Mirrors the
+// studio's grant in useSocket.ts. Granular by command name.
+const AGENT_TOOLS = ['bash', 'sh', 'node', 'git', 'npm', 'npx', 'pnpm', 'rg', 'grep', 'python3', 'uv'];
+
+export async function bootDriver(cfg: DriverCfg): Promise<void> {
   const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
   g.UglyNative = createNodeUglyNative();
+  // The Node UglyNative gates process/fs behind the permission system; grant them
+  // for the CLI (a trusted local process) so the agent's tools can spawn + edit.
+  type GrantReq = Parameters<typeof permissions.request>[0];
+  await permissions.request({ fs: 'full', process: AGENT_TOOLS } as unknown as GrantReq).catch(() => undefined);
   if (!g.localStorage) {
     const mem = new Map<string, string>();
     g.localStorage = {
