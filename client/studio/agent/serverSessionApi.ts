@@ -10,6 +10,7 @@
 import { native } from 'ugly-app/native';
 import type { ContentPart } from 'ugly-app/agent/client';
 import type { AgentMessage } from '../../../shared/agent';
+import { setSessionStore, getSessionStore, type SessionStore } from './sessionStore';
 
 async function api<T>(name: string, input: unknown): Promise<T | null> {
   try {
@@ -125,48 +126,27 @@ export interface SessionListRow {
   updated: number;
 }
 
-export const sessionApi = {
-  upsert: (input: {
-    sessionId: string;
-    projectId: string;
-    title?: string;
-    kind?: 'main' | 'session';
-    model?: string;
-    status?: 'running' | 'idle' | 'done' | 'error';
-    messageCount?: number;
-    costUsd?: number;
-  }): Promise<{ ok: boolean } | null> => api('codingSessionUpsert', input),
+// The server-backed store (the default). `sessionApi` below delegates to whichever
+// store is active — swap it via setSessionStore (e.g. the CLI's filesystem store).
+const serverSessionStore: SessionStore = {
+  upsert: (input) => api('codingSessionUpsert', input),
+  appendMessage: (input) => api('codingSessionAppendMessage', input),
+  compact: (input) => api('codingSessionCompact', input),
+  listMessages: (input) => api('codingSessionListMessages', input),
+  list: (input) => api('codingSessionList', input),
+  archive: (input) => api('codingSessionArchive', input),
+  clearMessages: (input) => api('codingSessionClearMessages', input),
+};
+setSessionStore(serverSessionStore);
 
-  appendMessage: (input: {
-    sessionId: string;
-    seq: number;
-    role: StoredRole;
-    content: string;
-  }): Promise<{ ok: boolean } | null> => api('codingSessionAppendMessage', input),
-
-  compact: (input: {
-    sessionId: string;
-    droppedIds: string[];
-    summaryId: string;
-    summarySeq: number;
-    summaryText: string;
-  }): Promise<{ ok: boolean } | null> => api('codingSessionCompact', input),
-
-  listMessages: (input: {
-    sessionId: string;
-    limit?: number;
-    includeCompacted?: boolean;
-  }): Promise<{ messages: StoredMessageRow[] } | null> => api('codingSessionListMessages', input),
-
-  list: (input: { projectId: string }): Promise<{ sessions: SessionListRow[] } | null> =>
-    api('codingSessionList', input),
-
-  archive: (input: { sessionId: string }): Promise<{ ok: boolean } | null> =>
-    api('codingSessionArchive', input),
-
-  /** `/clear`: wipe the session's persisted transcript so a resume starts empty. */
-  clearMessages: (input: { sessionId: string }): Promise<{ ok: boolean; deleted: number } | null> =>
-    api('codingSessionClearMessages', input),
+export const sessionApi: SessionStore = {
+  upsert: (i) => getSessionStore().upsert(i),
+  appendMessage: (i) => getSessionStore().appendMessage(i),
+  compact: (i) => getSessionStore().compact(i),
+  listMessages: (i) => getSessionStore().listMessages(i),
+  list: (i) => getSessionStore().list(i),
+  archive: (i) => getSessionStore().archive(i),
+  clearMessages: (i) => getSessionStore().clearMessages(i),
 };
 
 /** Turn a stored transcript row back into a runAgent working-context message (for resume). */
