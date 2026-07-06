@@ -65,7 +65,8 @@ export async function main(argv: string[]): Promise<number> {
       });
       const model = flag(argv, '--model');
       const pattern = flag(argv, '--pattern');
-      const res = await runEval({ taskName, origin: auth.origin, token: auth.token, ...(model ? { model } : {}), ...(pattern ? { pattern } : {}) });
+      const toolset = flag(argv, '--toolset');
+      const res = await runEval({ taskName, origin: auth.origin, token: auth.token, ...(model ? { model } : {}), ...(pattern ? { pattern } : {}), ...(toolset ? { toolset } : {}) });
       process.stdout.write(`${taskName}: ${res.score}/${res.scoreMax}\n`);
       return res.score >= res.scoreMax ? 0 : 1;
     }

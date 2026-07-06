@@ -50,7 +50,16 @@ import { decorateForStep, renderStepDecoration, filterToolsForStep } from './pat
 import type { Step } from './patterns/types';
 import { deriveCriteria, gradeAgainstCriteria, buildRevisePrompt, type Judge } from './patterns/judge';
 import { classifyForAuto, shouldRunEngine } from './patterns/classify';
+import { filterToolsByToolset, type Toolset } from './toolsets';
 import { spawnCollect } from '../../agent/tools/spawn';
+
+// Per-session toolset override (e.g. the CLI's `--toolset no-python` A/B). Read by
+// the live `tools` getter; set before the first turn. Session-scoped map so it
+// survives independent of the SessionAgentState lifecycle.
+const toolsetBySession = new Map<string, Toolset>();
+export function setSessionToolset(sessionId: string, toolset: Toolset): void {
+  toolsetBySession.set(sessionId, toolset);
+}
 
 /** No-tools LLM completion for the criteria grader — the same governed,
  *  metered /api/agentStep endpoint the main loop + delegate use. */
@@ -651,8 +660,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     get tools() {
       const mode = state.modelMode.kind === 'group' ? 'group' : 'single';
       const isUglyApp = uglyAppBySession.get(sessionId) ?? false;
-      // Gate to the current SBV step's allow-list (no-op when no pattern step is active).
-      return filterToolsForStep(sessionToolSpecs({ mode, isUglyApp }), state.currentStep);
+      // Gate to the current SBV step's allow-list (no-op when no pattern step is
+      // active), then apply any session toolset override (e.g. --toolset no-python).
+      const stepGated = filterToolsForStep(sessionToolSpecs({ mode, isUglyApp }), state.currentStep);
+      return filterToolsByToolset(stepGated, toolsetBySession.get(sessionId));
     },
     toolHandlers: makeToolHandlers(sessionId),
     budget: { maxTurns: 12 },

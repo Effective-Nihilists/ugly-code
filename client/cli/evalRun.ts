@@ -9,6 +9,8 @@ import { gradeProject, type GradeDeps } from '../studio/evals/grader';
 import type { EvalGradeResult } from '../studio/shared/api';
 import { spawnCollect } from '../agent/tools/spawn';
 import { bootDriver, runTurn } from './taskDriver';
+import { setSessionToolset } from '../studio/agent/clientAgent';
+import { isToolset } from '../studio/agent/toolsets';
 
 const execFileP = promisify(execFile);
 
@@ -71,13 +73,14 @@ async function readRunTotals(storeRoot: string, sessionId: string): Promise<{ co
   }
 }
 
-export async function runEval(cfg: { taskName: string; origin: string; token: string; model?: string; pattern?: string }): Promise<EvalRunResult> {
+export async function runEval(cfg: { taskName: string; origin: string; token: string; model?: string; pattern?: string; toolset?: string }): Promise<EvalRunResult> {
   const task = getEvalTask(cfg.taskName);
   if (!task) throw new Error(`Unknown eval task: ${cfg.taskName}`);
   const projectPath = await cloneFixture(task.name, task.repoUrl);
   const sessionId = `cli:${task.name}:${Date.now()}`;
   const storeRoot = `${process.env.HOME ?? '.'}/.ugly-code/session`;
   await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
+  if (cfg.toolset && isToolset(cfg.toolset)) setSessionToolset(sessionId, cfg.toolset);
   const selection = cfg.pattern ? { patternMode: cfg.pattern as never } : undefined;
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
   for (const turn of turns) {

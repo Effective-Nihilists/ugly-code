@@ -3,7 +3,7 @@
 // cell. This is the machinery that produces the episodes' pro/con numbers.
 import { runEval, type EvalRunResult } from './evalRun';
 
-export interface CompareConfig { label: string; model?: string; pattern?: string }
+export interface CompareConfig { label: string; model?: string; pattern?: string; toolset?: string }
 export interface CompareSpec { tasks: string[]; configs: CompareConfig[] }
 export interface Cell extends EvalRunResult { task: string; config: string }
 export interface ComparisonResult { cells: Cell[]; ranAt: number }
@@ -12,7 +12,7 @@ export interface ComparisonResult { cells: Cell[]; ranAt: number }
 export async function runComparison(
   spec: CompareSpec,
   ctx: { origin: string; token: string; ranAt: number },
-  runOne: (cfg: { taskName: string; origin: string; token: string; model?: string; pattern?: string }) => Promise<EvalRunResult> = runEval,
+  runOne: (cfg: { taskName: string; origin: string; token: string; model?: string; pattern?: string; toolset?: string }) => Promise<EvalRunResult> = runEval,
 ): Promise<ComparisonResult> {
   const cells: Cell[] = [];
   for (const task of spec.tasks) {
@@ -24,6 +24,7 @@ export async function runComparison(
           token: ctx.token,
           ...(config.model ? { model: config.model } : {}),
           ...(config.pattern ? { pattern: config.pattern } : {}),
+          ...(config.toolset ? { toolset: config.toolset } : {}),
         });
         cells.push({ task, config: config.label, ...r });
       } catch (e) {
