@@ -4,6 +4,7 @@
 import { createNodeUglyNative, permissions } from 'ugly-app/native';
 import { setActiveProjectPath } from '../studio/projectPath';
 import { runClientAgentTurn } from '../studio/agent/clientAgent';
+import { isClaudeCliModel, runClaudeCliTurn } from '../studio/agent/claudeCliAgent';
 import { setSessionStore } from '../studio/agent/sessionStore';
 import { makeFsSessionStore } from '../studio/agent/fsSessionStore';
 
@@ -48,5 +49,13 @@ export async function runTurn(
   onMsg: (m: unknown) => void,
   selection?: Parameters<typeof runClientAgentTurn>[3],
 ): Promise<void> {
+  // Baseline dispatch: a claude-cli model runs the local Claude Code CLI as the
+  // agent (its own tools); anything else runs the ugly.bot agent core. Both write
+  // cost/turns to the fs session store, so the comparison metrics stay uniform.
+  const model = (selection as { model?: string } | undefined)?.model;
+  if (isClaudeCliModel(model)) {
+    await runClaudeCliTurn(sessionId, text, model, onMsg as unknown as Parameters<typeof runClaudeCliTurn>[3]);
+    return;
+  }
   await runClientAgentTurn(sessionId, text, onMsg, selection);
 }

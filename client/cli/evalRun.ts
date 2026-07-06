@@ -83,7 +83,9 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
   await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
   setSessionEval(sessionId, true); // every CLI run is an eval → criteria judge active under SBV
   if (cfg.toolset && isToolset(cfg.toolset)) setSessionToolset(sessionId, cfg.toolset);
-  const selection = cfg.pattern ? { patternMode: cfg.pattern as never } : undefined;
+  const selection = cfg.model || cfg.pattern
+    ? { ...(cfg.model ? { model: cfg.model } : {}), ...(cfg.pattern ? { patternMode: cfg.pattern as never } : {}) }
+    : undefined;
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
   for (const turn of turns) {
     await runTurn(sessionId, turn, () => { /* transcript persisted by the fs store */ }, selection);
