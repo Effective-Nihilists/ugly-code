@@ -13,6 +13,7 @@ import { ensureUv } from '../agent/binaries/resolve';
 import type { EvalGradeResult, SessionSnapshot } from '../studio/shared/api';
 import { spawnCollect } from '../agent/tools/spawn';
 import { bootDriver, runTurn } from './taskDriver';
+import { isClaudeCliModel } from '../studio/agent/claudeCliAgent';
 import { setSessionToolset, setSessionEval } from '../studio/agent/clientAgent';
 import { isToolset } from '../studio/agent/toolsets';
 import { appendRunHistory } from '../studio/evals/history';
@@ -207,9 +208,13 @@ export async function runEval(cfg: {
   // No-edit persistence guard (Phase-5 telemetry lever). Telemetry showed the cheap
   // model can investigate a hard task then end its turn — or crash mid-run — with
   // `turns-to-first-edit: never` (0 diff → 0 score) while passing cells all made edits.
-  // One bounded nudge, applied to every model, resumes the session and drives it to
-  // edit. A no-op when the agent already edited or the task is planning (no diff).
-  if (shouldNudgeForNoEdit(task.kind, analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).edits)) {
+  // One bounded nudge resumes the session and drives it to edit; a no-op when the
+  // agent already edited or the task is planning (no diff). SKIP for claude-cli models:
+  // the CLI persists its transcript after returning, so an edit-count check here races
+  // the flush and always reads 0 → a spurious extra invocation that inflates cost/turns.
+  // claude-cli (the Opus baseline) reliably edits and never needs the nudge anyway.
+  const usingClaudeCli = !!cfg.model && isClaudeCliModel(cfg.model);
+  if (!usingClaudeCli && shouldNudgeForNoEdit(task.kind, analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).edits)) {
     process.stderr.write(`[eval] ${task.name}: 0 edits after turns — sending no-edit nudge\n`);
     await runTurn(sessionId, NO_EDIT_NUDGE, onMsg, selection);
   }
