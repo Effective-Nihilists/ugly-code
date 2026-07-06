@@ -164,6 +164,7 @@ const fetchSocket: RunAgentSocket = {
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let result: unknown;
+    let gotResult = false;
     let done = false;
     while (!done) {
       const { value, done: rdone } = await reader.read();
@@ -184,6 +185,7 @@ const fetchSocket: RunAgentSocket = {
         }
         if (frame.type === '__result__') {
           result = frame.result;
+          gotResult = true;
           done = true;
           break;
         }
@@ -192,6 +194,14 @@ const fetchSocket: RunAgentSocket = {
         }
         onFrame(frame);
       }
+    }
+    // The stream ended without a terminal frame → the SSE response was cut mid-turn
+    // (server/edge closed the long-lived connection). Fail loudly instead of
+    // returning `undefined`, which the runAgent loop would deref as
+    // `resp.content` → a cryptic "Cannot read properties of undefined". A clear
+    // error routes through the normal error/retry path.
+    if (!gotResult) {
+      throw new Error('agent stream ended without a result (connection cut mid-turn)');
     }
     return result;
   },
