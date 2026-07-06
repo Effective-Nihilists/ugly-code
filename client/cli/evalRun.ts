@@ -150,6 +150,9 @@ async function readFinalText(storeRoot: string, sessionId: string): Promise<stri
 
 export interface EvalRunResult { score: number; scoreMax: number; costUsd: number; turns: number; resolvedPattern: string | null }
 
+/** Follow-up sent to resume a session that crashed mid-run (status:error). */
+const RESUME_NUDGE = 'Continue where you left off and complete the task.';
+
 /** Read the run's cost + turn count from the fs session store's metadata. */
 async function readRunTotals(storeRoot: string, sessionId: string): Promise<{ costUsd: number; turns: number }> {
   const dir = sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_');
@@ -189,21 +192,36 @@ export async function runEval(cfg: {
   // Capture the pattern the engine resolved to (echoed in every session_state
   // snapshot) so the CLI + e2e tests can assert classifier routing accuracy.
   let resolvedPattern: string | null = null;
+  let lastTurnErrored = false;
   const onMsg = (msg: unknown): void => {
-    const m = msg as { event?: { type?: string; message?: string; error?: string; payload?: { payload?: { resolvedPattern?: string | null } } } };
+    const m = msg as { event?: { type?: string; payload?: { payload?: { resolvedPattern?: string | null; type?: string; reason?: string } } } };
+    const inner = m.event?.payload?.payload;
     if (m.event?.type === 'session_state') {
-      const rp = m.event.payload?.payload?.resolvedPattern;
+      const rp = inner?.resolvedPattern;
       if (rp != null) resolvedPattern = rp;
     }
-    // Surface a run-terminating error (why a cell died) — otherwise the runner
-    // swallows it and the cell silently scores 0.
-    if (m.event?.type === 'error') {
-      process.stderr.write(`[eval:error] ${cfg.taskName}: ${m.event.message ?? m.event.error ?? 'agent run error'}\n`);
+    // The turn finished — remember whether it crashed (transient "terminated"),
+    // read synchronously from the event stream so the retry decision doesn't race
+    // the async metadata flush.
+    if (inner?.type === 'agent_finished') {
+      lastTurnErrored = inner.reason === 'error';
+      if (lastTurnErrored) process.stderr.write(`[eval:error] ${cfg.taskName}: agent turn ended in error\n`);
     }
   };
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
   for (const turn of turns) {
     await runTurn(sessionId, turn, onMsg, selection);
+  }
+  // Resume-on-error retries. The deployed agent core intermittently returns a
+  // transient "terminated" mid-run (status:error) on cheap models — it crashed at
+  // *different* points across runs, so it's flaky, not deterministic. Without this,
+  // a task the model was actively solving scores 0 purely on transport luck. Resume
+  // the crashed session up to 3× (claude-cli manages its own retries, so skip it).
+  const usingClaudeCli = !!cfg.model && isClaudeCliModel(cfg.model);
+  for (let attempt = 1; !usingClaudeCli && attempt <= 3 && lastTurnErrored; attempt++) {
+    process.stderr.write(`[eval] ${task.name}: turn crashed — resume attempt ${attempt}/3\n`);
+    lastTurnErrored = false;
+    await runTurn(sessionId, RESUME_NUDGE, onMsg, selection);
   }
   // No-edit persistence guard (Phase-5 telemetry lever). Telemetry showed the cheap
   // model can investigate a hard task then end its turn — or crash mid-run — with
@@ -213,7 +231,6 @@ export async function runEval(cfg: {
   // the CLI persists its transcript after returning, so an edit-count check here races
   // the flush and always reads 0 → a spurious extra invocation that inflates cost/turns.
   // claude-cli (the Opus baseline) reliably edits and never needs the nudge anyway.
-  const usingClaudeCli = !!cfg.model && isClaudeCliModel(cfg.model);
   if (!usingClaudeCli && shouldNudgeForNoEdit(task.kind, analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).edits)) {
     process.stderr.write(`[eval] ${task.name}: 0 edits after turns — sending no-edit nudge\n`);
     await runTurn(sessionId, NO_EDIT_NUDGE, onMsg, selection);

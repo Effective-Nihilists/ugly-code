@@ -780,6 +780,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         state.log.append({ ts: Date.now(), type: 'compaction', droppedCount: e.droppedCount, ...(e.summary ? { summary: e.summary } : {}) });
         if (e.summary) persistCompaction(state, sessionId, e.droppedCount, e.summary);
       } else if (e.type === 'error') {
+        console.error('[clientAgent:error]', sessionId, e.message);
         emitMessage(emitRef.current, sessionId, 'assistant', [
           { type: 'text', data: { text: '⚠ ' + e.message } },
           { type: 'finish' },
@@ -792,7 +793,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         safeEmit(emitRef.current, {
           type: 'codingAgent:event',
           sessionId,
-          event: { type: 'agent_event', payload: { payload: { type: 'agent_finished' } } },
+          event: { type: 'agent_event', payload: { payload: { type: 'agent_finished', reason: e.type } } },
         });
       }
     },
