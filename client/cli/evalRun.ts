@@ -32,8 +32,14 @@ async function cloneFixture(taskName: string, repoUrl: string | undefined): Prom
   const safe = taskName.replace(/[^a-zA-Z0-9_.-]/g, '_');
   const stamp = String(Date.now());
   const base = `$HOME/.ugly-code/eval-projects/${safe}-${stamp}`;
+  // Strip the grader's own code (`eval/`) from the agent's workspace before seeding —
+  // an integrity fix: the agent must not read checker.ts/check-helpers.ts and grade to
+  // the test. (It also trims ~34KB of context, though that alone did NOT stop the
+  // cheap-model "terminated" crashes on rrule — those are a deployed-proxy limit on
+  // long generation, not context size.) No grader path reads the fixture's eval/
+  // (vitestScore→test/, SBP→vendored metadata).
   const seedGit =
-    `rm -rf .git && git init -b main -q && git add -A && ` +
+    `rm -rf .git eval && git init -b main -q && git add -A && ` +
     `git -c user.email=eval@ugly.bot -c user.name=eval commit -q -m "eval: seed ${safe}"`;
   const cmd = repoUrl
     ? `mkdir -p "$HOME/.ugly-code/eval-projects" && ` +
