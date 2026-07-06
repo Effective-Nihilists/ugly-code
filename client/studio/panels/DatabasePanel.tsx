@@ -88,9 +88,12 @@ export interface DatabasePanelProps {
   forceProd?: boolean;
   forceDev?: boolean;
   hideHeader?: boolean;
+  /** Route the user to the Publish tab (shown when the prod DB isn't provisioned
+   *  yet because the project was never deployed). */
+  onPublish?: () => void;
 }
 
-export function DatabasePanel({ forceProd, forceDev }: DatabasePanelProps = {}) {
+export function DatabasePanel({ forceProd, forceDev, onPublish }: DatabasePanelProps = {}) {
   const [storedMode, setStoredMode] = useStudioUserSetting<DbMode>('panel.database.mode', 'dev');
   const mode: DbMode = forceProd ? 'prod' : forceDev ? 'dev' : storedMode;
   // `||` (not `??`) is intentional: either boolean flag being `true` pins the mode.
@@ -118,10 +121,50 @@ export function DatabasePanel({ forceProd, forceDev }: DatabasePanelProps = {}) 
     setWrites(true);
   }, [mode]);
 
+  // For the prod DB, gate on publish state. A project that was never deployed has
+  // no Neon database yet, so firing the query just surfaces a confusing raw
+  // "No prod database connection" error. Read `.uglyapp` deployTarget (as ProdPanel
+  // does) and prompt the user to publish first instead. Only relevant in prod mode.
+  const [prodDeployed, setProdDeployed] = useState<'checking' | 'yes' | 'no'>('checking');
+  useEffect(() => {
+    if (mode !== 'prod') return;
+    let cancelled = false;
+    setProdDeployed('checking');
+    const cwd = getActiveProjectPath();
+    if (!cwd) { setProdDeployed('no'); return; }
+    void (async () => {
+      try {
+        const ua = JSON.parse(await native.fs.readFile(`${cwd}/.uglyapp`)) as {
+          deployTarget?: { workerUrl?: string } | null;
+        };
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- set true by cleanup across the await; flow analysis can't see the async gap
+        if (cancelled) return;
+        setProdDeployed(ua.deployTarget?.workerUrl ? 'yes' : 'no');
+      } catch {
+        // No `.uglyapp` yet (ENOENT) = never published → prompt to publish.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- set true by cleanup across the await; flow analysis can't see the async gap
+        if (cancelled) return;
+        setProdDeployed('no');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mode]);
+
   // The DB panel runs its query script as a local node subprocess (both dev bundled
   // Postgres AND prod Neon go through `native.process.spawn`), so a browser tab with
   // no native host can't reach any database — show that instead of an empty list.
   if (!isNativeAvailable()) return <NativeHostRequired feature="The database panel" />;
+
+  if (mode === 'prod' && prodDeployed === 'checking') {
+    return (
+      <div data-id="database-panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Centered>Checking publish status…</Centered>
+      </div>
+    );
+  }
+  if (mode === 'prod' && prodDeployed === 'no') {
+    return <ProdPublishGate onPublish={onPublish} />;
+  }
 
   return (
     <div data-id="database-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -165,6 +208,32 @@ export function DatabasePanel({ forceProd, forceDev }: DatabasePanelProps = {}) 
         {tab === 'sql' && <SqlConsole mode={mode} writes={writes} onWantWrites={enableWrites} />}
         {tab === 'schema' && <SchemaView mode={mode} />}
       </div>
+    </div>
+  );
+}
+
+// Shown for the prod DB when the project was never deployed (no Neon yet).
+function ProdPublishGate({ onPublish }: { onPublish?: () => void }) {
+  return (
+    <div
+      data-id="database-panel"
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100%', gap: 12, padding: 24, textAlign: 'center',
+      }}
+    >
+      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+        No production database yet
+      </span>
+      <span style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 420, lineHeight: 1.5 }}>
+        This project hasn’t been published, so there’s no production database to
+        browse. Publish it first to provision Neon — then your prod data shows up here.
+      </span>
+      {onPublish && (
+        <button data-id="db-publish-first" onClick={onPublish} style={btnStyle('primary')}>
+          Publish project →
+        </button>
+      )}
     </div>
   );
 }

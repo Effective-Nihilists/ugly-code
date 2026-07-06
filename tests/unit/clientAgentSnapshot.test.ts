@@ -17,6 +17,8 @@ describe('composeSessionSnapshot (client-agent telemetry echo)', () => {
     cost: 0.5,
     promptTokens: 10,
     completionTokens: 20,
+    cacheReadTokens: 40,
+    cacheCreationTokens: 5,
     perModel: [],
     messageCount: 3,
   };
@@ -58,6 +60,8 @@ describe('composeSessionSnapshot (client-agent telemetry echo)', () => {
     expect(snap.cost).toBe(0.5);
     expect(snap.promptTokens).toBe(10);
     expect(snap.completionTokens).toBe(20);
+    expect(snap.cacheReadTokens).toBe(40);
+    expect(snap.cacheCreationTokens).toBe(5);
     expect(snap.messageCount).toBe(3);
     expect(snap.sessionId).toBe('abc'); // workspace:session split
     expect(snap.compositeId).toBe('cs:abc');

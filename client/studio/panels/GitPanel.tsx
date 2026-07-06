@@ -251,7 +251,7 @@ function parseDiff(diff: string): DiffRow[] {
 }
 
 function DiffView({ diff }: { diff: string }): React.ReactElement {
-  if (!diff) return <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Select a file to see its diff.</span>;
+  if (!diff) return <span style={{ display: 'block', padding: '8px 14px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Select a file to see its diff.</span>;
   const rows = parseDiff(diff);
   return (
     <div style={D.inner}>

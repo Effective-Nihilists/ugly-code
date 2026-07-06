@@ -725,6 +725,8 @@ const handlers: Record<string, Handler> = {
       cost: 0,
       promptTokens: 0,
       completionTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
       perModel: [],
       messageCount: 0,
     });

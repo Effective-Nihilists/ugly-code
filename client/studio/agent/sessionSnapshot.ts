@@ -35,6 +35,8 @@ export function composeSessionSnapshot(args: {
   cost: number;
   promptTokens: number;
   completionTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
   perModel: PerModelAcc[];
   messageCount: number;
 }): SessionSnapshot {
@@ -64,8 +66,8 @@ export function composeSessionSnapshot(args: {
     cost: args.cost,
     promptTokens: args.promptTokens,
     completionTokens: args.completionTokens,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
+    cacheReadTokens: args.cacheReadTokens,
+    cacheCreationTokens: args.cacheCreationTokens,
     perModel: args.perModel,
     messageCount: args.messageCount,
     // Complete the snapshot so the mount/cast consumer (applySnapshot) can read

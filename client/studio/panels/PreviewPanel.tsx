@@ -1,11 +1,29 @@
 import React from 'react';
-import { native, isNativeAvailable } from 'ugly-app/native';
+import { native, isNativeAvailable, permissions } from 'ugly-app/native';
 import { NativeHostRequired } from '../common/NativeHostRequired';
 import { sessionPort, getSessionWorkspace } from '../agent/sessionWorkspace';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { devServerSpawn } from './devServerCmd';
 import { persistDevLog, flushDevLog } from './devServerLog';
 import { readDevControl } from './devServerControl';
+
+// The desktop daemon gates `native.process.spawn` on (a) the binary being bundled
+// and (b) a granted `process` capability with the binary allowlisted. Without an
+// up-front grant the dev-server spawn (`bash -lc 'pnpm dev'`) is denied / can't
+// resolve `bash` — on Windows that left the Preview blank (dev server never
+// booted). Request the tools once, exactly as the scaffold + publish flows do.
+const DEV_TOOLS = ['bash', 'node', 'pnpm', 'npm', 'yarn', 'git', 'cloudflared'];
+let devToolsGrant: Promise<void> | null = null;
+function ensureDevToolsGranted(): Promise<void> {
+  if (!devToolsGrant) {
+    type GrantReq = Parameters<typeof permissions.request>[0];
+    devToolsGrant = permissions
+      .request({ fs: 'full', process: [...DEV_TOOLS] } as unknown as GrantReq)
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
+  return devToolsGrant;
+}
 
 // A live preview of the running dev server, in an iframe. Each session gets a
 // unique PORT (set in the env of its run_command spawns, so `pnpm dev` binds it),
@@ -29,12 +47,15 @@ interface DevServer {
   // cloudflared prints it (null until then, or if cloudflared is unavailable → localhost).
   tunnelProc: { kill: (sig?: string) => void } | null;
   tunnelUrl: string | null;
+  // Monotonic per-start id. Bumped at each startDev(); the async tool-grant
+  // continuation checks it so a superseding start/stop cancels the stale spawn.
+  startToken: number;
   subs: Set<() => void>;
 }
 const devServers = new Map<string, DevServer>();
 function getDev(key: string, port: number): DevServer {
   let d = devServers.get(key);
-  if (!d) { d = { proc: null, running: false, stopping: false, port, log: '', tunnelProc: null, tunnelUrl: null, subs: new Set() }; devServers.set(key, d); }
+  if (!d) { d = { proc: null, running: false, stopping: false, port, log: '', tunnelProc: null, tunnelUrl: null, startToken: 0, subs: new Set() }; devServers.set(key, d); }
   return d;
 }
 function notify(d: DevServer): void { for (const fn of d.subs) fn(); }
@@ -84,15 +105,22 @@ function startDev(key: string, projectPath: string, port: number, databaseUrl?: 
   const d = getDev(key, port);
   d.stopping = true; // killing any prior proc below is intentional, not a crash
   if (d.proc) { try { d.proc.kill(); } catch { /* already gone */ } }
+  d.proc = null;
   d.log = '';
   d.running = true;
   d.port = port;
+  const myToken = ++d.startToken; // this start's id; a later start/stop invalidates it
   notify(d);
   d.log = `$ pnpm dev  (PORT=${port})\n`;
   d.stopping = false;
   const spec = devServerSpawn(port, databaseUrl);
   const cmdStr = `${spec.cmd} ${spec.args.join(' ')}`;
-  try {
+  // Grant the process capability (bundles bash/pnpm/... onto the spawn PATH)
+  // before spawning — required on Windows, idempotent elsewhere. The grant is
+  // async; do the spawn once it resolves so the daemon doesn't deny it.
+  void ensureDevToolsGranted().then(() => {
+   if (d.startToken !== myToken) return; // superseded by a newer start/stop
+   try {
     const p = native.process.spawn(spec.cmd, spec.args, { cwd: projectPath, env: spec.env });
     d.proc = p;
     p.onStdout((c) => { d.log = (d.log + c).slice(-12000); notify(d); void persistDevLog(projectPath, d.log); });
@@ -116,18 +144,20 @@ function startDev(key: string, projectPath: string, port: number, databaseUrl?: 
     });
     // Publish it to a public https URL so the mobile preview can reach it.
     startTunnel(d, projectPath, port);
-  } catch (e) {
+   } catch (e) {
     // Synchronous throw — e.g. NativeUnavailable when no host shell is wired.
     console.error('[PreviewPanel:dev-server-threw]', JSON.stringify({ cmd: cmdStr, cwd: projectPath, port, error: e instanceof Error ? e.message : String(e) }));
     d.log += `[error: ${(e as Error).message}]\n`;
     d.running = false;
     notify(d);
-  }
+   }
+  });
 }
 function stopDev(key: string): void {
   const d = devServers.get(key);
   if (!d) return;
   d.stopping = true; // user-requested shutdown — suppress the onExit failure log
+  d.startToken++; // cancel any start whose async tool-grant is still pending
   if (d.proc) { try { d.proc.kill(); } catch { /* already gone */ } }
   if (d.tunnelProc) { try { d.tunnelProc.kill(); } catch { /* already gone */ } }
   d.running = false;

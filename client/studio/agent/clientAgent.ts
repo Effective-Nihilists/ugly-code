@@ -185,6 +185,8 @@ interface SessionAgentState {
   cost: number;
   promptTokens: number;
   completionTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
   messageCount: number;
   perModel: Map<string, PerModelAcc>;
   createdAt: number;
@@ -444,15 +446,21 @@ function accrue(s: SessionAgentState, t: MsgTelemetry): void {
   const model = t.model ?? s.model;
   const input = t.inputTokens ?? 0;
   const output = t.outputTokens ?? 0;
+  const cacheRead = t.cacheReadTokens ?? 0;
+  const cacheCreation = t.cacheCreationTokens ?? 0;
   const cost = t.costUsd ?? 0;
   s.cost += cost;
   s.promptTokens += input;
   s.completionTokens += output;
+  s.cacheReadTokens += cacheRead;
+  s.cacheCreationTokens += cacheCreation;
   const pm = s.perModel.get(model) ?? {
     model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, cost: 0, turnCount: 0,
   };
   pm.inputTokens += input;
   pm.outputTokens += output;
+  pm.cacheReadTokens += cacheRead;
+  pm.cacheCreationTokens += cacheCreation;
   pm.cost += cost;
   pm.turnCount += 1;
   s.perModel.set(model, pm);
@@ -478,6 +486,8 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
     cost: s.cost,
     promptTokens: s.promptTokens,
     completionTokens: s.completionTokens,
+    cacheReadTokens: s.cacheReadTokens,
+    cacheCreationTokens: s.cacheCreationTokens,
     perModel: [...s.perModel.values()],
     messageCount: s.messageCount,
   });
@@ -541,6 +551,8 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection):
     cost: 0,
     promptTokens: 0,
     completionTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
     messageCount: 0,
     perModel: new Map(),
     createdAt: Date.now(),

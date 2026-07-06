@@ -369,7 +369,7 @@ export default function StudioProjectPage({
           {tab === 'database' && <div style={S.paneScroll}><DatabasePanel forceDev /></div>}
           {/* Sidebar prod views */}
           {tab === 'publish' && <div style={S.pane}><ProdPanel /></div>}
-          {tab === 'prodDatabase' && <div style={S.paneScroll}><DatabasePanel forceProd /></div>}
+          {tab === 'prodDatabase' && <div style={S.paneScroll}><DatabasePanel forceProd onPublish={() => { setTab('publish'); }} /></div>}
           {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel forceProd /></div>}
           {tab === 'events' && <div style={S.paneScroll}><EventsPanel /></div>}
           {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel forceProd /></div>}
