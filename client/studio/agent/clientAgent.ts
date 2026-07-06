@@ -61,6 +61,16 @@ export function setSessionToolset(sessionId: string, toolset: Toolset): void {
   toolsetBySession.set(sessionId, toolset);
 }
 
+// Eval-session marker. The SBV criteria-grader judge (derive rubric → grade the
+// BUILD diff → REVISE) is a MEASUREMENT mechanism, not something to impose on
+// every user turn — it only runs for sessions triggered from the eval flow (the
+// CLI, or the studio eval popup). Normal studio SBV sessions advance on natural
+// stop with no grader. Mirrors the monolith's eval-session gate (SessionSnapshot.eval).
+const evalSessions = new Set<string>();
+export function setSessionEval(sessionId: string, isEval: boolean): void {
+  if (isEval) evalSessions.add(sessionId); else evalSessions.delete(sessionId);
+}
+
 /** No-tools LLM completion for the criteria grader — the same governed,
  *  metered /api/agentStep endpoint the main loop + delegate use. */
 const agentStepJudge: Judge = async (system, user, maxTokens = 512) => {
@@ -842,9 +852,12 @@ export async function runClientAgentTurn(
   if (pattern) {
     const ws = getSessionWorkspace(sessionId);
     const projectDir = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? null;
-    // Derive the acceptance rubric once (best-effort) so the BUILD→VERIFY judge
-    // has something to grade against. No criteria → the gate is a no-op.
-    const criteria = await deriveCriteria(userText, '', agentStepJudge).catch(() => []);
+    // The criteria-grader runs ONLY for eval-flow sessions (CLI / eval popup) —
+    // it's a measurement + REVISE-pressure mechanism, not a per-user-turn cost.
+    // Normal SBV sessions leave `criteria` empty → the BUILD gate is a no-op.
+    const criteria = evalSessions.has(sessionId)
+      ? await deriveCriteria(userText, '', agentStepJudge).catch(() => [])
+      : [];
     try {
       for (let i = 0; i < pattern.steps.length; i++) {
         const step = pattern.steps[i];
@@ -856,6 +869,9 @@ export async function runClientAgentTurn(
           for (let r = 0; r < MAX_REVISE; r++) {
             const diff = await sessionGitDiff(projectDir);
             const grade = await gradeAgainstCriteria(userText, criteria, diff, agentStepJudge);
+            // Surface the per-criterion verdicts so the eval scorecard can render
+            // them (the monolith kept these internal; here they're first-class).
+            emit({ type: 'codingAgent:event', sessionId, event: { type: 'criteria_verdicts', payload: { verdicts: grade.verdicts, failing: grade.failing } } } as unknown as Parameters<typeof emit>[0]);
             if (!grade.parsed || grade.failing.length === 0) break;
             await state.controller.send(`${renderStepDecoration(step)}\n\n${buildRevisePrompt(grade.failing)}`);
           }

@@ -9,7 +9,7 @@ import { gradeProject, type GradeDeps } from '../studio/evals/grader';
 import type { EvalGradeResult } from '../studio/shared/api';
 import { spawnCollect } from '../agent/tools/spawn';
 import { bootDriver, runTurn } from './taskDriver';
-import { setSessionToolset } from '../studio/agent/clientAgent';
+import { setSessionToolset, setSessionEval } from '../studio/agent/clientAgent';
 import { isToolset } from '../studio/agent/toolsets';
 import { appendRunHistory } from '../studio/evals/history';
 
@@ -81,6 +81,7 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
   const sessionId = `cli:${task.name}:${Date.now()}`;
   const storeRoot = `${process.env.HOME ?? '.'}/.ugly-code/session`;
   await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
+  setSessionEval(sessionId, true); // every CLI run is an eval → criteria judge active under SBV
   if (cfg.toolset && isToolset(cfg.toolset)) setSessionToolset(sessionId, cfg.toolset);
   const selection = cfg.pattern ? { patternMode: cfg.pattern as never } : undefined;
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
