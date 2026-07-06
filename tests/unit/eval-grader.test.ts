@@ -157,4 +157,19 @@ describe('eval grader — deterministic gates', () => {
     expect(r.scoreMax).toBe(1);
     expect(r.score).toBe(1);
   });
+
+  it('no gates + judge + successCriteria → 0–5 rubric score (round(5·passed/total))', async () => {
+    const judge = async (system: string): Promise<string> =>
+      system.includes('code-review judge')
+        ? '[{"id":"C1","pass":true,"reason":"ok","evidence":"f:1"},{"id":"C2","pass":true,"reason":"ok"},{"id":"C3","pass":true,"reason":"ok"},{"id":"C4","pass":false,"reason":"missing"}]'
+        : '[{"id":"C1","statement":"a","rationale":"x"},{"id":"C2","statement":"b","rationale":"y"},{"id":"C3","statement":"c","rationale":"z"},{"id":"C4","statement":"d","rationale":"w"}]';
+    const d: GradeDeps = { ...deps({ run: () => ({ out: '', code: 0 }) }), judge };
+    const r = await gradeProject(
+      { taskName: 't', projectPath: '/p', successCriteria: 'do the thing with A, B, C, and D', runTotals: RUN_TOTALS },
+      d,
+    );
+    expect(r.scoreMax).toBe(5);
+    expect(r.score).toBe(4); // 3/4 pass → round(3.75) = 4
+    expect(r.checks?.some((c) => c.name.includes('C4') && !c.passed)).toBe(true);
+  });
 });

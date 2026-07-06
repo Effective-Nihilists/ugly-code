@@ -58,8 +58,44 @@ const cliGradeDeps: GradeDeps = {
     const { native } = await import('ugly-app/native');
     return native.fs.exists(p);
   },
-  // judge omitted for Plan 1 (judge: gates stay pending); Plan 4 wires the /api/agentStep judge.
+  // 5-level grader judge — a STRONG model (Sonnet) grades the rubric, per CODING.md
+  // §17.13 ("critic quality is load-bearing"). Routed through /api/agentStep (the
+  // fetch shim absolutizes + auth's it); billed to the user, separate from agent cost.
+  judge: async (system, user) => {
+    const res = await fetch('/api/agentStep', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ input: { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], model: GRADER_JUDGE_MODEL } }),
+    });
+    const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
+    if (json.error) throw new Error(json.error);
+    const content = json.result?.message?.content;
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) return content.map((b) => (b as { text?: string }).text ?? '').join('');
+    return '';
+  },
 };
+
+/** Strong grader-judge model (overridable via env for cost experiments). */
+const GRADER_JUDGE_MODEL = process.env.UGLY_GRADER_MODEL ?? 'claude_sonnet_4_6';
+
+/** The agent's last assistant message text — evidence for judge grading of
+ *  planning / write-to-spec tasks whose output isn't a code diff. */
+async function readFinalText(storeRoot: string, sessionId: string): Promise<string | undefined> {
+  const dir = sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_');
+  try {
+    const raw = await readFile(`${storeRoot}/${dir}/messages.jsonl`, 'utf8');
+    const rows = raw.split('\n').filter(Boolean).map((l) => JSON.parse(l) as { role: string; content: string });
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i].role !== 'assistant') continue;
+      const parsed = JSON.parse(rows[i].content) as { content?: Array<{ type?: string; text?: string }> };
+      const text = (parsed.content ?? []).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('\n').trim();
+      if (text) return text;
+    }
+  } catch { /* none */ }
+  return undefined;
+}
 
 export interface EvalRunResult { score: number; scoreMax: number; costUsd: number; turns: number }
 
@@ -90,12 +126,14 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
   for (const turn of turns) {
     await runTurn(sessionId, turn, () => { /* transcript persisted by the fs store */ }, selection);
   }
+  const finalText = await readFinalText(storeRoot, sessionId);
   const result = await gradeProject(
     {
       taskName: task.name,
       projectPath,
       ...(task.gates ? { gates: task.gates } : {}),
       ...(task.successCriteria ? { successCriteria: task.successCriteria } : {}),
+      ...(finalText ? { finalText } : {}),
       runTotals: ZERO_TOTALS,
     },
     cliGradeDeps,

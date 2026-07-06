@@ -7,6 +7,7 @@
 
 import type { EvalGate } from './registry';
 import type { EvalGradeResult } from '../shared/api';
+import { deriveCriteria, gradeAgainstCriteria, type Judge as JudgeFn } from '../agent/patterns/judge';
 
 /** IO seam so the gate logic is unit-testable without a real daemon. */
 export interface GradeDeps {
@@ -43,6 +44,9 @@ export interface GradeInput {
   gates?: EvalGate[];
   /** Prose success criteria — given to the LLM judge as the rubric. */
   successCriteria?: string;
+  /** The agent's final assistant message — extra evidence for judge grading of
+   *  planning / write-to-spec tasks where the "output" isn't a code diff. */
+  finalText?: string;
   runTotals: EvalGradeResult['runTotals'];
 }
 
@@ -171,28 +175,61 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
     }
   }
 
-  // No gates defined → universal signals: tsc clean + the project's test script.
+  // No gates defined → 5-level judge rubric: derive an acceptance rubric from
+  // successCriteria, grade the diff (+ final message) per-criterion, map to 0–5.
+  // Falls back to the coarse tsc+npm signals when no judge is available (unit
+  // tests) or a rubric can't be derived.
   if (gates.length === 0) {
-    // Only count the tsc signal for actual TypeScript projects. A fixture without
-    // a tsconfig.json makes `npx tsc --noEmit` fail spuriously ("this is not the
-    // tsc command…"), which would dock a point the agent legitimately earned.
-    const isTsProject = await deps.exists(`${input.projectPath}/tsconfig.json`);
-    if (isTsProject) {
-      const r = await tsc();
-      tscExit = r.code;
-      tscErrors = countTscErrors(r.out);
-      const tscOk = r.code === 0 && tscErrors === 0;
-      if (!tscOk) tscErrorSample = r.out.slice(0, 800);
-      checks.push({ name: 'tsc clean', passed: tscOk, detail: tscOk ? undefined : `${tscErrors} type error(s)` });
-      detMax += 1;
-      if (tscOk) detScore += 1;
+    let graded = false;
+    if (deps.judge && input.successCriteria && input.successCriteria.trim().length > 0) {
+      const judgeFn: JudgeFn = (system, user) => deps.judge!(system, user);
+      try {
+        const criteria = await deriveCriteria(input.successCriteria, '', judgeFn);
+        if (criteria.length >= 2) {
+          const diff = await collectDiff(input.projectPath, deps);
+          const evidence = input.finalText
+            ? `${diff}\n\n## Agent's final message\n${input.finalText.slice(0, 8000)}`
+            : diff;
+          const g = await gradeAgainstCriteria(input.successCriteria, criteria, evidence, judgeFn);
+          if (g.parsed && g.verdicts.length > 0) {
+            const stmt = new Map(criteria.map((c) => [c.id, c.statement]));
+            for (const v of g.verdicts) {
+              checks.push({
+                name: `${v.id}: ${stmt.get(v.id) ?? ''}`.slice(0, 200),
+                passed: v.pass,
+                detail: v.reason + (v.evidence ? ` [${v.evidence}]` : ''),
+              });
+            }
+            const passed = g.verdicts.filter((v) => v.pass).length;
+            detScore = Math.round(5 * (passed / g.verdicts.length));
+            detMax = 5;
+            graded = true;
+          }
+        }
+      } catch (e) {
+        console.error('[grader:judge0to5]', JSON.stringify({ taskName: input.taskName, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      }
     }
-
-    const t = await deps.run('npm', ['test', '--silent'], input.projectPath);
-    const testsOk = t.code === 0;
-    checks.push({ name: 'tests pass', passed: testsOk, detail: testsOk ? undefined : `npm test exit ${t.code ?? 'null'}` });
-    detMax += 1;
-    if (testsOk) detScore += 1;
+    if (!graded) {
+      // Coarse fallback (0–2): tsc clean for TS projects + the test script. tsc is
+      // only counted when a tsconfig.json exists (else `npx tsc` fails spuriously).
+      const isTsProject = await deps.exists(`${input.projectPath}/tsconfig.json`);
+      if (isTsProject) {
+        const r = await tsc();
+        tscExit = r.code;
+        tscErrors = countTscErrors(r.out);
+        const tscOk = r.code === 0 && tscErrors === 0;
+        if (!tscOk) tscErrorSample = r.out.slice(0, 800);
+        checks.push({ name: 'tsc clean', passed: tscOk, detail: tscOk ? undefined : `${tscErrors} type error(s)` });
+        detMax += 1;
+        if (tscOk) detScore += 1;
+      }
+      const t = await deps.run('npm', ['test', '--silent'], input.projectPath);
+      const testsOk = t.code === 0;
+      checks.push({ name: 'tests pass', passed: testsOk, detail: testsOk ? undefined : `npm test exit ${t.code ?? 'null'}` });
+      detMax += 1;
+      if (testsOk) detScore += 1;
+    }
   }
 
   const judgeMax = judgeResults.reduce((a, j) => a + j.points, 0);
