@@ -36,6 +36,17 @@ describe('fsSessionStore', () => {
     expect(all?.messages.some((m) => m.compacted)).toBe(true);
   });
 
+  it('serializes concurrent appends without losing rows (read-modify-write race)', async () => {
+    files.clear();
+    const store = makeFsSessionStore('/root');
+    // Fire 8 appends concurrently — a naive read-modify-write would clobber most.
+    await Promise.all(
+      Array.from({ length: 8 }, (_, seq) => store.appendMessage({ sessionId: 's1', seq, role: 'user', content: `"${seq}"` })),
+    );
+    const listed = await store.listMessages({ sessionId: 's1' });
+    expect(listed?.messages.map((m) => m.seq)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+
   it('upsert writes metadata.json', async () => {
     files.clear();
     const store = makeFsSessionStore('/root');
