@@ -48,6 +48,33 @@ import { ensureSessionWorkspace, getSessionWorkspace } from './sessionWorkspace'
 import { getPattern } from './patterns/registry';
 import { decorateForStep, renderStepDecoration, filterToolsForStep } from './patterns/decorate';
 import type { Step } from './patterns/types';
+import { deriveCriteria, gradeAgainstCriteria, buildRevisePrompt, type Judge } from './patterns/judge';
+import { spawnCollect } from '../../agent/tools/spawn';
+
+/** No-tools LLM completion for the criteria grader — the same governed,
+ *  metered /api/agentStep endpoint the main loop + delegate use. */
+const agentStepJudge: Judge = async (system, user, maxTokens = 512) => {
+  const res = await fetch('/api/agentStep', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ input: { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], options: { maxTokens } } }),
+  });
+  const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
+  if (json.error) throw new Error(json.error);
+  const content = json.result?.message?.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.map((b) => (b as { text?: string }).text ?? '').join('');
+  return '';
+};
+
+/** The session's uncommitted diff vs the baseline commit (the agent's edits). */
+async function sessionGitDiff(dir: string | null): Promise<string> {
+  if (!dir) return '';
+  try { return (await spawnCollect('git', ['-C', dir, 'diff', 'HEAD'], {})).stdout; } catch { return ''; }
+}
+
+const MAX_REVISE = 2;
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
 import { composeSessionSnapshot, type PerModelAcc } from './sessionSnapshot';
 export { composeSessionSnapshot };
@@ -792,11 +819,26 @@ export async function runClientAgentTurn(
   // reads `state.currentStep` to gate the model's tool list per step.
   const pattern = state.patternMode === 'spec-build-verify' ? getPattern('spec-build-verify') : undefined;
   if (pattern) {
+    const ws = getSessionWorkspace(sessionId);
+    const projectDir = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? null;
+    // Derive the acceptance rubric once (best-effort) so the BUILD→VERIFY judge
+    // has something to grade against. No criteria → the gate is a no-op.
+    const criteria = await deriveCriteria(userText, '', agentStepJudge).catch(() => []);
     try {
       for (let i = 0; i < pattern.steps.length; i++) {
-        state.currentStep = pattern.steps[i];
-        const message = i === 0 ? decorateForStep(userText, pattern.steps[i]) : renderStepDecoration(pattern.steps[i]);
-        await state.controller.send(message);
+        const step = pattern.steps[i];
+        state.currentStep = step;
+        await state.controller.send(i === 0 ? decorateForStep(userText, step) : renderStepDecoration(step));
+        // Governed judge at BUILD→VERIFY: grade the diff against the rubric; if
+        // criteria fail, loop BUILD with a targeted REVISE (bounded) before VERIFY.
+        if (step.id === 'build' && criteria.length > 0) {
+          for (let r = 0; r < MAX_REVISE; r++) {
+            const diff = await sessionGitDiff(projectDir);
+            const grade = await gradeAgainstCriteria(userText, criteria, diff, agentStepJudge);
+            if (!grade.parsed || grade.failing.length === 0) break;
+            await state.controller.send(`${renderStepDecoration(step)}\n\n${buildRevisePrompt(grade.failing)}`);
+          }
+        }
       }
     } finally {
       state.currentStep = null;
