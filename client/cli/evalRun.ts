@@ -198,7 +198,11 @@ export async function runEval(cfg: {
   // Capture the pattern the engine resolved to (echoed in every session_state
   // snapshot) so the CLI + e2e tests can assert classifier routing accuracy.
   let resolvedPattern: string | null = null;
-  let lastTurnErrored = false;
+  // Object holder (not a plain `let`): the flag is flipped inside the onMsg
+  // callback below, so a bare boolean would be flow-narrowed to literal `false`
+  // and the retry-loop condition flagged "always falsy". A property read across
+  // the intervening runTurn() calls isn't narrowed.
+  const turnState = { errored: false };
   const onMsg = (msg: unknown): void => {
     const m = msg as { event?: { type?: string; payload?: { payload?: { resolvedPattern?: string | null; type?: string; reason?: string } } } };
     const inner = m.event?.payload?.payload;
@@ -210,8 +214,8 @@ export async function runEval(cfg: {
     // read synchronously from the event stream so the retry decision doesn't race
     // the async metadata flush.
     if (inner?.type === 'agent_finished') {
-      lastTurnErrored = inner.reason === 'error';
-      if (lastTurnErrored) process.stderr.write(`[eval:error] ${cfg.taskName}: agent turn ended in error\n`);
+      turnState.errored = inner.reason === 'error';
+      if (turnState.errored) process.stderr.write(`[eval:error] ${cfg.taskName}: agent turn ended in error\n`);
     }
   };
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
@@ -224,9 +228,9 @@ export async function runEval(cfg: {
   // a task the model was actively solving scores 0 purely on transport luck. Resume
   // the crashed session up to 3× (claude-cli manages its own retries, so skip it).
   const usingClaudeCli = !!cfg.model && isClaudeCliModel(cfg.model);
-  for (let attempt = 1; !usingClaudeCli && attempt <= 3 && lastTurnErrored; attempt++) {
+  for (let attempt = 1; !usingClaudeCli && attempt <= 3 && turnState.errored; attempt++) {
     process.stderr.write(`[eval] ${task.name}: turn crashed — resume attempt ${attempt}/3\n`);
-    lastTurnErrored = false;
+    turnState.errored = false;
     await runTurn(sessionId, RESUME_NUDGE, onMsg, selection);
   }
   // No-edit persistence guard (Phase-5 telemetry lever). Telemetry showed the cheap
