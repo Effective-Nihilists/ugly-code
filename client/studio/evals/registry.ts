@@ -33,6 +33,9 @@ export interface RawEvalTask {
   repoUrl?: string;
   ticketPath?: string;
   gates?: EvalGate[];
+  /** Host-side workspace prep run after clone (SBP tasks: uv venv + pip install)
+   *  so the agent + grader can run the repo's tests. */
+  reproSetup?: { commands: string[]; perCommandTimeoutMs?: number; env?: Record<string, string> };
 }
 
 export interface ListedEvalTask {

