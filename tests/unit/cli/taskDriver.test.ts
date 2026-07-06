@@ -6,9 +6,10 @@ const { runClientAgentTurn, setSessionStore } = vi.hoisted(() => ({
 }));
 vi.mock('../../../client/studio/agent/clientAgent', () => ({ runClientAgentTurn }));
 vi.mock('../../../client/studio/projectPath', () => ({ setActiveProjectPath: vi.fn() }));
+const { permsRequest } = vi.hoisted(() => ({ permsRequest: vi.fn(async () => ({})) }));
 vi.mock('ugly-app/native', () => ({
   createNodeUglyNative: () => ({}),
-  permissions: { request: vi.fn(async () => ({})) },
+  permissions: { request: permsRequest },
   native: { fs: {} },
 }));
 vi.mock('../../../client/studio/agent/sessionStore', () => ({ setSessionStore }));
@@ -20,6 +21,7 @@ describe('taskDriver', () => {
   it('installs the fs store on boot and forwards turn messages', async () => {
     await bootDriver({ projectPath: '/p', sessionId: 's', origin: 'https://x', token: 'T', storeRoot: '/root' });
     expect(setSessionStore).toHaveBeenCalledWith({ tag: 'fs' });
+    expect(permsRequest.mock.calls[0][0]).toMatchObject({ fs: 'full', process: 'full' });
     const msgs: unknown[] = [];
     await runTurn('s', 'hi', (m) => msgs.push(m));
     expect(runClientAgentTurn).toHaveBeenCalledWith('s', 'hi', expect.any(Function));

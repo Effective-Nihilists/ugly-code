@@ -9,17 +9,15 @@ import { makeFsSessionStore } from '../studio/agent/fsSessionStore';
 
 export interface DriverCfg { projectPath: string; sessionId: string; origin: string; token: string; storeRoot: string }
 
-// The dev tools the agent's tools (bash/grep/lsp/finish) spawn. Mirrors the
-// studio's grant in useSocket.ts. Granular by command name.
-const AGENT_TOOLS = ['bash', 'sh', 'node', 'git', 'npm', 'npx', 'pnpm', 'rg', 'grep', 'python3', 'uv'];
-
 export async function bootDriver(cfg: DriverCfg): Promise<void> {
   const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
   g.UglyNative = createNodeUglyNative();
-  // The Node UglyNative gates process/fs behind the permission system; grant them
-  // for the CLI (a trusted local process) so the agent's tools can spawn + edit.
+  // The Node UglyNative gates process/fs behind the permission system; grant full
+  // access for the CLI (a trusted local process). `process: 'full'` (not a name
+  // allowlist) is required because python_exec / grep spawn RESOLVED ABSOLUTE
+  // binary paths (e.g. ~/.ugly-bot/binaries/.../uv) a name-based grant can't match.
   type GrantReq = Parameters<typeof permissions.request>[0];
-  await permissions.request({ fs: 'full', process: AGENT_TOOLS } as unknown as GrantReq).catch(() => undefined);
+  await permissions.request({ fs: 'full', process: 'full' } as unknown as GrantReq).catch(() => undefined);
   if (!g.localStorage) {
     const mem = new Map<string, string>();
     g.localStorage = {
