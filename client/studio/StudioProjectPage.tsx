@@ -407,7 +407,7 @@ export default function StudioProjectPage({
           {tab === 'publish' && <div style={S.pane}><ProdPanel /></div>}
           {tab === 'prodDatabase' && <div style={S.paneScroll}><DatabasePanel forceProd onPublish={() => { setTab('publish'); }} /></div>}
           {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel forceProd onPublish={() => { setTab('publish'); }} /></div>}
-          {tab === 'events' && <div style={S.paneScroll}><EventsPanel /></div>}
+          {tab === 'events' && <div style={S.paneScroll}><EventsPanel onPublish={() => { setTab('publish'); }} /></div>}
           {tab === 'feedback' && <div style={S.paneScroll}><FeedbackPanel onPublish={() => { setTab('publish'); }} sessions={stored.map((s) => ({ compositeId: s.compositeId, title: s.title }))} onSendToAgent={sendFeedbackToAgent} /></div>}
           {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel forceProd /></div>}
           {tab === 'terminal' && <div style={S.pane}><TerminalPanel /></div>}

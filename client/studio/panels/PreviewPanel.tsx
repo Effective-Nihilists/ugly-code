@@ -4,9 +4,10 @@ import { NativeHostRequired } from '../common/NativeHostRequired';
 import { sessionPort, getSessionWorkspace } from '../agent/sessionWorkspace';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { devServerSpawn } from './devServerCmd';
-import { persistDevLog, flushDevLog } from './devServerLog';
+import { persistDevLog, flushDevLog, readDevLog } from './devServerLog';
 import { readDevControl } from './devServerControl';
 import { ansiToNodes, stripAnsi } from './ansi';
+import { registerFeedbackContextProvider } from 'ugly-app/client';
 
 // The desktop daemon gates `native.process.spawn` on (a) the binary being bundled
 // and (b) a granted `process` capability with the binary allowlisted. Without an
@@ -177,21 +178,36 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   });
   const [committed, setCommitted] = React.useState<string>(url);
   const [reloadKey, setReloadKey] = React.useState(0);
-  const [showLog, setShowLog] = React.useState(false);
+  // Remember whether the log was open across tab switches + reloads (the log DATA
+  // survives in the module map on a tab switch, and is restored from disk on a
+  // page reload — see below — but this toggle is component-local, so persist it).
+  const showLogKey = `ugly-studio:previewShowLog:${sessionId ?? 'none'}`;
+  const [showLog, setShowLog] = React.useState<boolean>(() => {
+    try { return localStorage.getItem(showLogKey) === '1'; } catch { return false; }
+  });
+  React.useEffect(() => {
+    try { localStorage.setItem(showLogKey, showLog ? '1' : '0'); } catch { /* ignore */ }
+  }, [showLog, showLogKey]);
   // Dev-server log view: resizable height + auto-scroll-to-bottom (pinned unless
   // the user scrolls up to read history).
   const [logHeight, setLogHeight] = React.useState(200);
+  // True while dragging the resize handle — disables the iframe's pointer events
+  // so it doesn't swallow the mousemove events (the reason the drag "didn't work":
+  // once the cursor crossed onto the iframe it captured the events).
+  const [resizing, setResizing] = React.useState(false);
   const logRef = React.useRef<HTMLDivElement>(null);
   const logPinnedRef = React.useRef(true);
   const startLogResize = React.useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     const startY = e.clientY;
     const startH = logHeight;
+    setResizing(true);
     const onMove = (ev: MouseEvent): void => {
       // Handle sits above the log (log is at the bottom), so dragging UP grows it.
       setLogHeight(Math.min(600, Math.max(80, startH + (startY - ev.clientY))));
     };
     const onUp = (): void => {
+      setResizing(false);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -207,6 +223,32 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
     forceRender();
     return () => { d.subs.delete(forceRender); };
   }, [devKey, port]);
+
+  // Restore the persisted dev-server log on a fresh page load: the module map is
+  // wiped on reload, so seed `dev.log` from the on-disk log if it's empty (the
+  // running server itself survives on the host). Skipped on a tab switch, where
+  // the in-memory log is still present.
+  React.useEffect(() => {
+    const proj = getActiveProjectPath();
+    if (!proj) return;
+    const d = getDev(devKey, port);
+    if (d.log) return;
+    void readDevLog(proj).then((text) => {
+      const dd = getDev(devKey, port);
+      if (text && !dd.log) { dd.log = text; notify(dd); }
+    });
+  }, [devKey, port]);
+
+  // Attach the dev-server log to any feedback filed from the preview tab, so a
+  // "preview not working" report carries the actual dev-server output.
+  React.useEffect(
+    () =>
+      registerFeedbackContextProvider('devServerLog', (): Record<string, string> => {
+        const d = getDev(devKey, port);
+        return d.log ? { devServerLog: stripAnsi(d.log).slice(-8000) } : {};
+      }),
+    [devKey, port],
+  );
 
   React.useEffect(() => {
     try {
@@ -352,7 +394,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
           <iframe
             key={`${reloadKey}:${committed}`}
             src={committed}
-            style={S.frame}
+            style={{ ...S.frame, ...(resizing ? { pointerEvents: 'none' as const } : {}) }}
             title="Preview"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           />

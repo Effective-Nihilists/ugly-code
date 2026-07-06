@@ -349,6 +349,33 @@ export function FilePanel({
     }
   }, [root, list, selected]);
 
+  // Rename a file/folder in place (same parent), then re-read the parent so the
+  // tree shows the new name. Follows the rename in the current selection.
+  const renameEntry = React.useCallback(async (entry: Entry): Promise<void> => {
+    const next = window.prompt(`Rename ${entry.isDir ? 'folder' : 'file'}:`, entry.name);
+    if (next == null) return;
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === entry.name) return;
+    if (/[\\/]/.test(trimmed)) { window.alert('Name can’t contain slashes.'); return; }
+    const slash = entry.path.lastIndexOf('/');
+    const parent = slash > 0 ? entry.path.slice(0, slash) : root;
+    const dest = `${parent}/${trimmed}`;
+    try {
+      await native.fs.rename(entry.path, dest);
+    } catch (e) {
+      window.alert(`Rename failed: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    if (parent) {
+      const ents = await list(parent).catch(() => [] as Entry[]);
+      setOpen((prev) => ({ ...prev, [parent]: ents, [entry.path]: undefined }));
+    }
+    if (selected === entry.path) setSelected(dest);
+    else if (entry.isDir && selected?.startsWith(`${entry.path}/`)) {
+      setSelected(selected.replace(entry.path, dest));
+    }
+  }, [root, list, selected]);
+
   const openMenu = (e: React.MouseEvent, entry: Entry): void => {
     e.preventDefault();
     e.stopPropagation();
@@ -360,6 +387,10 @@ export function FilePanel({
       label: `Open in ${fileManagerName}`,
       hidden: !isLocal,
       onClick: () => { void revealInFinder(entry.path); },
+    },
+    {
+      label: 'Rename…',
+      onClick: () => { void renameEntry(entry); },
     },
     {
       label: 'Delete',

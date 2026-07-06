@@ -119,7 +119,11 @@ export const DB_SCRIPT = [
   "  let up = false; try { run('pg_isready', ['-h','127.0.0.1','-p',String(PORT)]); up = true; } catch {}",
   // Windows postgres: no unix sockets, needs dynamic_shared_memory_type=windows. We connect over TCP.
   "  const pgStartOpts = process.platform === 'win32' ? ('-p '+PORT+' -c listen_addresses=127.0.0.1 -c dynamic_shared_memory_type=windows') : ('-p '+PORT+' -k /tmp -c listen_addresses=127.0.0.1');",
-  "  if (!up) run('pg_ctl', ['-D', PGDATA, '-o', pgStartOpts, '-l', path.join(os.homedir(),'.ugly-studio','pg.log'), '-w', 'start']);",
+  "  const PGLOG = path.join(os.homedir(),'.ugly-studio','pg.log');",
+  // Bound the wait with -t 30 so a server that never comes up (e.g. a Windows
+  // dsm/perm issue) surfaces an error in ~30s instead of hanging the panel; on
+  // failure attach the pg.log tail so the actual postgres startup error is visible.
+  "  if (!up) { try { run('pg_ctl', ['-D', PGDATA, '-o', pgStartOpts, '-l', PGLOG, '-w', '-t', '30', 'start']); } catch (e) { let tail=''; try { tail = fs.readFileSync(PGLOG,'utf8').slice(-1000); } catch {} throw new Error('postgres failed to start: ' + ((e&&e.message)||e) + (tail ? ' | pg.log: ' + tail : '')); } }",
   "  let dbName = 'dev'; try { dbName = 'p_' + JSON.parse(fs.readFileSync(path.join(proj, '.uglyapp'),'utf8')).projectId; } catch {}",
   "  dbName = dbName.replace(/[^a-zA-Z0-9_]/g, '_');",
   "  try { run('createdb', ['-h','127.0.0.1','-p',String(PORT),'-U','postgres', dbName]); } catch {}",

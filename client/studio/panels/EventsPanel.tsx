@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSocket } from '../hooks/useSocket';
+import { useProdDeployGate } from '../hooks/useProdDeployGate';
+import { ProdPublishGate } from './ProdPublishGate';
 
 interface EventItem {
   id: string;
@@ -30,17 +32,23 @@ const card: React.CSSProperties = {
 export interface EventsPanelProps {
   /** Hide the panel's own title bar when rendered inside an outer tab surface. */
   hideHeader?: boolean;
+  /** Route to Publish (shown when the project was never deployed — no prod events). */
+  onPublish?: () => void;
 }
 
-export function EventsPanel({ hideHeader }: EventsPanelProps = {}) {
+export function EventsPanel({ hideHeader, onPublish }: EventsPanelProps = {}) {
   const socket = useSocket();
   const [topEvents, setTopEvents] = useState<
     { eventName: string; count: number }[]
   >([]);
   const [recentEvents, setRecentEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Events live in the project's prod store — a never-deployed project has none,
+  // so gate on publish state (mirrors Errors).
+  const deploy = useProdDeployGate(true);
 
   useEffect(() => {
+    if (deploy !== 'deployed') { setLoading(false); return; }
     setLoading(true);
     Promise.all([
       socket.request('eventTopEvents', { limit: 20 }),
@@ -52,7 +60,11 @@ export function EventsPanel({ hideHeader }: EventsPanelProps = {}) {
       })
       .catch((e: unknown) => { console.error('[EventsPanel]', e); })
       .finally(() => { setLoading(false); });
-  }, []);
+  }, [deploy]);
+
+  if (deploy === 'undeployed') {
+    return <ProdPublishGate what="events" onPublish={onPublish} />;
+  }
 
   return (
     <div
