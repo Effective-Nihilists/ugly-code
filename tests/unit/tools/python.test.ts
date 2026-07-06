@@ -1,26 +1,28 @@
 // Task B2.2 python_exec + B2.3 python_libraries.
 import { describe, it, expect, vi } from 'vitest';
-// python_exec now provisions a runtime via ensurePython (uv-managed under
-// ~/.ugly-bot/binaries); stub it to the plain `python` command so these tests
-// exercise python_exec's own output handling, not binary provisioning.
-vi.mock('../../../client/agent/binaries/resolve', () => ({ ensurePython: () => Promise.resolve('python') }));
-import { resetMock, mockCalls } from '../../helpers/uglyNativeMock';
+
+const { runPythonOneShot } = vi.hoisted(() => ({ runPythonOneShot: vi.fn() }));
+vi.mock('../../../client/agent/tools/pythonOneShot', () => ({ runPythonOneShot }));
+
+import { resetMock } from '../../helpers/uglyNativeMock';
 import { pythonExecTool } from '../../../client/agent/tools/pythonExec';
 import { pythonLibrariesTool } from '../../../client/agent/tools/pythonLibraries';
 
 describe('python_exec', () => {
-  it('runs the snippet and returns stdout', async () => {
-    resetMock({ proc: (cmd, args) => ({ stdout: cmd === 'python' && args.includes('-c') ? 'hello\n' : '', code: 0 }) });
+  it('runs the snippet via the one-shot runner and returns its output', async () => {
+    runPythonOneShot.mockResolvedValue({ output: 'hello', isError: false, timedOut: false, exitCode: 0 });
     const out = await pythonExecTool.run({ code: "print('hello')" }, { projectDir: '/proj' });
-    expect(out).toContain('hello');
-    const spawn = mockCalls().find((c) => c.channel === 'process.spawn');
-    expect((spawn?.payload as { cmd: string }).cmd).toBe('python');
+    expect(out).toBe('hello');
+    expect(runPythonOneShot).toHaveBeenCalledWith(expect.objectContaining({ code: "print('hello')", cwd: '/proj' }));
   });
-  it('surfaces stderr + non-zero exit', async () => {
-    resetMock({ proc: () => ({ stdout: '', stderr: 'Traceback: boom\n', code: 1 }) });
-    const out = await pythonExecTool.run({ code: 'raise Exception()' }, undefined);
-    expect(out).toMatch(/boom/);
-    expect(out).toMatch(/exit 1/);
+  it('passes an explicit timeout_ms through as timeoutMs', async () => {
+    runPythonOneShot.mockResolvedValue({ output: 'x', isError: false, timedOut: false, exitCode: 0 });
+    await pythonExecTool.run({ code: 'x=1', timeout_ms: 5000 }, undefined);
+    expect(runPythonOneShot).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 5000 }));
+  });
+  it('requires code', async () => {
+    const out = await pythonExecTool.run({}, undefined);
+    expect(out).toMatch(/`code` is required/);
   });
 });
 
