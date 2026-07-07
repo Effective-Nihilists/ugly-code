@@ -107,6 +107,37 @@ const agentStepJudge: Judge = async (system, user, maxTokens = 512) => {
   return '';
 };
 
+// ── Always-on agent-loop debug telemetry ────────────────────────────────────
+// Every session streams a structured event log to
+// ~/.ugly-code/session/<id>/debug.jsonl (turn timing, tokens, stream errors +
+// how long the request ran before failing, retries, compaction). This is the
+// diagnostic surface: when a run fails (e.g. `proxy stream: operation aborted`),
+// the log shows WHERE and HOW LONG — so failures are root-caused from telemetry
+// rather than reproduced. Extend `debugLog(...)` call sites as new questions arise.
+const debugEvents = new Map<string, Record<string, unknown>[]>();
+const debugClock = new Map<string, { start: number; last: number }>();
+function debugTick(sessionId: string): { sinceStartMs: number; sinceLastMs: number } {
+  const now = Date.now();
+  const c = debugClock.get(sessionId) ?? { start: now, last: now };
+  const r = { sinceStartMs: now - c.start, sinceLastMs: now - c.last };
+  c.last = now;
+  debugClock.set(sessionId, c);
+  return r;
+}
+function debugLog(sessionId: string, kind: string, data: Record<string, unknown> = {}): void {
+  try {
+    const arr = debugEvents.get(sessionId) ?? [];
+    arr.push({ ts: Date.now(), kind, ...data });
+    debugEvents.set(sessionId, arr);
+    const home = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.HOME ?? '.';
+    const dir = `${home}/.ugly-code/session/${sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_')}`;
+    void native.fs
+      .mkdir(dir, true)
+      .then(() => native.fs.writeFile(`${dir}/debug.jsonl`, arr.map((e) => JSON.stringify(e)).join('\n') + '\n'))
+      .catch(() => { /* debug logging must never break a run */ });
+  } catch { /* never throw from telemetry */ }
+}
+
 /** The session's uncommitted diff vs the baseline commit (the agent's edits). */
 async function sessionGitDiff(dir: string | null): Promise<string> {
   if (!dir) return '';
@@ -852,6 +883,15 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         emitTelemetry(state, sessionId);
       }
       persistMeta(state, sessionId, 'running');
+      const clk = debugTick(sessionId);
+      debugLog(sessionId, 'turn', {
+        turnMs: clk.sinceLastMs, // wall-time of this model turn (since prior activity)
+        model: telemetry?.model ?? state.model,
+        contentChars: JSON.stringify(content).length,
+        toolCalls: content.filter((b) => b.type === 'tool_use').length,
+        ...(telemetry ? { inputTokens: telemetry.inputTokens, outputTokens: telemetry.outputTokens, cacheReadTokens: telemetry.cacheReadTokens, costUsd: telemetry.costUsd } : {}),
+        msgCount: state.messageCount,
+      });
     },
     onEvent: (e) => {
       if (e.type === 'tool_result') {
@@ -876,9 +916,15 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         }
       } else if (e.type === 'compaction') {
         state.log.append({ ts: Date.now(), type: 'compaction', droppedCount: e.droppedCount, ...(e.summary ? { summary: e.summary } : {}) });
+        debugLog(sessionId, 'compaction', { droppedCount: e.droppedCount, summaryChars: e.summary?.length ?? 0, promptTokens: state.promptTokens, cacheReadTokens: state.cacheReadTokens });
         if (e.summary) persistCompaction(state, sessionId, e.droppedCount, e.summary);
       } else if (e.type === 'error') {
         console.error('[clientAgent:error]', sessionId, e.message);
+        // KEY diagnostic: how long the failing request ran before erroring
+        // (sinceLastMs), the total session age, and the error text — this is what
+        // distinguishes a fixed-duration timeout/abort from a transient blip.
+        const clk = debugTick(sessionId);
+        debugLog(sessionId, 'error', { message: e.message, ranMsBeforeError: clk.sinceLastMs, sessionAgeMs: clk.sinceStartMs, model: state.model, msgCount: state.messageCount, promptTokens: state.promptTokens });
         emitMessage(emitRef.current, sessionId, 'assistant', [
           { type: 'text', data: { text: '⚠ ' + e.message } },
           { type: 'finish' },
@@ -886,6 +932,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         state.log.append({ ts: Date.now(), type: 'error', message: e.message });
       }
       if (e.type === 'done' || e.type === 'error' || e.type === 'aborted' || e.type === 'budget_exceeded') {
+        if (e.type !== 'error') debugLog(sessionId, 'finish', { reason: e.type, ...debugTick(sessionId) });
         state.log.append({ ts: Date.now(), type: 'finish', reason: e.type });
         persistMeta(state, sessionId, e.type === 'error' ? 'error' : 'idle');
         safeEmit(emitRef.current, {
@@ -945,6 +992,7 @@ export async function runClientAgentTurn(
   await ensureResumed(state, sessionId);
   state.messageCount += 1;
   state.log.append({ ts: Date.now(), type: 'user', text: userText });
+  debugLog(sessionId, 'send', { textChars: userText.length, model: state.model, msgCount: state.messageCount, maxContextTokens: compactionThreshold(state.model), ...debugTick(sessionId) });
   if (!state.taskText) state.taskText = userText; // pin the original task for summaries
   if (!state.titleSet) {
     state.title = userText.slice(0, 120);
