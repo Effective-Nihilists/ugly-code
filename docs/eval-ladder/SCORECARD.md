@@ -12,19 +12,19 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | **L1** Simple bug fix | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L2** Harder bug fix / small feature | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L3** Multi-file / discipline | 5.0 | 5.0 | 5.0 | 5/5 |
-| **L4** Agentic long-horizon | 4.8 | 2.6 | 4.4 | 4/5 |
+| **L4** Agentic long-horizon | 4.8 | 4.4 | 4.4 | 4/5 |
 | **L5** Real-world agentic | — | — | — | 0/5 |
 
 ### Totals (cost + wall-time, summed over graded cells)
 
 | Metric | opus | deepseek | glm |
 |---|---|---|---|
-| **Total cost** | $14.4294 | $0.1511 | $1.2312 |
-| **Total time** | 54m34s | 20m28s | 61m30s |
-| **Tokens (in / out)** | n/a | 176k / 77k | 130k / 197k |
-| **Cache-hit rate** | n/a | 92% | 91% |
+| **Total cost** | $14.4351 | $0.1502 | $1.0723 |
+| **Total time** | 54m40s | 20m49s | 52m58s |
+| **Tokens (in / out)** | n/a | 179k / 75k | 158k / 154k |
+| **Cache-hit rate** | n/a | 91% | 89% |
 
-**Grand total spend:** $15.8118
+**Grand total spend:** $15.6576
 
 ## Level 1 — Simple bug fix
 
@@ -63,12 +63,12 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 
 | Task | opus | deepseek | glm |
 |---|---|---|---|
-| `agentic-orm-migration-with-trap` | 10/10 · $1.7015 · 27t · 5m40s | 1/10 · $0.0149 · 12t · 1m56s | 5/10 · $0.1798 · 12t · 8m24s |
+| `agentic-orm-migration-with-trap` | 10/10 · $1.7015 · 27t · 5m40s | 5/10 · $0.0130 · 12t · 1m33s | 5/10 · $0.1702 · 12t · 7m02s |
 | `agentic-stack-trace-lying` | 5/5 · $0.5234 · 12t · 1m40s | 5/5 · $0.0085 · 12t · 1m25s | 5/5 · $0.0351 · 8t · 1m17s |
 | `impossible-rrule-iterator` | 5/5 · $3.6484 · 25t · 13m41s | 5/5 · $0.0531 · 12t · 4m34s | 5/5 · $0.3590 · 12t · 17m32s |
-| `impossible-lost-updates` | 4/5 · $4.4463 · 53t · 23m51s | 0/5 · $0.0134 · 12t · 2m29s | 5/5 · $0.3973 · 12t · 21m40s |
-| `vague-make-nicer` ℹ | 1/5 · $0.2188 · 6t · 30s | 5/5 · $0.0072 · 12t · 1m01s | 5/5 · $0.0389 · 9t · 1m32s |
-| **mean** (excl. ℹ) | 4.8/5 | 2.6/5 | 4.4/5 |
+| `impossible-lost-updates` | 4/5 · $4.4463 · 53t · 23m51s | 5/5 · $0.0144 · 12t · 3m13s | 5/5 · $0.2467 · 12t · 14m38s |
+| `vague-make-nicer` ℹ | 1/5 · $0.2244 · 6t · 36s | 5/5 · $0.0072 · 12t · 1m01s | 5/5 · $0.0402 · 8t · 1m24s |
+| **mean** (excl. ℹ) | 4.8/5 | 4.4/5 | 4.4/5 |
 
 ℹ informational (judge-only taste task, excluded from the mean).
 
