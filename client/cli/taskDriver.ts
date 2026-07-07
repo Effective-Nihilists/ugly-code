@@ -33,12 +33,44 @@ export async function bootDriver(cfg: DriverCfg): Promise<void> {
   }
   setActiveProjectPath(cfg.projectPath);
   setSessionStore(makeFsSessionStore(cfg.storeRoot));
+  // Debug telemetry for the agent's LLM calls: log every /api/agentTurn|agentStep
+  // request's HTTP status + timing, the ERROR BODY on non-2xx (the actual provider
+  // error), and network-level rejections. Retries surface here as repeated requests
+  // (runAgent retries with exponential backoff via a stable msgId), so the count of
+  // rows for one turn = the retry count. Written to session/<id>/fetch.jsonl.
+  const fetchDbgDir = `${cfg.storeRoot}/${cfg.sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_')}`;
+  const fetchDbg: Record<string, unknown>[] = [];
+  const flushFetchDbg = (): void => {
+    void import('node:fs/promises')
+      .then((fs) => fs.mkdir(fetchDbgDir, { recursive: true }).then(() => fs.writeFile(`${fetchDbgDir}/fetch.jsonl`, fetchDbg.map((e) => JSON.stringify(e)).join('\n') + '\n')))
+      .catch(() => { /* debug logging never breaks a run */ });
+  };
+  const logFetch = (rec: Record<string, unknown>): void => { fetchDbg.push({ ts: Date.now(), ...rec }); flushFetchDbg(); };
+
   const realFetch = globalThis.fetch.bind(globalThis);
   (globalThis as { fetch: typeof fetch }).fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     if (typeof input === 'string' && input.startsWith('/')) {
       const headers = new Headers(init?.headers);
       if (!headers.has('Cookie')) headers.set('Cookie', `auth_token=${cfg.token}`);
-      return realFetch(cfg.origin + input, { ...init, headers });
+      const p = realFetch(cfg.origin + input, { ...init, headers });
+      if (input.startsWith('/api/agentTurn') || input.startsWith('/api/agentStep')) {
+        const t0 = Date.now();
+        return p.then(
+          (res) => {
+            const rec = { path: input.split('?')[0], status: res.status, ok: res.ok, ms: Date.now() - t0 };
+            // Capture the error body on failure (the real provider error) via clone()
+            // so the streaming SSE body the agent reads is not consumed.
+            if (!res.ok) res.clone().text().then((body) => { logFetch({ ...rec, body: body.slice(0, 800) }); }).catch(() => { logFetch(rec); });
+            else logFetch(rec);
+            return res;
+          },
+          (err: unknown) => {
+            logFetch({ path: input.split('?')[0], networkError: err instanceof Error ? `${err.name}: ${err.message}` : String(err), ms: Date.now() - t0 });
+            throw err;
+          },
+        );
+      }
+      return p;
     }
     return realFetch(input, init);
   });

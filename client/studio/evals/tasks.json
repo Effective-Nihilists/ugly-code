@@ -218,7 +218,7 @@
     "level": 5,
     "kind": "feature",
     "turns": [
-      "Build a ChatGPT-like chat feature end-to-end in this ugly-app project.\n\nRequirements:\n- A user can create multiple chat conversations and see a sidebar of their own conversations.\n- Inside a conversation, the user can send a message and receive an AI reply. Use `textGen(userId)` from `ugly-app/server` to produce the reply. (Check an existing handler in server/index.ts for how other endpoints are structured.)\n- Conversation and message history must persist per-user.\n- Add a route at `/chat` that renders the page (sidebar of conversations + message thread + input box).\n- Follow the framework conventions already in use in this repo: read shared/api.ts, shared/collections.ts, shared/pages.ts, server/index.ts, client/allPages.ts to see how the existing Todo feature is wired, and model your new feature on that pattern.\n\nVerify with `tsc --noEmit` before declaring done. Do not change anything in node_modules or package.json beyond what the feature requires."
+      "Design and build ChatGPT in this app. I need support for multiple separate chats, real AI responses to my messages, and it should look cool."
     ],
     "setup": {
       "command": "bash",
@@ -232,7 +232,7 @@
       "maxCostUsd": 3,
       "timeoutMs": 900000
     },
-    "successCriteria": "shared/collections.ts declares at least two new collections (Conversation and Message, or equivalent names) with zod types that carry per-user ownership (userId). shared/api.ts defines authReq endpoints covering: list my conversations, create conversation, send message / get reply. server/index.ts implements each handler with `satisfies RequestHandlers<typeof requests>` — the sendMessage handler must actually call `textGen(userId)` (not stub the reply). shared/pages.ts declares a `/chat` route; client/allPages.ts maps it to a lazy-loaded component; a chat page component exists under client/pages/ that renders the conversation sidebar + message thread + input. tsc --noEmit passes. Partial credit categories: (a) backend only (no UI) = partial, (b) UI skeleton but no textGen integration = partial, (c) full loop + tsc clean = pass.",
+    "successCriteria": "A working ChatGPT-style app built end-to-end from a vague user brief. Judge the RESULT (the agent had to discover the stack + design the feature itself — do not require any specific file names or APIs). Criteria: (1) the user can create and switch between MULTIPLE separate conversations (e.g. a sidebar); (2) sending a message returns a REAL AI-generated reply wired end-to-end — an actual model/AI call, NOT a stubbed/echoed/canned response; (3) conversations + messages PERSIST per-user across reloads; (4) a coherent, polished chat UI (thread + input + conversation switcher) that plausibly \"looks cool\", not a bare skeleton; (5) it builds cleanly (tsc --noEmit) and uses the project’s own framework conventions (whatever the repo already uses for data/endpoints/pages and calling its AI helper). Partial credit: backend-only or UI-without-real-AI = partial; full working loop + polished UI + clean build = pass.",
     "tags": [
       "ugly-app",
       "full-stack",
