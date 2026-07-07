@@ -12,19 +12,19 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | **L1** Simple bug fix | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L2** Harder bug fix / small feature | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L3** Multi-file / discipline | 5.0 | 5.0 | 5.0 | 5/5 |
-| **L4** Agentic long-horizon | 4.8 | 5.0 | 5.0 | 4/5 |
-| **L5** Real-world agentic | — | — | — | 0/5 |
+| **L4** Agentic long-horizon | 4.8 | 5.0 | 5.0 | 5/6 |
+| **L5** Real-world agentic | 2.6 | 3.0 | 2.3 | 5/5 |
 
 ### Totals (cost + wall-time, summed over graded cells)
 
 | Metric | opus | deepseek | glm |
 |---|---|---|---|
-| **Total cost** | $14.4351 | $0.1808 | $1.2828 |
-| **Total time** | 54m40s | 27m07s | 61m44s |
-| **Tokens (in / out)** | n/a | 193k / 96k | 159k / 169k |
-| **Cache-hit rate** | n/a | 95% | 93% |
+| **Total cost** | $29.5992 | $0.3813 | $2.8539 |
+| **Total time** | 102m13s | 56m08s | 140m50s |
+| **Tokens (in / out)** | n/a | 405k / 202k | 291k / 375k |
+| **Cache-hit rate** | n/a | 95% | 95% |
 
-**Grand total spend:** $15.8987
+**Grand total spend:** $32.8343
 
 ## Level 1 — Simple bug fix
 
@@ -67,6 +67,7 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | `agentic-stack-trace-lying` | 5/5 · $0.5234 · 12t · 1m40s | 5/5 · $0.0085 · 12t · 1m25s | 5/5 · $0.0351 · 8t · 1m17s |
 | `impossible-rrule-iterator` | 5/5 · $3.6484 · 25t · 13m41s | 5/5 · $0.0531 · 12t · 4m34s | 5/5 · $0.3590 · 12t · 17m32s |
 | `impossible-lost-updates` | 4/5 · $4.4463 · 53t · 23m51s | 5/5 · $0.0144 · 12t · 3m13s | 5/5 · $0.2467 · 12t · 14m38s |
+| `impossible-semver-satisfies` | 5/5 · $1.6379 · 13t · 7m10s | 5/5 · $0.0348 · 20t · 3m50s | 5/5 · $0.5397 · 14t · 26m34s |
 | `vague-make-nicer` ℹ | 1/5 · $0.2244 · 6t · 36s | 5/5 · $0.0072 · 12t · 1m01s | 5/5 · $0.0402 · 8t · 1m24s |
 | **mean** (excl. ℹ) | 4.8/5 | 5.0/5 | 5.0/5 |
 
@@ -76,10 +77,10 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 
 | Task | opus | deepseek | glm |
 |---|---|---|---|
-| `sbpro-ansible-ansible-39bd8b99` | — | — | — |
-| `boss-chatgpt-clone` | — | — | — |
-| `l5-large-refactor` | — | — | — |
-| `l5-improve-the-harness` | — | — | — |
-| `l5-build-canvas-game` | — | — | — |
-| **mean** (excl. ℹ) | — | — | — |
+| `sbpro-ansible-ansible-39bd8b99` | 2/5 · $3.6266 · 61t · 13m01s | 2/5 · $0.0479 · 33t · 9m03s | 2/5 · $0.5425 · 60t · 25m36s |
+| `boss-chatgpt-clone` | 1/5 · $2.7512 · 41t · 5m36s | 1/5 · $0.0301 · 40t · 3m42s | 2/5 · $0.2942 · 40t · 6m32s |
+| `l5-large-refactor` | 5/5 · $1.4510 · 20t · 4m54s | 4/5 · $0.0239 · 26t · 3m23s | 5/5 · $0.0619 · 11t · 2m25s |
+| `l5-improve-the-harness` | 5/5 · $2.0955 · 16t · 8m26s | 5/5 · $0.0327 · 22t · 5m25s | 0/5 · $0.1327 · 20t · 17m59s |
+| `l5-build-canvas-game` | 0/5 · $3.6019 · 54t · 8m26s | 3/5 · $0.0311 · 28t · 3m38s | — |
+| **mean** (excl. ℹ) | 2.6/5 | 3.0/5 | 2.3/5 |
 

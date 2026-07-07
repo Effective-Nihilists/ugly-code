@@ -1831,7 +1831,7 @@
   {
     "name": "impossible-semver-satisfies",
     "kind": "feature",
-    "level": 5,
+    "level": 4,
     "turns": [
       "Read TICKET.md, then implement satisfies(version, range) in src/satisfies.ts to match node-semver exactly (no semver import, no hardcoding the vectors). Maximize how many of the 180 adversarial vectors in test/satisfies.test.ts pass; partial implementations earn partial credit."
     ],
