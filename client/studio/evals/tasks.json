@@ -221,15 +221,11 @@
       "Build a ChatGPT-like chat feature end-to-end in this ugly-app project.\n\nRequirements:\n- A user can create multiple chat conversations and see a sidebar of their own conversations.\n- Inside a conversation, the user can send a message and receive an AI reply. Use `textGen(userId)` from `ugly-app/server` to produce the reply. (Check an existing handler in server/index.ts for how other endpoints are structured.)\n- Conversation and message history must persist per-user.\n- Add a route at `/chat` that renders the page (sidebar of conversations + message thread + input box).\n- Follow the framework conventions already in use in this repo: read shared/api.ts, shared/collections.ts, shared/pages.ts, server/index.ts, client/allPages.ts to see how the existing Todo feature is wired, and model your new feature on that pattern.\n\nVerify with `tsc --noEmit` before declaring done. Do not change anything in node_modules or package.json beyond what the feature requires."
     ],
     "setup": {
-      "command": "npx",
+      "command": "bash",
       "args": [
-        "--yes",
-        "ugly-app",
-        "init",
-        "app"
-      ],
-      "cwd": "app",
-      "timeoutMs": 420000
+        "-lc",
+        "npx --yes ugly-app@latest init --in-place --with todo,tests"
+      ]
     },
     "budget": {
       "maxTurns": 40,
@@ -1808,15 +1804,11 @@
     ],
     "ticketPath": "TICKET.md",
     "setup": {
-      "command": "npx",
+      "command": "bash",
       "args": [
-        "--yes",
-        "ugly-app",
-        "init",
-        "app"
-      ],
-      "cwd": "app",
-      "timeoutMs": 420000
+        "-lc",
+        "npx --yes ugly-app@latest init --in-place --with todo,tests"
+      ]
     },
     "budget": {
       "maxTurns": 50,

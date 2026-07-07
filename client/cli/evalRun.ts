@@ -61,6 +61,22 @@ async function cloneFixture(taskName: string, repoUrl: string | undefined): Prom
   return path;
 }
 
+/** Run a task's `setup` command in the cloned project, then FOLD the result into the
+ *  baseline commit. This is how a task materialises a FRESH template at run time
+ *  instead of committing a snapshot that goes stale — e.g. a full-stack task ships
+ *  only the brief and declares `setup` = `npx ugly-app@latest init …`, so every run
+ *  gets the current framework. Amending the baseline keeps the scaffold out of the
+ *  agent's graded diff (only the agent's edits show). No-op when `setup` is absent. */
+async function runSetup(task: { setup?: unknown }, projectPath: string): Promise<void> {
+  const s = task.setup as { command?: string; args?: string[] } | undefined;
+  if (!s?.command || !Array.isArray(s.args)) return;
+  process.stderr.write(`[setup] ${s.command} ${s.args.join(' ').slice(0, 100)}\n`);
+  const r = await spawnCollect(s.command, s.args, { cwd: projectPath });
+  if (r.code !== 0 && r.code !== null) process.stderr.write(`[setup] exit ${r.code}: ${r.stderr.slice(-500)}\n`);
+  // Fold the scaffold into the baseline seed so `git diff HEAD` = the agent's edits only.
+  await spawnCollect('bash', ['-lc', `cd ${JSON.stringify(projectPath)} && git add -A && git -c user.email=eval@ugly.bot -c user.name=eval commit -q --amend --no-edit || true`], {});
+}
+
 /** Run a task's reproSetup (SBP: uv venv + pip install) so the agent + grader can
  *  run the repo's tests. `uv` is resolved via ~/.ugly-bot/binaries and put on PATH. */
 async function runReproSetup(task: { reproSetup?: { commands: string[] } }, projectPath: string): Promise<void> {
@@ -209,6 +225,7 @@ export async function runEval(cfg: {
   const sessionId = `cli:${task.name}:${Date.now()}`;
   const storeRoot = `${process.env.HOME ?? '.'}/.ugly-code/session`;
   await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
+  await runSetup(task, projectPath); // scaffold-based tasks: materialise a FRESH template (never stale)
   await runReproSetup(task, projectPath); // SBP tasks: uv venv + pip install before the agent
   setSessionEval(sessionId, true); // every CLI run is an eval → criteria judge active under SBV
   // Honor the TASK's declared step budget instead of the interactive 12-turn cap —
