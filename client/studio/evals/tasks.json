@@ -1763,7 +1763,7 @@
     "kind": "planning",
     "level": 5,
     "turns": [
-      "Read TICKET.md, then review the real harness code under harness-snapshot/ and research the current state of the art in coding-agent evaluation. Produce DESIGN.md at the repo root: a concrete, prioritized, research-grounded design for how to make ugly-code the best possible coding-agent harness, citing specific mechanisms in the snapshot and naming their weaknesses."
+      "We want ugly-code to be the best coding-agent evaluation harness out there. The current harness code is bundled under harness-snapshot/ — read it closely, look at where the state of the art is in coding-agent evals (recent research and real benchmarks), and write up DESIGN.md at the repo root: your prioritized, concrete plan for how you'd make it better. Ground every recommendation in the actual code you read and in real research."
     ],
     "ticketPath": "TICKET.md",
     "budget": {
@@ -1771,7 +1771,7 @@
       "maxCostUsd": 4,
       "timeoutMs": 1200000
     },
-    "successCriteria": "DESIGN.md exists at the repo root and is a strong, prioritized design for improving ugly-code as a coding-agent harness. It must (a) accurately read the real snapshot code — citing concrete mechanisms such as the derived-vs-authored difficulty in registry.ts, how judge gates gather evidence in grader.ts, the no-edit nudge and resume-on-error in evalRun.ts, or the fail_to_pass/pass_to_pass path in sbpGrader.ts — and name real weaknesses; (b) be grounded in specific, real current research/benchmarks (e.g. SWE-bench / SWE-bench-Pro / Terminal-Bench, judge reliability, contamination, reward hacking); (c) propose prioritized, feasible improvements tied to concrete limitations, distinguishing quick wins from larger bets; and (d) surface at least one non-obvious lever. Graded by an LLM judge on depth, accuracy, grounding, prioritization, feasibility, and insight.",
+    "successCriteria": "DESIGN.md exists at the repo root and is a strong, prioritized design for making ugly-code the best possible coding-agent harness. Grade on: (a) evidence the agent actually read the bundled harness-snapshot/ code — it cites specific, real files and mechanisms IT found and names their genuine weaknesses; verify the citations against the snapshot, reward real discoveries, and penalize invented or vague claims about the code (the prompt does not tell it what to find, so finding the real weak points is the test); (b) grounding in specific, real, current coding-agent-eval research and benchmarks (e.g. SWE-bench and its successors, judge-reliability / contamination / reward-hacking literature) — substance, not name-drops; (c) prioritized, feasible improvements each tied to a concrete limitation it identified, distinguishing quick wins from larger bets; (d) at least one non-obvious lever a strong engineer wouldn't immediately reach for. Deduct for hand-waving, invented facts about the code, greenfield-rewrite proposals, or research name-drops with no substance.",
     "gates": [
       {
         "name": "DESIGN.md produced",
@@ -1782,7 +1782,7 @@
         "name": "harness design quality",
         "points": 4,
         "kind": "judge:harness-design-rubric",
-        "description": "Score 0-4 the DESIGN.md. Award points only for: accurate, specific reading of the real harness-snapshot code (cites concrete files/mechanisms and real weaknesses, not generic advice); grounding in real, current coding-agent-eval research/benchmarks; prioritized, feasible improvements tied to concrete limitations (quick wins vs larger bets); and at least one non-obvious insight. Deduct for hand-waving, invented facts about the code, greenfield-rewrite proposals, or research name-drops with no substance."
+        "description": "Score 0-4 the DESIGN.md. The prompt does NOT tell the agent which weaknesses to find, so reward genuine discovery: verify each cited file/mechanism against the actual harness-snapshot/ code, and award points only for accurate, specific readings the agent found itself (concrete files/mechanisms + real weaknesses, not generic advice or invented claims); grounding in real, current coding-agent-eval research/benchmarks; prioritized, feasible improvements tied to concrete limitations (quick wins vs larger bets); and at least one non-obvious insight. Deduct for hand-waving, invented facts about the code, greenfield-rewrite proposals, or research name-drops with no substance."
       }
     ],
     "tags": [
@@ -1800,7 +1800,7 @@
     "kind": "feature",
     "level": 5,
     "turns": [
-      "Read TICKET.md, then build the playable Breakout-style canvas game it describes on a new /game route in this ugly-app project. Follow the existing framework conventions (shared/pages.ts, client/allPages.ts, client/pages/*Page.tsx). Verify with `npx tsc --noEmit` before declaring done."
+      "Turn this app into a Breakout game — you know, bounce a ball off a paddle to smash all the bricks. When someone opens it they should land right in the game. Make it genuinely fun to play and look really cool."
     ],
     "ticketPath": "TICKET.md",
     "setup": {
@@ -1815,7 +1815,7 @@
       "maxCostUsd": 4,
       "timeoutMs": 1200000
     },
-    "successCriteria": "A new /game route is added (shared/pages.ts + client/allPages.ts + a client/pages component) rendering a playable Breakout-style canvas game: a keyboard/pointer-controlled paddle, a ball with real physics (wall bounces + paddle-angle reflection), a grid of breakable bricks with correct collision resolution (no tunneling at normal speed), a requestAnimationFrame loop with frame-rate-independent motion, and working score/lives/win(all bricks cleared)/lose(out of lives)/restart states. tsc --noEmit passes. Partial credit: (a) route + canvas renders but no real physics = partial; (b) physics + controls but missing win/lose or buggy collision = partial; (c) complete, correct, and polished/fun = pass. Judge for completeness, correctness of collision/physics/controls, and polish/feel.",
+    "successCriteria": "The agent, working from a vague user request, turns this ugly-app into a genuinely playable Breakout game — the game IS the app: opening it (the home/landing experience) drops the user straight into the game, not a game bolted onto some leftover starter site. Judge the OUTCOME, not any particular files or routes: (1) it's actually playable in the browser — a paddle the user controls (keyboard and/or pointer) and a ball that bounces and breaks bricks; (2) the physics feel right — real wall and paddle bounces with paddle-angle reflection and no ball tunneling through bricks at normal speed; (3) motion is smooth and frame-rate-independent (a proper game loop, not stuttery or speed-varying by machine); (4) score, lives, win (all bricks cleared), lose (out of lives), and restart all work; (5) it looks polished and 'cool' — not a bare rectangle on a white page; (6) the project builds clean (tsc --noEmit passes). Partial credit: renders but no real physics = partial; physics + controls but missing win/lose or buggy collision = partial; complete + correct + fun + polished = pass. Penalize leaving the scaffold's default home/todo pages as the entry point. Reward the agent for making sound stack and design choices on its own; do NOT require any specific file layout or route name.",
     "tags": [
       "ugly-app",
       "full-stack",

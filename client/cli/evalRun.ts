@@ -28,10 +28,15 @@ const ZERO_TOTALS: EvalGradeResult['runTotals'] = {
 };
 
 /** Clone the task's fixture repo into ~/.ugly-code/eval-projects/<task>-<stamp> and re-init git. */
-async function cloneFixture(taskName: string, repoUrl: string | undefined): Promise<string> {
+async function cloneFixture(taskName: string, repoUrl: string | undefined, label?: string): Promise<string> {
   const safe = taskName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  // Include the model/config label in the folder name so a 3-model compare leaves
+  // three DISTINGUISHABLE workspaces (e.g. boss-chatgpt-clone__glm_5_2-<ts>) instead
+  // of three same-named dirs differing only by timestamp. These dirs persist (never
+  // cleaned up) so the resulting apps/DESIGN.md can be opened and tried after the run.
+  const safeLabel = label ? '__' + label.replace(/[^a-zA-Z0-9_.-]/g, '_') : '';
   const stamp = String(Date.now());
-  const base = `$HOME/.ugly-code/eval-projects/${safe}-${stamp}`;
+  const base = `$HOME/.ugly-code/eval-projects/${safe}${safeLabel}-${stamp}`;
   // Strip the grader's own code (`eval/`) from the agent's workspace before seeding —
   // an integrity fix: the agent must not read checker.ts/check-helpers.ts and grade to
   // the test. (It also trims ~34KB of context, though that alone did NOT stop the
@@ -221,7 +226,8 @@ export async function runEval(cfg: {
 }): Promise<EvalRunResult> {
   const task = getEvalTask(cfg.taskName);
   if (!task) throw new Error(`Unknown eval task: ${cfg.taskName}`);
-  const projectPath = await cloneFixture(task.name, task.repoUrl);
+  const projectPath = await cloneFixture(task.name, task.repoUrl, cfg.model ?? cfg.pattern);
+  process.stderr.write(`[eval] ${task.name} (${cfg.model ?? cfg.pattern ?? 'default'}) → ${projectPath}\n`);
   const sessionId = `cli:${task.name}:${Date.now()}`;
   const storeRoot = `${process.env.HOME ?? '.'}/.ugly-code/session`;
   await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
