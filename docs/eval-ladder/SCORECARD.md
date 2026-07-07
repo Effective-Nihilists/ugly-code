@@ -12,19 +12,19 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | **L1** Simple bug fix | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L2** Harder bug fix / small feature | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L3** Multi-file / discipline | 5.0 | 5.0 | 5.0 | 5/5 |
-| **L4** Agentic long-horizon | — | — | — | 0/5 |
+| **L4** Agentic long-horizon | 4.8 | 2.6 | 4.4 | 4/5 |
 | **L5** Real-world agentic | — | — | — | 0/5 |
 
 ### Totals (cost + wall-time, summed over graded cells)
 
 | Metric | opus | deepseek | glm |
 |---|---|---|---|
-| **Total cost** | $3.8910 | $0.0539 | $0.2211 |
-| **Total time** | 9m12s | 9m03s | 11m05s |
-| **Tokens (in / out)** | n/a | 57k / 30k | 29k / 25k |
-| **Cache-hit rate** | n/a | 94% | 95% |
+| **Total cost** | $14.4294 | $0.1511 | $1.2312 |
+| **Total time** | 54m34s | 20m28s | 61m30s |
+| **Tokens (in / out)** | n/a | 176k / 77k | 130k / 197k |
+| **Cache-hit rate** | n/a | 92% | 91% |
 
-**Grand total spend:** $4.1659
+**Grand total spend:** $15.8118
 
 ## Level 1 — Simple bug fix
 
@@ -35,7 +35,7 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | `bug-fix-ts-error` | 5/5 · $0.2603 · 9t · 33s | 5/5 · $0.0018 · 7t · 23s | 5/5 · $0.0048 · 4t · 13s |
 | `short-numeric-pythagorean-overflow` | 5/5 · $0.1936 · 7t · 23s | 5/5 · $0.0021 · 8t · 22s | 5/5 · $0.0062 · 5t · 17s |
 | `short-regex-email-localpart-strip` | 5/5 · $0.4586 · 7t · 2m00s | 5/5 · $0.0071 · 12t · 1m32s | 5/5 · $0.0506 · 7t · 2m33s |
-| **mean** | 5.0/5 | 5.0/5 | 5.0/5 |
+| **mean** (excl. ℹ) | 5.0/5 | 5.0/5 | 5.0/5 |
 
 ## Level 2 — Harder bug fix / small feature
 
@@ -46,7 +46,7 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | `adversarial-config` | 5/5 · $0.1909 · 7t · 26s | 5/5 · $0.0027 · 9t · 28s | 5/5 · $0.0119 · 7t · 30s |
 | `debug-flaky-async` | 5/5 · $0.3235 · 10t · 47s | 5/5 · $0.0046 · 12t · 54s | 5/5 · $0.0192 · 7t · 55s |
 | `feature-add-endpoint` | 5/5 · $0.1132 · 3t · 9s | 5/5 · $0.0035 · 12t · 46s | 5/5 · $0.0064 · 4t · 20s |
-| **mean** | 5.0/5 | 5.0/5 | 5.0/5 |
+| **mean** (excl. ℹ) | 5.0/5 | 5.0/5 | 5.0/5 |
 
 ## Level 3 — Multi-file / discipline
 
@@ -57,18 +57,20 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | `bug-fix-passes-but-breaks-sibling` | 5/5 · $0.2871 · 9t · 36s | 5/5 · $0.0039 · 12t · 34s | 5/5 · $0.0116 · 7t · 43s |
 | `refactor-preserve-api` | 5/5 · $0.1832 · 5t · 26s | 5/5 · $0.0047 · 7t · 31s | 5/5 · $0.0255 · 10t · 1m23s |
 | `divergent-strategy-sql-perf` | 5/5 · $0.2765 · 10t · 35s | 5/5 · $0.0063 · 11t · 37s | 5/5 · $0.0193 · 6t · 56s |
-| **mean** | 5.0/5 | 5.0/5 | 5.0/5 |
+| **mean** (excl. ℹ) | 5.0/5 | 5.0/5 | 5.0/5 |
 
 ## Level 4 — Agentic long-horizon
 
 | Task | opus | deepseek | glm |
 |---|---|---|---|
-| `agentic-orm-migration-with-trap` | — | — | — |
-| `agentic-stack-trace-lying` | — | — | — |
-| `impossible-rrule-iterator` | — | — | — |
-| `impossible-lost-updates` | — | — | — |
-| `vague-make-nicer` | — | — | — |
-| **mean** | — | — | — |
+| `agentic-orm-migration-with-trap` | 10/10 · $1.7015 · 27t · 5m40s | 1/10 · $0.0149 · 12t · 1m56s | 5/10 · $0.1798 · 12t · 8m24s |
+| `agentic-stack-trace-lying` | 5/5 · $0.5234 · 12t · 1m40s | 5/5 · $0.0085 · 12t · 1m25s | 5/5 · $0.0351 · 8t · 1m17s |
+| `impossible-rrule-iterator` | 5/5 · $3.6484 · 25t · 13m41s | 5/5 · $0.0531 · 12t · 4m34s | 5/5 · $0.3590 · 12t · 17m32s |
+| `impossible-lost-updates` | 4/5 · $4.4463 · 53t · 23m51s | 0/5 · $0.0134 · 12t · 2m29s | 5/5 · $0.3973 · 12t · 21m40s |
+| `vague-make-nicer` ℹ | 1/5 · $0.2188 · 6t · 30s | 5/5 · $0.0072 · 12t · 1m01s | 5/5 · $0.0389 · 9t · 1m32s |
+| **mean** (excl. ℹ) | 4.8/5 | 2.6/5 | 4.4/5 |
+
+ℹ informational (judge-only taste task, excluded from the mean).
 
 ## Level 5 — Real-world agentic
 
@@ -79,5 +81,5 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | `l5-large-refactor` | — | — | — |
 | `l5-improve-the-harness` | — | — | — |
 | `l5-build-canvas-game` | — | — | — |
-| **mean** | — | — | — |
+| **mean** (excl. ℹ) | — | — | — |
 

@@ -21,3 +21,7 @@ playwright-report/
 .ugly-studio/users/
 .ugly-studio/home/
 .env.publish
+
+# Python bytecode cache (agent python-lib)
+__pycache__/
+*.pyc
