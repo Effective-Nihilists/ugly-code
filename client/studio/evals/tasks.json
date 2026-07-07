@@ -228,7 +228,7 @@
       ]
     },
     "budget": {
-      "maxTurns": 40,
+      "maxTurns": 80,
       "maxCostUsd": 3,
       "timeoutMs": 900000
     },

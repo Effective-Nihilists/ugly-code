@@ -113,20 +113,20 @@ async function verifyOnSettle(sessionId: string): Promise<string | null> {
   if (!editedSinceVerifyBySession.get(sessionId)) return null; // no edits since last check
   editedSinceVerifyBySession.set(sessionId, false); // consume; a new edit re-arms it
   const continues = verifyContinuesBySession.get(sessionId) ?? 0;
-  if (continues >= MAX_VERIFY_CONTINUES) return null; // stop nudging; let the turn end
+  if (continues >= MAX_VERIFY_CONTINUES) { debugLog(sessionId, 'verify_skip', { reason: 'cap' }); return null; }
   const ws = getSessionWorkspace(sessionId);
   const cwd = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? '';
-  if (!cwd) return null;
+  if (!cwd) { debugLog(sessionId, 'verify_skip', { reason: 'no_cwd' }); return null; }
   let gate: Awaited<ReturnType<typeof resolveVerifyGate>>;
-  try { gate = await resolveVerifyGate(cwd); } catch { return null; }
-  if (!gate) return null; // no verify command for this project/language → skip, never block
+  try { gate = await resolveVerifyGate(cwd); } catch (e) { debugLog(sessionId, 'verify_skip', { reason: 'resolve_error', cwd, err: String(e) }); return null; }
+  if (!gate) { debugLog(sessionId, 'verify_skip', { reason: 'no_gate', cwd }); return null; }
   let out = '';
   let code: number | null = 0;
   try {
     const r = await spawnCollect(gate.command, gate.args, { cwd });
     out = `${r.stdout}\n${r.stderr}`.trim();
     code = r.code;
-  } catch { return null; } // gate couldn't run (missing tool) → don't block the turn
+  } catch (e) { debugLog(sessionId, 'verify_skip', { reason: 'spawn_error', gate: gate.label, err: String(e) }); return null; }
   debugLog(sessionId, 'verify', { gate: gate.label, code, ok: code === 0, attempt: continues + 1 });
   if (code === 0) { verifyContinuesBySession.set(sessionId, 0); return null; } // clean → finish
   verifyContinuesBySession.set(sessionId, continues + 1);
