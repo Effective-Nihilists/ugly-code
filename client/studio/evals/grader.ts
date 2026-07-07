@@ -338,7 +338,19 @@ const DIFF_EXCLUDES = [
  *  (node_modules/dist/…) are excluded so real edits survive the cap. */
 async function collectDiff(projectPath: string, deps: GradeDeps): Promise<string> {
   await deps.run('git', ['add', '-A', '--', '.', ...DIFF_EXCLUDES], projectPath);
+  // A --stat summary FIRST, so the judge always sees the COMPLETE set of changed
+  // files + line counts even when the detailed diff below is truncated. `git diff`
+  // orders files alphabetically, so late-sorting dirs (server/, shared/) fall off
+  // the cap on a large build and the judge wrongly concludes that logic is absent
+  // (e.g. "the server-side AI call isn't present") — a systematic under-grade of
+  // big builds. This was self-identified by the improve-harness eval itself.
+  const stat = (await deps.run('git', ['diff', '--cached', '--stat', '--', '.', ...DIFF_EXCLUDES], projectPath)).out;
   const r = await deps.run('git', ['diff', '--cached', '--no-color', '--', '.', ...DIFF_EXCLUDES], projectPath);
-  const out = r.out;
-  return out.length > 20_000 ? out.slice(0, 20_000) + '\n…(diff truncated)' : out;
+  // 60KB default (was 20KB — too small for a full-app build, which truncated the
+  // graded logic). Override via UGLY_GRADER_DIFF_CAP. ~15k tokens for the judge.
+  const CAP = Number(process.env.UGLY_GRADER_DIFF_CAP) || 60_000;
+  const detail = r.out.length > CAP
+    ? r.out.slice(0, CAP) + `\n…(diff detail truncated at ${CAP} chars — consult the complete file summary above; do NOT assume a file not shown here is missing or stubbed)`
+    : r.out;
+  return `## Changed files (complete list)\n${stat}\n\n## Diff detail\n${detail}`;
 }

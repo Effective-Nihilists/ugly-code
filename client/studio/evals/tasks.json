@@ -239,7 +239,20 @@
       "ai",
       "boss"
     ],
-    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-boss-chatgpt-clone.git"
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-boss-chatgpt-clone.git",
+    "gates": [
+      {
+        "name": "builds clean",
+        "points": 1,
+        "kind": "tsc"
+      },
+      {
+        "name": "working chatgpt clone",
+        "points": 4,
+        "kind": "judge:boss-chatgpt-quality",
+        "description": "Score 0-4 the ChatGPT-style app from the diff. Be harsh; default LOW and only award a point when the code clearly implements the capability (not stubbed, commented-out, or half-wired). +1 MULTIPLE separate conversations the user can create and switch between (a chat list / sidebar + new-chat, each its own thread — not a single shared message log); +1 REAL AI responses — the assistant reply comes from an actual model/AI call (the framework's textGen / agentTurn / streamChat helper), NOT a hardcoded, echoed, or canned string; +1 PERSISTENCE — conversations and messages are stored in the DB (a collection + load on mount), surviving reload, not just React state; +1 polished, coherent chat UI (thread + input + conversation switcher) that plausibly 'looks cool', not the bare scaffold. The chat app must be a real, reachable feature (its own page/route is fine — it need not replace the home page). HARD CAP at 1 if the AI reply is stubbed/echoed/canned rather than a real model call — a real AI response is the thing the user explicitly asked for. If the full server handler isn't visible in the (possibly truncated) diff, judge the AI wiring from whatever calling code IS visible and do not assume a stub."
+      }
+    ]
   },
   {
     "name": "boss-image-gallery",
