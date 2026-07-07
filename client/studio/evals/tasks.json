@@ -1779,10 +1779,28 @@
         "kind": "fileExists:DESIGN.md"
       },
       {
-        "name": "harness design quality",
-        "points": 4,
-        "kind": "judge:harness-design-rubric",
-        "description": "Score 0-4 the DESIGN.md. The prompt does NOT tell the agent which weaknesses to find, so reward genuine discovery: verify each cited file/mechanism against the actual harness-snapshot/ code, and award points only for accurate, specific readings the agent found itself (concrete files/mechanisms + real weaknesses, not generic advice or invented claims); grounding in real, current coding-agent-eval research/benchmarks; prioritized, feasible improvements tied to concrete limitations (quick wins vs larger bets); and at least one non-obvious insight. Deduct for hand-waving, invented facts about the code, greenfield-rewrite proposals, or research name-drops with no substance."
+        "name": "code-reading accuracy",
+        "points": 3,
+        "kind": "judge:harness-code-reading",
+        "description": "Score 0-3 how accurately and SPECIFICALLY DESIGN.md reads the real harness code the agent was given. Be harsh; default to the LOW end. 3 = ONLY if it cites multiple concrete, specific, non-obvious mechanisms by file/function (e.g. how task difficulty is derived-vs-authored, how a judge gate assembles the diff as its evidence, the resume-on-error and no-edit-nudge control flow, the fail_to_pass/pass_to_pass SBP path, the collectDiff baseline handling) AND names a real, correct weakness of each — a reading that could only come from actually studying the code. 2 = a few specific, correct citations but some generic filler. 1 = mostly generic 'add more tests'-style advice with at most one real mechanism. 0 = generic, or contains claims about how the code works that are invented or wrong. HARD RULE: any single fabricated or incorrect claim about the code caps this gate at 1. Reward verifiable specificity, never confident prose."
+      },
+      {
+        "name": "research grounding",
+        "points": 2,
+        "kind": "judge:harness-research",
+        "description": "Score 0-2 the grounding in REAL, current coding-agent-eval research/benchmarks. 2 = names multiple real benchmarks/papers (e.g. SWE-bench and its successors, Terminal-Bench, judge-reliability / contamination / reward-hacking literature) AND correctly characterizes what each measures and ties it to a specific proposed change. 1 = real names but shallow — dropped without substance or mis-characterized. 0 = vague ('industry best practice') or fabricated/mis-attributed citations. Penalize any benchmark or paper that appears invented or wrong."
+      },
+      {
+        "name": "prioritization & feasibility",
+        "points": 2,
+        "kind": "judge:harness-prioritization",
+        "description": "Score 0-2. 2 = proposals are genuinely prioritized, each tied to a concrete limitation the doc identified, clearly separating cheap quick-wins from larger bets, with realistic effort/impact reasoning. 1 = a reasonable list but weak or missing prioritization/justification. 0 = an unordered wishlist, or infeasible / rewrite-everything proposals. Penalize hand-wavy effort claims."
+      },
+      {
+        "name": "non-obvious insight",
+        "points": 2,
+        "kind": "judge:harness-insight",
+        "description": "Score 0-2 on genuine insight. Be stingy — most docs should score 0-1 here. 2 = surfaces at least one correct, non-obvious lever a strong engineer would NOT immediately reach for (NOT 'add more tests', 'use a better model/judge', or 'add more tasks') and justifies why it matters. 1 = mildly interesting but largely obvious. 0 = nothing beyond the obvious."
       }
     ],
     "tags": [
@@ -1826,7 +1844,20 @@
       "agentic",
       "cross-review"
     ],
-    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l5-build-canvas-game.git"
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l5-build-canvas-game.git",
+    "gates": [
+      {
+        "name": "builds clean",
+        "points": 1,
+        "kind": "tsc"
+      },
+      {
+        "name": "playable breakout game",
+        "points": 4,
+        "kind": "judge:canvas-game-quality",
+        "description": "Score 0-4 the Breakout game from the diff. Be harsh; default LOW. The GAME MUST BE THE APP — opening the app's home/landing route lands directly in the game. If the agent left the scaffold's default home/todo page as the entry point and only added a side route, cap this gate at 1. Otherwise award for what the code actually implements: +1 a canvas with a real requestAnimationFrame game loop and a user-controlled paddle (keyboard and/or pointer); +1 real ball physics — wall + paddle bounces with paddle-angle reflection AND brick-collision resolution that won't tunnel at normal speed (look for swept/positional collision, not a naive AABB that teleports); +1 complete game states: score, lives, win (all bricks cleared), lose (out of lives), and restart all wired up; +1 polish/feel — styling, colors, feedback, difficulty that reads as a finished arcade game rather than a bare rectangle. Do not award a point for a feature that is stubbed, commented-out, or obviously non-functional in the code."
+      }
+    ]
   },
   {
     "name": "impossible-semver-satisfies",
