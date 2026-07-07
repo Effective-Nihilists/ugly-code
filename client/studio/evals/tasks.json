@@ -160,7 +160,7 @@
     "gates": [
       {
         "name": "tests pass",
-        "points": 3,
+        "points": 2,
         "kind": "vitest:src/userService.test.ts",
         "description": "All three tests in userService.test.ts pass."
       },
@@ -171,22 +171,10 @@
         "description": "tsc --noEmit exits 0."
       },
       {
-        "name": "fix is in cacheUser",
-        "points": 3,
-        "kind": "fileMatches:src/userService.ts:fixIsInCacheUser",
-        "description": "The fix is in the cacheUser method (which was mutating the input). Detected by: cacheUser no longer contains a delete on email."
-      },
-      {
-        "name": "no defensive guard at call site",
-        "points": 1,
-        "kind": "fileMatches:src/userService.ts:noDefensiveGuard",
-        "description": "renderAuditEntry was not \"fixed\" with a `?? ''` or `?.` guard on user.email. Per CONTEXT.md, that approach is rejected."
-      },
-      {
-        "name": "explanatory note added",
-        "points": 1,
-        "kind": "fileMatches:src/userService.ts:hasNote",
-        "description": "A 1-3 sentence note near the top of userService.ts explains what the actual cause was. Detected by presence of \"stack trace\" or \"misleading\" or \"mutat\" in the first 60 lines."
+        "name": "root-cause fix, not a band-aid",
+        "points": 2,
+        "kind": "judge:root-cause-discipline",
+        "description": "This task tests DISCIPLINE — a defensive guard at the call site also makes the tests pass but is the wrong fix. Award up to 2 points: 2 if ALL of (a) the fix is in cacheUser, which stopped mutating/deleting user.email before storing; (b) the consumers (renderAuditEntry/formatGreeting) were NOT patched with a `?? \"\"` or `?.` defensive guard on user.email; (c) userService.ts has a 1-3 sentence note (near the top) explaining that the stack trace was misleading / the real cause was the mutation. Award 1 if the root cause is fixed in cacheUser but the note is missing. Award 0 if the fix is a defensive guard/band-aid at a consumer rather than in cacheUser. Judge strictly from the diff."
       }
     ],
     "tags": [
