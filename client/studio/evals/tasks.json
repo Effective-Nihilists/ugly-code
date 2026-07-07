@@ -218,7 +218,7 @@
     "level": 5,
     "kind": "feature",
     "turns": [
-      "Design and build ChatGPT in this app. I need support for multiple separate chats, real AI responses to my messages, and it should look cool."
+      "Design and build ChatGPT in this app. I need support for multiple separate chats, real AI responses to my messages, and it should look cool. Just build it out into a working app — you don't need to run the plan by me first, take it all the way to done."
     ],
     "setup": {
       "command": "bash",
@@ -1818,14 +1818,13 @@
     "kind": "feature",
     "level": 5,
     "turns": [
-      "Turn this app into a Breakout game — you know, bounce a ball off a paddle to smash all the bricks. When someone opens it they should land right in the game. Make it genuinely fun to play and look really cool."
+      "Turn this app into a Breakout game — you know, bounce a ball off a paddle to smash all the bricks. When someone opens it they should land right in the game. Make it genuinely fun to play and look really cool. Just build the whole thing and get it working end-to-end — no need to check the plan with me first."
     ],
-    "ticketPath": "TICKET.md",
     "setup": {
       "command": "bash",
       "args": [
         "-lc",
-        "npx --yes ugly-app@latest init --in-place --with todo,tests"
+        "npx --yes ugly-app@latest init --in-place --with todo,tests && rm -f TICKET.md README.md"
       ]
     },
     "budget": {
