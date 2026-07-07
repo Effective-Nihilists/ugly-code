@@ -56,6 +56,7 @@ import { runMaxMode } from './patterns/max-mode-host';
 import { runGroupMode } from './patterns/group-mode-host';
 import { awaitStepReview, rejectStepReviewsForSession } from './stepReviewBroker';
 import { native } from 'ugly-app/native';
+import { getCodingAgentModels } from 'ugly-app/shared';
 import { filterToolsByToolset, type Toolset } from './toolsets';
 import { spawnCollect } from '../../agent/tools/spawn';
 
@@ -361,7 +362,7 @@ function applySelection(s: SessionAgentState, sel?: AgentSelection): void {
  * forgets its goal. Structural (no extra AI call): the task + a bulleted trail of
  * the assistant's text + tool calls from the dropped turns.
  */
-function buildCompactionSummary(taskText: string, dropped: AgentMessage[]): string {
+function mechanicalSummary(taskText: string, dropped: AgentMessage[]): string {
   const trail: string[] = [];
   for (const m of dropped) {
     if (m.role !== 'assistant' || !Array.isArray(m.content)) continue;
@@ -381,6 +382,79 @@ function buildCompactionSummary(taskText: string, dropped: AgentMessage[]): stri
   if (taskText) parts.push(`\nOriginal task:\n${taskText.slice(0, 1000)}`);
   if (trail.length) parts.push(`\nWork done so far (most recent last):\n${trail.slice(-50).join('\n')}`);
   return parts.join('\n');
+}
+
+/** Render dropped turns (assistant text + tool CALLS + tool RESULTS) into a transcript
+ *  for the summariser — capped so the summary call itself stays small. The old
+ *  mechanical trail logged only WHICH tools ran, dropping every result; this keeps the
+ *  results (test failures, file contents read, command output) that the summary needs. */
+function renderDropped(dropped: AgentMessage[]): string {
+  const lines: string[] = [];
+  for (const m of dropped) {
+    if (!Array.isArray(m.content)) {
+      if (typeof m.content === 'string' && m.content.trim()) lines.push(`${m.role.toUpperCase()}: ${m.content.trim().slice(0, 600)}`);
+      continue;
+    }
+    for (const b of m.content as Record<string, unknown>[]) {
+      if (b.type === 'text' && typeof b.text === 'string' && b.text.trim()) {
+        lines.push(`${m.role === 'assistant' ? 'ASSISTANT' : 'NOTE'}: ${b.text.trim().slice(0, 600)}`);
+      } else if (b.type === 'tool_use') {
+        lines.push(`TOOL_CALL ${String(b.name)}: ${JSON.stringify(b.input ?? {}).slice(0, 300)}`);
+      } else if (b.type === 'tool_result') {
+        const c = b.content;
+        const s = typeof c === 'string' ? c : Array.isArray(c) ? c.map((x) => (x as { text?: string }).text ?? '').join('') : JSON.stringify(c ?? '');
+        if (s.trim()) lines.push(`TOOL_RESULT: ${s.trim().slice(0, 900)}`);
+      }
+    }
+  }
+  const out = lines.join('\n');
+  return out.length > 44_000 ? out.slice(-44_000) : out; // keep most-recent if huge
+}
+
+/** Content-preserving compaction: an LLM condenses the dropped turns into a dense
+ *  summary that keeps the FINDINGS (reference material read, discoveries), what was
+ *  tried and WHY it failed, current file state, and next steps — not just a log of
+ *  which tools ran. The old mechanical trail dropped every tool result, so a model
+ *  that had read a library's source or gathered debug findings lost them on
+ *  compaction (observed: glm re-reading its file in a stuck loop). Falls back to the
+ *  mechanical trail if the summariser call fails. */
+async function buildCompactionSummary(taskText: string, dropped: AgentMessage[], judge: Judge): Promise<string> {
+  const transcript = renderDropped(dropped);
+  if (!transcript.trim()) return mechanicalSummary(taskText, dropped);
+  const system =
+    'You compress an in-progress coding-agent session so it can continue after the older turns below are removed from its context. Write a DENSE, CONCRETE summary that preserves everything needed to keep working WITHOUT the removed turns: ' +
+    '(1) key facts / reference material the agent discovered (relevant file contents, API/algorithm details, regexes, specific values) — quote the important bits; ' +
+    '(2) what it tried and the OUTCOME — which tests/checks fail and the SPECIFIC error or reason; ' +
+    '(3) files created/modified and their current state; ' +
+    '(4) the concrete next steps / remaining plan. ' +
+    'Omit greetings and narration. Prefer specifics (names, numbers, error messages) over generalities. Output only the summary.';
+  const user = `## Original task\n${taskText.slice(0, 2000)}\n\n## Session so far (oldest first) — compress this:\n${transcript}`;
+  try {
+    const s = (await judge(system, user, 3000)).trim();
+    return s ? `[Earlier turns were compacted into this summary.]\n\n${s}` : mechanicalSummary(taskText, dropped);
+  } catch (e) {
+    console.error('[compaction] LLM summary failed; using mechanical fallback', e instanceof Error ? e.message : String(e));
+    return mechanicalSummary(taskText, dropped);
+  }
+}
+
+// Model context windows (from the catalog) → a model-aware compaction threshold.
+const modelCtxWindow = new Map<string, number>();
+function contextWindowFor(model: string | undefined): number {
+  if (!model) return 128_000;
+  if (modelCtxWindow.size === 0) {
+    try { for (const m of getCodingAgentModels()) modelCtxWindow.set(m.id, m.contextWindow); } catch { /* fall back to default */ }
+  }
+  return modelCtxWindow.get(model) ?? 128_000;
+}
+/** Compact well below the model's real window (leaving response headroom), capped
+ *  for cost/latency. Fixes premature compaction of large-window models: glm/deepseek
+ *  have ~1M windows, but the old flat 120k compacted the VERBOSE one (glm) at ~11% of
+ *  capacity, throwing away reference material + debug findings mid-task. */
+function compactionThreshold(model: string | undefined): number {
+  const RESPONSE_MARGIN = 48_000, FLOOR = 96_000;
+  const CEILING = Number(process.env.UGLY_MAX_CONTEXT ?? 400_000);
+  return Math.max(FLOOR, Math.min(contextWindowFor(model) - RESPONSE_MARGIN, CEILING));
 }
 
 const sessions = new Map<string, SessionAgentState>();
@@ -731,9 +805,9 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     // its original instruction (the system prompt is sent separately and is never
     // compacted; this preserves the user's goal across compactions).
     compaction: {
-      maxContextTokens: 120_000,
+      maxContextTokens: compactionThreshold(state.model),
       keepRecentTurns: 8,
-      summarize: (dropped) => Promise.resolve(buildCompactionSummary(state.taskText, dropped)),
+      summarize: (dropped) => buildCompactionSummary(state.taskText, dropped, agentStepJudge),
     },
     // Live token streaming: create the assistant bubble on the first token, then
     // update it in place as text arrives (onTurn finalizes it authoritatively).
