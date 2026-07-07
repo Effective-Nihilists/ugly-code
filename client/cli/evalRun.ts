@@ -14,7 +14,7 @@ import type { EvalGradeResult, SessionSnapshot } from '../studio/shared/api';
 import { spawnCollect } from '../agent/tools/spawn';
 import { bootDriver, runTurn } from './taskDriver';
 import { isClaudeCliModel } from '../studio/agent/claudeCliAgent';
-import { setSessionToolset, setSessionEval } from '../studio/agent/clientAgent';
+import { setSessionToolset, setSessionEval, setSessionMaxTurns } from '../studio/agent/clientAgent';
 import { isToolset } from '../studio/agent/toolsets';
 import { appendRunHistory } from '../studio/evals/history';
 
@@ -211,6 +211,11 @@ export async function runEval(cfg: {
   await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
   await runReproSetup(task, projectPath); // SBP tasks: uv venv + pip install before the agent
   setSessionEval(sessionId, true); // every CLI run is an eval → criteria judge active under SBV
+  // Honor the TASK's declared step budget instead of the interactive 12-turn cap —
+  // otherwise long-horizon tasks (e.g. the 80-turn ORM migration) get cut off at
+  // turn 12 for the client agent (deepseek/glm) while claude-cli runs its own loop,
+  // making the comparison unfair. The runner's own maxTurns nudge/resume still bound total work.
+  setSessionMaxTurns(sessionId, task.budget.maxTurns);
   if (cfg.toolset && isToolset(cfg.toolset)) setSessionToolset(sessionId, cfg.toolset);
   const selection = cfg.model || cfg.pattern || cfg.modelMode
     ? {

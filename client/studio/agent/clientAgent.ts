@@ -77,6 +77,16 @@ export function setSessionEval(sessionId: string, isEval: boolean): void {
   if (isEval) evalSessions.add(sessionId); else evalSessions.delete(sessionId);
 }
 
+// Per-session agent-step budget override. The interactive default is 12 (a
+// per-message cap so a chat turn can't run away), but an eval must honor the
+// TASK's declared budget.maxTurns — a long-horizon task (e.g. the 80-turn ORM
+// migration) was being cut off at turn 12, so deepseek/glm never finished while
+// claude-cli (its own loop) ran freely. Set before the first turn; default 12.
+const maxTurnsBySession = new Map<string, number>();
+export function setSessionMaxTurns(sessionId: string, maxTurns: number): void {
+  if (Number.isFinite(maxTurns) && maxTurns > 0) maxTurnsBySession.set(sessionId, Math.floor(maxTurns));
+}
+
 /** No-tools LLM completion for the criteria grader — the same governed,
  *  metered /api/agentStep endpoint the main loop + delegate use. */
 const agentStepJudge: Judge = async (system, user, maxTokens = 512) => {
@@ -716,7 +726,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       return filterToolsByToolset(stepGated, toolsetBySession.get(sessionId));
     },
     toolHandlers: makeToolHandlers(sessionId),
-    budget: { maxTurns: 12 },
+    budget: { maxTurns: maxTurnsBySession.get(sessionId) ?? 12 },
     // Pin the task + a work-log into every summary so a long session never loses
     // its original instruction (the system prompt is sent separately and is never
     // compacted; this preserves the user's goal across compactions).
