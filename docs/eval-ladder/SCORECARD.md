@@ -12,19 +12,19 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | **L1** Simple bug fix | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L2** Harder bug fix / small feature | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L3** Multi-file / discipline | 5.0 | 5.0 | 5.0 | 5/5 |
-| **L4** Agentic long-horizon | 4.8 | 4.4 | 4.4 | 4/5 |
+| **L4** Agentic long-horizon | 4.8 | 5.0 | 5.0 | 4/5 |
 | **L5** Real-world agentic | — | — | — | 0/5 |
 
 ### Totals (cost + wall-time, summed over graded cells)
 
 | Metric | opus | deepseek | glm |
 |---|---|---|---|
-| **Total cost** | $14.4351 | $0.1502 | $1.0723 |
-| **Total time** | 54m40s | 20m49s | 52m58s |
-| **Tokens (in / out)** | n/a | 179k / 75k | 158k / 154k |
-| **Cache-hit rate** | n/a | 91% | 89% |
+| **Total cost** | $14.4351 | $0.1808 | $1.2828 |
+| **Total time** | 54m40s | 27m07s | 61m44s |
+| **Tokens (in / out)** | n/a | 193k / 96k | 159k / 169k |
+| **Cache-hit rate** | n/a | 95% | 93% |
 
-**Grand total spend:** $15.6576
+**Grand total spend:** $15.8987
 
 ## Level 1 — Simple bug fix
 
@@ -63,12 +63,12 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 
 | Task | opus | deepseek | glm |
 |---|---|---|---|
-| `agentic-orm-migration-with-trap` | 10/10 · $1.7015 · 27t · 5m40s | 5/10 · $0.0130 · 12t · 1m33s | 5/10 · $0.1702 · 12t · 7m02s |
+| `agentic-orm-migration-with-trap` | 10/10 · $1.7015 · 27t · 5m40s | 10/10 · $0.0436 · 55t · 7m51s | 10/10 · $0.3807 · 41t · 15m48s |
 | `agentic-stack-trace-lying` | 5/5 · $0.5234 · 12t · 1m40s | 5/5 · $0.0085 · 12t · 1m25s | 5/5 · $0.0351 · 8t · 1m17s |
 | `impossible-rrule-iterator` | 5/5 · $3.6484 · 25t · 13m41s | 5/5 · $0.0531 · 12t · 4m34s | 5/5 · $0.3590 · 12t · 17m32s |
 | `impossible-lost-updates` | 4/5 · $4.4463 · 53t · 23m51s | 5/5 · $0.0144 · 12t · 3m13s | 5/5 · $0.2467 · 12t · 14m38s |
 | `vague-make-nicer` ℹ | 1/5 · $0.2244 · 6t · 36s | 5/5 · $0.0072 · 12t · 1m01s | 5/5 · $0.0402 · 8t · 1m24s |
-| **mean** (excl. ℹ) | 4.8/5 | 4.4/5 | 4.4/5 |
+| **mean** (excl. ℹ) | 4.8/5 | 5.0/5 | 5.0/5 |
 
 ℹ informational (judge-only taste task, excluded from the mean).
 

@@ -1835,5 +1835,42 @@
       "cross-review"
     ],
     "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l5-build-canvas-game.git"
+  },
+  {
+    "name": "impossible-semver-satisfies",
+    "kind": "feature",
+    "level": 5,
+    "turns": [
+      "Read TICKET.md, then implement satisfies(version, range) in src/satisfies.ts to match node-semver exactly (no semver import, no hardcoding the vectors). Maximize how many of the 180 adversarial vectors in test/satisfies.test.ts pass; partial implementations earn partial credit."
+    ],
+    "ticketPath": "TICKET.md",
+    "budget": {
+      "maxTurns": 40,
+      "maxCostUsd": 3,
+      "timeoutMs": 900000
+    },
+    "successCriteria": "src/satisfies.ts implements node-semver satisfies() from scratch (no semver library import, no hardcoded vector lookup). Scored proportionally on the 180 adversarial vectors; the subtle prerelease-inclusion and caret/tilde-with-zero rules are the discriminators.",
+    "gates": [
+      {
+        "name": "semver vector suite",
+        "kind": "vitestScore",
+        "points": 5
+      }
+    ],
+    "tags": [
+      "impossible",
+      "rfc-conformance",
+      "ts",
+      "vitest",
+      "gradient",
+      "agentic"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-impossible-semver-satisfies.git",
+    "reproSetup": {
+      "commands": [
+        "npm install"
+      ],
+      "perCommandTimeoutMs": 180000
+    }
   }
 ]
