@@ -13,18 +13,18 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 | **L2** Harder bug fix / small feature | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L3** Multi-file / discipline | 5.0 | 5.0 | 5.0 | 5/5 |
 | **L4** Agentic long-horizon | 4.8 | 5.0 | 5.0 | 5/6 |
-| **L5** Real-world agentic | 2.6 | 3.0 | 2.3 | 5/5 |
+| **L5** Real-world agentic | 2.6 | 3.4 | 3.8 | 5/5 |
 
 ### Totals (cost + wall-time, summed over graded cells)
 
 | Metric | opus | deepseek | glm |
 |---|---|---|---|
-| **Total cost** | $29.5992 | $0.3813 | $2.8539 |
-| **Total time** | 102m13s | 56m08s | 140m50s |
-| **Tokens (in / out)** | n/a | 405k / 202k | 291k / 375k |
-| **Cache-hit rate** | n/a | 95% | 95% |
+| **Total cost** | $32.3981 | $0.4171 | $4.1968 |
+| **Total time** | 107m34s | 54m55s | 161m38s |
+| **Tokens (in / out)** | n/a | 461k / 211k | 573k / 493k |
+| **Cache-hit rate** | n/a | 95% | 94% |
 
-**Grand total spend:** $32.8343
+**Grand total spend:** $37.0120
 
 ## Level 1 — Simple bug fix
 
@@ -32,7 +32,7 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 |---|---|---|---|
 | `smoke-trivial-fix` | 5/5 · $0.1305 · 4t · 16s | 5/5 · $0.0011 · 5t · 13s | 5/5 · $0.0041 · 4t · 11s |
 | `bug-fix-null-check` | 5/5 · $0.2200 · 7t · 21s | 5/5 · $0.0016 · 6t · 17s | 5/5 · $0.0065 · 6t · 19s |
-| `bug-fix-ts-error` | 5/5 · $0.2603 · 9t · 33s | 5/5 · $0.0018 · 7t · 23s | 5/5 · $0.0048 · 4t · 13s |
+| `bug-fix-ts-error` | 5/5 · $0.2603 · 9t · 33s | 5/5 · $0.0008 · 4t · 14s | 5/5 · $0.0048 · 4t · 13s |
 | `short-numeric-pythagorean-overflow` | 5/5 · $0.1936 · 7t · 23s | 5/5 · $0.0021 · 8t · 22s | 5/5 · $0.0062 · 5t · 17s |
 | `short-regex-email-localpart-strip` | 5/5 · $0.4586 · 7t · 2m00s | 5/5 · $0.0071 · 12t · 1m32s | 5/5 · $0.0506 · 7t · 2m33s |
 | **mean** (excl. ℹ) | 5.0/5 | 5.0/5 | 5.0/5 |
@@ -77,10 +77,10 @@ Per cell: `score/5 · $cost · turns · wall-time`. `turns` = honest assistant t
 
 | Task | opus | deepseek | glm |
 |---|---|---|---|
-| `sbpro-ansible-ansible-39bd8b99` | 2/5 · $3.6266 · 61t · 13m01s | 2/5 · $0.0479 · 33t · 9m03s | 2/5 · $0.5425 · 60t · 25m36s |
-| `boss-chatgpt-clone` | 1/5 · $2.7512 · 41t · 5m36s | 1/5 · $0.0301 · 40t · 3m42s | 2/5 · $0.2942 · 40t · 6m32s |
+| `sbpro-ansible-ansible-39bd8b99` | 2/5 · $4.1943 · 56t · 14m46s | 2/5 · $0.0489 · 35t · 7m36s | 2/5 · $0.5420 · 56t · 22m15s |
+| `boss-chatgpt-clone` | 1/5 · $5.7292 · 66t · 12m37s | 1/5 · $0.0418 · 40t · 4m16s | 2/5 · $0.3362 · 40t · 6m22s |
 | `l5-large-refactor` | 5/5 · $1.4510 · 20t · 4m54s | 4/5 · $0.0239 · 26t · 3m23s | 5/5 · $0.0619 · 11t · 2m25s |
-| `l5-improve-the-harness` | 5/5 · $2.0955 · 16t · 8m26s | 5/5 · $0.0327 · 22t · 5m25s | 0/5 · $0.1327 · 20t · 17m59s |
-| `l5-build-canvas-game` | 0/5 · $3.6019 · 54t · 8m26s | 3/5 · $0.0311 · 28t · 3m38s | — |
-| **mean** (excl. ℹ) | 2.6/5 | 3.0/5 | 2.3/5 |
+| `l5-improve-the-harness` | 8/10 · $4.6882 · 41t · 12m31s | 10/10 · $0.0587 · 12t · 3m52s | 10/10 · $0.4780 · 18t · 4m15s |
+| `l5-build-canvas-game` | 1/5 · $0.2624 · 3t · 56s | 5/5 · $0.0292 · 40t · 5m00s | ⚠ 5/5 · $0.9561 · 50t · 38m03s |
+| **mean** (excl. ℹ) | 2.6/5 | 3.4/5 | 3.8/5 |
 
