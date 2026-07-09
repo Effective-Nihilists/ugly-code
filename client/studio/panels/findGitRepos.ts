@@ -20,7 +20,8 @@ function runFind(root: string): Promise<string> {
     try {
       const p = native.process.spawn('bash', [
         '-c',
-        `find -L "${root.replace(/"/g, '\\"')}" -maxdepth 4 -name ".git" -type d 2>/dev/null | sed 's|/\\.git$||' | grep -v '/node_modules/' | sort`,
+        // -type d catches normal .git dirs; -type f catches submodule/worktree .git files.
+        `(find -L "${root.replace(/"/g, '\\"')}" -maxdepth 4 -name ".git" -type d 2>/dev/null; find -L "${root.replace(/"/g, '\\"')}" -maxdepth 4 -name ".git" -type f 2>/dev/null) | sed 's|/\\.git$||' | grep -v '/node_modules/' | sort -u`,
       ]);
       p.onStdout((c) => (out += c));
       p.onStderr((c) => (err += c));

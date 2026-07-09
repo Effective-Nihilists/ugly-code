@@ -170,7 +170,7 @@ export function GitPanel(): React.ReactElement {
     <div data-id="git-panel" style={S.root}>
       <div style={S.bar}>
         <span style={S.branch}>⎇ {branch || '—'}</span>
-        {repos.length > 1 ? (
+        {repos.length > 0 ? (
           <select
             data-id="git-repo-select"
             style={S.repoSelect}
