@@ -5,7 +5,7 @@ import { SessionSnapshotSchema } from '../shared/api';
 import { spliceMissingUserRows } from '../agent/messageBackfill';
 import { parseCodebaseReadinessEvent } from '../agent/codebaseReadinessEvent';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
-import { onCustomMessage } from './useSocket';
+import { onCustomMessage, getSessionModel, getSessionAxes } from './useSocket';
 import { subscribeEditorLspStatus } from '../agent/lsp/registry';
 
 export interface ToolUse {
@@ -1156,8 +1156,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // default. Project Home owns the global "what model should NEW
   // sessions start with" setting and passes it explicitly to the
   // first chatCreate; subsequent in-session swaps stay local.
+  // Restore the per-session axes the user last picked (persisted in localStorage by
+  // useSocket) so a RELOAD shows them instead of the global defaults. The worker no
+  // longer echoes these back into the header (that caused the session to appear to
+  // switch its own model/plan/reasoning), so this mount state IS the UI source of
+  // truth until the user changes an axis. Model + reasoning are also confirmed by the
+  // chatCreate response below; the others are client-only.
+  const seededAxes = initialSessionId ? getSessionAxes(initialSessionId) : {};
+  const seededModel = initialSessionId ? getSessionModel(initialSessionId) : null;
   const [model, setModel] = useState<string>(
-    () => initialModel ?? DEFAULT_MODEL,
+    () => seededModel ?? initialModel ?? DEFAULT_MODEL,
   );
   // A ref mirror of `model` so synchronous callers (handleHeroSubmit → setModelMode
   // → sendMessage → startNewChat, all in one tick before re-render) read the
@@ -1170,7 +1178,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // down in the UI when they need latency back. Resumed sessions
   // overwrite this from disk via the chatCreate response.
   const [reasoningEffort, setReasoningEffortState] =
-    useState<ReasoningEffort>('max');
+    useState<ReasoningEffort>(() => (seededAxes.reasoningEffort as ReasoningEffort | undefined) ?? 'max');
   // Ref mirror so a same-tick hero pre-pick (handleHeroSubmit → switchReasoningEffort
   // → sendMessage → startNewChat, before any re-render) reaches chatCreate instead of
   // the stale closure default. Mirrors the `modelRef` pattern below.
@@ -1281,14 +1289,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // get the *State suffix because the public callbacks (setPermissionMode
   // etc., defined as useCallback below) wrap them with server RPC calls.
   const [permissionMode, setPermissionModeState] =
-    useState<SessionSnapshot['permissionMode']>('edit');
+    useState<SessionSnapshot['permissionMode']>(
+      () => (seededAxes.permissionMode as SessionSnapshot['permissionMode'] | undefined) ?? 'edit',
+    );
   const [modelMode, setModelModeState] = useState<SessionSnapshot['modelMode']>(
-    {
-      kind: 'auto',
-    },
+    () => (seededAxes.modelMode as SessionSnapshot['modelMode'] | undefined) ?? { kind: 'auto' },
   );
   const [patternMode, setPatternModeState] =
-    useState<SessionSnapshot['patternMode']>('auto');
+    useState<SessionSnapshot['patternMode']>(
+      () => (seededAxes.patternMode as SessionSnapshot['patternMode'] | undefined) ?? 'auto',
+    );
   // Ref mirrors of the three axes so a same-tick new-session hero pre-pick reaches
   // `chatCreate` (see reasoningEffortRef / modelRef). The setters below write these
   // synchronously; `startNewChat` reads `.current` so it never sends a stale default.

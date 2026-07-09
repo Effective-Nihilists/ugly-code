@@ -262,7 +262,7 @@ function patchSessionAxes(sessionId: string, patch: SessionAxes): void {
   try { localStorage.setItem(axesKey(sessionId), JSON.stringify(merged)); } catch { /* ignore */ }
 }
 /** Session axes, hydrated from localStorage on the first read after a reload. */
-function getSessionAxes(sessionId: string): SessionAxes {
+export function getSessionAxes(sessionId: string): SessionAxes {
   const inMem = sessionAxes.get(sessionId);
   if (inMem) return inMem;
   try {

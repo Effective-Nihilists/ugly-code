@@ -9,7 +9,7 @@
 
 import { native } from 'ugly-app/native';
 import type { ContentPart } from 'ugly-app/agent/client';
-import type { AgentMessage } from '../../../shared/agent';
+import type { AgentMessage, AgentContentPart } from '../../../shared/agent';
 import { setSessionStore, getSessionStore, type SessionStore } from './sessionStore';
 
 async function api<T>(name: string, input: unknown): Promise<T | null> {
@@ -187,14 +187,32 @@ export interface ResumeContext {
  * user message gets a continue-ready assistant turn. Pure + exported for tests.
  */
 export function reconstructResumeContext(rows: StoredMessageRow[], sessionId: string): ResumeContext {
-  const messages: AgentMessage[] = [];
+  const raw: AgentMessage[] = [];
   const activeRows: ActiveRow[] = [];
   let maxSeq = -1;
   for (const r of rows) {
     maxSeq = Math.max(maxSeq, r.seq);
     const id = r.kind === 'summary' ? `${sessionId}:summary:${r.seq}` : `${sessionId}:${r.seq}`;
     activeRows.push({ seq: r.seq, id });
-    messages.push(rowToMessage(r));
+    raw.push(rowToMessage(r));
+  }
+  // Collapse CONSECUTIVE same-role messages into one. Providers (deepseek et al.)
+  // require strict user/assistant alternation; a mid-turn STEER persists a standalone
+  // user row that can land right after a tool_result user row, and compaction can
+  // leave adjacent same-role rows too — either would 400 the next request. Merging
+  // their content keeps the request valid without losing anything.
+  const asParts = (c: AgentMessage['content']): AgentContentPart[] =>
+    Array.isArray(c) ? c : [{ type: 'text' as const, text: c }];
+  const messages: AgentMessage[] = [];
+  let prev: AgentMessage | undefined;
+  for (const m of raw) {
+    if (prev?.role === m.role) {
+      prev = { role: m.role, content: [...asParts(prev.content), ...asParts(m.content)] };
+      messages[messages.length - 1] = prev;
+    } else {
+      prev = m;
+      messages.push(m);
+    }
   }
   const tail = messages.at(-1);
   if (tail?.role === 'assistant' && Array.isArray(tail.content)) {

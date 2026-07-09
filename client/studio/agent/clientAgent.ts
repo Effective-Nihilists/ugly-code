@@ -382,11 +382,10 @@ interface SessionAgentState {
   /** Parked `pauseForUserReviewAfter` gates awaiting the user's approve/iterate
    *  reply. Echoed in `session_state` so the IDE renders the StepReviewCard. */
   pendingStepReviews: SessionSnapshot['pendingStepReviews'];
-  /** Serialize turns per session. A message sent WHILE a turn is running is queued
-   *  here and run when the active turn finishes — sending mid-turn must not throw
-   *  "a turn is already in progress" (the underlying controller is single-flight). */
+  /** True while a turn is running for this session. A message sent while true is
+   *  STEERED into the live turn (controller.steer) rather than starting a new turn or
+   *  throwing "a turn is already in progress" (the controller is single-flight). */
   turnRunning: boolean;
-  pendingSends: { userText: string; selection?: AgentSelection }[];
 }
 
 // Codebase analysis (semantic index + architecture doc) runs per SESSION, decoupled from the
@@ -830,7 +829,6 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     currentStepIter: 0,
     pendingStepReviews: [],
     turnRunning: false,
-    pendingSends: [],
   };
   applySelection(state, selection);
   state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: state.model });
@@ -1036,7 +1034,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
           event: { type: 'agent_event', payload: { payload: {
             type: 'agent_finished',
             reason: e.type,
-            diag: { ranMs: tick.sinceStartMs, msgCount: state.messageCount, promptTokens: state.promptTokens, cacheReadTokens: state.cacheReadTokens, model: state.model },
+            // For reason='error', carry the message into telemetry so a bug report
+            // captures the ACTUAL failure (e.g. a "tool use issue") — the ⚠ bubble
+            // text isn't recorded verbatim in the browser recentLogs.
+            diag: { ranMs: tick.sinceStartMs, msgCount: state.messageCount, promptTokens: state.promptTokens, cacheReadTokens: state.cacheReadTokens, model: state.model, ...(e.type === 'error' && 'message' in e ? { errMsg: String((e as { message: unknown }).message).slice(0, 400) } : {}) },
           } } },
         });
       }
@@ -1082,12 +1083,14 @@ export async function runClientAgentTurn(
   selection?: AgentSelection,
 ): Promise<void> {
   const state = getOrCreate(sessionId, emit, selection);
-  // Serialize turns per session. If one is already running, QUEUE this message and
-  // run it when the active turn finishes — the renderer already shows the user's
-  // optimistic bubble, so it simply lands after the current reply instead of failing
-  // with "a turn is already in progress" (the reported mid-turn send bug).
+  // If a turn is already running, STEER it: fold this message into the live turn
+  // (ugly-app runAgent.steer) so the model reacts to it at its next step, instead of
+  // failing with "a turn is already in progress" or deferring it to a whole new turn.
+  // Show + persist it so it's part of the transcript at its real position.
   if (state.turnRunning) {
-    state.pendingSends.push({ userText, ...(selection ? { selection } : {}) });
+    const steerMsgId = persistRow(state, sessionId, 'user', userText);
+    emitMessage(emit, sessionId, 'user', [{ type: 'text', data: { text: userText } }], { id: steerMsgId, action: 'created' });
+    state.controller.steer(userText);
     return;
   }
   state.turnRunning = true;
@@ -1095,15 +1098,6 @@ export async function runClientAgentTurn(
     await runOneClientAgentTurn(state, sessionId, userText, emit);
   } finally {
     state.turnRunning = false;
-    const next = state.pendingSends.shift();
-    if (next) {
-      // Run the next queued message on the session's live emit. Fire-and-forget:
-      // this recursion re-enters the guard above (turnRunning is now false). Guard
-      // the tail against an unhandled rejection (turn errors normally surface as a
-      // ⚠ bubble via the controller, but workspace/resume setup can still throw).
-      void runClientAgentTurn(sessionId, next.userText, state.emitRef.current, next.selection)
-        .catch((e: unknown) => { console.error('[clientAgent] queued turn failed', sessionId, e); });
-    }
   }
 }
 
