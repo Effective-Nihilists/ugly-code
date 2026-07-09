@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { InferDocType } from 'ugly-app/shared';
 import { defineCollections } from 'ugly-app/shared';
+import { sessionConfigSchema } from './sessionConfig';
 
 // ─── Coding-agent session collections (own module ON PURPOSE) ────────────────
 // The coding chat runs client-side (client/studio/agent/clientAgent.ts); these
@@ -29,6 +30,10 @@ export const CodingSessionSchema = z.object({
   messageCount: z.number(),
   costUsd: z.number(),
   archived: z.boolean(),
+  // The session's run configuration (model + run modes) — strictly typed and
+  // server-persisted so every browser opening the session sees the same picks. See
+  // shared/sessionConfig.ts. Optional for backward-compat with rows written before.
+  config: sessionConfigSchema.optional(),
 });
 export type CodingSessionKind = 'main' | 'session';
 export type CodingSessionStatus = 'running' | 'idle' | 'done' | 'error';

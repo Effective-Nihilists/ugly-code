@@ -10,6 +10,7 @@
 import { native } from 'ugly-app/native';
 import type { ContentPart } from 'ugly-app/agent/client';
 import type { AgentMessage, AgentContentPart } from '../../../shared/agent';
+import type { SessionConfig } from '../../../shared/sessionConfig';
 import { setSessionStore, getSessionStore, type SessionStore } from './sessionStore';
 
 async function api<T>(name: string, input: unknown): Promise<T | null> {
@@ -130,6 +131,8 @@ export interface SessionListRow {
   costUsd: number;
   created: number;
   updated: number;
+  /** The session's strictly-typed run config (absent on rows written before it). */
+  config?: SessionConfig;
 }
 
 // The server-backed store (the default). `sessionApi` below delegates to whichever

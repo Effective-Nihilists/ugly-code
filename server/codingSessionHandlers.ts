@@ -56,6 +56,9 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         messageCount: input.messageCount ?? existing?.messageCount ?? 0,
         costUsd: input.costUsd ?? existing?.costUsd ?? 0,
         archived: existing?.archived ?? false,
+        // The session config is written by chatCreate + the axis set* RPCs; a plain
+        // persistMeta (worker turn) omits it, so preserve the stored value.
+        ...((input.config ?? existing?.config) ? { config: input.config ?? existing?.config } : {}),
         ...dbDefaults(),
         // Preserve the original creation time across updates.
         ...(existing ? { created: existing.created } : {}),
@@ -135,6 +138,7 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
           status: d.status, messageCount: d.messageCount, costUsd: d.costUsd,
           created: new Date(d.created).getTime(),
           updated: new Date(d.updated).getTime(),
+          ...(d.config ? { config: d.config } : {}),
         })),
       };
     },

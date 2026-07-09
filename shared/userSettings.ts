@@ -14,6 +14,7 @@
  * reads zod-parse the blob and merge it over DEFAULT_USER_SETTINGS.
  */
 import { z } from 'zod';
+import { sessionConfigDefaultsSchema } from './sessionConfig';
 
 // The `codingAgent` block mirrors the studio's `getUserSettings` output
 // (client/studio/shared/api.ts). Optional fields are advanced/aux-model knobs a
@@ -42,6 +43,10 @@ export const codingAgentSettingsSchema = z.object({
   superSpecModels: z.array(z.string()).optional(),
   superSynthesisModel: z.string().optional(),
   superInjectionStyle: z.enum(['advisory', 'imperative']).optional(),
+  // The user's LAST-picked session config (model + run modes), remembered so a NEW
+  // coding session defaults to it. Per-session picks live on the session itself
+  // (CodingSession.config); this is only the seed for freshly-created sessions.
+  sessionDefaults: sessionConfigDefaultsSchema.optional(),
 });
 export type CodingAgentSettings = z.infer<typeof codingAgentSettingsSchema>;
 
@@ -79,6 +84,8 @@ export const userSettingsPatchSchema = z.object({
       superSpecModels: z.array(z.string()).optional(),
       superSynthesisModel: z.string().nullable().optional(),
       superInjectionStyle: z.enum(['advisory', 'imperative']).nullable().optional(),
+      // Remembered defaults for new sessions (see CodingSession.config).
+      sessionDefaults: sessionConfigDefaultsSchema.optional(),
     })
     .optional(),
 });
@@ -129,6 +136,10 @@ export function mergeUserSettings(base: UserSettings, patch: UserSettingsPatch):
       expensiveParallel: p.expensiveParallel ?? ca.expensiveParallel,
       // Optional scalar/model knobs: `null` clears, `undefined` keeps base.
       ...mergeOptional(ca, p),
+      // Remembered new-session defaults: merge the patch over the stored value.
+      ...(p.sessionDefaults !== undefined
+        ? { sessionDefaults: { ...ca.sessionDefaults, ...p.sessionDefaults } }
+        : {}),
     },
   };
 }

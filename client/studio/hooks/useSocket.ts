@@ -252,7 +252,7 @@ interface SessionAxes {
 }
 const sessionAxes = new Map<string, SessionAxes>();
 const axesKey = (sid: string): string => `ugly-studio:axes:${sid}`;
-function patchSessionAxes(sessionId: string, patch: SessionAxes): void {
+export function patchSessionAxes(sessionId: string, patch: SessionAxes): void {
   if (!sessionId) return;
   const merged = { ...(sessionAxes.get(sessionId) ?? {}), ...patch };
   sessionAxes.set(sessionId, merged);

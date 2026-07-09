@@ -5,7 +5,16 @@ import { SessionSnapshotSchema } from '../shared/api';
 import { spliceMissingUserRows } from '../agent/messageBackfill';
 import { parseCodebaseReadinessEvent } from '../agent/codebaseReadinessEvent';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
-import { onCustomMessage, getSessionModel, getSessionAxes } from './useSocket';
+import { onCustomMessage, getSessionModel, getSessionAxes, setSessionModel, patchSessionAxes } from './useSocket';
+import {
+  readServerConfig,
+  writeServerConfig,
+  completeConfig,
+  axesToConfig,
+  coerceModelMode,
+  type AxisState,
+} from '../agent/sessionConfigStore';
+import type { SessionConfig, SessionConfigDefaults } from '../../../shared/sessionConfig';
 import { subscribeEditorLspStatus } from '../agent/lsp/registry';
 
 export interface ToolUse {
@@ -3499,6 +3508,89 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       cancelled = true;
     };
   }, [app]);
+
+  // ── Per-session config (server-persisted) ──────────────────────────────────
+  // The header axes (model/mode/plan/reasoning/pattern) are a PER-SESSION setting
+  // stored on the CodingSession doc, so any browser that opens the session sees the
+  // same values (localStorage is only an instant-render cache, corrected here). A
+  // brand-new session is seeded from the user's remembered `sessionDefaults` and
+  // persisted; changing an axis writes back to THIS session (never others) and
+  // updates the user default so the next new session starts there. See
+  // shared/sessionConfig.ts.
+  const configSeededRef = useRef<string | null>(null);
+  const lastPersistedConfigRef = useRef<string>('');
+  useEffect(() => {
+    if (!sessionId || !app || configSeededRef.current === sessionId) return;
+    configSeededRef.current = sessionId;
+    let cancelled = false;
+    const applyConfig = (c: SessionConfig): void => {
+      setModel(c.model);
+      setModelModeState(c.mode);
+      setPermissionModeState(c.perm);
+      setReasoningEffortState(c.reasoning);
+      setPatternModeState(c.pattern);
+      // Hydrate the buildSelection cache so the next turn runs with these values.
+      setSessionModel(sessionId, c.model);
+      patchSessionAxes(sessionId, {
+        modelMode: c.mode,
+        permissionMode: c.perm,
+        reasoningEffort: c.reasoning,
+        patternMode: c.pattern,
+      });
+    };
+    void (async () => {
+      const fallback: AxisState = { model, modelMode: coerceModelMode(modelMode), permissionMode, reasoningEffort, patternMode };
+      try {
+        const stored = await readServerConfig(sessionId);
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- flipped true in the effect cleanup; TS can't see the deferred write.
+        if (cancelled) return;
+        let config: SessionConfig;
+        if (stored) {
+          config = stored; // resume/open → the session's authoritative server value
+        } else {
+          // New session → seed from the user's remembered defaults, then persist.
+          const socket = app.socket as unknown as { request(n: string, i: unknown): Promise<unknown> };
+          const settings = (await socket
+            .request('getUserSettings', {})
+            .catch(() => null)) as { codingAgent?: { sessionDefaults?: SessionConfigDefaults } } | null;
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- flipped true in the effect cleanup; TS can't see the deferred write.
+          if (cancelled) return;
+          // New session → seed the header + cache from the user's defaults. Do NOT
+          // persist yet (that would create an empty session doc / sidebar spam); the
+          // worker's persistMeta writes the config on the session's first turn.
+          config = completeConfig(settings?.codingAgent?.sessionDefaults, fallback);
+        }
+        applyConfig(config);
+        lastPersistedConfigRef.current = JSON.stringify(config);
+      } catch {
+        /* keep the local instant-render values */
+      }
+    })();
+    return () => { cancelled = true; };
+    // Seed ONCE per session — axis values are read via closure, not deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, app]);
+
+  // Persist header axis CHANGES to THIS session (server) and remember them as the
+  // user's default for new sessions. Guarded so the initial seed above doesn't
+  // re-persist or overwrite the user default.
+  const sessionStarted = messages.length > 0;
+  useEffect(() => {
+    if (!sessionId || configSeededRef.current !== sessionId) return;
+    const config = axesToConfig({ model, modelMode: coerceModelMode(modelMode), permissionMode, reasoningEffort, patternMode });
+    const json = JSON.stringify(config);
+    if (json === lastPersistedConfigRef.current) return;
+    lastPersistedConfigRef.current = json;
+    // Persist to THIS session only if its doc already exists (has turns) — a
+    // not-yet-started session gets its config from the worker's first persistMeta,
+    // so writing here would create an empty doc. Always remember the pick as the
+    // user default for new sessions.
+    if (sessionStarted) void writeServerConfig(sessionId, config);
+    if (app) {
+      const socket = app.socket as unknown as { request(n: string, i: unknown): Promise<unknown> };
+      void socket.request('updateUserSettings', { codingAgent: { sessionDefaults: config } }).catch(() => {/* best-effort */});
+    }
+  }, [model, modelMode, permissionMode, reasoningEffort, patternMode, sessionId, app, sessionStarted]);
 
   const switchReasoningEffort = useCallback(
     (next: ReasoningEffort) => {

@@ -2,6 +2,7 @@ import { authReq, defineMessages, defineRequests, frameworkMessages, frameworkRe
 import { agentMessageSchema } from './agent';
 import { agentTurnRequestSchema, agentTurnResponseSchema } from 'ugly-app/agent/shared';
 import { userSettingsSchema, userSettingsPatchSchema } from './userSettings';
+import { sessionConfigSchema } from './sessionConfig';
 
 export const requests = defineRequests({
   // Standardized client-driven agent turn (ugly-app/agent). The studio coding
@@ -149,6 +150,8 @@ export const requests = defineRequests({
       status: z.enum(['running', 'idle', 'done', 'error']).optional(),
       messageCount: z.number().int().min(0).optional(),
       costUsd: z.number().min(0).optional(),
+      // The session's strictly-typed run config (see shared/sessionConfig.ts).
+      config: sessionConfigSchema.optional(),
     }),
     output: z.object({ ok: z.boolean() }),
     rateLimit: { max: 240, window: 60 },
@@ -216,6 +219,8 @@ export const requests = defineRequests({
           costUsd: z.number(),
           created: z.number(),
           updated: z.number(),
+          // The session's strictly-typed run config; absent on old rows.
+          config: sessionConfigSchema.optional(),
         }),
       ),
     }),

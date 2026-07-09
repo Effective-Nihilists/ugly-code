@@ -2,6 +2,7 @@
 // here so the surface (studio → server, CLI → filesystem) can be swapped without
 // touching the agent loop. The server impl is registered as the default.
 import type { StoredRole, StoredMessageRow, SessionListRow } from './serverSessionApi';
+import type { SessionConfig } from '../../../shared/sessionConfig';
 
 export interface SessionStore {
   upsert(i: {
@@ -13,6 +14,8 @@ export interface SessionStore {
     status?: 'running' | 'idle' | 'done' | 'error';
     messageCount?: number;
     costUsd?: number;
+    /** The session's strictly-typed run config (server-persisted, per session). */
+    config?: SessionConfig;
     // Cumulative token usage, persisted so analyzeRun/scorecards can report
     // cache-hit rate + tokens (the CLI fs store keeps these; the server store
     // may ignore them). Optional — not every agent path tracks tokens.

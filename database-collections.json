@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-05T21:26:42.009Z",
+  "generatedAt": "2026-07-09T04:28:22.743Z",
   "source": "shared/collections.ts",
   "collections": {
     "perfLog": {
@@ -453,6 +453,129 @@
           "archived": {
             "type": "boolean",
             "required": true
+          },
+          "config": {
+            "type": "object",
+            "fields": {
+              "mode": {
+                "type": "union",
+                "variants": [
+                  {
+                    "type": "object",
+                    "fields": {
+                      "kind": {
+                        "type": "literal",
+                        "values": [
+                          "auto"
+                        ],
+                        "required": true
+                      }
+                    },
+                    "required": true
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "kind": {
+                        "type": "literal",
+                        "values": [
+                          "max"
+                        ],
+                        "required": true
+                      }
+                    },
+                    "required": true
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "kind": {
+                        "type": "literal",
+                        "values": [
+                          "single"
+                        ],
+                        "required": true
+                      },
+                      "model": {
+                        "type": "string",
+                        "required": true
+                      }
+                    },
+                    "required": true
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "kind": {
+                        "type": "literal",
+                        "values": [
+                          "group"
+                        ],
+                        "required": true
+                      },
+                      "models": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "required": true
+                        },
+                        "required": true
+                      },
+                      "personas": {
+                        "type": "record",
+                        "valueType": {
+                          "type": "string",
+                          "required": true
+                        },
+                        "required": false
+                      }
+                    },
+                    "required": true
+                  }
+                ],
+                "required": true
+              },
+              "model": {
+                "type": "string",
+                "required": true
+              },
+              "pattern": {
+                "type": "enum",
+                "values": [
+                  "none",
+                  "auto",
+                  "spec-build-verify",
+                  "super-spec-build-verify",
+                  "quick-edit",
+                  "investigate-fix",
+                  "super-investigate-fix",
+                  "chat-qa",
+                  "chat-advisory"
+                ],
+                "required": true
+              },
+              "perm": {
+                "type": "enum",
+                "values": [
+                  "edit",
+                  "yolo",
+                  "claude-plan"
+                ],
+                "required": true
+              },
+              "reasoning": {
+                "type": "enum",
+                "values": [
+                  "off",
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ],
+                "required": true
+              }
+            },
+            "required": false
           },
           "costUsd": {
             "type": "number",

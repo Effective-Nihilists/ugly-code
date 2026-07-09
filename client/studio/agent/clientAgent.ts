@@ -46,6 +46,7 @@ import {
 import { assistantParts, type Part } from './sessionDisplay';
 import { ensureSessionWorkspace, getSessionWorkspace, removeSessionWorkspace } from './sessionWorkspace';
 import type { ToolName } from '../../../shared/agent';
+import { axesToConfig, coerceModelMode } from '../../../shared/sessionConfig';
 import { getPattern } from './patterns/registry';
 import { decorateForStep, renderStepDecoration, filterToolsForStep } from './patterns/decorate';
 import { type Step, type Pattern, type PatternId, isPatternId, isSuperPattern, superToBasePattern } from './patterns/types';
@@ -609,6 +610,17 @@ function persistCompaction(s: SessionAgentState, sessionId: string, droppedCount
 /** Upsert the session metadata row (title/status/tokens/cost). */
 function persistMeta(s: SessionAgentState, sessionId: string, status: 'running' | 'idle' | 'done' | 'error'): void {
   if (!s.projectId) return;
+  // Persist the session's run config (model + modes) from the applied selection so a
+  // session created here gets its config on its first turn — and any browser that
+  // reopens it sees the same picks. Per-session; the server upsert preserves it when
+  // omitted. See shared/sessionConfig.ts.
+  const config = axesToConfig({
+    model: s.model,
+    modelMode: coerceModelMode(s.modelMode),
+    permissionMode: s.permissionMode,
+    reasoningEffort: s.reasoningEffort,
+    patternMode: s.patternMode,
+  });
   void sessionApi.upsert({
     sessionId,
     projectId: s.projectId,
@@ -621,6 +633,7 @@ function persistMeta(s: SessionAgentState, sessionId: string, status: 'running' 
     completionTokens: s.completionTokens,
     cacheReadTokens: s.cacheReadTokens,
     cacheCreationTokens: s.cacheCreationTokens,
+    config,
   });
 }
 
