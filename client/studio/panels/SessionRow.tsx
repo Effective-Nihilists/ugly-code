@@ -46,6 +46,8 @@ export interface SessionRowData {
   totalTokens: number;
   /** Cumulative USD cost from in-memory `info`. */
   totalCost: number;
+  /** Git branch this session operates on. Rendered as a monospace pill after the title. */
+  branch?: string;
 }
 
 export interface SessionRowProps {
@@ -166,6 +168,26 @@ export function SessionRow({
         >
           {compact && <StatusDot running={session.running} />}
           {session.title}
+          {session.branch && (
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9.5,
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+                color: session.branch === 'main' ? 'var(--text-muted)' : 'var(--text-secondary)',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: 3,
+                padding: '1px 5px',
+                flexShrink: 0,
+                marginLeft: 4,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {session.branch}
+            </span>
+          )}
         </div>
         {deleting ? (
           <span

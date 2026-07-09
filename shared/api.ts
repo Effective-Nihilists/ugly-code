@@ -152,6 +152,8 @@ export const requests = defineRequests({
       costUsd: z.number().min(0).optional(),
       // The session's strictly-typed run config (see shared/sessionConfig.ts).
       config: sessionConfigSchema.optional(),
+      // The git branch the session operates on (server-persisted, cross-browser).
+      branch: z.string().optional(),
     }),
     output: z.object({ ok: z.boolean() }),
     rateLimit: { max: 240, window: 60 },
@@ -221,6 +223,8 @@ export const requests = defineRequests({
           updated: z.number(),
           // The session's strictly-typed run config; absent on old rows.
           config: sessionConfigSchema.optional(),
+          // The git branch (or 'main') this session operates on.
+          branch: z.string().optional(),
         }),
       ),
     }),

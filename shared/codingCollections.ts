@@ -34,6 +34,10 @@ export const CodingSessionSchema = z.object({
   // server-persisted so every browser opening the session sees the same picks. See
   // shared/sessionConfig.ts. Optional for backward-compat with rows written before.
   config: sessionConfigSchema.optional(),
+  // The git branch (or 'main') this session operates on. Server-persisted so
+  // every browser sees the correct branch pill. Only set for worktree sessions;
+  // main-branch sessions omit it (the sidebar resolves to 'main').
+  branch: z.string().optional(),
 });
 export type CodingSessionKind = 'main' | 'session';
 export type CodingSessionStatus = 'running' | 'idle' | 'done' | 'error';

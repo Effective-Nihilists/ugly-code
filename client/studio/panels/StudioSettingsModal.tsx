@@ -21,7 +21,10 @@ import {
   MODEL_SETTING_KEY,
   PATTERN_SETTING_KEY,
   PERMISSION_SETTING_KEY,
+  REASONING_SETTING_KEY,
+  BRANCH_MODE_SETTING_KEY,
 } from './NewSessionHero';
+import type { ReasoningEffort } from './ReasoningSelector';
 
 /**
  * Studio settings panel — surfaces the coding-agent "3-axis" per-user
@@ -128,6 +131,14 @@ export function StudioSettingsModal({
   const [modelMode, setModelMode] = useStudioUserSetting<ModelAxisValue>(
     MODEL_MODE_SETTING_KEY,
     { kind: 'single', model: 'deepseek_v4_pro' },
+  );
+  const [reasoningEffort, setReasoningEffort] = useStudioUserSetting<ReasoningEffort>(
+    REASONING_SETTING_KEY,
+    'high',
+  );
+  const [branchMode, setBranchMode] = useStudioUserSetting<'worktree' | 'main'>(
+    BRANCH_MODE_SETTING_KEY,
+    'worktree',
   );
 
   // Catalog lookup — the multi-select works in `CodingAgentModel`
@@ -417,6 +428,39 @@ export function StudioSettingsModal({
               needed.
             </div>
           )}
+        </Section>
+
+        {/* ── Reasoning default ── */}
+        <Section
+          title="Reasoning default"
+          hint="Controls how much the model thinks before answering each turn. High = deeper reasoning, low = faster."
+        >
+          <select
+            data-id="settings-reasoning-select"
+            value={reasoningEffort}
+            onChange={(e) => { setReasoningEffort(e.target.value as ReasoningEffort); }}
+            style={selectCss}
+          >
+            <option value="high">High — thorough reasoning</option>
+            <option value="medium">Medium — balanced</option>
+            <option value="low">Low — fast</option>
+          </select>
+        </Section>
+
+        {/* ── Branch isolation default ── */}
+        <Section
+          title="Branch isolation"
+          hint="Every new session creates a git worktree by default (isolated from other sessions). Switch to main branch to work directly on the project directory."
+        >
+          <select
+            data-id="settings-branch-mode-select"
+            value={branchMode}
+            onChange={(e) => { setBranchMode(e.target.value as 'worktree' | 'main'); }}
+            style={selectCss}
+          >
+            <option value="worktree">Worktree (isolated branch)</option>
+            <option value="main">Main branch (no isolation)</option>
+          </select>
         </Section>
       </Modal.Body>
       <Modal.Footer>

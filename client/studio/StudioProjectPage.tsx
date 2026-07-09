@@ -211,6 +211,8 @@ export default function StudioProjectPage({
         ...(s.kind === 'main' ? { kind: 'main' as const } : {}),
         updated_at: s.updated,
         model: s.model || 'auto',
+        // Branch is server-persisted for cross-browser visibility.
+        ...(s.branch ? { branch: s.branch } : {}),
       }));
       setStored((prev) => {
         const serverIds = new Set(mapped.map((m) => m.compositeId));
@@ -302,6 +304,7 @@ export default function StudioProjectPage({
       model: s.model,
       totalTokens: 0,
       totalCost: 0,
+      ...(s.branch ? { branch: s.branch } : {}),
     })),
   ];
 

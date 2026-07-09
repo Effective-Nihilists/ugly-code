@@ -180,18 +180,25 @@ async function ensureDeps(dir: string, onProgress: ProgressFn | undefined, onlyI
   return true;
 }
 
+export interface WorkspaceOptions {
+  /** When `'main'`, the session operates directly on the project's main branch
+   *  (no worktree). Default (`'worktree'` or undefined) provisions an isolated
+   *  worktree on a per-session branch. */
+  branchMode?: 'worktree' | 'main';
+}
+
 /** Resolve (creating if needed) the workspace for a session. Idempotent + cached. */
-export async function ensureSessionWorkspace(sessionId: string, projectPath: string | null, onProgress?: ProgressFn): Promise<SessionWorkspace> {
+export async function ensureSessionWorkspace(sessionId: string, projectPath: string | null, onProgress?: ProgressFn, opts?: WorkspaceOptions): Promise<SessionWorkspace> {
   const cached = cache.get(sessionId);
   if (cached) return cached;
   const pending = inflight.get(sessionId);
   if (pending) return pending;
-  const p = provision(sessionId, projectPath, onProgress).finally(() => inflight.delete(sessionId));
+  const p = provision(sessionId, projectPath, onProgress, opts).finally(() => inflight.delete(sessionId));
   inflight.set(sessionId, p);
   return p;
 }
 
-async function provision(sessionId: string, projectPath: string | null, onProgress?: ProgressFn): Promise<SessionWorkspace> {
+async function provision(sessionId: string, projectPath: string | null, onProgress?: ProgressFn, opts?: WorkspaceOptions): Promise<SessionWorkspace> {
   const port = portFor(sessionId);
   if (!projectPath) {
     const ws: SessionWorkspace = { dir: '', port, isWorktree: false };
@@ -219,17 +226,30 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
     }
   } catch { /* ignore */ }
 
-  // The MAIN session operates on the project itself (no worktree). Decide from
-  // the client's own session store (StudioProjectPage flags the first session
-  // 'main') — no DB dependency, so isolation never silently degrades when
-  // persistence is unavailable.
-  let isMain = true;
-  try {
-    const stored = loadSessions(projectPath);
-    const me = stored.find((s) => s.compositeId === sessionId);
-    const hasMain = stored.some((s) => s.kind === 'main');
-    isMain = me ? me.kind === 'main' : !hasMain; // a brand-new session is main iff none exists yet
-  } catch { /* default isMain=true on failure → safe */ }
+  // Decide isolation: `opts.branchMode` overrides the localStorage `kind`.
+  // When branchMode === 'main', the session runs directly on the project directory
+  // (no worktree). When branchMode === 'worktree' and the session isn't the
+  // canonical 'main' session, provision an isolated worktree. Falls back to the
+  // stored `kind` for backward compatibility (sessions created before this option).
+  let isMain: boolean;
+  if (opts?.branchMode === 'main') {
+    isMain = true;
+  } else if (opts?.branchMode === 'worktree') {
+    // Worktree mode: stay on project dir only if this is the canonical main session.
+    try {
+      const stored = loadSessions(projectPath);
+      const me = stored.find((s) => s.compositeId === sessionId);
+      isMain = me ? me.kind === 'main' : false;
+    } catch { isMain = false; }
+  } else {
+    // Legacy path: no branchMode specified — existing behavior.
+    try {
+      const stored = loadSessions(projectPath);
+      const me = stored.find((s) => s.compositeId === sessionId);
+      const hasMain = stored.some((s) => s.kind === 'main');
+      isMain = me ? me.kind === 'main' : !hasMain;
+    } catch { isMain = true; }
+  }
   if (isMain) {
     // The main session runs against the project dir — ensure its deps are installed
     // (only when node_modules is missing) so `pnpm dev` / publish / the DB panel's

@@ -16,6 +16,8 @@ export interface SessionStore {
     costUsd?: number;
     /** The session's strictly-typed run config (server-persisted, per session). */
     config?: SessionConfig;
+    /** The git branch this session operates on (server-persisted for cross-browser visibility). */
+    branch?: string;
     // Cumulative token usage, persisted so analyzeRun/scorecards can report
     // cache-hit rate + tokens (the CLI fs store keeps these; the server store
     // may ignore them). Optional — not every agent path tracks tokens.

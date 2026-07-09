@@ -212,6 +212,8 @@ export interface AgentSelection {
   permissionMode?: SessionSnapshot['permissionMode'];
   modelMode?: SessionSnapshot['modelMode'];
   patternMode?: SessionSnapshot['patternMode'];
+  /** 'worktree' (default) = isolated worktree; 'main' = operate on project dir directly. */
+  branchMode?: 'worktree' | 'main';
 }
 
 const rid = (): string => 'msg_' + Math.random().toString(36).slice(2, 11);
@@ -372,6 +374,8 @@ interface SessionAgentState {
   permissionMode: SessionSnapshot['permissionMode'];
   modelMode: SessionSnapshot['modelMode'];
   patternMode: SessionSnapshot['patternMode'];
+  /** Worktree isolation mode — read by ensureWorkspaceStep on first provision. */
+  branchMode: 'worktree' | 'main';
   /** The active step during a pattern-driven turn (null otherwise). Read by
    *  the live `tools` getter to gate the model's tool list per step. */
   currentStep: Step | null;
@@ -431,6 +435,7 @@ function applySelection(s: SessionAgentState, sel?: AgentSelection): void {
   if (sel.permissionMode) s.permissionMode = sel.permissionMode;
   if (sel.modelMode) s.modelMode = sel.modelMode;
   if (sel.patternMode) s.patternMode = sel.patternMode;
+  if (sel.branchMode) s.branchMode = sel.branchMode;
 }
 
 // composeSessionSnapshot moved to ./sessionSnapshot (shared with the renderer's
@@ -837,6 +842,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     permissionMode: 'edit',
     modelMode: { kind: 'auto' },
     patternMode: 'auto',
+    branchMode: 'worktree',
     currentStep: null,
     resolvedPattern: null,
     currentStepIter: 0,
@@ -1085,7 +1091,15 @@ async function ensureWorkspaceStep(sessionId: string, emit: Emit): Promise<void>
       { id: progressId, action: created ? 'updated' : 'created' },
     );
     created = true;
-  });
+  }, { branchMode: sessions.get(sessionId)?.branchMode });
+  // Persist branch info to the server session so every browser sees the pill.
+  const ws = getSessionWorkspace(sessionId);
+  const st = sessions.get(sessionId);
+  const branch = ws?.branch ?? (st?.branchMode === 'main' ? 'main' : undefined);
+  if (branch) {
+    const projectId = st?.projectId ?? await resolveProjectId(getActiveProjectPath());
+    void sessionApi.upsert({ sessionId, projectId, branch }).catch(() => undefined);
+  }
 }
 
 /** Run one user turn to completion (model ↔ tools), streaming studio events. */

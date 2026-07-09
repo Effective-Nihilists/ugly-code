@@ -89,7 +89,7 @@ import {
   resolveSlashSelection,
   type Skill,
 } from '../hooks/useSlashCommands';
-import { useSocket, getActiveProjectPath } from '../hooks/useSocket';
+import { useSocket, getActiveProjectPath, patchSessionAxes } from '../hooks/useSocket';
 import { isTool } from '../../../shared/agent';
 import { native } from 'ugly-app/native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -6142,6 +6142,9 @@ CodingAgentChatProps = {}) {
       void setPermissionMode(params.permissionMode);
       void setPatternMode(params.patternMode);
       switchReasoningEffort(params.reasoningEffort);
+      // Branch mode is set on the session axes so the first turn's selection
+      // carries it to the desktop task for workspace provisioning.
+      if (sessionId) patchSessionAxes(sessionId, { branchMode: params.branchMode });
       const trimmed = params.prompt.trim();
       if (trimmed) await sendMessage(trimmed);
     },
@@ -6150,6 +6153,7 @@ CodingAgentChatProps = {}) {
       setPermissionMode,
       setPatternMode,
       switchReasoningEffort,
+      sessionId,
       sendMessage,
     ],
   );

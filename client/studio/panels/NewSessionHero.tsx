@@ -60,6 +60,7 @@ export const PERMISSION_SETTING_KEY = 'codingAgentPermissionMode';
 export const MODEL_MODE_SETTING_KEY = 'codingAgentModelMode';
 export const PATTERN_SETTING_KEY = 'codingAgentPatternMode';
 export const REASONING_SETTING_KEY = 'codingAgentReasoningEffort';
+export const BRANCH_MODE_SETTING_KEY = 'codingAgentBranchMode';
 
 /**
  * Max pixel height the prompt textarea will auto-grow to before it
@@ -88,6 +89,8 @@ export interface NewSessionStartParams {
   modelMode: ModelAxisValue;
   patternMode: PatternAxisValue;
   reasoningEffort: ReasoningEffort;
+  /** Worktree isolation or main branch. */
+  branchMode: 'worktree' | 'main';
 }
 
 export interface NewSessionHeroProps {
@@ -133,6 +136,8 @@ export function NewSessionHero({
   );
   const [reasoningEffort, setReasoningEffort] =
     useStudioUserSetting<ReasoningEffort>(REASONING_SETTING_KEY, 'high');
+  const [branchMode, setBranchMode] =
+    useStudioUserSetting<'worktree' | 'main'>(BRANCH_MODE_SETTING_KEY, 'worktree');
 
   // When the user pins a single model via the Model axis, also write
   // that id to the legacy `codingAgentModel` slot so non-hero
@@ -224,6 +229,7 @@ export function NewSessionHero({
         modelMode,
         patternMode,
         reasoningEffort,
+        branchMode,
       };
       // Hand off and reset local state — the hero unmounts almost
       // immediately as SessionLayout swaps the center pane to
@@ -238,6 +244,7 @@ export function NewSessionHero({
       modelMode,
       patternMode,
       reasoningEffort,
+      branchMode,
       onStartCreation,
       pendingEvalTask,
     ],
@@ -496,6 +503,19 @@ export function NewSessionHero({
             style={{
               display: 'flex',
               alignItems: 'center',
+              gap: 8,
+              marginTop: 12,
+              animationDuration: '480ms',
+              animationDelay: '500ms',
+            }}
+          >
+            <BranchModeToggle value={branchMode} onChange={setBranchMode} />
+          </div>
+          <div
+            className="us-fade-up"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
               justifyContent: 'space-between',
               gap: 16,
               marginTop: 16,
@@ -566,5 +586,46 @@ export function NewSessionHero({
           the sidebar so other sessions / project tabs stay
           interactive while creation runs. */}
     </div>
+  );
+}
+/**
+ * Two-segment toggle: Worktree (isolated branch) vs Main branch (direct on project).
+ */
+function BranchModeToggle({
+  value,
+  onChange,
+}: {
+  value: 'worktree' | 'main';
+  onChange: (v: 'worktree' | 'main') => void;
+}): React.ReactElement {
+  const seg: React.CSSProperties = {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.04em',
+    padding: '4px 10px',
+    border: '1px solid var(--border)',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    cursor: 'pointer',
+    flexShrink: 0,
+  };
+  const active: React.CSSProperties = {
+    ...seg,
+    background: 'var(--accent-dim)',
+    color: 'var(--accent)',
+    borderColor: 'var(--accent)',
+  };
+  const left = value === 'worktree' ? { ...active, borderTopLeftRadius: 5, borderBottomLeftRadius: 5 } : { ...seg, borderTopLeftRadius: 5, borderBottomLeftRadius: 5 };
+  const right = value === 'main' ? { ...active, borderTopRightRadius: 5, borderBottomRightRadius: 5 } : { ...seg, borderTopRightRadius: 5, borderBottomRightRadius: 5 };
+  return (
+    <>
+      <button type="button" data-id="branch-mode-worktree" onClick={() => { onChange('worktree'); }} style={left} title="Git worktree on a new branch — isolated from other sessions">
+        ⑂ Worktree
+      </button>
+      <button type="button" data-id="branch-mode-main" onClick={() => { onChange('main'); }} style={right} title="Work directly on the main branch — share the working directory">
+        ⎇ Main branch
+      </button>
+    </>
   );
 }

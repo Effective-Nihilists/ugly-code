@@ -207,6 +207,11 @@ export interface SessionListSidebarSession {
   /** Cumulative USD cost from in-memory `info`. */
   totalCost: number;
   /**
+   * Git branch this session operates on. `'main'` for main-branch sessions,
+   * the worktree branch name for isolated sessions. Rendered as a pill.
+   */
+  branch?: string;
+  /**
    * Parent orchestrator's compositeId when this session is a max-mode
    * peer. Causes the row to render indented under its parent.
    */
@@ -986,6 +991,7 @@ function SessionRowList({
                 model: s.model,
                 totalTokens: s.totalTokens,
                 totalCost: s.totalCost,
+                ...(s.branch ? { branch: s.branch } : {}),
               }}
               active={s.compositeId === activeCompositeId}
               onClick={() => {

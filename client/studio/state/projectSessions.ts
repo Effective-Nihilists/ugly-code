@@ -10,6 +10,8 @@ export interface StoredSession {
   kind?: 'main';
   updated_at: number;
   model: string;
+  /** Branch name (server-persisted, not saved to localStorage). */
+  branch?: string;
 }
 
 const keyFor = (projectPath: string): string => `ugly-studio:sessions:${projectPath}`;
@@ -29,7 +31,10 @@ export function loadSessions(projectPath: string | undefined): StoredSession[] {
 export function saveSessions(projectPath: string | undefined, sessions: StoredSession[]): void {
   if (!projectPath) return;
   try {
-    localStorage.setItem(keyFor(projectPath), JSON.stringify(sessions));
+    // Strip branch before persisting to localStorage — branch is server-persisted
+    // for cross-browser visibility, not stored locally.
+    const stripped = sessions.map(({ branch: _, ...rest }) => rest);
+    localStorage.setItem(keyFor(projectPath), JSON.stringify(stripped));
   } catch {
     /* best effort */
   }

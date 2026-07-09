@@ -249,6 +249,7 @@ interface SessionAxes {
   patternMode?: string;
   permissionMode?: string;
   reasoningEffort?: string;
+  branchMode?: 'worktree' | 'main';
 }
 const sessionAxes = new Map<string, SessionAxes>();
 const axesKey = (sid: string): string => `ugly-studio:axes:${sid}`;

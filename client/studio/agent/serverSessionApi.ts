@@ -133,6 +133,8 @@ export interface SessionListRow {
   updated: number;
   /** The session's strictly-typed run config (absent on rows written before it). */
   config?: SessionConfig;
+  /** The git branch (or 'main') this session operates on. Server-persisted. */
+  branch?: string;
 }
 
 // The server-backed store (the default). `sessionApi` below delegates to whichever
