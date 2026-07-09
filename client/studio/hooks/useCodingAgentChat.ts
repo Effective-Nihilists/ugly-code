@@ -1862,7 +1862,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           return;
         }
         const snap = parsed.data;
-        if (snap.compositeId !== sessionId) return;
+        // Accept the snapshot when its compositeId matches either the current
+        // sessionId OR the initialSessionId that was used to create/resume it.
+        // The outer event filter accepts both (see acceptedSessionId), but during
+        // the ~140ms window between chatCreate fire and setSessionId(newId)
+        // landing, the snapshot arrives with the server's compositeId while the
+        // local sessionId is still null. Dropping it here would lose any
+        // pendingAskUsers the snapshot carries — the ask_user card never renders.
+        if (snap.compositeId !== sessionId && snap.compositeId !== initialSessionId) return;
         applySnapshot(snap);
         return;
       }
@@ -2884,17 +2891,27 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // tab from a prior auto-seed would mount this hook and silently
   // create a session at the default model (`z-ai:glm-5.1`). See the
   // `ws_rua1zyh0mpu3e58o:sess_vf20ctadmpu3e58o` postmortem.
-  const didInitRef = useRef(false);
+  // Guard the mount/resume effect below so it runs once per initialSessionId value.
+  // Without this, a temporarily-empty sessionId placeholder from a prior auto-seed
+  // would mount this hook and silently create a session at the default model. BUT when
+  // the USER switches sessions (initialSessionId changes), the guard must let the new
+  // session through — otherwise the UI stays on the dead session and never re-attaches.
+  const lastInitSessionRef = useRef<string | null>(null);
   useEffect(() => {
-    if (didInitRef.current) return;
-    didInitRef.current = true;
-    if (!initialSessionId) {
-      console.log(
-        `[session-origin] useCodingAgentChat.mountEffect skip ` +
-          `(no initialSessionId — fresh sessions go through NewSessionHero)`,
-      );
-      return;
-    }
+    // Skip when no session to resume, or when we already initialized this id.
+    if (!initialSessionId) return;
+    if (lastInitSessionRef.current === initialSessionId) return;
+    lastInitSessionRef.current = initialSessionId;
+    // Clear stale state from a prior session so the user doesn't see old messages
+    // flash before the new session's history loads in.
+    setMessages([]);
+    setPeerMessages([]);
+    setPeerToolProgress({});
+    setPeerLspState({});
+    setPeerStuckState({});
+    console.log(
+      `[session-origin] useCodingAgentChat.mountEffect chatCreate initialSessionId=${initialSessionId}`,
+    );
     let cancelled = false;
     void (async () => {
       try {
@@ -3025,18 +3042,38 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
 
         if (initialSessionId) {
           try {
-            const { messages: history, hasMore } = (await agentApi(
-              backend.chatListMessages,
-              { sessionId: newId, limit: PAGE_SIZE },
-            )) as { messages?: WireMessage[]; hasMore?: boolean };
+            // Load history up to WINDOW_MAX messages on mount — don't make the user
+            // click "load older" after every reload just to see more than 20 messages.
+            let allHistory: WireMessage[] = [];
+            let beforeId: string | undefined;
+            let hasMore = false;
+            let exhausted = false;
+            while (!exhausted && allHistory.length < WINDOW_MAX) {
+              const page = (await agentApi(backend.chatListMessages, {
+                sessionId: newId,
+                limit: PAGE_SIZE,
+                ...(beforeId ? { beforeId } : {}),
+              })) as { messages?: WireMessage[]; hasMore?: boolean };
+              if (cancelled) return;
+              const msgs = page.messages ?? [];
+              if (msgs.length === 0) break;
+              allHistory = [...msgs, ...allHistory];
+              hasMore = Boolean(page.hasMore);
+              beforeId = msgs[0].id;
+              exhausted = !hasMore;
+            }
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
-            if (cancelled || !Array.isArray(history)) return;
-            setHasMoreOlder(Boolean(hasMore));
+            if (cancelled || allHistory.length === 0) return;
+            setHasMoreOlder(exhausted ? false : hasMore);
             setHasMoreNewer(false);
+            console.log(
+              '[session-origin] resume backfill: loaded=%d hasMoreOlder=%s',
+              allHistory.length, !exhausted,
+            );
             // Replay history through the same handlers used for live
             // streaming events. We don't preserve a `firstTurnSent` flag
             // here — the server already tracks it.
-            for (const m of history) {
+            for (const m of allHistory) {
               if (m.role === 'assistant') processAssistantMessage(m, 'created');
               else if (m.role === 'tool') processToolMessage(m);
               else if (m.role === 'judge') processJudgeMessage(m);
@@ -3122,6 +3159,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     })();
     return () => {
       cancelled = true;
+      if (initialSessionId) {
+        console.log(
+          '[session-origin] useCodingAgentChat.unmount sessionId=%s',
+          initialSessionId,
+        );
+      }
     };
     // Intentionally mount-only — we don't want to re-create the session on
     // every prop change.

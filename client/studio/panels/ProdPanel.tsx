@@ -3,6 +3,7 @@ import { native, permissions } from 'ugly-app/native';
 import { ConsoleText } from '../components/ConsoleText';
 import { LinkifiedText } from '../components/LinkifiedText';
 import { GitRepoSelector, useActiveRepoPath } from './GitRepoSelector';
+import { uglyBotAuthJson } from '../hooks/useSocket';
 
 /** The bits of `.uglyapp`'s persisted deployTarget we surface. */
 interface DeployTarget {
@@ -16,29 +17,7 @@ type UglyProcess = ReturnType<typeof native.process.spawn>;
 const PUBLISH_TOOLS = ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'];
 
 /**
- * `ugly-app publish` authenticates to ugly.bot by reading `~/.ugly-bot/auth.json`
- * ({ token, userId, serverUrl }) — written by the `ugly-app login` CLI flow. A
- * Studio-only user never ran that, so publish failed with "not logged in to
- * ugly.bot" even though Studio itself is logged in. Studio's `auth_token` cookie
- * IS the same ugly.bot SSO JWT (userId = its `sub` claim), so we materialize the
- * CLI auth file from it before publishing. Returns the file's JSON, or null if
- * there's no readable token (then we don't touch the file — the CLI errors as before).
- */
-function uglyBotAuthJson(): string | null {
-  const m = document.cookie.split('; ').find((c) => c.startsWith('auth_token='));
-  const token = m ? m.slice('auth_token='.length) : '';
-  if (!token) return null;
-  try {
-    const seg = token.split('.')[1];
-    const payload = JSON.parse(atob(seg.replace(/-/g, '+').replace(/_/g, '/'))) as { sub?: string };
-    if (!payload.sub) return null;
-    return JSON.stringify({ token, userId: payload.sub, serverUrl: 'https://ugly.bot' });
-  } catch {
-    return null;
-  }
-}
-
-/**
+ * Prod / Publish panel. Mirrors the monolith's PublishTab: shows the deployed
  * Prod / Publish panel. Mirrors the monolith's PublishTab: shows the deployed
  * target (live URL + last deploy) and runs `ugly-app publish` for the open
  * project, streaming the orchestrator's output. The monolith drove a PTY over a

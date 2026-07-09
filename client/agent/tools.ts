@@ -157,6 +157,7 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
   switch (name as AgentToolName) {
     case 'read': {
       const rawPath = String(p.path);
+      if (!rawPath || rawPath === 'undefined') return 'read: `path` is required';
       const raw = await native.fs.readFile(resolvePath(ctx, rawPath));
       return formatHashlineRead(
         rawPath,
@@ -166,13 +167,16 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       );
     }
     case 'write': {
-      const abs = resolvePath(ctx, String(p.path));
+      const rawPath = String(p.path);
+      if (!rawPath || rawPath === 'undefined') return 'write: `path` is required';
+      const abs = resolvePath(ctx, rawPath);
       await native.fs.writeFile(abs, str(p.content ?? ''));
       if (ctx?.sessionId) markDirty(ctx.sessionId, abs);
       return `Wrote ${relativizePath(ctx, abs)}`;
     }
     case 'edit': {
       const rawPath = String(p.path);
+      if (!rawPath || rawPath === 'undefined') return 'edit: `path` is required';
       const path = resolvePath(ctx, rawPath);
       const cur = await native.fs.readFile(path);
       // Accept `old`/`new` as aliases for old_string/new_string (legacy callers).

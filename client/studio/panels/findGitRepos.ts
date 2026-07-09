@@ -120,6 +120,14 @@ export function getCachedRepos(): GitRepo[] {
   return cachedRepos ?? [];
 }
 
+/** Check whether a given repo path is known to have ugly-app as a dependency,
+ *  based on the cached scan results. Returns false (not ugly-app) when the
+ *  scan hasn't finished yet (the cache is still null). */
+export function isRepoUglyApp(repoPath: string): boolean {
+  if (!cachedRepos) return false;
+  return cachedRepos.some((r) => r.path === repoPath && r.isUglyApp);
+}
+
 export async function findAndCacheGitRepos(root: string): Promise<GitRepo[]> {
   cachedRepos = await findGitRepos(root);
   return cachedRepos;

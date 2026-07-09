@@ -113,7 +113,7 @@ export function isConnected(): boolean {
 // The opened project's absolute path now lives in a React-free module (so the agent loop
 // can bundle headless). Re-exported here for existing importers (StudioProjectPage, etc.).
 import { getActiveProjectPath, setActiveProjectPath, getActiveRepoPath } from '../projectPath';
-export { getActiveProjectPath, setActiveProjectPath, getActiveRepoPath };
+export { getActiveProjectPath, setActiveProjectPath, getActiveRepoPath, readAuthTokenCookie };
 
 // ── Background coding-task adoption ──────────────────────────────────────────
 // The coding session runs as a background task (Studio desktop, or mobile via the Ugly
@@ -384,8 +384,8 @@ function runCli(cmd: string): Promise<{ _id: string; created: number; data: Reco
 }
 
 /** Studio's ugly.bot session as the CLI's auth.json blob (owner token needed by
- *  `feedback:resolve`). Mirrors ProdPanel's bridge. */
-function uglyBotAuthJson(): string | null {
+ *  `feedback:resolve`). Mirrored in ProdPanel's bridge — the canonical copy is here. */
+export function uglyBotAuthJson(): string | null {
   const m = document.cookie.split('; ').find((c) => c.startsWith('auth_token='));
   const token = m ? m.slice('auth_token='.length) : '';
   if (!token) return null;

@@ -7,7 +7,10 @@ import { persistDevLog, flushDevLog, readDevLog } from './devServerLog';
 import { readDevControl } from './devServerControl';
 import { ansiToNodes, stripAnsi } from './ansi';
 import { registerFeedbackContextProvider } from 'ugly-app/client';
+
 import { GitRepoSelector, useActiveRepoPath } from './GitRepoSelector';
+import { isRepoUglyApp } from './findGitRepos';
+import { getActiveProjectPath } from '../projectPath';
 
 // The desktop daemon gates `native.process.spawn` on (a) the binary being bundled
 // and (b) a granted `process` capability with the binary allowlisted. Without an
@@ -109,6 +112,15 @@ function startTunnel(d: DevServer, projectPath: string, port: number): void {
 
 function startDev(key: string, projectPath: string, port: number, databaseUrl?: string): void {
   const d = getDev(key, port);
+  // Reject repos that aren't ugly-app projects — `pnpm dev` won't work there.
+  if (!isRepoUglyApp(projectPath)) {
+    d.log = `[error] Cannot start dev server: "${projectPath.split('/').pop()}" is not an ugly-app project.\n` +
+      `The dev server requires \`pnpm dev\` (ugly-app CLI) to run.\n` +
+      `Select an ugly-app project from the repo selector (★).\n`;
+    d.running = false;
+    notify(d);
+    return;
+  }
   d.stopping = true; // killing any prior proc below is intentional, not a crash
   if (d.proc) { try { d.proc.kill(); } catch { /* already gone */ } }
   d.proc = null;
@@ -121,6 +133,13 @@ function startDev(key: string, projectPath: string, port: number, databaseUrl?: 
   d.stopping = false;
   const spec = devServerSpawn(port, databaseUrl);
   const cmdStr = `${spec.cmd} ${spec.args.join(' ')}`;
+  // Log the cwd and whether the selected repo differs from the project root
+  // so error telemetry captures the exact scenario when the dev server fails
+  // after a repo switch. This helps debug "pnpm fails on sub-repo" reports.
+  console.log(
+    '[PreviewPanel:startDev] key=%s port=%d cwd=%s projectPath=%s',
+    key, port, projectPath, getActiveProjectPath(),
+  );
   // Grant the process capability (bundles bash/pnpm/... onto the spawn PATH)
   // before spawning — required on Windows, idempotent elsewhere. The grant is
   // async; do the spawn once it resolves so the daemon doesn't deny it.
@@ -230,7 +249,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
     d.subs.add(forceRender);
     forceRender();
     return () => { d.subs.delete(forceRender); };
-  }, [devKey, port]);
+  }, [activeRepo, devKey, port]);
 
   // Restore the persisted dev-server log on a fresh page load: the module map is
   // wiped on reload, so seed `dev.log` from the on-disk log if it's empty (the

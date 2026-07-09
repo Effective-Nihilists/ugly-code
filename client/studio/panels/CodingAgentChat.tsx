@@ -6072,9 +6072,11 @@ CodingAgentChatProps = {}) {
         'codebaseDiagnostics',
         async (): Promise<Record<string, string>> => {
           const cwd = getActiveProjectPath() ?? '';
+          const activeRepo = new URLSearchParams(window.location.search).get('repo');
           const diag: Record<string, unknown> = {
             nativeAvailable: isNativeAvailable(),
             cwd,
+            activeRepo,
             userAgent: navigator.userAgent,
             readiness: codebaseReadinessRef.current,
           };

@@ -14,7 +14,38 @@ import React from 'react';
 import { getActiveProjectPath, setActiveRepoPath } from '../projectPath';
 import { findAndCacheGitRepos, getCachedRepos, type GitRepo } from './findGitRepos';
 
-// ── Query-string helpers (shared across panels) ──────────────────────────────
+// ── Module-level pub/sub for cross-instance sync ──────────────────────
+// Replaces the fragile `window.dispatchEvent(new PopStateEvent('popstate'))`
+// pattern. Each useQueryParam instance subscribes on mount; set() notifies
+// all subscribers for the same key synchronously, without relying on
+// window events (which are untrusted when dispatched synthetically).
+
+/** Latest committed value per key, so a late-mounting instance seeds
+ *  from the most recent write, not the URL (which replaceState may not
+ *  have flushed yet in some browser implementations). */
+const latestValue = new Map<string, string | null>();
+
+/** Subscriber callbacks per key: `(newValue) => void`. */
+const subscribers = new Map<string, Set<(v: string | null) => void>>();
+
+function subscribe(key: string, cb: (v: string | null) => void): () => void {
+  let set = subscribers.get(key);
+  if (!set) {
+    set = new Set();
+    subscribers.set(key, set);
+  }
+  set.add(cb);
+  return () => { set!.delete(cb); if (set!.size === 0) subscribers.delete(key); };
+}
+
+function notifySubscribers(key: string, value: string | null): void {
+  const set = subscribers.get(key);
+  if (set) {
+    for (const cb of set) cb(value);
+  }
+}
+
+// ── Query-string helpers (shared across panels) ──────────────────────
 
 function readQueryParam(key: string): string | null {
   return new URLSearchParams(window.location.search).get(key);
@@ -27,21 +58,36 @@ function writeQueryParam(key: string, value: string | null): void {
   window.history.replaceState({}, '', url.pathname + url.search);
 }
 
-// ── React hook to read/write a query param ──────────────────────────────────
+// ── React hook to read/write a query param ──────────────────────────
 
 export function useQueryParam(key: string, defaultValue: string | null = null): [string | null, (v: string | null) => void] {
-  const [val, setVal] = React.useState<string | null>(() => readQueryParam(key) ?? defaultValue);
+  // Seed from the module-level cache first (fast path), falling back to URL.
+  const [val, setVal] = React.useState<string | null>(
+    () => latestValue.has(key) ? latestValue.get(key)! : (readQueryParam(key) ?? defaultValue),
+  );
 
+  // Subscribe to cross-instance notifications + browser back/forward.
   React.useEffect(() => {
-    const onPop = (): void => { setVal(readQueryParam(key) ?? defaultValue); };
+    const unsub = subscribe(key, (v) => { setVal(v); });
+    const onPop = (): void => {
+      const qv = readQueryParam(key);
+      // Only react when the value actually changed (avoids re-render on
+      // no-op replaceState calls from other code).
+      if (qv !== (latestValue.get(key) ?? null)) {
+        latestValue.set(key, qv);
+        setVal(qv ?? defaultValue);
+      }
+    };
     window.addEventListener('popstate', onPop);
-    return () => { window.removeEventListener('popstate', onPop); };
+    return () => { unsub(); window.removeEventListener('popstate', onPop); };
   }, [key, defaultValue]);
 
   const set = React.useCallback((v: string | null) => {
     writeQueryParam(key, v);
+    latestValue.set(key, v);
     setVal(v);
-    window.dispatchEvent(new CustomEvent('ugly-studio:repo-changed', { detail: { repo: v } }));
+    // Notify other useQueryParam instances for the same key.
+    notifySubscribers(key, v);
   }, [key]);
 
   return [val, set];
