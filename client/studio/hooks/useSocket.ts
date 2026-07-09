@@ -15,7 +15,6 @@
 import { useContext, useMemo } from 'react';
 import type { AppSocket } from 'ugly-app/client';
 import { native, permissions, taskEntryUrl } from 'ugly-app/native';
-import { waitForTaskRunning } from './taskReady';
 import { buildId } from '../../../shared/Build';
 import type { AppRegistry, ReasoningEffort, SessionSnapshot } from '../shared/api';
 import { composeSessionSnapshot } from '../agent/sessionSnapshot';
@@ -135,42 +134,19 @@ function readAuthTokenCookie(): string {
 /** Start (or re-attach to) the session's coding task + wire its events to emitCustom. */
 async function ensureCodingTask(sessionId: string): Promise<string> {
   const id = 'coding:' + sessionId;
-  const wanted = taskEntryUrl('coding', buildId);
-  // Re-attach to a HEALTHY task from the CURRENT build (renderer reload / another window).
-  // A task left over from a prior deploy runs an old bundle that lacks the methods this
-  // renderer calls (→ "unknown task method: send"), and an exited/errored task can't serve
-  // calls — in those cases stop it and start fresh (the session rebuilds its context from
-  // the DB on the next turn). Entry carries the buildId, so a new deploy never reuses old.
-  //
-  // We must NOT trust a cached `sessionTaskIds` entry on its own: attachCodingTask (the
-  // viewer path) attaches to whatever live task the host has with NO buildId pin, so after a
-  // deploy the cache can point at a STALE task still running the previous bundle. Sends would
-  // then execute old logic (e.g. the pre-fix turn-cap) forever. So ALWAYS validate the live
-  // task's entry against `wanted` (an enum() per send — cheap host IPC — is worth correctness).
-  const existing = (await native.task.enum()).find((t) => t.id === id);
-  const reusable = existing && existing.status !== 'exited' && existing.status !== 'error' && existing.entry === wanted;
-  if (reusable) {
-    sessionTaskIds.set(sessionId, id);
-    wireTaskListener(id);
-    return id;
-  }
-  // Stale (prior build), dead, or missing → replace with a fresh current-build task.
-  //
-  // Stop→start on the SAME id races the host task runner: `stop` kills the old
-  // child ASYNChronously, and its late `exit` event — keyed by id — fires AFTER the
-  // new task is registered, clobbering the fresh record to 'exited' and unwiring its
-  // child ("coding task failed to start: exited"). We can't patch the installed
-  // host, so avoid the race from here: stop, LET THE OLD CHILD DIE (settle), then
-  // start; if a slow-dying old child still clobbers the new task, retry with a
-  // longer settle. Clear listenedTaskIds so the fresh task re-registers its host
-  // listener (the clobber/cleanup drops the old one).
-  if (existing) { try { await native.task.stop(id); } catch { /* already gone */ } }
-  sessionTaskIds.delete(sessionId);
-  listenedTaskIds.delete(id);
-  const startFresh = () => native.task.start({
-    entry: wanted,
-    kind: 'coding',
+  // Upsert via the framework's generic, race-safe task.ensure: reuse the running
+  // task when its bundle (`entry`, which pins the buildId) matches, else replace it
+  // (stop stale/dead → start fresh → wait ready), returning the id. This supersedes
+  // the old hand-rolled enum→compare→stop→start here. Two subtleties it handles:
+  //  - A cached `sessionTaskIds` from attachCodingTask (the viewer path, no buildId
+  //    pin) can point at a STALE task from a prior deploy — validating `entry` every
+  //    call ensures sends never run an old bundle (e.g. the pre-fix turn cap).
+  //  - The host stop→start-same-id `exit` race (a killed child's late exit clobbers
+  //    the fresh task to 'exited') is absorbed internally.
+  const { reused } = await native.task.ensure({
     id,
+    entry: taskEntryUrl('coding', buildId),
+    kind: 'coding',
     params: {
       projectPath: getActiveProjectPath(),
       sessionId,
@@ -178,31 +154,12 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
       authToken: readAuthTokenCookie(),
     },
   });
-  // No prior task ⇒ no exit to race, start immediately. Otherwise settle first, and
-  // retry on an early 'exited' (the clobber) with a growing gap — by the 2nd/3rd try
-  // the old child is long dead and the fresh task registers cleanly.
-  const settles = existing ? [350, 900, 1800] : [0];
-  let lastErr: unknown;
-  for (const settleMs of settles) {
-    if (settleMs > 0) await new Promise<void>((r) => setTimeout(r, settleMs));
-    await startFresh();
-    try {
-      // Wait until the child has loaded its bundle (status flips to 'running' on the
-      // task's `ready`). task.start resolves when the child is SPAWNED; the runner
-      // then fetches + imports the bundle over https — calling a method before that
-      // races the load and throws "unknown task method".
-      await waitForTaskRunning(id, () => native.task.enum());
-      sessionTaskIds.set(sessionId, id);
-      wireTaskListener(id);
-      return id;
-    } catch (e) {
-      // Likely the stop→start clobber (fresh task marked 'exited' by the old child's
-      // late exit). Retry after a longer settle; a genuine startup failure re-throws
-      // after the last attempt.
-      lastErr = e;
-    }
-  }
-  throw lastErr;
+  sessionTaskIds.set(sessionId, id);
+  // A freshly started task dropped the old host listener (stop's cleanup), so force a
+  // re-subscribe; a reused task keeps its listener (wireTaskListener dedups).
+  if (!reused) listenedTaskIds.delete(id);
+  wireTaskListener(id);
+  return id;
 }
 /** Wire a task's emitCustom-shaped frames back onto the local bus, once per task id. */
 function wireTaskListener(id: string): void {
