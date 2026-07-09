@@ -906,9 +906,19 @@ const handlers: Record<string, Handler> = {
       // real error — via task.listen. So swallow the timeout instead of showing a
       // spurious "turn failed" bubble (the "timeout in UglyNative" bug report).
       // Non-timeout rejections are genuine dispatch failures → surface them.
+      const sentAt = Date.now();
       native.task.call(id, 'send', { text: message, selection: buildSelection(sessionId) })
+        .then(() => {
+          // Diagnostic (browser feedback telemetry): a `send` RPC that resolves
+          // FAST (before a real turn could run) means the task child returned
+          // early — the turn isn't being driven. A slow resolve / timeout is the
+          // expected shape for a real turn. Pairs with the task-side turn_dispatch
+          // + agent_finished diag to localize instant no-op turns.
+          console.debug('[codingAgentChatSend] send RPC resolved after %dms', Date.now() - sentAt);
+        })
         .catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : String(e);
+          console.debug('[codingAgentChatSend] send RPC rejected after %dms: %s', Date.now() - sentAt, msg);
           if (/timed out/i.test(msg)) return; // turn continues streaming independently
           emitAgentError(sessionId, e);
         });

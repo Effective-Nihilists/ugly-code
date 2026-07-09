@@ -987,13 +987,23 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         state.log.append({ ts: Date.now(), type: 'error', message: e.message });
       }
       if (e.type === 'done' || e.type === 'error' || e.type === 'aborted' || e.type === 'budget_exceeded') {
-        if (e.type !== 'error') debugLog(sessionId, 'finish', { reason: e.type, ...debugTick(sessionId) });
+        const tick = debugTick(sessionId);
+        if (e.type !== 'error') debugLog(sessionId, 'finish', { reason: e.type, ...tick });
         state.log.append({ ts: Date.now(), type: 'finish', reason: e.type });
         persistMeta(state, sessionId, e.type === 'error' ? 'error' : 'idle');
         safeEmit(emitRef.current, {
           type: 'codingAgent:event',
           sessionId,
-          event: { type: 'agent_event', payload: { payload: { type: 'agent_finished', reason: e.type } } },
+          // `diag` is folded into the browser's feedback recentLogs by the renderer
+          // (see useCodingAgentChat agent_event handler) to explain instant no-op
+          // turns ("I sent a message and nothing happened"): a tiny `ranMs` with
+          // reason `done` means the model returned nothing; `budget_exceeded`/`aborted`
+          // point at context size / a stale abort instead.
+          event: { type: 'agent_event', payload: { payload: {
+            type: 'agent_finished',
+            reason: e.type,
+            diag: { ranMs: tick.sinceStartMs, msgCount: state.messageCount, promptTokens: state.promptTokens, cacheReadTokens: state.cacheReadTokens, model: state.model },
+          } } },
         });
       }
     },
@@ -1071,6 +1081,18 @@ export async function runClientAgentTurn(
   state.resolvedPattern = resolvedId;
   const pattern = resolvedId ? getPattern(superToBasePattern(resolvedId)) : undefined;
   const projectDir = mainProjectDir(sessionId);
+  // Diagnostic probe (browser feedback telemetry): records that the turn reached
+  // model-axis dispatch and which path it takes. Paired with the agent_finished
+  // `diag`, this pins whether an instant no-op turn short-circuited before dispatch
+  // (probe absent) or the model/controller returned nothing (probe present, tiny ranMs).
+  safeEmit(emit, {
+    type: 'codingAgent:event',
+    sessionId,
+    event: { type: 'agent_event', payload: { payload: {
+      type: 'turn_dispatch',
+      diag: { modelKind: state.modelMode.kind, pattern: resolvedId ?? 'none', msgCount: state.messageCount, promptTokens: state.promptTokens, maxContextTokens: compactionThreshold(state.model) },
+    } } },
+  });
   try {
     // Model axis dispatch. Priority: group (own peers, no steps) → max (peers run
     // the base pattern, picker) → super-* (mid-mode parent-as-survivor fan-out) →

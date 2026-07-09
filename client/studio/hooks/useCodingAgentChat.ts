@@ -2100,9 +2100,22 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // final assistant message with no finish part at all — which
       // would leave the spinner hanging forever.
       if (eventType === 'agent_event') {
-        const innerBody = payload?.payload as { type?: string } | undefined;
+        const innerBody = payload?.payload as { type?: string; reason?: string; diag?: unknown } | undefined;
         const innerType = innerBody?.type ?? payload?.type;
-        console.debug('[CodingAgentChat] Agent event: innerType=%s', innerType);
+        // Fold the turn diagnostics into the console so bug-report feedback
+        // telemetry captures WHY a turn ended (reason + ranMs/tokens) — the task
+        // child's own logs don't reach the browser recentLogs. Probes:
+        // `turn_dispatch` (reached model dispatch) + `agent_finished` (outcome).
+        if (innerType === 'agent_finished' || innerType === 'turn_dispatch') {
+          console.debug(
+            '[CodingAgentChat] Agent event: innerType=%s reason=%s diag=%s',
+            innerType,
+            innerBody?.reason ?? '',
+            JSON.stringify(innerBody?.diag ?? {}),
+          );
+        } else {
+          console.debug('[CodingAgentChat] Agent event: innerType=%s', innerType);
+        }
         // subagent_event envelopes are produced by the session for
         // every event a delegate child emits. The shape is
         //   { type: 'subagent_event', child_session_id, child_index, depth, event }
