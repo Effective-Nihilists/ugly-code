@@ -503,19 +503,6 @@ export function NewSessionHero({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
-              marginTop: 12,
-              animationDuration: '480ms',
-              animationDelay: '500ms',
-            }}
-          >
-            <BranchDropdown value={branchMode} onChange={setBranchMode} />
-          </div>
-          <div
-            className="us-fade-up"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
               justifyContent: 'space-between',
               gap: 16,
               marginTop: 16,
@@ -553,6 +540,7 @@ export function NewSessionHero({
                 flexWrap: 'wrap',
               }}
             >
+              <BranchDropdown value={branchMode} onChange={setBranchMode} />
               <AgentAxisSelector
                 permission={permissionMode}
                 model={modelMode}
