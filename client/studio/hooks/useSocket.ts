@@ -134,8 +134,6 @@ function readAuthTokenCookie(): string {
 }
 /** Start (or re-attach to) the session's coding task + wire its events to emitCustom. */
 async function ensureCodingTask(sessionId: string): Promise<string> {
-  const have = sessionTaskIds.get(sessionId);
-  if (have) return have;
   const id = 'coding:' + sessionId;
   const wanted = taskEntryUrl('coding', buildId);
   // Re-attach to a HEALTHY task from the CURRENT build (renderer reload / another window).
@@ -143,26 +141,37 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
   // renderer calls (→ "unknown task method: send"), and an exited/errored task can't serve
   // calls — in those cases stop it and start fresh (the session rebuilds its context from
   // the DB on the next turn). Entry carries the buildId, so a new deploy never reuses old.
+  //
+  // We must NOT trust a cached `sessionTaskIds` entry on its own: attachCodingTask (the
+  // viewer path) attaches to whatever live task the host has with NO buildId pin, so after a
+  // deploy the cache can point at a STALE task still running the previous bundle. Sends would
+  // then execute old logic (e.g. the pre-fix turn-cap) forever. So ALWAYS validate the live
+  // task's entry against `wanted` (an enum() per send — cheap host IPC — is worth correctness).
   const existing = (await native.task.enum()).find((t) => t.id === id);
   const reusable = existing && existing.status !== 'exited' && existing.status !== 'error' && existing.entry === wanted;
-  if (!reusable) {
-    if (existing) { try { await native.task.stop(id); } catch { /* already gone */ } }
-    await native.task.start({
-      entry: wanted,
-      kind: 'coding',
-      id,
-      params: {
-        projectPath: getActiveProjectPath(),
-        sessionId,
-        origin: location.origin,
-        authToken: readAuthTokenCookie(),
-      },
-    });
+  if (reusable) {
+    sessionTaskIds.set(sessionId, id);
+    wireTaskListener(id);
+    return id;
   }
+  // Stale (prior build), dead, or missing → replace with a fresh current-build task.
+  if (existing) { try { await native.task.stop(id); } catch { /* already gone */ } }
+  sessionTaskIds.delete(sessionId);
+  await native.task.start({
+    entry: wanted,
+    kind: 'coding',
+    id,
+    params: {
+      projectPath: getActiveProjectPath(),
+      sessionId,
+      origin: location.origin,
+      authToken: readAuthTokenCookie(),
+    },
+  });
   // Wait until the child has loaded its bundle (status flips to 'running' on the task's
   // `ready`) before returning. task.start resolves when the child is SPAWNED, but the runner
   // then fetches + imports the bundle over https — calling a method before that races the load
-  // and throws "unknown task method". A reused, already-running task passes on the first check.
+  // and throws "unknown task method".
   await waitForTaskRunning(id, () => native.task.enum());
   sessionTaskIds.set(sessionId, id);
   wireTaskListener(id);
