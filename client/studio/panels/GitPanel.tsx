@@ -1,7 +1,9 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
 import { getActiveProjectPath } from '../hooks/useSocket';
-import { findGitRepos, type GitRepo } from './findGitRepos';
+// NOTE: ./findGitRepos scans a root for nested .git dirs to power a repo switcher.
+// The module is ready but not yet wired into this panel — import it here once the
+// switcher UI lands (kept out for now so lint stays clean).
 
 // A real git workspace: status (staged/unstaged/untracked) + colored diff +
 // stage-select + commit + history, all over `native.process.spawn('git', …)`.

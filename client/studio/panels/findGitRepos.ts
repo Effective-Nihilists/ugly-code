@@ -24,7 +24,7 @@ function runFind(root: string): Promise<string> {
       ]);
       p.onStdout((c) => (out += c));
       p.onStderr((c) => (err += c));
-      p.onError((e) => reject(new Error(e)));
+      p.onError((e) => { reject(new Error(e)); });
       p.onExit((code) => {
         if (code === 0) resolve(out);
         else reject(new Error(err || `find exited ${code ?? '?'}`));
