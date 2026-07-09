@@ -45,7 +45,7 @@ function resolveTilde(root: string): Promise<string> {
     try {
       const p = native.process.spawn('bash', ['-lc', 'echo "$HOME"']);
       p.onStdout((c) => (out += c));
-      p.onError(() => resolve(root)); // fall back to raw path
+      p.onError(() => { resolve(root); }); // fall back to raw path
       p.onExit((code) => {
         const home = out.trim();
         if (code === 0 && home.length > 0) {
