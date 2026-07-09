@@ -1,9 +1,7 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
 import { getActiveProjectPath } from '../hooks/useSocket';
-// NOTE: ./findGitRepos scans a root for nested .git dirs to power a repo switcher.
-// The module is ready but not yet wired into this panel — import it here once the
-// switcher UI lands (kept out for now so lint stays clean).
+import { findGitRepos, type GitRepo } from './findGitRepos';
 
 // A real git workspace: status (staged/unstaged/untracked) + colored diff +
 // stage-select + commit + history, all over `native.process.spawn('git', …)`.
@@ -81,14 +79,24 @@ export function GitPanel(): React.ReactElement {
   const [commits, setCommits] = React.useState<Commit[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
+  const [repos, setRepos] = React.useState<GitRepo[]>([]);
+  const [activeRepo, setActiveRepo] = React.useState<string | null>(null);
+
+  // Effective working directory: the selected repo or the active project root.
+  const cwd = activeRepo ?? getActiveProjectPath() ?? '';
+
+  // Scan for nested .git dirs on mount.
+  React.useEffect(() => {
+    const root = getActiveProjectPath();
+    if (root) void findGitRepos(root).then(setRepos);
+  }, []);
 
   const refresh = React.useCallback(async () => {
-    const cwd = getActiveProjectPath();
     if (!cwd) return;
     const [b, s] = await Promise.all([git(['branch', '--show-current'], cwd), git(['status', '--porcelain=v1', '-z', '-uall'], cwd)]);
     setBranch(b.out.trim());
     setFiles(parseStatus(s.out));
-  }, []);
+  }, [cwd]);
 
   React.useEffect(() => {
     void refresh();
@@ -109,17 +117,15 @@ export function GitPanel(): React.ReactElement {
   };
 
   const openFile = React.useCallback(async (f: GitFile) => {
-    const cwd = getActiveProjectPath();
     if (!cwd) return;
     setActive(f.path);
     setView('changes');
     const args = f.label === 'U' ? ['diff', '--no-color', '--no-index', '--', '/dev/null', f.path] : ['diff', '--no-color', 'HEAD', '--', f.path];
     const r = await git(args, cwd);
     setDiff(r.out || '(no diff)');
-  }, []);
+  }, [cwd]);
 
   const commit = React.useCallback(async () => {
-    const cwd = getActiveProjectPath();
     const toCommit = files.filter((f) => isChecked(f.path)).map((f) => f.path);
     if (!cwd || !commitMsg.trim() || toCommit.length === 0 || busy) return;
     setBusy(true);
@@ -139,22 +145,20 @@ export function GitPanel(): React.ReactElement {
       setActive(null);
       void refresh();
     }
-  }, [files, commitMsg, busy, isChecked, refresh]);
+  }, [files, commitMsg, busy, isChecked, cwd, refresh]);
 
   const loadHistory = React.useCallback(async () => {
-    const cwd = getActiveProjectPath();
     if (!cwd) return;
     const r = await git(['log', '-n', '50', `--format=${LOG_FMT}`], cwd);
     setCommits(parseLog(r.out));
-  }, []);
+  }, [cwd]);
 
   const openCommit = React.useCallback(async (hash: string) => {
-    const cwd = getActiveProjectPath();
     if (!cwd) return;
     setActive(hash);
     const r = await git(['show', '--no-color', hash], cwd);
     setDiff(r.out);
-  }, []);
+  }, [cwd]);
 
   React.useEffect(() => {
     if (view === 'history') void loadHistory();
@@ -166,6 +170,21 @@ export function GitPanel(): React.ReactElement {
     <div data-id="git-panel" style={S.root}>
       <div style={S.bar}>
         <span style={S.branch}>⎇ {branch || '—'}</span>
+        {repos.length > 1 ? (
+          <select
+            data-id="git-repo-select"
+            style={S.repoSelect}
+            value={activeRepo ?? getActiveProjectPath() ?? ''}
+            onChange={(e) => { setActiveRepo(e.target.value || null); }}
+          >
+            <option value={getActiveProjectPath() ?? ''}>{getActiveProjectPath()?.split('/').pop() ?? '(root)'}</option>
+            {repos.map((r) => (
+              <option key={r.path} value={r.path}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <button data-id="git-tab-changes" style={tabStyle(view === 'changes')} onClick={() => { setView('changes'); }}>
           Changes{files.length ? ` (${files.length})` : ''}
         </button>
@@ -310,6 +329,7 @@ const S = {
   root: { height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', color: 'var(--text-primary)', minHeight: 0 },
   bar: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 },
   branch: { fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, marginRight: 6 },
+  repoSelect: { fontFamily: 'var(--font-mono)', fontSize: 11, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 6px', maxWidth: 160, outline: 'none' },
   tab: { fontFamily: 'var(--font-mono)', fontSize: 12, background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' },
   btn: { fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 12px', cursor: 'pointer' },
   body: { flex: 1, minHeight: 0, display: 'flex' },
