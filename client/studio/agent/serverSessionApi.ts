@@ -57,11 +57,17 @@ export interface ToolRowPayload { results: ToolResultPayload[] }
 // Assistant rows store the turn content PLUS the model that produced it (so the
 // chat can show a per-message model badge after reload). Legacy rows stored a
 // bare ContentPart[] — `decodeAssistantPayload` accepts both.
-export interface AssistantContentPayload { content: ContentPart[]; model?: string }
+// `toolStartedAt` maps a tool_use id → wall-clock start (persisted so a running
+// tool's duration timer survives reload; see clientAgent onTurn).
+export interface AssistantContentPayload { content: ContentPart[]; model?: string; toolStartedAt?: Record<string, number> }
 export function decodeAssistantPayload(raw: unknown): AssistantContentPayload {
   if (Array.isArray(raw)) return { content: raw as ContentPart[] }; // legacy: bare content
   const p = (raw ?? {}) as Partial<AssistantContentPayload>;
-  return { content: p.content ?? [], ...(p.model ? { model: p.model } : {}) };
+  return {
+    content: p.content ?? [],
+    ...(p.model ? { model: p.model } : {}),
+    ...(p.toolStartedAt ? { toolStartedAt: p.toolStartedAt } : {}),
+  };
 }
 
 export type StoredRole = 'user' | 'assistant' | 'tool';

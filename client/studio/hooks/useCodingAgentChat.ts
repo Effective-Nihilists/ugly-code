@@ -627,6 +627,8 @@ interface MessagePartData {
   name?: string;
   input?: string;
   finished?: boolean;
+  /** Persisted tool start (wall-clock ms) so a running tool's timer survives reload. */
+  started_at?: number;
   tool_call_id?: string;
   content?: string;
   is_error?: boolean;
@@ -785,6 +787,9 @@ function agentMessageToChatMessage(
             name: (d.name as string | undefined) ?? 'tool',
             input: (d.input as string | undefined) ?? '',
             status: d.finished ? 'executing' : 'running',
+            // Persisted start time (see clientAgent onTurn) so a running tool's
+            // duration timer survives reload instead of resetting to zero.
+            ...(typeof d.started_at === 'number' ? { startedAt: d.started_at } : {}),
           });
           break;
         case 'finish':
@@ -2102,11 +2107,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       if (eventType === 'agent_event') {
         const innerBody = payload?.payload as { type?: string; reason?: string; diag?: unknown } | undefined;
         const innerType = innerBody?.type ?? payload?.type;
-        // Fold the turn diagnostics into the console so bug-report feedback
+        // Fold the turn-end diagnostics into the console so bug-report feedback
         // telemetry captures WHY a turn ended (reason + ranMs/tokens) — the task
-        // child's own logs don't reach the browser recentLogs. Probes:
-        // `turn_dispatch` (reached model dispatch) + `agent_finished` (outcome).
-        if (innerType === 'agent_finished' || innerType === 'turn_dispatch') {
+        // child's own logs don't reach the browser recentLogs.
+        if (innerType === 'agent_finished') {
           console.debug(
             '[CodingAgentChat] Agent event: innerType=%s reason=%s diag=%s',
             innerType,
@@ -2275,6 +2279,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             name: part.data?.name ?? 'tool',
             input: part.data?.input ?? '',
             status: part.data?.finished ? 'executing' : 'running',
+            // Persisted start time (see clientAgent onTurn) so a running tool's
+            // duration timer survives reload instead of resetting to zero.
+            ...(typeof part.data?.started_at === 'number' ? { startedAt: part.data.started_at } : {}),
           });
           break;
         case 'tool_result':

@@ -876,7 +876,21 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       return filterToolsByToolset(stepGated, toolsetBySession.get(sessionId));
     },
     toolHandlers: makeToolHandlers(sessionId),
-    budget: { maxTurns: maxTurnsBySession.get(sessionId) ?? 12 },
+    // Turn cap is EVAL-ONLY. The framework's `maxTurns` counts against a
+    // controller-LIFETIME total that is NEVER reset per user message (runAgent
+    // `send()` doesn't clear `totals`), and `budgetExceeded()` is checked BEFORE
+    // compaction — so ANY cap on an interactive session eventually makes every new
+    // message no-op with `budget_exceeded` ("I sent a message and nothing
+    // happened") once the session has done that many cumulative model-turns. Evals
+    // want the bounded, measurable run (honoring a task's declared maxTurns);
+    // interactive chat must NOT be capped — the user decides when to stop and the
+    // model ends turns naturally. A getter so eval status set after creation still
+    // applies. Empty budget ⇒ no cap (budgetExceeded returns null).
+    get budget() {
+      return evalSessions.has(sessionId)
+        ? { maxTurns: maxTurnsBySession.get(sessionId) ?? 12 }
+        : {};
+    },
     // Pin the task + a work-log into every summary so a long session never loses
     // its original instruction (the system prompt is sent separately and is never
     // compacted; this preserves the user's goal across compactions).
@@ -926,8 +940,21 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       state.messageCount += 1;
       state.log.append({ ts: Date.now(), type: 'assistant', content, ...(telemetry ? { telemetry } : {}) });
       // Persist the assistant turn verbatim (one row, matches one working-context
-      // message) — content + model so the badge survives reload.
-      persistRow(state, sessionId, 'assistant', { content, ...modelOpt });
+      // message) — content + model so the badge survives reload. Stamp each
+      // tool_use's start time (handoff clock, ~now) so a still-running tool's
+      // duration timer survives a page reload instead of resetting to zero (the
+      // live meta event refines it to the subprocess launch while running; this is
+      // the persisted fallback the reload path reads back).
+      const toolStartedAt: Record<string, number> = {};
+      const stamp = Date.now();
+      for (const blk of content) {
+        if (blk.type === 'tool_use' && typeof blk.id === 'string') toolStartedAt[blk.id] = stamp;
+      }
+      persistRow(state, sessionId, 'assistant', {
+        content,
+        ...modelOpt,
+        ...(Object.keys(toolStartedAt).length > 0 ? { toolStartedAt } : {}),
+      });
       if (telemetry) {
         accrue(state, telemetry);
         state.log.append({ ts: Date.now(), type: 'telemetry', telemetry });
@@ -1081,18 +1108,6 @@ export async function runClientAgentTurn(
   state.resolvedPattern = resolvedId;
   const pattern = resolvedId ? getPattern(superToBasePattern(resolvedId)) : undefined;
   const projectDir = mainProjectDir(sessionId);
-  // Diagnostic probe (browser feedback telemetry): records that the turn reached
-  // model-axis dispatch and which path it takes. Paired with the agent_finished
-  // `diag`, this pins whether an instant no-op turn short-circuited before dispatch
-  // (probe absent) or the model/controller returned nothing (probe present, tiny ranMs).
-  safeEmit(emit, {
-    type: 'codingAgent:event',
-    sessionId,
-    event: { type: 'agent_event', payload: { payload: {
-      type: 'turn_dispatch',
-      diag: { modelKind: state.modelMode.kind, pattern: resolvedId ?? 'none', msgCount: state.messageCount, promptTokens: state.promptTokens, maxContextTokens: compactionThreshold(state.model) },
-    } } },
-  });
   try {
     // Model axis dispatch. Priority: group (own peers, no steps) → max (peers run
     // the base pattern, picker) → super-* (mid-mode parent-as-survivor fan-out) →

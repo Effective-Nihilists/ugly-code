@@ -15,13 +15,19 @@ export interface Part {
   data?: Record<string, unknown>;
 }
 
-/** Build the studio `parts` array for an assistant turn from its content. */
-export function assistantParts(content: ContentPart[]): Part[] {
+/**
+ * Build the studio `parts` array for an assistant turn from its content.
+ * `toolStartedAt` (persisted per tool_use id) stamps `started_at` onto each
+ * tool_call so a running tool's duration timer survives a reload — the live emit
+ * omits it (the tool_progress meta event supplies it while running).
+ */
+export function assistantParts(content: ContentPart[], toolStartedAt?: Record<string, number>): Part[] {
   const parts: Part[] = [];
   for (const blk of content) {
     if (blk.type === 'text' && blk.text) {
       parts.push({ type: 'text', data: { text: blk.text } });
     } else if (blk.type === 'tool_use') {
+      const startedAt = toolStartedAt?.[blk.id];
       parts.push({
         type: 'tool_call',
         // The studio renders tool_call.input as a JSON string, not an object.
@@ -30,6 +36,7 @@ export function assistantParts(content: ContentPart[]): Part[] {
           name: blk.name,
           input: typeof blk.input === 'string' ? blk.input : JSON.stringify(blk.input ?? {}),
           finished: true,
+          ...(typeof startedAt === 'number' ? { started_at: startedAt } : {}),
         },
       });
     }
@@ -72,8 +79,8 @@ export function rowsToDisplayMessages(sessionId: string, rows: StoredMessageRow[
         ],
       });
     } else if (r.role === 'assistant') {
-      const { content, model } = decodeAssistantPayload(payload);
-      out.push({ id: baseId, role: 'assistant', parts: assistantParts(content), ...(model ? { model } : {}) });
+      const { content, model, toolStartedAt } = decodeAssistantPayload(payload);
+      out.push({ id: baseId, role: 'assistant', parts: assistantParts(content, toolStartedAt), ...(model ? { model } : {}) });
     } else if (r.role === 'tool') {
       const results = (payload as Partial<ToolRowPayload>).results ?? [];
       results.forEach((x, i) => {
