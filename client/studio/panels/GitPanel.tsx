@@ -81,6 +81,10 @@ export function GitPanel(): React.ReactElement {
   const [notice, setNotice] = React.useState<string | null>(null);
   const [repos, setRepos] = React.useState<GitRepo[]>([]);
   const [activeRepo, setActiveRepo] = React.useState<string | null>(null);
+  // Whether `cwd` is actually a git repo. The root (e.g. ~/Documents/GitHub) often
+  // isn't — it just holds nested repos — so we must never surface git's raw
+  // "fatal: not a git repository" to the user; show a clean empty state instead.
+  const [isRepo, setIsRepo] = React.useState(true);
 
   // Effective working directory: the selected repo or the active project root.
   const cwd = activeRepo ?? getActiveProjectPath() ?? '';
@@ -95,10 +99,12 @@ export function GitPanel(): React.ReactElement {
   const refresh = React.useCallback(async () => {
     if (!cwd) return;
     const [b, s] = await Promise.all([git(['branch', '--show-current'], cwd), git(['status', '--porcelain=v1', '-z', '-uall'], cwd)]);
-    // Only parse output when git succeeded — an error (e.g. "fatal: not a git
-    // repository") must not be parsed as file paths.
+    // `git status` succeeds iff cwd is inside a work tree — use it to gate the whole
+    // panel so git's raw "fatal: not a git repository" is never rendered.
+    setIsRepo(s.ok);
     setBranch(b.ok ? b.out.trim() : '');
     setFiles(s.ok ? parseStatus(s.out) : []);
+    if (!s.ok) { setCommits([]); setDiff(''); setActive(null); }
   }, [cwd]);
 
   React.useEffect(() => {
@@ -153,7 +159,8 @@ export function GitPanel(): React.ReactElement {
   const loadHistory = React.useCallback(async () => {
     if (!cwd) return;
     const r = await git(['log', '-n', '50', `--format=${LOG_FMT}`], cwd);
-    setCommits(parseLog(r.out));
+    // Never parse a "fatal: …" (non-repo / empty history) as commits.
+    setCommits(r.ok ? parseLog(r.out) : []);
   }, [cwd]);
 
   const openCommit = React.useCallback(async (hash: string) => {
@@ -202,7 +209,11 @@ export function GitPanel(): React.ReactElement {
 
       <div style={S.body}>
         <div style={S.left}>
-          {view === 'changes' ? (
+          {!isRepo ? (
+            <div style={S.empty}>
+              Not a git repository.{repos.length > 0 ? ' Pick a repo from the menu above.' : ''}
+            </div>
+          ) : view === 'changes' ? (
             files.length === 0 ? (
               <div style={S.empty}>No changes — working tree clean.</div>
             ) : (

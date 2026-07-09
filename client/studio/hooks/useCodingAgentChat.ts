@@ -1423,19 +1423,21 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         if (snap.reasoningEffort !== intended.reasoningEffort)
           drift.push(`reasoningEffort ${intended.reasoningEffort}→${snap.reasoningEffort}`);
         if (drift.length > 0) {
-          console.error(
-            '[session-origin] new-session axis drift — picked settings were ignored',
+          console.debug(
+            '[session-origin] worker echoed axes differing from local picks — keeping local (not adopting)',
             JSON.stringify({ sessionId: intended.id, drift }),
           );
         }
       }
-      setModel(snap.model);
-      setReasoningEffortState(snap.reasoningEffort);
-      // Three-axis state — drives the AgentAxisSelector dropdowns and
-      // the PatternStrip overlay.
-      setPermissionModeState(snap.permissionMode);
-      setModelModeState(snap.modelMode);
-      setPatternModeState(snap.patternMode);
+      // The USER-SELECTED axes — model, reasoningEffort, permissionMode (plan/edit),
+      // modelMode, patternMode — are CLIENT-owned: seeded on mount (persisted model +
+      // localStorage) and changed only via the axis dropdowns, then re-sent to the
+      // worker every turn. We deliberately DO NOT adopt them from a session_state
+      // snapshot. A worker that just restarted (e.g. after a deploy — task.ensure now
+      // restarts it) briefly holds DEFAULT axes and echoes them; adopting that echo
+      // clobbered the user's picks — the session appeared to switch itself
+      // (flash → auto → pro, plan → edit, reasoning level reset). Worker-COMPUTED
+      // fields (resolvedPattern, current step, worktree, …) are still adopted below.
       setResolvedPattern(snap.resolvedPattern);
       setCurrentStepId(snap.currentStepId);
       setCurrentStepIter(snap.currentStepIter);

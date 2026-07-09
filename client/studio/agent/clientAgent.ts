@@ -382,6 +382,11 @@ interface SessionAgentState {
   /** Parked `pauseForUserReviewAfter` gates awaiting the user's approve/iterate
    *  reply. Echoed in `session_state` so the IDE renders the StepReviewCard. */
   pendingStepReviews: SessionSnapshot['pendingStepReviews'];
+  /** Serialize turns per session. A message sent WHILE a turn is running is queued
+   *  here and run when the active turn finishes — sending mid-turn must not throw
+   *  "a turn is already in progress" (the underlying controller is single-flight). */
+  turnRunning: boolean;
+  pendingSends: { userText: string; selection?: AgentSelection }[];
 }
 
 // Codebase analysis (semantic index + architecture doc) runs per SESSION, decoupled from the
@@ -824,6 +829,8 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     resolvedPattern: null,
     currentStepIter: 0,
     pendingStepReviews: [],
+    turnRunning: false,
+    pendingSends: [],
   };
   applySelection(state, selection);
   state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: state.model });
@@ -1075,6 +1082,37 @@ export async function runClientAgentTurn(
   selection?: AgentSelection,
 ): Promise<void> {
   const state = getOrCreate(sessionId, emit, selection);
+  // Serialize turns per session. If one is already running, QUEUE this message and
+  // run it when the active turn finishes — the renderer already shows the user's
+  // optimistic bubble, so it simply lands after the current reply instead of failing
+  // with "a turn is already in progress" (the reported mid-turn send bug).
+  if (state.turnRunning) {
+    state.pendingSends.push({ userText, ...(selection ? { selection } : {}) });
+    return;
+  }
+  state.turnRunning = true;
+  try {
+    await runOneClientAgentTurn(state, sessionId, userText, emit);
+  } finally {
+    state.turnRunning = false;
+    const next = state.pendingSends.shift();
+    if (next) {
+      // Run the next queued message on the session's live emit. Fire-and-forget:
+      // this recursion re-enters the guard above (turnRunning is now false). Guard
+      // the tail against an unhandled rejection (turn errors normally surface as a
+      // ⚠ bubble via the controller, but workspace/resume setup can still throw).
+      void runClientAgentTurn(sessionId, next.userText, state.emitRef.current, next.selection)
+        .catch((e: unknown) => { console.error('[clientAgent] queued turn failed', sessionId, e); });
+    }
+  }
+}
+
+async function runOneClientAgentTurn(
+  state: SessionAgentState,
+  sessionId: string,
+  userText: string,
+  emit: Emit,
+): Promise<void> {
   // Provision the session's isolated workspace (worktree + deps install) before
   // the first turn so the agent's tools operate in it. Streams progress into the
   // chat; a no-op for the main session (runs on the project) or once cached.

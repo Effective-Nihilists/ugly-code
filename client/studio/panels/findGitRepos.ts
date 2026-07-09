@@ -25,6 +25,7 @@ async function walk(dir: string, depth: number, out: GitRepo[]): Promise<void> {
     console.log('[findGitRepos:walk] readdir failed', JSON.stringify({ dir, err: (e as Error).message }));
     return;
   }
+  const subdirs: string[] = [];
   for (const e of entries) {
     if (e.name === '.git') {
       out.push({ name: dir.split('/').pop() ?? dir, path: dir });
@@ -32,8 +33,11 @@ async function walk(dir: string, depth: number, out: GitRepo[]): Promise<void> {
     }
     if (!e.isDirectory) continue;
     if (SKIP_DIRS.has(e.name)) continue;
-    await walk(`${dir}/${e.name}`, depth + 1, out);
+    subdirs.push(`${dir}/${e.name}`);
   }
+  // Walk sibling directories concurrently — sequential readdir over the UglyNative
+  // IPC bridge made scanning a big root (e.g. ~/Documents/GitHub) take many seconds.
+  await Promise.all(subdirs.map((d) => walk(d, depth + 1, out)));
 }
 
 /** Resolve a leading `~` to an absolute home-directory path by asking the host
