@@ -35,7 +35,7 @@ function subscribe(key: string, cb: (v: string | null) => void): () => void {
     subscribers.set(key, set);
   }
   set.add(cb);
-  return () => { set!.delete(cb); if (set!.size === 0) subscribers.delete(key); };
+  return () => { set.delete(cb); if (set.size === 0) subscribers.delete(key); };
 }
 
 function notifySubscribers(key: string, value: string | null): void {

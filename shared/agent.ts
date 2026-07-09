@@ -85,10 +85,7 @@ export type ToolName =
   | 'spec_read'
   | 'spec_write'
   | 'scratchpad'
-  | 'memory_read'
-  | 'memory_save'
-  | 'memory_list'
-  | 'memory_delete'
+  | 'memory_add'
   | 'delegate'
   | 'delegate_parallel'
   | 'ask_user'
@@ -339,9 +336,17 @@ Before finishing: re-read the original request and confirm each requirement is m
 When asked **how to approach**, explain first; don't auto-implement.
 </task_completion>
 
-<memory_protocol>
-The \`memory_save\` / \`memory_read\` / \`memory_list\` tools persist context across sessions in this project. Write only when the user gives you guidance worth keeping (corrections, validations, named constraints, external-system pointers). Don't memorize code — \`git log\` / re-reading the file is authoritative. Before acting on a recalled memory, verify the named function/flag/file still exists.
-</memory_protocol>
+<memory>
+{{MEMORY}}
+
+Call \`memory_add\` when you discover something worth remembering across sessions:
+- User preferences, naming conventions, or project-specific rules they told you
+- Architecture decisions made or discovered during the session
+- Workarounds for library bugs, test infra quirks, or deployment gotchas
+- Known limitations or tradeoffs you'd want to avoid re-discovering
+
+Do NOT memorize code itself — \`git log\` / re-reading the file is the source of truth.
+</memory>
 
 <code_conventions>
 Match the existing codebase: read similar code for patterns, libraries, naming. Don't change filenames/variables unnecessarily. Don't add formatters/linters/tests to codebases that don't have them. New projects can be creative; existing codebases want surgical edits. Never log secrets. Comments only when the user asked, and they explain *why* not *what*.

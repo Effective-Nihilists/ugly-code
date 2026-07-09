@@ -1,130 +1,126 @@
-// `memory_save` / `memory_read` / `memory_list` / `memory_delete` — persistent,
-// project-scoped agent memory as JSON files under <project>/.ugly-studio/memory/.
-// Ported from ugly-studio f5a74c2^:.../memory-*.ts.
+// `memory_add` — append a line to MEMORY.md. When the file exceeds 10 KB,
+// automatically compacts via LLM call (pure text-gen, no tools).
+// Ported from the multi-file memory_save/read/list/delete tools (removed).
 
 import { native } from 'ugly-app/native';
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
 import { projectRoot } from './lspForProject';
 
-function memDir(root: string): string {
-  return `${root.replace(/\/+$/, '')}/.ugly-studio/memory`;
-}
-function slug(name: string): string {
-  return name.trim().replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'note';
-}
-
-// eslint-disable-next-line @typescript-eslint/require-await
-async function requireRoot(ctx: Parameters<ToolModule['run']>[1]): Promise<string | null> {
-  return projectRoot(ctx);
+// Hook for the host (clientAgent) to receive notification after a write so
+// it can refresh its own memory content cache for the system prompt injection.
+// Set once at init time; never unset.
+let onMemoryWrite: ((projectDir: string) => void) | null = null;
+export function setMemoryWriteHook(hook: (projectDir: string) => void): void {
+  onMemoryWrite = hook;
 }
 
-export const memorySaveTool: ToolModule = {
-  name: 'memory_save',
+const MEMORY_FILE = 'MEMORY.md';
+const MAX_BYTES = 10_000;
+const TARGET_BYTES = 8_000; // compact to this size
+
+/** Return the absolute path to MEMORY.md, or null when no project is open. */
+function memoryPath(ctx: Parameters<ToolModule['run']>[1]): string | null {
+  const root = projectRoot(ctx);
+  if (!root) return null;
+  return `${root.replace(/\/+$/, '')}/${MEMORY_FILE}`;
+}
+
+/** Call the agent's LLM to condense `content` to ≤ TARGET_BYTES. */
+async function compactViaLLM(
+  ctx: Parameters<ToolModule['run']>[1],
+  content: string,
+): Promise<string | null> {
+  const step = ctx?.step;
+  if (!step) return null; // no step function available → can't compact
+  try {
+    const res = await step({
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a concise memory-keeper. Condense the following memory file into a deduplicated, ' +
+            'well-organized Markdown document. Prioritize architecture decisions, deployment config, ' +
+            'test infrastructure gotchas, and user preferences. Remove redundant or outdated entries. ' +
+            `Keep the total under ${TARGET_BYTES} bytes. Output ONLY the condensed Markdown — no commentary.`,
+        },
+        { role: 'user', content },
+      ],
+    });
+    const rawContent = res.message.content;
+    // AgentMessage.content can be a string or an array of content parts.
+    // The compaction response will be plain text, so handle either.
+    const condensed = typeof rawContent === 'string' ? rawContent : '';
+    // Guard: if the LLM returned something empty or larger, keep the original.
+    if (condensed.trim().length === 0) return null;
+    if (new TextEncoder().encode(condensed).length > MAX_BYTES) return null;
+    return condensed;
+  } catch (err) {
+    console.error('[memory_add:compact] LLM compaction failed', err);
+    return null;
+  }
+}
+
+export const memoryAddTool: ToolModule = {
+  name: 'memory_add',
   spec: {
-    name: 'memory_save',
-    description: 'Save a durable memory (a fact worth remembering across sessions) under a name.',
+    name: 'memory_add',
+    description:
+      'Record a fact you discovered that will be useful across sessions. ' +
+      'Appends to MEMORY.md which is injected into every turn\'s system prompt. ' +
+      'When the file exceeds 10 KB it is automatically condensed.',
     parameters: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Short name/key for the memory.' },
-        content: { type: 'string', description: 'The fact to remember.' },
+        content: {
+          type: 'string',
+          description: 'A line of text describing what you learned.',
+        },
       },
-      required: ['name', 'content'],
+      required: ['content'],
       additionalProperties: false,
     },
   } satisfies TextGenTool,
   async run(input, ctx) {
-    const root = await requireRoot(ctx);
-    if (!root) return '(no project open)';
-    const name = (typeof input.name === 'string' ? input.name : '').trim();
-    if (!name) return 'memory_save: `name` is required';
-    await native.fs.mkdir(memDir(root), true);
-    await native.fs.writeFile(
-      `${memDir(root)}/${slug(name)}.json`,
-      JSON.stringify({ name, content: (typeof input.content === 'string' ? input.content : '') }, null, 2),
-    );
-    return `saved memory ${JSON.stringify(name)}`;
-  },
-};
+    const content = (typeof input.content === 'string' ? input.content : '').trim();
+    if (!content) return 'memory_add: `content` is required';
 
-export const memoryReadTool: ToolModule = {
-  name: 'memory_read',
-  spec: {
-    name: 'memory_read',
-    description: 'Read a saved memory by name.',
-    parameters: {
-      type: 'object',
-      properties: { name: { type: 'string', description: 'The memory name.' } },
-      required: ['name'],
-      additionalProperties: false,
-    },
-  } satisfies TextGenTool,
-  async run(input, ctx) {
-    const root = await requireRoot(ctx);
+    const root = projectRoot(ctx);
     if (!root) return '(no project open)';
-    const name = (typeof input.name === 'string' ? input.name : '').trim();
+    const filePath = `${root.replace(/\/+$/, '')}/${MEMORY_FILE}`;
+
+    // Read existing content (empty string if file doesn't exist)
+    let existing = '';
     try {
-      const raw = await native.fs.readFile(`${memDir(root)}/${slug(name)}.json`);
-      const m = JSON.parse(raw) as { name: string; content: string };
-      return `# ${m.name}\n${m.content}`;
+      existing = await native.fs.readFile(filePath);
     } catch {
-      return `(no memory named ${JSON.stringify(name)})`;
+      // File doesn't exist yet — that's fine
     }
-  },
-};
 
-export const memoryListTool: ToolModule = {
-  name: 'memory_list',
-  spec: {
-    name: 'memory_list',
-    description: 'List all saved memory names.',
-    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
-  } satisfies TextGenTool,
-  async run(_input, ctx) {
-    const root = await requireRoot(ctx);
-    if (!root) return '(no project open)';
-    try {
-      const entries = await native.fs.readdir(memDir(root));
-      const names: string[] = [];
-      for (const e of entries) {
-        if (!e.isFile || !e.name.endsWith('.json')) continue;
-        try {
-          const m = JSON.parse(await native.fs.readFile(`${memDir(root)}/${e.name}`)) as { name?: string };
-          names.push(m.name ?? e.name.replace(/\.json$/, ''));
-        } catch {
-          names.push(e.name.replace(/\.json$/, ''));
-        }
+    // Append the new line
+    const separator = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+    const updated = existing + separator + content + '\n';
+
+    // Check size and compact if needed
+    const sizeBytes = new TextEncoder().encode(updated).length;
+    if (sizeBytes > MAX_BYTES) {
+      const compacted = await compactViaLLM(ctx, updated);
+      if (compacted !== null) {
+        await native.fs.writeFile(filePath, compacted);
+        onMemoryWrite?.(root);
+        const newSize = new TextEncoder().encode(compacted).length;
+        const savedKb = Math.round((sizeBytes - newSize) / 1024);
+        return `ok (compacted from ${Math.round(sizeBytes / 1024)} KB to ${Math.round(newSize / 1024)} KB, saved ${savedKb} KB)`;
       }
-      return names.length ? names.map((n) => `- ${n}`).join('\n') : '(no saved memories)';
-    } catch {
-      return '(no saved memories)';
+      // Compaction failed or returned bad output — keep the oversized file and warn
+      await native.fs.writeFile(filePath, updated);
+      onMemoryWrite?.(root);
+      return `ok (warning: file is ${Math.round(sizeBytes / 1024)} KB, LLM compaction failed — try again later)`;
     }
-  },
-};
 
-export const memoryDeleteTool: ToolModule = {
-  name: 'memory_delete',
-  spec: {
-    name: 'memory_delete',
-    description: 'Delete a saved memory by name.',
-    parameters: {
-      type: 'object',
-      properties: { name: { type: 'string', description: 'The memory name.' } },
-      required: ['name'],
-      additionalProperties: false,
-    },
-  } satisfies TextGenTool,
-  async run(input, ctx) {
-    const root = await requireRoot(ctx);
-    if (!root) return '(no project open)';
-    const name = (typeof input.name === 'string' ? input.name : '').trim();
-    try {
-      await native.fs.rm(`${memDir(root)}/${slug(name)}.json`, { force: true });
-      return `deleted memory ${JSON.stringify(name)}`;
-    } catch (e) {
-      console.error('[memoryDeleteTool:rm]', JSON.stringify({ name, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
-      return `(could not delete ${JSON.stringify(name)})`;
-    }
+    // Size is fine — just write
+    await native.fs.writeFile(filePath, updated);
+    onMemoryWrite?.(root);
+    return 'ok';
   },
 };

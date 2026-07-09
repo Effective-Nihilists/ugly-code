@@ -22,6 +22,7 @@ import {
   type RunAgentSocket,
 } from 'ugly-app/agent/client';
 import { dispatchTool, isUglyAppProject, killSessionBashProcs } from '../../agent/tools';
+import { setMemoryWriteHook } from '../../agent/tools/memory';
 import { registeredToolSpecs } from '../../agent/tools/registry';
 import { sessionToolSpecs } from '../../agent/tools/gating';
 import { discoverSkills, formatAvailableSkills } from '../hooks/skillDiscovery';
@@ -399,7 +400,25 @@ interface SessionAgentState {
 // until the user sent a message, which never happens if they're waiting for it to be "ready").
 // Keyed by sessionId; lives for the task process. See `ensureCodebaseAnalysis`.
 const codebaseReadinessBySession = new Map<string, SessionSnapshot['codebaseReadiness']>();
+// Cached MEMORY.md content per project path — read once at session start and
+// refreshed after every memory_add call. Read synchronously by the systemPrompt
+// getter (which can't await).
+const memoryContentByProject = new Map<string, string>();
+
+export async function refreshMemoryContent(projectDir: string): Promise<void> {
+  try {
+    memoryContentByProject.set(projectDir, await native.fs.readFile(projectDir + '/MEMORY.md'));
+  } catch {
+    memoryContentByProject.set(projectDir, '(no memories yet)');
+  }
+}
+
+// Register the memory write hook so the MEMORY.md content cache is refreshed
+// automatically after every memory_add call.
+setMemoryWriteHook((projectDir) => { void refreshMemoryContent(projectDir); });
+
 const architectureDocBySession = new Map<string, string>();
+// ...
 // Rendered <available_skills> block per session (discovered once, async, then
 // read synchronously by the systemPrompt getter — mirrors architectureDoc).
 const skillsBlockBySession = new Map<string, string>();
@@ -860,6 +879,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     ensureCodebaseAnalysis(sessionId, emitRef.current);
     ensureSkillsDiscovered(sessionId);
     ensureUglyAppFlag(sessionId);
+    // Seed the MEMORY.md content cache so the systemPrompt getter doesn't
+    // need to read the file synchronously every turn.
+    const dir = getActiveProjectPath();
+    if (dir) void refreshMemoryContent(dir);
   }
 
   state.controller = runAgent({
@@ -877,7 +900,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     // structural context up front without spending turns reading files.
     get systemPrompt() {
       const architectureDoc = architectureDocBySession.get(sessionId);
-      const base = architectureDoc
+      let base = architectureDoc
         ? `${AGENT_SYSTEM_PROMPT}\n\n# Project architecture (auto-generated map — exports, types, inheritance)\n\n${architectureDoc}`
         : AGENT_SYSTEM_PROMPT;
       // Real per-turn <env> (replaces the monolith's hardcoded sample block).
@@ -886,7 +909,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       const env = `<env>\nWorking directory: ${cwd}\nToday's date: ${new Date().toISOString().slice(0, 10)}\n</env>`;
       // Dynamic <available_skills> (discovered once per session; see below).
       const skillsBlock = skillsBlockBySession.get(sessionId) ?? formatAvailableSkills([]);
-      return `${base.replace('{{AVAILABLE_SKILLS}}', skillsBlock)}\n\n${env}`;
+      // Inject MEMORY.md into the system prompt from the cache (refreshed on
+      // session start and after every memory_add call).
+      const memoryBlock = memoryContentByProject.get(cwd) ?? '(no memories yet)';
+      return `${base.replace('{{AVAILABLE_SKILLS}}', skillsBlock).replace('{{MEMORY}}', memoryBlock)}\n\n${env}`;
     },
     // Static per-session gating (read afresh each turn): COMMON + single/group
     // mode set + the ugly-app project set (when applicable) + feature gates —

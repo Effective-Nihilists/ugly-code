@@ -1156,7 +1156,7 @@ function ToolList() {
     { name: 'grep' }, { name: 'glob' }, { name: 'write' },
     { name: 'todos' }, { name: 'multiedit' }, { name: 'web_fetch' },
     { name: 'python_exec', gap: true },
-    { name: 'memory_save', gap: true },
+    { name: 'memory_add', gap: true },
     { name: 'spec_write', gap: true },
     { name: 'delegate', gap: true },
     { name: 'analyze_image', gap: true },

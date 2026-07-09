@@ -12,14 +12,8 @@ playwright-report/
 .env.*
 !.env.example
 
-# ugly-studio state (do not commit)
-.ugly-studio/codebase-index.db*
-.ugly-studio/session-index.db*
-.ugly-studio/layout.json
-.ugly-studio/sandbox-state.json
-.ugly-studio/tmp/
-.ugly-studio/users/
-.ugly-studio/home/
+# ugly-studio runtime state (DB files, logs, temp data, sandboxes)
+.ugly-studio/
 .env.publish
 
 # Python bytecode cache (agent python-lib)

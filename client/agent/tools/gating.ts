@@ -17,7 +17,7 @@ const COMMON_TOOLS: ToolName[] = [
 /** Added only in single (default interactive) mode. */
 const SINGLE_MODE_TOOLS: ToolName[] = [
   'spec_read', 'spec_write', 'scratchpad',
-  'memory_read', 'memory_save', 'memory_list', 'memory_delete',
+  'memory_add',
   'delegate', 'delegate_parallel', 'ask_user', 'web_search',
   'analyze_image', 'dep_docs', 'python_libraries',
   'tool_search', 'tool_request',
@@ -36,15 +36,13 @@ const UGLY_APP_TOOLS: ToolName[] = [
 /** Feature gates. Defaults mirror the monolith: multiAgent OFF by default;
  *  memory + specs on; interactive (ask_user) on. */
 export interface GatingFeatures {
-  memoryRead: boolean;
-  memoryWrite: boolean;
+  memory: boolean;
   multiAgent: boolean;
   specs: boolean;
   interactive: boolean;
 }
 export const DEFAULT_FEATURES: GatingFeatures = {
-  memoryRead: true,
-  memoryWrite: true,
+  memory: true,
   multiAgent: false,
   specs: true,
   interactive: true,
@@ -63,8 +61,7 @@ export function allowedToolNames(input: GatingInput): Set<ToolName> {
   (input.mode === 'group' ? GROUP_MODE_TOOLS : SINGLE_MODE_TOOLS).forEach((t) => s.add(t));
   if (input.isUglyApp) UGLY_APP_TOOLS.forEach((t) => s.add(t));
   if (!f.specs) { s.delete('spec_read'); s.delete('spec_write'); }
-  if (!f.memoryRead) { s.delete('memory_read'); s.delete('memory_list'); }
-  if (!f.memoryWrite) { s.delete('memory_save'); s.delete('memory_delete'); }
+  if (!f.memory) { s.delete('memory_add'); }
   if (!f.multiAgent) { s.delete('delegate'); s.delete('delegate_parallel'); }
   if (!f.interactive) s.delete('ask_user');
   return s;

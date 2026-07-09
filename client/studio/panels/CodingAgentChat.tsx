@@ -344,10 +344,7 @@ const TOOL_ICON_MAP: Record<string, React.ReactNode> = {
   delegate: <GitBranch size={13} />,
   delegate_parallel: <GitBranch size={13} />,
   // Memory + scratchpad
-  memory_save: <Lightbulb size={13} />,
-  memory_read: <Lightbulb size={13} />,
-  memory_list: <Lightbulb size={13} />,
-  memory_delete: <Lightbulb size={13} />,
+  memory_add: <Lightbulb size={13} />,
   scratchpad: <StickyNote size={13} />,
   // Specs
   spec_read: <ClipboardList size={13} />,

@@ -92,7 +92,7 @@ export interface SubagentChild {
  * `CodingAgentSettings` interface.
  */
 export interface CodingAgentFeatures {
-  memory: { read: boolean; write: boolean };
+  memory: boolean;
   multiAgent: { enabled: boolean };
   autoLint: boolean;
   checkpoints: boolean;
@@ -127,7 +127,7 @@ export interface CodingAgentFeatures {
 }
 
 const DEFAULT_FEATURES: CodingAgentFeatures = {
-  memory: { read: true, write: true },
+  memory: true,
   multiAgent: { enabled: true },
   autoLint: false,
   checkpoints: false,
@@ -158,10 +158,7 @@ interface ServerCodingAgent {
 /** Map a `getUserSettings` / `updateUserSettings` response onto the local feature state. */
 function serverToFeatures(ca: ServerCodingAgent): CodingAgentFeatures {
   return {
-    memory: {
-      read: !!ca.memory?.read,
-      write: !!ca.memory?.write,
-    },
+    memory: ca.memory?.read !== false || ca.memory?.write !== false,
     multiAgent: { enabled: !!ca.multiAgent?.enabled },
     autoLint: !!ca.autoLint,
     checkpoints: !!ca.checkpoints,

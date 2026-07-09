@@ -40,16 +40,15 @@ describe('static tool gating', () => {
   it('feature gates: multiAgent defaults OFF (no delegate); memory/specs toggle', () => {
     const def = allowedToolNames({ mode: 'single', isUglyApp: false });
     expect(def.has('delegate')).toBe(false); // multiAgent off by default
-    expect(def.has('memory_read')).toBe(true);
+    expect(def.has('memory_add')).toBe(true);
     expect(def.has('spec_write')).toBe(true);
 
     const on = allowedToolNames({ mode: 'single', isUglyApp: false, features: { multiAgent: true } });
     expect(on.has('delegate')).toBe(true);
     expect(on.has('delegate_parallel')).toBe(true);
 
-    const noMem = allowedToolNames({ mode: 'single', isUglyApp: false, features: { memoryRead: false, memoryWrite: false } });
-    expect(noMem.has('memory_read')).toBe(false);
-    expect(noMem.has('memory_save')).toBe(false);
+    const noMem = allowedToolNames({ mode: 'single', isUglyApp: false, features: { memory: false } });
+    expect(noMem.has('memory_add')).toBe(false);
   });
 
   it('sessionToolSpecs returns only specs for allowed, defined tools', () => {
