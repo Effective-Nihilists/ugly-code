@@ -88,7 +88,8 @@ export function GitPanel(): React.ReactElement {
   // Scan for nested .git dirs on mount.
   React.useEffect(() => {
     const root = getActiveProjectPath();
-    if (root) void findAndCacheGitRepos(root).then(setRepos);
+    console.log('[GitPanel] mount, scanning repos under', root);
+    if (root) void findAndCacheGitRepos(root).then((r) => { console.log('[GitPanel] repos loaded', r.length); setRepos(r); });
   }, []);
 
   const refresh = React.useCallback(async () => {
