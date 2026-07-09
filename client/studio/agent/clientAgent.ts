@@ -900,7 +900,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     // structural context up front without spending turns reading files.
     get systemPrompt() {
       const architectureDoc = architectureDocBySession.get(sessionId);
-      let base = architectureDoc
+      const base = architectureDoc
         ? `${AGENT_SYSTEM_PROMPT}\n\n# Project architecture (auto-generated map — exports, types, inheritance)\n\n${architectureDoc}`
         : AGENT_SYSTEM_PROMPT;
       // Real per-turn <env> (replaces the monolith's hardcoded sample block).

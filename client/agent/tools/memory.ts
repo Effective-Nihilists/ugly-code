@@ -19,13 +19,6 @@ const MEMORY_FILE = 'MEMORY.md';
 const MAX_BYTES = 10_000;
 const TARGET_BYTES = 8_000; // compact to this size
 
-/** Return the absolute path to MEMORY.md, or null when no project is open. */
-function memoryPath(ctx: Parameters<ToolModule['run']>[1]): string | null {
-  const root = projectRoot(ctx);
-  if (!root) return null;
-  return `${root.replace(/\/+$/, '')}/${MEMORY_FILE}`;
-}
-
 /** Call the agent's LLM to condense `content` to ≤ TARGET_BYTES. */
 async function compactViaLLM(
   ctx: Parameters<ToolModule['run']>[1],

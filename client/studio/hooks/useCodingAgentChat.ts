@@ -158,6 +158,7 @@ interface ServerCodingAgent {
 /** Map a `getUserSettings` / `updateUserSettings` response onto the local feature state. */
 function serverToFeatures(ca: ServerCodingAgent): CodingAgentFeatures {
   return {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     memory: ca.memory?.read !== false || ca.memory?.write !== false,
     multiAgent: { enabled: !!ca.multiAgent?.enabled },
     autoLint: !!ca.autoLint,
@@ -3051,6 +3052,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
                 limit: PAGE_SIZE,
                 ...(beforeId ? { beforeId } : {}),
               })) as { messages?: WireMessage[]; hasMore?: boolean };
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
               if (cancelled) return;
               const msgs = page.messages ?? [];
               if (msgs.length === 0) break;

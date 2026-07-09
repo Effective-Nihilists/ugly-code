@@ -264,6 +264,10 @@ export class LspClient {
   private readonly diagnostics = new Map<string, LspDiagnostic[]>();
   /** Monotonic timestamp of the most recent publishDiagnostics per file. Used by waitForDiagnostics to distinguish "fresh publish" from "stale entry". */
   private readonly diagnosticsPublishedAt = new Map<string, number>();
+  private readonly diagnosticsWaiters = new Map<
+    string,
+    { resolve: () => void; baselineAt: number }[]
+  >();
   private readonly openDocuments = new Map<
     string,
     { content: string; version: number }
@@ -579,17 +583,56 @@ export class LspClient {
    * call. We wait for a publish whose timestamp is strictly newer than
    * the pre-existing one, so re-syncing an already-open file doesn't
    * return instantly on a stale cache entry.
+   *
+   * Event-driven — registers a one-shot resolver instead of busy-waiting
+   * with a 50ms poll loop (previously 30 setTimeout calls/sec could saturate
+   * the event loop during multi-file LSP startup).
    */
   async waitForDiagnostics(filePath: string, timeoutMs = 1500): Promise<void> {
     if (this.state !== 'ready') return;
     const abs = path.resolve(this.workspaceRoot, filePath);
     const baselinePublishedAt = this.diagnosticsPublishedAt.get(abs) ?? 0;
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      const latest = this.diagnosticsPublishedAt.get(abs) ?? 0;
-      if (latest > baselinePublishedAt) return;
-      await new Promise((r) => setTimeout(r, 50));
-    }
+    const latest = this.diagnosticsPublishedAt.get(abs) ?? 0;
+    if (latest > baselinePublishedAt) return;
+
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const done = (): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      };
+
+      const timer = setTimeout(done, timeoutMs);
+
+      // Check between microtasks
+      const cur = this.diagnosticsPublishedAt.get(abs) ?? 0;
+      if (cur > baselinePublishedAt) { done(); return; }
+
+      let arr = this.diagnosticsWaiters.get(abs);
+      if (!arr) { arr = []; this.diagnosticsWaiters.set(abs, arr); }
+      arr.push({ resolve: done, baselineAt: baselinePublishedAt });
+
+      const cleanup = (): void => {
+        clearTimeout(timer);
+        const list = this.diagnosticsWaiters.get(abs);
+        if (list) {
+          const i = list.findIndex((w) => w.baselineAt === baselinePublishedAt);
+          if (i >= 0) list.splice(i, 1);
+          if (list.length === 0) this.diagnosticsWaiters.delete(abs);
+        }
+      };
+    });
+  }
+
+  /** Notify any waitForDiagnostics resolvers when a path gets new diagnostics. */
+  private resolveDiagnosticsWaiters(filePath: string): void {
+    const waiters = this.diagnosticsWaiters.get(filePath);
+    if (!waiters || waiters.length === 0) return;
+    const ts = this.diagnosticsPublishedAt.get(filePath) ?? Date.now();
+    const toResolve = waiters.filter((w) => ts > w.baselineAt);
+    for (const w of toResolve) w.resolve();
   }
 
   /** Get the diagnostics for a file (by relative or absolute path). */
@@ -1156,6 +1199,7 @@ export class LspClient {
       this.diagnostics.set(filePath, diags);
     }
     this.diagnosticsPublishedAt.set(filePath, Date.now());
+    this.resolveDiagnosticsWaiters(filePath);
     this.emitState('updated', {
       file: path.relative(this.workspaceRoot, filePath),
       diagnostics: diags,
