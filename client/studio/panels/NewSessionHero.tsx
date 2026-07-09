@@ -13,7 +13,7 @@ import {
   useStudioUserSettingsHydrated,
 } from '../hooks/useStudioUserSetting';
 import { shortcut } from '../utils/platform';
-import { type SubscriptionProvider } from './ModelSelector';
+import { GitBranch } from 'lucide-react';import { Popover } from '../system';import { type SubscriptionProvider } from './ModelSelector';
 import {
   ReasoningSelector,
   supportsReasoningClient,
@@ -509,7 +509,7 @@ export function NewSessionHero({
               animationDelay: '500ms',
             }}
           >
-            <BranchModeToggle value={branchMode} onChange={setBranchMode} />
+            <BranchDropdown value={branchMode} onChange={setBranchMode} />
           </div>
           <div
             className="us-fade-up"
@@ -591,41 +591,85 @@ export function NewSessionHero({
 /**
  * Two-segment toggle: Worktree (isolated branch) vs Main branch (direct on project).
  */
-function BranchModeToggle({
+function BranchDropdown({
   value,
   onChange,
 }: {
   value: 'worktree' | 'main';
   onChange: (v: 'worktree' | 'main') => void;
 }): React.ReactElement {
-  const seg: React.CSSProperties = {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
-    fontWeight: 600,
-    letterSpacing: '0.04em',
-    padding: '4px 10px',
-    border: '1px solid var(--border)',
-    background: 'transparent',
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    flexShrink: 0,
-  };
-  const active: React.CSSProperties = {
-    ...seg,
-    background: 'var(--accent-dim)',
-    color: 'var(--accent)',
-    borderColor: 'var(--accent)',
-  };
-  const left = value === 'worktree' ? { ...active, borderTopLeftRadius: 5, borderBottomLeftRadius: 5 } : { ...seg, borderTopLeftRadius: 5, borderBottomLeftRadius: 5 };
-  const right = value === 'main' ? { ...active, borderTopRightRadius: 5, borderBottomRightRadius: 5 } : { ...seg, borderTopRightRadius: 5, borderBottomRightRadius: 5 };
+  const label = value === 'worktree' ? 'Worktree' : 'Main branch';
+  const trigger = (
+    <button
+      data-id="branch-mode-trigger"
+      type="button"
+      aria-label="Branch: {label}"
+      data-us-tooltip="Branch: {label}"
+      data-us-tooltip-placement="top"
+      style={{
+        background: 'var(--bg-secondary, #1a1a2e)',
+        border: '1px solid var(--border, #2a2a3e)',
+        borderRadius: 6,
+        padding: '4px 8px',
+        color: 'var(--text-primary, #e0e0e0)',
+        fontSize: 12,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+      }}
+    >
+      <GitBranch size={13} />
+      <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
+      <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+        <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
   return (
-    <>
-      <button type="button" data-id="branch-mode-worktree" onClick={() => { onChange('worktree'); }} style={left} title="Git worktree on a new branch — isolated from other sessions">
-        ⑂ Worktree
-      </button>
-      <button type="button" data-id="branch-mode-main" onClick={() => { onChange('main'); }} style={right} title="Work directly on the main branch — share the working directory">
-        ⎇ Main branch
-      </button>
-    </>
+    <Popover trigger={trigger} placement="bottom-start" minWidth={240}>
+      {(ctx) => (
+        <>
+          <button
+            data-id="branch-mode-option-worktree"
+            role="menuitem"
+            type="button"
+            onClick={() => { onChange('worktree'); ctx.close(); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              padding: '8px 10px',
+              background: value === 'worktree' ? 'var(--bg-hover, rgba(255,85,0,0.1))' : 'transparent',
+              border: 'none', borderRadius: 6, cursor: 'pointer',
+              color: 'var(--text-primary, #e0e0e0)', fontSize: 12, textAlign: 'left',
+            }}
+          >
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span>Worktree</span>
+              <span style={{ color: 'var(--text-muted, #666)', fontSize: 10 }}>Isolated git worktree on a new branch</span>
+            </span>
+          </button>
+          <button
+            data-id="branch-mode-option-main"
+            role="menuitem"
+            type="button"
+            onClick={() => { onChange('main'); ctx.close(); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              padding: '8px 10px',
+              background: value === 'main' ? 'var(--bg-hover, rgba(255,85,0,0.1))' : 'transparent',
+              border: 'none', borderRadius: 6, cursor: 'pointer',
+              color: 'var(--text-primary, #e0e0e0)', fontSize: 12, textAlign: 'left',
+            }}
+          >
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span>Main branch</span>
+              <span style={{ color: 'var(--text-muted, #666)', fontSize: 10 }}>Directly on the project main branch (no isolation)</span>
+            </span>
+          </button>
+        </>
+      )}
+    </Popover>
   );
 }

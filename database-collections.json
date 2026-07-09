@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-09T04:28:22.743Z",
+  "generatedAt": "2026-07-09T05:41:17.846Z",
   "source": "shared/collections.ts",
   "collections": {
     "perfLog": {
@@ -453,6 +453,10 @@
           "archived": {
             "type": "boolean",
             "required": true
+          },
+          "branch": {
+            "type": "string",
+            "required": false
           },
           "config": {
             "type": "object",

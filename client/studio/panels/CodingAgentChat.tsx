@@ -89,7 +89,7 @@ import {
   resolveSlashSelection,
   type Skill,
 } from '../hooks/useSlashCommands';
-import { useSocket, getActiveProjectPath, patchSessionAxes } from '../hooks/useSocket';
+import { useSocket, getActiveProjectPath } from '../hooks/useSocket';
 import { isTool } from '../../../shared/agent';
 import { native } from 'ugly-app/native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -6024,6 +6024,7 @@ CodingAgentChatProps = {}) {
     setPermissionMode,
     setModelMode,
     setPatternMode,
+    setBranchMode,
   } = useCodingAgentChat({
     initialSessionId,
     initialModel,
@@ -6133,8 +6134,8 @@ CodingAgentChatProps = {}) {
     },
     [],
   );
-
   const handleHeroSubmit = useCallback(
+
     async (params: NewSessionStartParams) => {
       // Apply the axis picks to THIS session, model first (it may convert
       // the backend in place for a Claude-CLI <-> ugly.bot switch).
@@ -6142,9 +6143,8 @@ CodingAgentChatProps = {}) {
       void setPermissionMode(params.permissionMode);
       void setPatternMode(params.patternMode);
       switchReasoningEffort(params.reasoningEffort);
-      // Branch mode is set on the session axes so the first turn's selection
-      // carries it to the desktop task for workspace provisioning.
-      if (sessionId) patchSessionAxes(sessionId, { branchMode: params.branchMode });
+      // Branch mode is set via synchronous ref so startNewChat picks it up.
+      setBranchMode(params.branchMode);
       const trimmed = params.prompt.trim();
       if (trimmed) await sendMessage(trimmed);
     },
@@ -6153,7 +6153,7 @@ CodingAgentChatProps = {}) {
       setPermissionMode,
       setPatternMode,
       switchReasoningEffort,
-      sessionId,
+      setBranchMode,
       sendMessage,
     ],
   );

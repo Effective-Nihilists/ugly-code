@@ -862,6 +862,7 @@ const handlers: Record<string, Handler> = {
     // legacy permission axis ('edit' | 'yolo').
     if (i.mode) patchSessionAxes(sessionId, { permissionMode: str(i.mode) });
     if (i.patternMode) patchSessionAxes(sessionId, { patternMode: str(i.patternMode) });
+    if (i.branchMode) patchSessionAxes(sessionId, { branchMode: str(i.branchMode) as "worktree" | "main" });
     if (i.modelMode) {
       patchSessionAxes(sessionId, { modelMode: i.modelMode });
       const mm = i.modelMode as { kind?: string; model?: string };

@@ -1195,6 +1195,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   useEffect(() => {
     reasoningEffortRef.current = reasoningEffort;
   }, [reasoningEffort]);
+  // Branch mode mirror (same pattern — synchronous so startNewChat reads the hero's pick).
+  const branchModeRef = useRef<'worktree' | 'main'>('worktree');
+  const setBranchMode = useCallback((next: 'worktree' | 'main') => {
+    branchModeRef.current = next;
+  }, []);
   const [pendingSkill, setPendingSkill] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingPermissions, setPendingPermissions] = useState<
@@ -1335,6 +1340,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     modelMode: SessionSnapshot['modelMode'];
     patternMode: SessionSnapshot['patternMode'];
     reasoningEffort: ReasoningEffort;
+    branchMode: "worktree" | "main";
   } | null>(null);
   const [resolvedPattern, setResolvedPattern] =
     useState<SessionSnapshot['resolvedPattern']>(null);
@@ -2759,6 +2765,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       const createModelMode = modelModeRef.current;
       const createPatternMode = patternModeRef.current;
       const createReasoningEffort = reasoningEffortRef.current;
+      const createBranchMode = branchModeRef.current;
       // Send the permission axis from the ref, not the stale closure. In-process
       // (ugly.bot) sessions only ever carry 'edit' | 'yolo' (the selector hides
       // 'claude-plan' for them), and 'yolo' now takes effect at runtime via the
@@ -2782,6 +2789,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // turn that starts before it lands would otherwise run at the default —
         // the "new session ignored my reasoning setting" bug.
         reasoningEffort: createReasoningEffort,
+        branchMode: createBranchMode,
       })) as ChatCreateResponse;
       console.debug('[CodingAgentChat] Session created: %s', newId);
       // Arm the one-shot drift sentinel: the first snapshot for `newId` must echo
@@ -2792,6 +2800,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         modelMode: createModelMode,
         patternMode: createPatternMode,
         reasoningEffort: createReasoningEffort,
+        branchMode: createBranchMode,
       };
       setSessionId(newId);
       onSessionCreatedRef.current?.(newId);
@@ -4310,5 +4319,6 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     setPermissionMode,
     setModelMode,
     setPatternMode,
+    setBranchMode,
   };
 }

@@ -77,6 +77,41 @@ test.describe('Studio shell — real app', () => {
     await expect(page.locator('[data-id=home-prompt-input]')).toBeVisible();
   });
 
+  test('branch-mode dropdown renders in the new session hero and opens the popover', async ({ page }) => {
+    await enterStudioShell(page, auth!);
+    await openProject(page);
+
+    const trigger = page.locator('[data-id=branch-mode-trigger]');
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toContainText('Worktree');
+
+    await trigger.click();
+    await expect(page.locator('[data-id=branch-mode-option-worktree]')).toBeVisible();
+    await expect(page.locator('[data-id=branch-mode-option-main]')).toBeVisible();
+    await expect(page.locator('[data-id=branch-mode-option-main]')).toContainText('Main branch');
+
+    await page.locator('[data-id=branch-mode-option-main]').click();
+    await expect(trigger).toContainText('Main branch');
+
+    await trigger.click();
+    await page.locator('[data-id=branch-mode-option-worktree]').click();
+    await expect(trigger).toContainText('Worktree');
+  });
+
+  test('branch-mode dropdown value persists across reload', async ({ page }) => {
+    await enterStudioShell(page, auth!);
+    await openProject(page);
+
+    const trigger = page.locator('[data-id=branch-mode-trigger]');
+    await trigger.click();
+    await page.locator('[data-id=branch-mode-option-main]').click();
+    await expect(trigger).toContainText('Main branch');
+
+    await page.reload();
+    await page.locator('[data-id=home-prompt-input]').waitFor({ timeout: 10_000 });
+    await expect(page.locator('[data-id=branch-mode-trigger]')).toContainText('Main branch');
+  });
+
   // Full real loop: NewSessionHero → codingAgentChatSend → runClientAgentTurn →
   // POST /api/agentTurn → ugly.bot /v1/ai → assistant reply, RENDERED into the
   // transcript. Computed answers (NOT in the prompt) rule out matching the user
