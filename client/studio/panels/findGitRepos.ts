@@ -11,6 +11,10 @@ import { native } from 'ugly-app/native';
 export interface GitRepo {
   name: string;
   path: string;
+  /** True when the repo has `ugly-app` as a dependency (package.json) or a
+   *  `.uglyapp` config file — used to flag ugly-app-based projects in the
+   *  repo selector dropdown. */
+  isUglyApp?: boolean;
 }
 
 const MAX_DEPTH = 4;
@@ -38,6 +42,34 @@ async function walk(dir: string, depth: number, out: GitRepo[]): Promise<void> {
   // Walk sibling directories concurrently — sequential readdir over the UglyNative
   // IPC bridge made scanning a big root (e.g. ~/Documents/GitHub) take many seconds.
   await Promise.all(subdirs.map((d) => walk(d, depth + 1, out)));
+}
+
+/** Check if a repo directory is an ugly-app-based project by looking for
+ *  `.uglyapp` config or `ugly-app` in `package.json` dependencies. */
+async function checkIsUglyApp(repoPath: string): Promise<boolean> {
+  try {
+    // Fast path: .uglyapp exists → definite ugly-app project
+    const entries = await native.fs.readdir(repoPath);
+    if (entries.some((e) => e.name === '.uglyapp')) return true;
+    // Check package.json for ugly-app dependency
+    if (entries.some((e) => e.name === 'package.json')) {
+      const pkg = await native.fs.readFile(`${repoPath}/package.json`);
+      try {
+        const parsed = JSON.parse(pkg) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+        return !!(parsed.dependencies?.['ugly-app'] ?? parsed.devDependencies?.['ugly-app']);
+      } catch { /* invalid JSON */ }
+    }
+  } catch { /* read error — not accessible */ }
+  return false;
+}
+
+/** Annotate repos with the isUglyApp flag in batches. */
+async function annotateUglyApp(repos: GitRepo[]): Promise<GitRepo[]> {
+  const checks = repos.map(async (r) => {
+    r.isUglyApp = await checkIsUglyApp(r.path);
+    return r;
+  });
+  return Promise.all(checks);
 }
 
 /** Resolve a leading `~` to an absolute home-directory path by asking the host
@@ -76,7 +108,9 @@ export async function findGitRepos(root: string): Promise<GitRepo[]> {
     console.log('[findGitRepos] walk threw', (e as Error).message);
   }
   repos.sort((a, b) => a.path.length - b.path.length);
-  console.log('[findGitRepos] found', repos.length, 'repos', JSON.stringify(repos.map((r) => r.path)));
+  // Annotate with ugly-app flags
+  await annotateUglyApp(repos);
+  console.log('[findGitRepos] found', repos.length, 'repos', JSON.stringify(repos.map((r) => ({ path: r.path, isUglyApp: r.isUglyApp }))));
   return repos;
 }
 

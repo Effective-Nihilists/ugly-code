@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { native } from 'ugly-app/native';
-import { getActiveProjectPath } from './useSocket';
+import { getActiveRepoPath } from './useSocket';
 
 export type ProdDeployState = 'checking' | 'deployed' | 'undeployed';
 
@@ -17,7 +17,7 @@ export function useProdDeployGate(enabled: boolean): ProdDeployState {
     if (!enabled) return;
     let cancelled = false;
     setState('checking');
-    const cwd = getActiveProjectPath();
+    const cwd = getActiveRepoPath();
     if (!cwd) { setState('undeployed'); return; }
     void (async () => {
       try {

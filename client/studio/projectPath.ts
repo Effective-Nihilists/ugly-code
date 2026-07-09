@@ -2,6 +2,10 @@
 // coding-task bundle, by the task entry from uglyTask.params. Kept in a tiny React-free
 // module so the agent loop (clientAgent.ts) can be bundled into a Node task child without
 // pulling in useSocket → React.
+//
+// This is the CODING AGENT's working directory — always the main project root, never
+// changed by the repo selector dropdown. Panels that need to scope to a sub-repo read
+// `getActiveRepoPath()` instead.
 let activeProjectPath: string | null = null;
 
 export function setActiveProjectPath(p: string | null): void {
@@ -24,4 +28,20 @@ export function getActiveProjectPath(): string | null {
     } catch { /* malformed URL — fall through to null */ }
   }
   return null;
+}
+
+// ── Active repo path (sub-repo scoping for UI panels) ──────────────────────
+// When the user picks a git repo from the GitRepoSelector dropdown, panels
+// (errors, events, feedback, workers, preview, publish, database) scope to that
+// repo. The coding agent IGNORES this and stays anchored to the main project
+// root (getActiveProjectPath above). Falls back to getActiveProjectPath when no
+// sub-repo is selected, so panels work identically without the dropdown.
+let activeRepoPath: string | null = null;
+
+export function setActiveRepoPath(p: string | null): void {
+  activeRepoPath = p;
+}
+
+export function getActiveRepoPath(): string | null {
+  return activeRepoPath ?? getActiveProjectPath();
 }

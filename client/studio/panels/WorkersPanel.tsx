@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DevProdToggle } from '../components/DevProdToggle';
 import { useSocket } from '../hooks/useSocket';
 import { useStudioUserSetting } from '../hooks/useStudioUserSetting';
+import { GitRepoSelector } from './GitRepoSelector';
 
 interface WorkerManifestItem {
   name: string;
@@ -240,6 +241,7 @@ export function WorkersPanel({
             >
               Workers
             </span>
+            <GitRepoSelector />
           </div>
         )}
         <div
@@ -276,6 +278,7 @@ export function WorkersPanel({
           >
             Workers
           </span>
+          <GitRepoSelector />
           {!modePinned && (
             <DevProdToggle mode={mode} onModeChange={handleModeChange} />
           )}

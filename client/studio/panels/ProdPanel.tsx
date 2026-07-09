@@ -1,8 +1,8 @@
 import React from 'react';
 import { native, permissions } from 'ugly-app/native';
-import { getActiveProjectPath } from '../hooks/useSocket';
 import { ConsoleText } from '../components/ConsoleText';
 import { LinkifiedText } from '../components/LinkifiedText';
+import { GitRepoSelector, useActiveRepoPath } from './GitRepoSelector';
 
 /** The bits of `.uglyapp`'s persisted deployTarget we surface. */
 interface DeployTarget {
@@ -46,6 +46,7 @@ function uglyBotAuthJson(): string | null {
  * stream stdout/stderr into a console.
  */
 export function ProdPanel(): React.ReactElement {
+  const activeRepo = useActiveRepoPath();
   const [target, setTarget] = React.useState<DeployTarget | null>(null);
   const [output, setOutput] = React.useState('');
   const [running, setRunning] = React.useState(false);
@@ -55,7 +56,7 @@ export function ProdPanel(): React.ReactElement {
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const loadTarget = React.useCallback(async () => {
-    const cwd = getActiveProjectPath();
+    const cwd = activeRepo;
     if (!cwd) return;
     try {
       const ua = JSON.parse(await native.fs.readFile(`${cwd}/.uglyapp`)) as { deployTarget?: DeployTarget };
@@ -66,7 +67,7 @@ export function ProdPanel(): React.ReactElement {
       // would spam errorLog for every unpublished project — deliberately silent.
       setTarget(null);
     }
-  }, []);
+  }, [activeRepo]);
 
   React.useEffect(() => {
     void loadTarget();
@@ -77,7 +78,7 @@ export function ProdPanel(): React.ReactElement {
   }, [output]);
 
   const deploy = React.useCallback(async () => {
-    const cwd = getActiveProjectPath();
+    const cwd = activeRepo;
     if (!cwd || running) return;
     setOutput('');
     setError(null);
@@ -129,7 +130,7 @@ export function ProdPanel(): React.ReactElement {
       setError((e as Error).message);
       setRunning(false);
     }
-  }, [running, loadTarget]);
+  }, [activeRepo, running, loadTarget]);
 
   // Send a line to the running publish's stdin (answers its prompts — custom
   // domain, etc.). Echo it into the console so the user sees what they sent.
@@ -160,6 +161,7 @@ export function ProdPanel(): React.ReactElement {
   return (
     <div data-id="prod-panel" style={S.root}>
       <div style={S.header}>
+        <GitRepoSelector />
         <div style={S.targetCol}>
           {liveUrl ? (
             <>

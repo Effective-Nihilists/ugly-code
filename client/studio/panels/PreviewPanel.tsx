@@ -2,12 +2,12 @@ import React from 'react';
 import { native, isNativeAvailable, permissions } from 'ugly-app/native';
 import { NativeHostRequired } from '../common/NativeHostRequired';
 import { sessionPort, getSessionWorkspace } from '../agent/sessionWorkspace';
-import { getActiveProjectPath } from '../hooks/useSocket';
 import { devServerSpawn } from './devServerCmd';
 import { persistDevLog, flushDevLog, readDevLog } from './devServerLog';
 import { readDevControl } from './devServerControl';
 import { ansiToNodes, stripAnsi } from './ansi';
 import { registerFeedbackContextProvider } from 'ugly-app/client';
+import { GitRepoSelector, useActiveRepoPath } from './GitRepoSelector';
 
 // The desktop daemon gates `native.process.spawn` on (a) the binary being bundled
 // and (b) a granted `process` capability with the binary allowlisted. Without an
@@ -174,6 +174,7 @@ function stopDev(key: string): void {
 }
 
 export function PreviewPanel({ sessionId }: { sessionId?: string | null }): React.ReactElement {
+  const activeRepo = useActiveRepoPath();
   const port = sessionId ? sessionPort(sessionId) : 4321;
   const defaultUrl = `http://localhost:${port}`;
   const devKey = sessionId ?? 'root';
@@ -236,7 +237,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   // running server itself survives on the host). Skipped on a tab switch, where
   // the in-memory log is still present.
   React.useEffect(() => {
-    const proj = getActiveProjectPath();
+    const proj = activeRepo;
     if (!proj) return;
     const d = getDev(devKey, port);
     if (d.log) return;
@@ -244,7 +245,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
       const dd = getDev(devKey, port);
       if (text && !dd.log) { dd.log = text; notify(dd); }
     });
-  }, [devKey, port]);
+  }, [activeRepo, devKey, port]);
 
   // Attach the dev-server log to any feedback filed from the preview tab, so a
   // "preview not working" report carries the actual dev-server output.
@@ -285,7 +286,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   // can't call startDev/stopDev directly. Poll ~1.5s; act on each new nonce once.
   const lastCtlNonce = React.useRef<string | null>(null);
   React.useEffect(() => {
-    const proj = getActiveProjectPath();
+    const proj = activeRepo;
     if (!proj) return;
     let cancelled = false;
     // Seed with the current command so a stale pre-mount request isn't replayed.
@@ -299,7 +300,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
       });
     }, 1500);
     return () => { cancelled = true; clearInterval(id); };
-  }, [devKey, port, sessionId]);
+  }, [activeRepo, devKey, port, sessionId]);
 
   // Reload the iframe once the dev server is actually READY. `ugly-app dev` runs
   // Vite in MIDDLEWARE mode, so it never prints Vite's "➜ Local:" / "ready in Nms"
@@ -338,7 +339,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   }, [dev.running, dev.startToken]);
 
   const startOrRestart = React.useCallback(() => {
-    const proj = getActiveProjectPath();
+    const proj = activeRepo;
     if (!proj) { setShowLog(true); return; }
     startDev(devKey, proj, port, sessionId ? getSessionWorkspace(sessionId)?.databaseUrl : undefined);
     setShowLog(true);
@@ -349,7 +350,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
     setUrl(target);
     setCommitted(target);
     try { localStorage.setItem(keyFor(sessionId ?? null), target); } catch { /* ignore */ }
-  }, [devKey, port, sessionId]);
+  }, [activeRepo, devKey, port, sessionId]);
 
   // Auto-scroll the log to the bottom as new output arrives, while pinned.
   React.useEffect(() => {
@@ -378,6 +379,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
         )}
         <span style={{ ...S.dot, background: dev.running ? 'var(--accent-success, #10b981)' : 'var(--text-muted)' }} title={dev.running ? `running on :${dev.port}` : 'stopped'} />
         <button data-id="preview-reload" style={S.iconBtn} title="Reload preview" onClick={() => { setReloadKey((k) => k + 1); }}>↻</button>
+        <GitRepoSelector />
         <input
           data-id="preview-url"
           style={S.input}

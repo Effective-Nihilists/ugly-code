@@ -4,6 +4,7 @@ import { useSocket } from '../hooks/useSocket';
 import { useStudioUserSetting } from '../hooks/useStudioUserSetting';
 import { useProdDeployGate } from '../hooks/useProdDeployGate';
 import { ProdPublishGate } from './ProdPublishGate';
+import { GitRepoSelector } from './GitRepoSelector';
 
 interface ErrorSummary {
   message: string;
@@ -143,6 +144,7 @@ export function ErrorsPanel({
           >
             Errors
           </span>
+          <GitRepoSelector />
           {!modePinned && (
             <DevProdToggle mode={mode} onModeChange={handleModeChange} />
           )}

@@ -17,11 +17,12 @@ import { native } from 'ugly-app/native';
 import { DevProdToggle } from '../components/DevProdToggle';
 import { CodeEditor } from '../components/CodeEditor';
 import { ResultsTable } from '../components/ResultsTable';
-import { useSocket, getActiveProjectPath } from '../hooks/useSocket';
+import { useSocket, getActiveRepoPath } from '../hooks/useSocket';
 import { useStudioUserSetting } from '../hooks/useStudioUserSetting';
 import { shortcut } from '../utils/platform';
 import { isNativeAvailable } from 'ugly-app/native';
 import { NativeHostRequired } from '../common/NativeHostRequired';
+import { GitRepoSelector, useActiveRepoPath } from './GitRepoSelector';
 
 type DbMode = 'dev' | 'prod';
 type Tab = 'browse' | 'sql' | 'schema';
@@ -95,6 +96,7 @@ export interface DatabasePanelProps {
 }
 
 export function DatabasePanel({ forceProd, forceDev, onPublish }: DatabasePanelProps = {}) {
+  const activeRepo = useActiveRepoPath();
   const [storedMode, setStoredMode] = useStudioUserSetting<DbMode>('panel.database.mode', 'dev');
   const mode: DbMode = forceProd ? 'prod' : forceDev ? 'dev' : storedMode;
   // `||` (not `??`) is intentional: either boolean flag being `true` pins the mode.
@@ -131,7 +133,7 @@ export function DatabasePanel({ forceProd, forceDev, onPublish }: DatabasePanelP
     if (mode !== 'prod') return;
     let cancelled = false;
     setProdDeployed('checking');
-    const cwd = getActiveProjectPath();
+    const cwd = activeRepo;
     if (!cwd) { setProdDeployed('no'); return; }
     void (async () => {
       try {
@@ -149,7 +151,7 @@ export function DatabasePanel({ forceProd, forceDev, onPublish }: DatabasePanelP
       }
     })();
     return () => { cancelled = true; };
-  }, [mode]);
+  }, [activeRepo, mode]);
 
   // The DB panel runs its query script as a local node subprocess (both dev bundled
   // Postgres AND prod Neon go through `native.process.spawn`), so a browser tab with
@@ -171,6 +173,7 @@ export function DatabasePanel({ forceProd, forceDev, onPublish }: DatabasePanelP
     <div data-id="database-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="panel-toolbar" style={{ gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Database</span>
+        <GitRepoSelector />
         <div style={{ display: 'inline-flex', gap: 2, marginLeft: 4 }}>
           {(['browse', 'sql', 'schema'] as Tab[]).map((t) => (
             <button
@@ -777,7 +780,7 @@ function SchemaView({ mode }: { mode: DbMode }) {
 /** Best-effort: pull the collection's TS interface out of the project's
  *  shared/collections.ts so the schema view shows the intended shape. */
 async function loadTsInterface(collection: string): Promise<string | null> {
-  const proj = getActiveProjectPath();
+  const proj = getActiveRepoPath();
   if (!proj) return null;
   try {
     const src = await native.fs.readFile(`${proj}/shared/collections.ts`);

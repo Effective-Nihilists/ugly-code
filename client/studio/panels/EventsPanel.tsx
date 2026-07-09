@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { useProdDeployGate } from '../hooks/useProdDeployGate';
 import { ProdPublishGate } from './ProdPublishGate';
+import { GitRepoSelector } from './GitRepoSelector';
 
 interface EventItem {
   id: string;
@@ -82,6 +83,7 @@ export function EventsPanel({ hideHeader, onPublish }: EventsPanelProps = {}) {
           >
             Events
           </span>
+          <GitRepoSelector />
         </div>
       )}
       <div

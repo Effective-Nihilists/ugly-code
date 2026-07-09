@@ -112,8 +112,8 @@ export function isConnected(): boolean {
 
 // The opened project's absolute path now lives in a React-free module (so the agent loop
 // can bundle headless). Re-exported here for existing importers (StudioProjectPage, etc.).
-import { getActiveProjectPath, setActiveProjectPath } from '../projectPath';
-export { getActiveProjectPath, setActiveProjectPath };
+import { getActiveProjectPath, setActiveProjectPath, getActiveRepoPath } from '../projectPath';
+export { getActiveProjectPath, setActiveProjectPath, getActiveRepoPath };
 
 // ── Background coding-task adoption ──────────────────────────────────────────
 // The coding session runs as a background task (Studio desktop, or mobile via the Ugly
@@ -348,7 +348,7 @@ const ZERO_RUN_TOTALS = {
  *  telemetry) and parse the NDJSON output into docs. Resolves [] on any failure
  *  (project not deployed, no CF token, command missing) so panels degrade. */
 function runCli(cmd: string): Promise<{ _id: string; created: number; data: Record<string, unknown> }[]> {
-  const proj = getActiveProjectPath();
+  const proj = getActiveRepoPath();
   if (!proj) return Promise.resolve([]);
   return new Promise((resolve) => {
     let stdout = '';
@@ -411,7 +411,7 @@ async function resolveFeedbackCli(
   status: 'resolved' | 'declined',
   resolution: string,
 ): Promise<void> {
-  const proj = getActiveProjectPath();
+  const proj = getActiveRepoPath();
   if (!proj) throw new Error('No active project');
   const authJson = uglyBotAuthJson();
   type GrantReq = Parameters<typeof permissions.request>[0];
@@ -453,7 +453,7 @@ const mapWorkerStatus = (s: unknown): 'completed' | 'failed' =>
   s === 'error' ? 'failed' : 'completed';
 
 function runDbScript(op: string, mode: string, input: unknown): Promise<unknown> {
-  const proj = getActiveProjectPath();
+  const proj = getActiveRepoPath();
   if (!proj) return Promise.reject(new Error('No active project'));
   return new Promise((resolve, reject) => {
     let stdout = '';
@@ -668,7 +668,7 @@ const handlers: Record<string, Handler> = {
   // parsing shared/cron.ts — `defineWorkers({ name: defineWorker({ schedule,
   // description }) })`. The runs list (below) still comes from prod telemetry.
   workersGetManifest: async () => {
-    const proj = getActiveProjectPath();
+    const proj = getActiveRepoPath();
     if (!proj) return { available: false, reason: 'No project open.', workers: [] };
     let src = '';
     for (const rel of ['/shared/cron.ts', '/src/shared/cron.ts']) {

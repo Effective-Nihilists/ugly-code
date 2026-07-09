@@ -2,6 +2,7 @@ import React from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { useProdDeployGate } from '../hooks/useProdDeployGate';
 import { ProdPublishGate } from './ProdPublishGate';
+import { GitRepoSelector } from './GitRepoSelector';
 
 // The Studio Feedback tab — the `ugly-app feedback` CLI, in-app: list the
 // project's prod feedback reports, resolve/decline them (owner-gated via the
@@ -119,6 +120,7 @@ export function FeedbackPanel({ onPublish, sessions = [], onSendToAgent }: Feedb
     <div data-id="feedback-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="panel-toolbar" style={{ gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Feedback</span>
+        <GitRepoSelector />
         <div style={{ flex: 1 }} />
         <button data-id="feedback-refresh" style={btn} onClick={load}>↻ Refresh</button>
       </div>

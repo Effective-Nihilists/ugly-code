@@ -2,6 +2,7 @@ import React from 'react';
 import { native } from 'ugly-app/native';
 import { getActiveProjectPath } from '../hooks/useSocket';
 import { findAndCacheGitRepos, type GitRepo } from './findGitRepos';
+import { GitRepoSelector, useQueryParam } from './GitRepoSelector';
 
 // A real git workspace: status (staged/unstaged/untracked) + colored diff +
 // stage-select + commit + history, all over `native.process.spawn('git', …)`.
@@ -80,7 +81,7 @@ export function GitPanel(): React.ReactElement {
   const [busy, setBusy] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [repos, setRepos] = React.useState<GitRepo[]>([]);
-  const [activeRepo, setActiveRepo] = React.useState<string | null>(null);
+  const [activeRepo] = useQueryParam('repo');
   // Whether `cwd` is actually a git repo. The root (e.g. ~/Documents/GitHub) often
   // isn't — it just holds nested repos — so we must never surface git's raw
   // "fatal: not a git repository" to the user; show a clean empty state instead.
@@ -179,21 +180,7 @@ export function GitPanel(): React.ReactElement {
   return (
     <div data-id="git-panel" style={S.root}>
       <div style={S.bar}>
-        {repos.length > 0 ? (
-          <select
-            data-id="git-repo-select"
-            style={S.repoSelect}
-            value={activeRepo ?? getActiveProjectPath() ?? ''}
-            onChange={(e) => { setActiveRepo(e.target.value || null); }}
-          >
-            <option value={getActiveProjectPath() ?? ''}>{getActiveProjectPath()?.split('/').pop() ?? '(root)'}</option>
-            {repos.map((r) => (
-              <option key={r.path} value={r.path}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        ) : null}
+        <GitRepoSelector />
         <span style={{ ...S.branch, flex: 'none' }}>⎇ {branch || '—'}</span>
         <button data-id="git-tab-changes" style={tabStyle(view === 'changes')} onClick={() => { setView('changes'); }}>
           Changes{files.length ? ` (${files.length})` : ''}
