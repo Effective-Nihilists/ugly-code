@@ -1,7 +1,7 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
 import { getActiveProjectPath } from '../hooks/useSocket';
-import { findGitRepos, type GitRepo } from './findGitRepos';
+import { findAndCacheGitRepos, type GitRepo } from './findGitRepos';
 
 // A real git workspace: status (staged/unstaged/untracked) + colored diff +
 // stage-select + commit + history, all over `native.process.spawn('git', …)`.
@@ -88,14 +88,16 @@ export function GitPanel(): React.ReactElement {
   // Scan for nested .git dirs on mount.
   React.useEffect(() => {
     const root = getActiveProjectPath();
-    if (root) void findGitRepos(root).then(setRepos);
+    if (root) void findAndCacheGitRepos(root).then(setRepos);
   }, []);
 
   const refresh = React.useCallback(async () => {
     if (!cwd) return;
     const [b, s] = await Promise.all([git(['branch', '--show-current'], cwd), git(['status', '--porcelain=v1', '-z', '-uall'], cwd)]);
-    setBranch(b.out.trim());
-    setFiles(parseStatus(s.out));
+    // Only parse output when git succeeded — an error (e.g. "fatal: not a git
+    // repository") must not be parsed as file paths.
+    setBranch(b.ok ? b.out.trim() : '');
+    setFiles(s.ok ? parseStatus(s.out) : []);
   }, [cwd]);
 
   React.useEffect(() => {
@@ -169,7 +171,6 @@ export function GitPanel(): React.ReactElement {
   return (
     <div data-id="git-panel" style={S.root}>
       <div style={S.bar}>
-        <span style={S.branch}>⎇ {branch || '—'}</span>
         {repos.length > 0 ? (
           <select
             data-id="git-repo-select"
@@ -185,6 +186,7 @@ export function GitPanel(): React.ReactElement {
             ))}
           </select>
         ) : null}
+        <span style={{ ...S.branch, flex: 'none' }}>⎇ {branch || '—'}</span>
         <button data-id="git-tab-changes" style={tabStyle(view === 'changes')} onClick={() => { setView('changes'); }}>
           Changes{files.length ? ` (${files.length})` : ''}
         </button>

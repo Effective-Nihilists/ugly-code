@@ -2,8 +2,8 @@
  * Scan a root directory for all `.git` directories (up to 4 levels deep) so the
  * GitPanel can offer a repo switcher. Skips `node_modules`/`.pnpm` junk.
  *
- * The scan runs via `bash` over `native.process.spawn` — inexpensive at panel
- * mount and cached in-memory (the panel re-scans on Refresh).
+ * Uses `native.fs` (readdir + exists) instead of bash `find` — no process
+ * permission needed, and the scan runs synchronously at mount without a shell.
  */
 import { native } from 'ugly-app/native';
 
@@ -12,58 +12,50 @@ export interface GitRepo {
   path: string;
 }
 
-/** Spawn a quick find command and collect stdout. Expands leading ~ to $HOME
- *  so the path resolves inside the double-quoted shell command (bash won't
- *  expand ~ inside double quotes). */
-function runFind(root: string): Promise<string> {
-  // Expand leading ~ to $HOME so it resolves inside double quotes below.
-  const expanded = root.replace(/^~(?=$|\/)/, '$HOME');
-  return new Promise((resolve, reject) => {
-    let out = '';
-    let err = '';
-    try {
-      const p = native.process.spawn('bash', [
-        '-c',
-        // -type d catches normal .git dirs; -type f catches submodule/worktree .git files.
-        `(find -L "${expanded.replace(/"/g, '\\"')}" -maxdepth 4 -name ".git" -type d 2>/dev/null; find -L "${expanded.replace(/"/g, '\\"')}" -maxdepth 4 -name ".git" -type f 2>/dev/null) | sed 's|/\\.git$||' | grep -v '/node_modules/' | sort -u`,
-      ]);
-      p.onStdout((c) => (out += c));
-      p.onStderr((c) => (err += c));
-      p.onError((e) => { reject(new Error(e)); });
-      p.onExit((code) => {
-        if (code === 0) resolve(out);
-        else reject(new Error(err || `find exited ${code ?? '?'}`));
-      });
-    } catch (e) {
-      reject(e instanceof Error ? e : new Error(String(e)));
-    }
-  });
-}
+const MAX_DEPTH = 4;
+const SKIP_DIRS = new Set(['node_modules', '.pnpm', '.git', 'dist', '.ugly-studio']);
 
-/** Find all git repos under `root` (synchronous-appearing via caching). */
-let cachedRepos: GitRepo[] | null = null;
-
-export async function findGitRepos(root: string): Promise<GitRepo[]> {
-  // Always clear the cache so a manual Refresh re-scans.
-  cachedRepos = null;
-  if (!root) return [];
+async function walk(dir: string, depth: number, out: GitRepo[]): Promise<void> {
+  if (depth > MAX_DEPTH) return;
+  let entries: { name: string; isDirectory: boolean; isFile: boolean }[];
   try {
-    const stdout = await runFind(root);
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    const repos = lines.map((p) => ({
-      name: p.split('/').pop() ?? p,
-      path: p,
-    }));
-    // Sort: deepest nested last so the root is first.
-    repos.sort((a, b) => a.path.length - b.path.length);
-    cachedRepos = repos;
-    return repos;
+    entries = await native.fs.readdir(dir);
   } catch {
-    return [];
+    return; // permission denied or not a dir — skip
+  }
+  for (const e of entries) {
+    // Catch both .git dirs (normal repos) and .git files (submodules/worktrees).
+    if (e.name === '.git') {
+      out.push({ name: dir.split('/').pop() ?? dir, path: dir });
+      continue; // never recurse into .git
+    }
+    if (!e.isDirectory) continue;
+    if (SKIP_DIRS.has(e.name)) continue;
+    await walk(`${dir}/${e.name}`, depth + 1, out);
   }
 }
 
-/** Quick synchronous lookup of the cached scan (no re-scan). */
+/** Find all git repos under `root`. */
+export async function findGitRepos(root: string): Promise<GitRepo[]> {
+  if (!root) return [];
+  const repos: GitRepo[] = [];
+  try {
+    await walk(root, 0, repos);
+  } catch {
+    // degrade — empty list
+  }
+  // Sort: deepest nested last so the root is first in the dropdown.
+  repos.sort((a, b) => a.path.length - b.path.length);
+  return repos;
+}
+
+let cachedRepos: GitRepo[] | null = null;
+
 export function getCachedRepos(): GitRepo[] {
   return cachedRepos ?? [];
+}
+
+export async function findAndCacheGitRepos(root: string): Promise<GitRepo[]> {
+  cachedRepos = await findGitRepos(root);
+  return cachedRepos;
 }
