@@ -6,7 +6,7 @@
 // its emitCustom-style events become task events (task.event:<id>) via uglyTask.emit.
 import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
-import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, ensureCodebaseAnalysis, type AgentSelection } from './clientAgent';
+import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, ensureCodebaseAnalysis, emitAgentTurnError, type AgentSelection } from './clientAgent';
 import { killSessionBashProcs } from '../../agent/tools';
 import { installTaskErrorLog } from './taskErrorLog';
 import {
@@ -76,8 +76,19 @@ defineTask({
   onCall: {
     // Run one agent turn. The loop's emitCustom-shaped frames stream to listeners as the
     // 'msg' task event; the UI adapter feeds them to its existing onCustomMessage handler.
+    // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
     send: async (p: { text: string; selection?: AgentSelection }) => {
-      await runClientAgentTurn(sessionId, p.text, (msg) => { t.emit('msg', msg); }, p.selection);
+      // Kick off the turn but DON'T block the RPC on it. A full agent turn can
+      // run for minutes; awaiting it here kept `task.call('send')` open past the
+      // host bridge's call timeout, surfacing as "task.call timed out: send"
+      // (reported as "timeout in UglyNative"). The turn's frames — and now its
+      // errors — stream back via the 'msg' task event, so the RPC only needs to
+      // acknowledge receipt.
+      const emit = (msg: { type: string; [k: string]: unknown }): void => { t.emit('msg', msg); };
+      void runClientAgentTurn(sessionId, p.text, emit, p.selection).catch((e: unknown) => {
+        console.error('[coding-task:send] turn failed', e);
+        emitAgentTurnError(emit, sessionId, e);
+      });
       return { ok: true };
     },
     // Interrupt the running turn (chatStop → task.call('interrupt')). Kill any

@@ -32,6 +32,12 @@ import { cronTasks } from '../shared/cron';
 import { agentTurnHandler } from 'ugly-app/agent/server';
 import { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } from '../shared/agent';
 import { makeCodingSessionHandlers } from './codingSessionHandlers';
+import {
+  DEFAULT_USER_SETTINGS,
+  mergeUserSettings,
+  parseStoredUserSettings,
+} from '../shared/userSettings';
+import type { UserSettings } from '../shared/userSettings';
 
 // The per-request TypedDB is set on the app context before each fetch handler
 // runs (createWorkersApp). The coding-session handlers read it lazily.
@@ -57,6 +63,41 @@ const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
   // (follow-up) — the tool-enabled agent loop uses `agentTurn` (agentTurnHandler),
   // which IS workers-safe.
   ...makeCodingSessionHandlers(workersDb),
+
+  // ── Per-user coding-agent settings (Neon-backed; one doc per user) ──────
+  // Mirrors the Node entry (server/index.ts). These MUST be registered here
+  // too: prod serves the studio chat from the Worker, and the chat reads
+  // settings on mount via `socket.request('getUserSettings')`. Omitting them
+  // surfaced as `[Router] 'getUserSettings' is not registered` in prod. The
+  // helpers (shared/userSettings.ts) import only zod, so they bundle cleanly.
+  getUserSettings: async (userId): Promise<UserSettings> => {
+    const doc = await workersDb().getDoc(collections.userSettings, userId);
+    return parseStoredUserSettings(doc?.data);
+  },
+  updateUserSettings: async (userId, patch): Promise<UserSettings> => {
+    const db = workersDb();
+    const doc = await db.getDoc(collections.userSettings, userId);
+    const current = parseStoredUserSettings(doc?.data);
+    const next = mergeUserSettings(current, patch);
+    await db.setDoc(collections.userSettings, {
+      _id: userId,
+      userId,
+      data: JSON.stringify(next),
+      ...dbDefaults(),
+    });
+    return next;
+  },
+  // eslint-disable-next-line @typescript-eslint/require-await
+  resetUserSettings: async (userId): Promise<UserSettings> => {
+    // Delete the doc so a fresh read falls back to defaults (best-effort — a
+    // missing doc already reads as defaults).
+    void workersDb()
+      .deleteDoc(collections.userSettings, userId)
+      .catch(() => {
+        /* noop */
+      });
+    return DEFAULT_USER_SETTINGS;
+  },
 
   // Recent projects — synced across the user's devices/sessions. Mirrors the
   // Node entry (server/index.ts) but reads the per-request TypedDB via workersDb().

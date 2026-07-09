@@ -1,6 +1,7 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
 import { getActiveProjectPath } from '../hooks/useSocket';
+import { findGitRepos, type GitRepo } from './findGitRepos';
 
 // A real git workspace: status (staged/unstaged/untracked) + colored diff +
 // stage-select + commit + history, all over `native.process.spawn('git', …)`.

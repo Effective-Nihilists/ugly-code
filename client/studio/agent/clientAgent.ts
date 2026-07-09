@@ -570,6 +570,20 @@ function emitMessage(
   });
 }
 
+/**
+ * Render a turn failure as an assistant error bubble (⚠). The renderer's send
+ * path used to surface turn errors by rejecting the `task.call('send')` RPC, but
+ * that RPC now returns immediately (a full turn outlives the host's bridge-call
+ * timeout — "task.call timed out: send"). The fire-and-forget send in
+ * coding-task.ts catches turn errors and emits them through here instead.
+ */
+export function emitAgentTurnError(emit: Emit, sessionId: string, e: unknown): void {
+  emitMessage(emit, sessionId, 'assistant', [
+    { type: 'text', data: { text: '⚠ ' + (e instanceof Error ? e.message : String(e)) } },
+    { type: 'finish' },
+  ]);
+}
+
 
 // ── Server persistence helpers (all best-effort; never break the loop) ───────
 
