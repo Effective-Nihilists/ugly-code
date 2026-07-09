@@ -12,7 +12,20 @@ export interface GitRepo {
   path: string;
 }
 
-
+/** Spawn a quick find command and collect stdout. Expands leading ~ to $HOME
+ *  so the path resolves inside the double-quoted shell command (bash won't
+ *  expand ~ inside double quotes). */
+function runFind(root: string): Promise<string> {
+  // Expand leading ~ to $HOME so it resolves inside double quotes below.
+  const expanded = root.replace(/^~(?=$|\/)/, '$HOME');
+  return new Promise((resolve, reject) => {
+    let out = '';
+    let err = '';
+    try {
+      const p = native.process.spawn('bash', [
+        '-c',
+        // -type d catches normal .git dirs; -type f catches submodule/worktree .git files.
+        `(find -L "${expanded.replace(/"/g, '\\"')}" -maxdepth 4 -name ".git" -type d 2>/dev/null; find -L "${expanded.replace(/"/g, '\\"')}" -maxdepth 4 -name ".git" -type f 2>/dev/null) | sed 's|/\\.git$||' | grep -v '/node_modules/' | sort -u`,
       ]);
       p.onStdout((c) => (out += c));
       p.onStderr((c) => (err += c));
