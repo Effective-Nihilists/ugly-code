@@ -890,12 +890,28 @@ const handlers: Record<string, Handler> = {
     //    Proxy); its frames stream back via task.listen. The IDE only runs inside Ugly
     //    Studio, so there's no in-renderer fallback.
     void (async () => {
+      let id: string;
       try {
-        const id = await ensureCodingTask(sessionId);
-        await native.task.call(id, 'send', { text: message, selection: buildSelection(sessionId) });
+        id = await ensureCodingTask(sessionId);
       } catch (e) {
+        // The task couldn't be started at all — a real, surfaced failure.
         emitAgentError(sessionId, e);
+        return;
       }
+      // The `send` call stays open for the ENTIRE turn (the host keeps the task
+      // child driving the turn only while this call is pending — see coding-task
+      // `send`). A long turn therefore outruns the host bridge's task.call
+      // timeout, which rejects this promise with "task.call timed out: send".
+      // That is BENIGN: the turn keeps running and streams its frames — and any
+      // real error — via task.listen. So swallow the timeout instead of showing a
+      // spurious "turn failed" bubble (the "timeout in UglyNative" bug report).
+      // Non-timeout rejections are genuine dispatch failures → surface them.
+      native.task.call(id, 'send', { text: message, selection: buildSelection(sessionId) })
+        .catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (/timed out/i.test(msg)) return; // turn continues streaming independently
+          emitAgentError(sessionId, e);
+        });
     })();
     return Promise.resolve({});
   },
