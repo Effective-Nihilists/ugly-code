@@ -155,9 +155,19 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
     return id;
   }
   // Stale (prior build), dead, or missing → replace with a fresh current-build task.
+  //
+  // Stop→start on the SAME id races the host task runner: `stop` kills the old
+  // child ASYNChronously, and its late `exit` event — keyed by id — fires AFTER the
+  // new task is registered, clobbering the fresh record to 'exited' and unwiring its
+  // child ("coding task failed to start: exited"). We can't patch the installed
+  // host, so avoid the race from here: stop, LET THE OLD CHILD DIE (settle), then
+  // start; if a slow-dying old child still clobbers the new task, retry with a
+  // longer settle. Clear listenedTaskIds so the fresh task re-registers its host
+  // listener (the clobber/cleanup drops the old one).
   if (existing) { try { await native.task.stop(id); } catch { /* already gone */ } }
   sessionTaskIds.delete(sessionId);
-  await native.task.start({
+  listenedTaskIds.delete(id);
+  const startFresh = () => native.task.start({
     entry: wanted,
     kind: 'coding',
     id,
@@ -168,14 +178,31 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
       authToken: readAuthTokenCookie(),
     },
   });
-  // Wait until the child has loaded its bundle (status flips to 'running' on the task's
-  // `ready`) before returning. task.start resolves when the child is SPAWNED, but the runner
-  // then fetches + imports the bundle over https — calling a method before that races the load
-  // and throws "unknown task method".
-  await waitForTaskRunning(id, () => native.task.enum());
-  sessionTaskIds.set(sessionId, id);
-  wireTaskListener(id);
-  return id;
+  // No prior task ⇒ no exit to race, start immediately. Otherwise settle first, and
+  // retry on an early 'exited' (the clobber) with a growing gap — by the 2nd/3rd try
+  // the old child is long dead and the fresh task registers cleanly.
+  const settles = existing ? [350, 900, 1800] : [0];
+  let lastErr: unknown;
+  for (const settleMs of settles) {
+    if (settleMs > 0) await new Promise<void>((r) => setTimeout(r, settleMs));
+    await startFresh();
+    try {
+      // Wait until the child has loaded its bundle (status flips to 'running' on the
+      // task's `ready`). task.start resolves when the child is SPAWNED; the runner
+      // then fetches + imports the bundle over https — calling a method before that
+      // races the load and throws "unknown task method".
+      await waitForTaskRunning(id, () => native.task.enum());
+      sessionTaskIds.set(sessionId, id);
+      wireTaskListener(id);
+      return id;
+    } catch (e) {
+      // Likely the stop→start clobber (fresh task marked 'exited' by the old child's
+      // late exit). Retry after a longer settle; a genuine startup failure re-throws
+      // after the last attempt.
+      lastErr = e;
+    }
+  }
+  throw lastErr;
 }
 /** Wire a task's emitCustom-shaped frames back onto the local bus, once per task id. */
 function wireTaskListener(id: string): void {
