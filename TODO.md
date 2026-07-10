@@ -140,6 +140,36 @@ The #1 discriminator (the only one whose gap grows with capability).
 - [ ] add `level: 6` to the ladder + UI grouping; wire per-task multi-run + mean/spread
 - [ ] first full L6 round (3 models × 3 runs), report the separation
 
+### Verdict 2 (2026-07-10, evening): opus also beats the structurally anti-opus tasks
+
+Ran the two tasks built from the structural diagnosis. **Opus 5/5 on both.**
+
+- **l6-compound-incident: 5/5** ($0.75, 12 turns, 168s). The misleading-oracle trap never
+  fired: opus read all four source files BEFORE running anything, identified all three
+  causes statically, and fixed them in one pass — its cache fix (WeakMap per store + record-
+  count staleness check) was cleaner than the calibration's canonical fix. Lesson: when
+  complete comprehension is achievable in one context read, the trap is dead on arrival.
+- **l6-spec-conformance (TARIFF-1): 5/5** ($2.00, 16 turns, 565s). **195/195 hidden vectors,
+  independently re-verified outside the grader.** A perfect implementation of an invented
+  spec with six errata overrides, where a correct-except-errata impl calibrates to 2/5.
+  Opus read the whole spec, honored every erratum, and iterated only against the 13 public
+  teaching vectors.
+
+**Sharpened conclusion.** Six L6 tasks, every axis: thoroughness, surgical precision,
+concurrency insight, misleading oracle, anti-prior careful reading with a 100%-perfection
+bar. All 5/5, all verified genuine. The two structural properties none of these removed are
+the two that matter: (1) **full visibility** — every fixture/spec still fit in one working
+set; (2) **short horizon** — opus never needed more than 16 turns / 10 minutes. The honest
+statement: *we can no longer author a well-specified, single-session, single-context task
+that opus 4.8 fails.* Remaining levers are structural, not calibration:
+  - **amnesia relay (T3)** — force context loss across sessions; needs `freshSessionPerTurn`
+    in the task driver.
+  - **scale beyond context** — a generated spec/codebase too large to hold in one working
+    set (hundreds of sections / 100k+ LOC), where selective reading must replace complete
+    reading.
+Meanwhile the new tasks remain strong discriminators DOWN the ladder (skim impl = 2/5,
+partial fixes = 2-3/5): running deepseek/glm banks the model separation the scoreboard needs.
+
 ### Verdict (2026-07-10): opus passes every single-insight L6 axis at 5/5
 
 Built and calibrated three hard, deterministic, contamination-resistant tasks across the
