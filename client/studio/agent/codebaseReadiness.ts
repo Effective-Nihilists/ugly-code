@@ -5,10 +5,24 @@
 // task reaches it directly on desktop and via the host bridge on the proxy.
 import { installUglyNative } from 'ugly-app/native';
 
-/** SessionSnapshot.codebaseReadiness shape (kept loose to avoid a cross-package type dep). */
+/** SessionSnapshot.codebaseReadiness shape (kept loose to avoid a cross-package type dep).
+ *  Mirrors `CodebaseReadinessSchema` in ../shared/api.ts — keep the two in step. */
 export interface CodebaseReadiness {
-  indexer?: { status?: string; indexedChunks?: number; totalChunks?: number; totalFiles?: number };
-  architecture?: { status?: string; filesAnalyzed?: number; filesTotal?: number };
+  indexer?: {
+    status?: string;
+    indexedChunks?: number;
+    totalChunks?: number;
+    totalFiles?: number;
+    phase?: string;
+    indexedFiles?: number;
+    filesPerSec?: number;
+    chunksPerSec?: number;
+    etaSeconds?: number;
+    elapsedSeconds?: number;
+    error?: string;
+  };
+  architecture?: { status?: string; filesAnalyzed?: number; filesTotal?: number; lastWrittenAt?: number; error?: string };
+  diagnostics?: { lastError?: string; logTail?: string };
 }
 
 const pollers = new Map<string, ReturnType<typeof setInterval>>();

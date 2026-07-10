@@ -50,7 +50,7 @@ import { ensureSessionWorkspace, getSessionWorkspace, removeSessionWorkspace } f
 import type { ToolName } from '../../../shared/agent';
 import { axesToConfig, coerceModelMode } from '../../../shared/sessionConfig';
 import { getPattern } from './patterns/registry';
-import { decorateForStep, renderStepDecoration, filterToolsForStep } from './patterns/decorate';
+import { decorateForStep, decorateForNonePattern, renderStepDecoration, filterToolsForStep } from './patterns/decorate';
 import { type Step, type Pattern, type PatternId, isPatternId, isSuperPattern, superToBasePattern } from './patterns/types';
 import { deriveCriteria, gradeAgainstCriteria, buildRevisePrompt, type Judge } from './patterns/judge';
 import { classifyForAuto, isClassificationConfident } from './patterns/classify';
@@ -1265,7 +1265,14 @@ async function runOneClientAgentTurn(
     } else if (pattern) {
       await runPatternStepsOnMain({ state, sessionId, emit, userText, pattern, resolvedId, startIdx: 0, injection: null, projectDir });
     } else {
-      await state.controller.send(userText);
+      // Flat `none` loop: no step engine, so nothing counterbalances the base
+      // prompt's edit-boldly rules. Decorate the turn to make the model surface
+      // design decisions before coding. NEVER for eval sessions — `ask_user`
+      // ends the turn, so an eval that asks a question hangs forever.
+      // (Peers/delegates never reach here; they call `controller.send` directly.)
+      await state.controller.send(
+        evalSessions.has(sessionId) ? userText : decorateForNonePattern(userText),
+      );
     }
   } finally {
     state.currentStep = null;

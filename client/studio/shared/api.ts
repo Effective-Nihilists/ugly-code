@@ -304,7 +304,27 @@ export const CodebaseReadinessSchema = z.object({
     indexedChunks: z.number().optional(),
     totalChunks: z.number().optional(),
     totalFiles: z.number().optional(),
+    // Progress detail powering the stats modal. All optional so an older host
+    // that doesn't emit them still parses (this is a STRICT parse — unknown
+    // keys are dropped, missing-but-required keys reject the whole reading).
+    // Rates + ETA are computed host-side off one monotonic clock, never here.
+    phase: z.enum(['scanning', 'chunking', 'embedding', 'committing']).optional(),
+    indexedFiles: z.number().optional(),
+    filesPerSec: z.number().optional(),
+    chunksPerSec: z.number().optional(),
+    etaSeconds: z.number().optional(),
+    elapsedSeconds: z.number().optional(),
+    error: z.string().optional(),
   }),
+  // Why a stuck "Codebase: loading" gives no reason today: the host already
+  // emits `daemon: {lastError, logTail}` when the indexer daemon never came up,
+  // and this strict parse silently threw it away. Surface it instead.
+  diagnostics: z
+    .object({
+      lastError: z.string().optional(),
+      logTail: z.string().optional(),
+    })
+    .optional(),
 });
 
 /**

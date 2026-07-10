@@ -109,6 +109,7 @@ import {
 } from './ReasoningSelector';
 import { capSessionBundle } from './sessionFeedbackBundle';
 import { fetchCodebaseStatus } from '../agent/codebaseReadiness';
+import { CodebaseStatsModal } from './CodebaseStatsModal';
 
 // ── Shared helpers ──────────────────────────────────────────────────
 
@@ -399,7 +400,11 @@ function firstLine(s: string, max = 200): string {
   return line.length > max ? line.slice(0, max) + '…' : line;
 }
 
-function formatToolInput(name: string, input: string, cwd = ''): string {
+function formatToolInput(
+  name: string,
+  input: string,
+  cwd = '',
+): React.ReactNode {
   try {
     const parsed = JSON.parse(input) as ToolInput;
     // Single-task / prompt-style tools — show the task text, not JSON.
@@ -413,17 +418,34 @@ function formatToolInput(name: string, input: string, cwd = ''): string {
     }
     if (typeof parsed.code === 'string') return firstLine(parsed.code);
     if (typeof parsed.url === 'string') return parsed.url;
+    // Path-bearing tools (`read`, `dep_docs`, …) render the path as a link,
+    // matching EditCard. `offset` is a 1-based start line, so a clicked
+    // `read` opens the file where the agent was looking.
     if (parsed.file_path) {
       const range =
         parsed.offset != null || parsed.limit != null
           ? ` (${parsed.offset ?? 0}+${parsed.limit ?? '?'})`
           : '';
-      return `${relativizePath(parsed.file_path, cwd)}${range}`;
+      return (
+        <span title={parsed.file_path}>
+          <LinkedPath path={parsed.file_path} line={parsed.offset}>
+            {relativizePath(parsed.file_path, cwd)}
+          </LinkedPath>
+          {range}
+        </span>
+      );
     }
     if (parsed.command) return parsed.command;
     if (parsed.pattern) return parsed.pattern;
     if (parsed.query) return parsed.query;
-    if (parsed.path) return relativizePath(parsed.path, cwd);
+    if (parsed.path)
+      return (
+        <span title={parsed.path}>
+          <LinkedPath path={parsed.path}>
+            {relativizePath(parsed.path, cwd)}
+          </LinkedPath>
+        </span>
+      );
     if (parsed.sql) return parsed.sql;
     return input.length > 200 ? input.slice(0, 200) + '...' : input;
   } catch {
@@ -5602,10 +5624,13 @@ function PeerLiveStrip({
  */
 function CodebaseReadinessPill({
   readiness,
+  onOpenStats,
 }: {
   readiness:
     | import('../shared/api').SessionSnapshot['codebaseReadiness']
     | null;
+  /** Open the detailed stats modal. */
+  onOpenStats: () => void;
 }) {
   const arch = readiness?.architecture;
   const indexer = readiness?.indexer;
@@ -5722,22 +5747,34 @@ function CodebaseReadinessPill({
       'search + architecture analysis (a browser tab has no host to run them).',
     );
   }
-  const tooltip = [fullHeadline, ...detailLines].join('\n');
+  const tooltip = [
+    fullHeadline,
+    ...detailLines,
+    '',
+    'Click for detailed stats.',
+  ].join('\n');
 
   return (
-    <span
+    <button
+      type="button"
+      data-id="codebase-readiness-pill"
       data-us-tooltip={tooltip}
+      onClick={onOpenStats}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
         padding: '2px 8px',
+        fontFamily: 'inherit',
         fontSize: 11,
+        lineHeight: 'inherit',
         color: 'var(--text-muted)',
+        background: 'transparent',
         border: '1px solid var(--border)',
         borderRadius: 4,
         flexShrink: 0,
         whiteSpace: 'nowrap',
+        cursor: 'pointer',
       }}
     >
       <span
@@ -5754,7 +5791,7 @@ function CodebaseReadinessPill({
         }}
       />
       {shortLabel}
-    </span>
+    </button>
   );
 }
 
@@ -6122,6 +6159,9 @@ CodingAgentChatProps = {}) {
   // we see the actual indexer/architecture state rather than the last poll.
   const codebaseReadinessRef = useRef<unknown>(null);
   codebaseReadinessRef.current = codebaseReadiness ?? null;
+  // Shared by BOTH pill render sites (empty-session + active-session toolbars),
+  // so the modal exists once regardless of which pill was clicked.
+  const [codebaseStatsOpen, setCodebaseStatsOpen] = useState(false);
   useEffect(
     () =>
       registerFeedbackContextProvider(
@@ -7441,6 +7481,11 @@ CodingAgentChatProps = {}) {
           position: 'relative',
         }}
       >
+        <CodebaseStatsModal
+          open={codebaseStatsOpen}
+          onClose={() => { setCodebaseStatsOpen(false); }}
+          seed={codebaseReadiness ?? null}
+        />
         <div className="panel-toolbar">
           {sessionInfo && <SessionReadout info={sessionInfo} model={model} />}
           <AutoRouteHint routing={autoModeRouting} />
@@ -7454,7 +7499,7 @@ CodingAgentChatProps = {}) {
               onClick={() => void compactNow()}
             />
           )}
-          <CodebaseReadinessPill readiness={codebaseReadiness} />
+          <CodebaseReadinessPill readiness={codebaseReadiness} onOpenStats={() => { setCodebaseStatsOpen(true); }} />
           {/* Session-id copy button removed per feedback (header was cluttered). */}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
@@ -7534,6 +7579,12 @@ CodingAgentChatProps = {}) {
           onClose={() => { setEvalScorecardModalOpen(false); }}
         />
       )}
+      <CodebaseStatsModal
+        open={codebaseStatsOpen}
+        onClose={() => { setCodebaseStatsOpen(false); }}
+        seed={codebaseReadiness ?? null}
+      />
+
       <div
         className="coding-chat-selectable"
         style={{
@@ -7618,7 +7669,7 @@ CodingAgentChatProps = {}) {
               onClick={() => void compactNow()}
             />
           )}
-          <CodebaseReadinessPill readiness={codebaseReadiness} />
+          <CodebaseReadinessPill readiness={codebaseReadiness} onOpenStats={() => { setCodebaseStatsOpen(true); }} />
           {/* Session-id copy button removed per feedback (header was cluttered). */}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
