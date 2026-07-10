@@ -148,9 +148,18 @@ Findings that generalise to the rest of L6:
 On the 16-function version opus killed **29/31 → 4/5** (missed only the two deepest
 degenerate-input mutants) — near-ceiling. Acting on finding #4, scaled to a **32-function
 kit** with 50 mutants concentrated in the corners (empty/single inputs, ties, duplicates,
-NaN, negative counts, immutability). Competent happy-path testing now scores **18/50 → 2/5**,
-so weaker models should crater; whether *opus* rations effort or still tests exhaustively is
-what the run measures — opus wrote an 816-line suite (not obviously rationing).
+NaN, negative counts, immutability). Competent happy-path testing scores **18/50 → 2/5**.
+
+**Result: opus killed 50/50 → 5/5.** It wrote a 671-line suite and covered every corner,
+including all 31 adversarial mutants. Verified genuine (not timeout-inflated): the whole run —
+agent + grading 60 vitest invocations — took 204s (~2s/run), so no 90s timeout ever fired.
+
+**Conclusion: test-writing is NOT the axis that breaks opus.** Established across two versions
+(29/31 then 50/50). Opus is exceptional at exhaustive, corner-aware test authoring; scaling the
+surface only made it write more tests, not miss more. This task is an excellent discriminator
+for *weaker* models (happy-path = 2/5) but will not put opus in the 10–30% band. To actually
+fail opus, pivot axis → **L6.4 hard concurrency/debugging** (research: frontier models <50%),
+where the bottleneck is reasoning about interleavings, not thoroughness.
 
 Two engineering lessons from the scale-up, both now fixed:
 - **A mutant can hang the grader.** `chunk` with a step of `n-1` and `n=1` is a *synchronous*
