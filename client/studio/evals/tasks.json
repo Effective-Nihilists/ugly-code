@@ -2304,5 +2304,49 @@
         "kind": "diffBudget:400:1200:src"
       }
     ]
+  },
+  {
+    "name": "l6-build-sokoban",
+    "level": 6,
+    "kind": "feature",
+    "ticketPath": "SPEC.md",
+    "turns": [
+      "Read SPEC.md and build the Sokoban game it describes as the app's home page (client/pages/HomePage.tsx), following the observable DOM contract exactly. Make it correct on every rule, playable with keyboard and touch, and clean on a phone (safe area, no overlapping controls, no console errors). Delete the scaffold's demo pages you don't need. Work autonomously until it is done. Do not stop to present a plan or ask for approval."
+    ],
+    "fixture": "./fixture",
+    "budget": {
+      "maxTurns": 80,
+      "maxCostUsd": 8,
+      "timeoutMs": 5400000
+    },
+    "setup": {
+      "command": "bash",
+      "args": [
+        "-lc",
+        "npx --yes ugly-app@latest init --in-place --with tests && npx --yes playwright install chromium"
+      ]
+    },
+    "successCriteria": "A playable, correct Sokoban built to SPEC.md: two specified levels, arrow+WASD movement, wall/box/push rules (no pushing into walls or double-boxing, blocked moves don't advance the counter), undo/restart/next, keyboard and on-screen touch controls, a hidden-until-solved win banner, mobile safe-area, and no overlapping controls or console errors. Graded ENTIRELY by an objective Playwright flow battery (25 flows) the agent never sees: it builds the app, serves the static client, and plays the game headlessly, asserting the observable contract (data-id board/moves/level/win + control buttons; data-cell/data-content per cell) after exact input sequences, plus __uglyInspect overlap and safe-area cleanliness. floor(25 x flowsPassed/25). Calibrated: a correct reference implementation passes 25/25, an empty scaffold ~2/25.",
+    "tags": [
+      "ts",
+      "react",
+      "ugly-app",
+      "game",
+      "canvas-free",
+      "ux",
+      "playwright",
+      "objective-grading",
+      "build-a-real-thing",
+      "agentic"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l6-build-sokoban.git",
+    "gates": [
+      {
+        "name": "UX flow battery",
+        "points": 25,
+        "kind": "uxFlows",
+        "description": "Hidden 25-flow Playwright battery the agent never sees: boot without errors, board/cell rendering, player start position, move counter, wall blocking, box pushing onto goals, no double-push, WASD, undo (incl. box), restart, on-screen controls, level advance, level-2 solvability, win banner hidden-until-solved, plus __uglyInspect overlap and mobile safe-area cleanliness. floor(25 x passed/25)."
+      }
+    ]
   }
 ]

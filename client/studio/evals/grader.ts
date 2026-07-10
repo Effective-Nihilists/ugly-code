@@ -10,6 +10,7 @@ import type { EvalGradeResult } from '../shared/api';
 import { deriveCriteria, gradeAgainstCriteria, type Judge as JudgeFn } from '../agent/patterns/judge';
 import { getMutationSuite } from './l6/mutation';
 import { getHiddenSuite } from './l6/hidden';
+import { getUxFlowSuite, UX_RUNNER } from './l6/uxflows';
 
 /** IO seam so the gate logic is unit-testable without a real daemon. */
 export interface GradeDeps {
@@ -153,6 +154,13 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
     } else if (kind === 'mutationScore') {
       // Score the suite the agent WROTE by how many seeded bugs it catches.
       const r = await scoreMutations(input, deps, pts);
+      checks.push({ name: r.label ? `${gate.name} (${r.label})` : gate.name, passed: r.passed, detail: r.detail });
+      detMax += pts;
+      detScore += r.awarded;
+    } else if (kind === 'uxFlows') {
+      // Build the agent's app, serve the static client, drive a hidden Playwright
+      // flow battery in headless chromium, score per-flow. Objective UX grading.
+      const r = await runUxFlows(input, deps, pts);
       checks.push({ name: r.label ? `${gate.name} (${r.label})` : gate.name, passed: r.passed, detail: r.detail });
       detMax += pts;
       detScore += r.awarded;
@@ -369,6 +377,54 @@ async function countChangedLines(projectPath: string, dir: string, deps: GradeDe
     total += (Number(add) || 0) + (Number(del) || 0);
   }
   return total;
+}
+
+/**
+ * Objective UX grading for "build a real product" tasks: build the agent's app,
+ * serve the static client, and drive a hidden Playwright flow battery in headless
+ * chromium (via a runner written into the project so it resolves the project's own
+ * playwright). Score = floor(pts · flowsPassed / flowsTotal). No LLM judge; no
+ * backend — the client is served statically.
+ */
+async function runUxFlows(input: GradeInput, deps: GradeDeps, pts: number): Promise<MutationOutcome> {
+  const suite = getUxFlowSuite(input.taskName);
+  if (!suite) return { awarded: 0, passed: false, detail: `no ux-flow battery registered for ${input.taskName}` };
+  if (!deps.writeFile) return { awarded: 0, passed: false, detail: 'grader deps lack writeFile — cannot run ux flows' };
+  const cwd = input.projectPath;
+
+  const build = await deps.run('bash', ['-lc', suite.buildCmd], cwd, 600_000);
+  if (!(await deps.exists(joinPath(cwd, suite.clientDir)))) {
+    return { awarded: 0, passed: false, detail: `build produced no ${suite.clientDir} (build exit ${build.code ?? 'null'}): ${build.out.slice(-400)}` };
+  }
+
+  const runnerPath = joinPath(cwd, '__uxrunner.mjs');
+  const batteryPath = joinPath(cwd, '__uxbattery.json');
+  try {
+    await deps.writeFile(runnerPath, UX_RUNNER);
+    await deps.writeFile(batteryPath, JSON.stringify(suite.battery));
+    const port = 4400 + (Math.abs(hashString(input.taskName)) % 200);
+    const r = await deps.run('node', ['__uxrunner.mjs', suite.clientDir, '__uxbattery.json', String(port)], cwd, 300_000);
+    const line = r.out.split('\n').reverse().find((l) => l.includes('UXFLOWS_RESULT'));
+    if (!line) return { awarded: 0, passed: false, detail: `flow runner produced no result (exit ${r.code ?? 'null'}): ${r.out.slice(-400)}` };
+    const parsed = JSON.parse(line.slice(line.indexOf('UXFLOWS_RESULT') + 'UXFLOWS_RESULT'.length)) as {
+      passed: number; total: number; results: { name: string; ok: boolean; why?: string }[];
+    };
+    const failed = parsed.results.filter((x) => !x.ok).map((x) => `${x.name}${x.why ? ` — ${x.why}` : ''}`);
+    return {
+      awarded: parsed.total > 0 ? Math.floor((pts * parsed.passed) / parsed.total) : 0,
+      passed: parsed.total > 0 && parsed.passed === parsed.total,
+      label: `${parsed.passed}/${parsed.total} flows`,
+      detail: failed.length ? `failed:\n  - ${failed.join('\n  - ')}` : undefined,
+    };
+  } finally {
+    await deps.run('rm', ['-f', '__uxrunner.mjs', '__uxbattery.json'], cwd);
+  }
+}
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return h;
 }
 
 /**
