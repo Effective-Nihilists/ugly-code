@@ -1,6 +1,6 @@
 {
   "name": "ugly-code",
-  "version": "0.1.110",
+  "version": "0.1.111",
   "type": "module",
   "bin": {
     "ugly-code": "bin/ugly-code.mjs"
@@ -12,8 +12,8 @@
     "build:workers": "ugly-app build:workers",
     "lint": "ugly-app lint",
     "lint:fix": "ugly-app lint --fix",
-    "deploy": "ugly-app publish",
-    "deploy:assets": "ugly-app publish:assets",
+    "deploy": "ugly-app deploy",
+    "deploy:assets": "ugly-app deploy:assets",
     "purge:assets": "ugly-app purge:assets",
     "db:migrate": "ugly-app db:migrate",
     "db:schema-gen": "ugly-app db:schema-gen",
@@ -55,7 +55,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.183.2",
-    "ugly-app": "0.1.812",
+    "ugly-app": "0.1.815",
     "yjs": "^13.6.30",
     "zod": "^4.3.6"
   },
