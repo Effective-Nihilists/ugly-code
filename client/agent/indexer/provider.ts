@@ -7,13 +7,12 @@
 // node code fails the build ("join not exported by __vite-browser-external").
 //
 // So callers depend on THIS module, which has no node imports. The task installs
-// the real implementation at boot via `setCodebaseProvider`; everywhere else (and
-// before the task registers) a host-channel fallback routes to ugly-studio's
-// `codebase.*` native channel — the pre-move behavior. The grep tool's index
-// search only ever executes inside the task, so the fallback is really just for
-// the renderer helpers and belt-and-suspenders.
+// the real implementation at boot via `setCodebaseProvider`. Every `codebaseProvider()`
+// caller (the grep tool's index search, the readiness poll) runs INSIDE the task, so
+// the impl is always present by the time it's called — there is no host fallback
+// (the ugly-studio `codebase.*` channel was removed). Renderer-side callers reach the
+// task over RPC instead (see useSocket `codebaseCall`).
 
-import { installUglyNative } from 'ugly-app/native';
 // Type-only — erased at compile time, so this does NOT pull node:http in.
 import type { SearchMode, SearchResponse } from './client';
 
@@ -59,47 +58,6 @@ export interface CodebaseProvider {
   reconcile(projectPath: string, worktreeRoot?: string): void;
 }
 
-const inv = (channel: string, payload: unknown): Promise<unknown> =>
-  installUglyNative().invoke(channel as never, payload as never);
-
-/** Routes to ugly-studio's host `codebase.*` channel — the pre-move path. */
-const hostFallback: CodebaseProvider = {
-  ensureIndex(projectPath) {
-    void inv('codebase.ensureIndex', { projectPath }).catch(() => undefined);
-  },
-  async indexerReadiness(projectPath) {
-    const r = (await inv('codebase.status', { projectPath })) as {
-      indexer: IndexerReadiness;
-      diagnostics?: CodebaseDiagnostics;
-    };
-    return r.diagnostics ? { indexer: r.indexer, diagnostics: r.diagnostics } : { indexer: r.indexer };
-  },
-  async search(projectPath, query, limit, mode, opts) {
-    return (await inv('codebase.search', {
-      projectPath,
-      query,
-      limit,
-      mode,
-      ...(opts?.scope ? { scope: opts.scope } : {}),
-      ...(opts?.extensions ? { extensions: opts.extensions } : {}),
-      ...(opts?.worktreeRoot ? { worktreeRoot: opts.worktreeRoot } : {}),
-    })) as SearchResponse;
-  },
-  async update(projectPath, files, worktreeRoot) {
-    await inv('codebase.update', {
-      projectPath,
-      files,
-      ...(worktreeRoot ? { worktreeRoot } : {}),
-    });
-  },
-  reconcile(projectPath, worktreeRoot) {
-    void inv('codebase.reconcile', {
-      projectPath,
-      ...(worktreeRoot ? { worktreeRoot } : {}),
-    }).catch(() => undefined);
-  },
-};
-
 let impl: CodebaseProvider | null = null;
 
 /** Called once by the coding task at boot to install the local (in-process) indexer. */
@@ -107,7 +65,13 @@ export function setCodebaseProvider(p: CodebaseProvider): void {
   impl = p;
 }
 
-/** The active provider: the task-installed local one, else the host channel. */
+/** The active provider. Installed by the coding task at boot; only ever called
+ *  from inside the task, so a missing impl is a wiring bug, not a runtime path. */
 export function codebaseProvider(): CodebaseProvider {
-  return impl ?? hostFallback;
+  if (!impl) {
+    throw new Error(
+      'codebaseProvider() called before setCodebaseProvider — the indexer only runs in the coding task',
+    );
+  }
+  return impl;
 }
