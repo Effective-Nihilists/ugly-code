@@ -196,7 +196,7 @@ const MAX_REVISE = 2;
 import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
 import { composeSessionSnapshot, type PerModelAcc } from './sessionSnapshot';
 export { composeSessionSnapshot };
-import { startCodebasePoll, stopCodebasePoll, fetchArchitectureDoc } from './codebaseReadiness';
+import { startCodebasePoll, stopCodebasePoll } from './codebaseReadiness';
 
 type Emit = (msg: { type: string; [k: string]: unknown }) => void;
 
@@ -466,7 +466,6 @@ export async function refreshMemoryContent(projectDir: string): Promise<void> {
 // automatically after every memory_add call.
 setMemoryWriteHook((projectDir) => { void refreshMemoryContent(projectDir); });
 
-const architectureDocBySession = new Map<string, string>();
 // ...
 // Rendered <available_skills> block per session (discovered once, async, then
 // read synchronously by the systemPrompt getter — mirrors architectureDoc).
@@ -865,12 +864,6 @@ export function ensureCodebaseAnalysis(sessionId: string, emit: Emit): void {
       sessionId,
       event: { type: 'codebase_readiness', payload: { payload: r } },
     });
-    // Once the architecture doc is ready, fetch it once (injected via the systemPrompt getter).
-    if (!architectureDocBySession.has(sessionId) && r.architecture?.status === 'ready') {
-      void fetchArchitectureDoc(cwd).then((doc) => {
-        if (doc) architectureDocBySession.set(sessionId, doc);
-      });
-    }
   }, worktreeRoot);
 }
 
@@ -946,14 +939,9 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     get model() {
       return state.model;
     },
-    // Live getter (read per turn, like model): once the host's architecture analysis is
-    // ready we fetch ARCHITECTURE.md and append it as a codebase map, so the agent gets
-    // structural context up front without spending turns reading files.
+    // Live getter (read per turn, like model).
     get systemPrompt() {
-      const architectureDoc = architectureDocBySession.get(sessionId);
-      const base = architectureDoc
-        ? `${AGENT_SYSTEM_PROMPT}\n\n# Project architecture (auto-generated map — exports, types, inheritance)\n\n${architectureDoc}`
-        : AGENT_SYSTEM_PROMPT;
+      const base = AGENT_SYSTEM_PROMPT;
       // Real per-turn <env> (replaces the monolith's hardcoded sample block).
       const ws = getSessionWorkspace(sessionId);
       const cwd = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? '(no project open)';

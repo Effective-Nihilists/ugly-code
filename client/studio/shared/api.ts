@@ -286,28 +286,24 @@ export const SessionEvalStateSchema = z.object({
 export type SessionEvalState = z.infer<typeof SessionEvalStateSchema>;
 
 /**
- * Codebase-analysis readiness — architecture doc + semantic indexer state for a
- * session's project. Extracted so the standalone `codebase_readiness` event (which
- * updates ONLY the header pill, without a full session_state snapshot) can validate
- * the same shape the snapshot embeds. See `parseCodebaseReadinessEvent`.
+ * Codebase-analysis readiness — semantic-indexer state for a session's project.
+ * Extracted so the standalone `codebase_readiness` event (which updates ONLY the
+ * header pill, without a full session_state snapshot) can validate the same shape
+ * the snapshot embeds. See `parseCodebaseReadinessEvent`.
+ *
+ * The indexer runs in the ugly-code coding task (moved out of ugly-studio). The
+ * architecture-doc surface was removed (that generator is gone).
  */
 export const CodebaseReadinessSchema = z.object({
-  architecture: z.object({
-    status: z.enum(['idle', 'building', 'ready', 'failed']),
-    filesAnalyzed: z.number().optional(),
-    filesTotal: z.number().optional(),
-    lastWrittenAt: z.number().optional(),
-    error: z.string().optional(),
-  }),
   indexer: z.object({
     status: z.enum(['idle', 'indexing', 'ready', 'error']),
     indexedChunks: z.number().optional(),
     totalChunks: z.number().optional(),
     totalFiles: z.number().optional(),
-    // Progress detail powering the stats modal. All optional so an older host
-    // that doesn't emit them still parses (this is a STRICT parse — unknown
+    // Progress detail powering the stats modal. All optional so a reading from a
+    // still-provisioning daemon still parses (this is a STRICT parse — unknown
     // keys are dropped, missing-but-required keys reject the whole reading).
-    // Rates + ETA are computed host-side off one monotonic clock, never here.
+    // Rates + ETA are computed in the daemon off one monotonic clock.
     phase: z.enum(['scanning', 'chunking', 'embedding', 'committing']).optional(),
     indexedFiles: z.number().optional(),
     filesPerSec: z.number().optional(),
@@ -316,12 +312,11 @@ export const CodebaseReadinessSchema = z.object({
     elapsedSeconds: z.number().optional(),
     error: z.string().optional(),
   }),
-  // Why a stuck "Codebase: loading" gives no reason today: the host already
-  // emits `daemon: {lastError, logTail}` when the indexer daemon never came up,
-  // and this strict parse silently threw it away. Surface it instead.
+  // Why a stuck "Codebase: analyzing…" gives no reason otherwise: the daemon
+  // reports a dead/never-started state as a bare status, and without this a
+  // strict parse would drop the detail. `message` is the plain-language state.
   diagnostics: z
     .object({
-      /** Plain-language daemon state — "not running", "not answering", etc. */
       message: z.string().optional(),
       lastError: z.string().nullish(),
       logTail: z.string().optional(),

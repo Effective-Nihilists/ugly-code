@@ -144,7 +144,6 @@ export function CodebaseStatsModal({
   const live = seed ?? null;
 
   const indexer = live?.indexer;
-  const arch = live?.architecture;
   const diagnostics = live?.diagnostics;
 
   const pct = (() => {
@@ -172,7 +171,6 @@ export function CodebaseStatsModal({
     diagnostics?.lastError,
     diagnostics?.logTail?.trim(),
     indexer?.error,
-    arch?.error,
   ].some((v) => typeof v === 'string' && v.length > 0);
 
   const pctKnown = indexer?.status === 'ready' || !noProgressYet;
@@ -184,7 +182,7 @@ export function CodebaseStatsModal({
         {nativeMissing ? (
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
             Codebase analysis runs on your machine. Open this project in the Ugly Studio desktop
-            app to enable semantic search and architecture-aware answers — a browser tab has no
+            app to enable semantic search — a browser tab has no
             host to run the indexer.
           </p>
         ) : !live ? (
@@ -244,16 +242,6 @@ export function CodebaseStatsModal({
               )}
             </Section>
 
-            <Section title="Architecture map">
-              <Row label="Status" value={arch?.status ?? '—'} />
-              {arch?.filesTotal ? (
-                <Row label="Files analyzed" value={`${arch.filesAnalyzed ?? 0} / ${arch.filesTotal}`} />
-              ) : null}
-              {arch?.lastWrittenAt ? (
-                <Row label="Last written" value={new Date(arch.lastWrittenAt).toLocaleString()} />
-              ) : null}
-            </Section>
-
             {hasDiagnostics && (
               <Section title="Diagnostics">
                 {daemonMessage && !daemonDown && (
@@ -263,9 +251,6 @@ export function CodebaseStatsModal({
                 )}
                 {indexer?.error && (
                   <p style={{ fontSize: 12, color: '#e53935', margin: '0 0 8px' }}>{indexer.error}</p>
-                )}
-                {arch?.error && (
-                  <p style={{ fontSize: 12, color: '#e53935', margin: '0 0 8px' }}>{arch.error}</p>
                 )}
                 {diagnostics?.lastError && (
                   <p style={{ fontSize: 12, color: '#e53935', margin: '0 0 8px' }}>

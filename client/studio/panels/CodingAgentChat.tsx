@@ -5615,7 +5615,7 @@ function PeerLiveStrip({
 
 /**
  * Compact dot + short label rendered in the panel header next to
- * ContextMeter. Surfaces architecture + semantic-index readiness in
+ * ContextMeter. Surfaces semantic-index readiness in
  * one chip; hover the chip to see the full per-surface status via
  * the `title` tooltip. Replaced the wide `CodebaseAnalysisStrip`
  * that used to live inside the input area — the header is the right
@@ -5632,26 +5632,23 @@ function CodebaseReadinessPill({
   /** Open the detailed stats modal. */
   onOpenStats: () => void;
 }) {
-  const arch = readiness?.architecture;
   const indexer = readiness?.indexer;
-  const archActive = arch?.status === 'building';
   const idxActive = indexer?.status === 'indexing';
-  const archReady = arch?.status === 'ready';
   const idxReady = indexer?.status === 'ready';
-  const anyActive = archActive || idxActive;
-  const anyError = arch?.status === 'failed' || indexer?.status === 'error';
+  const anyActive = idxActive;
+  const anyError = indexer?.status === 'error';
 
-  // In a plain browser there's no host to run the indexer, so `codebase.status`
-  // never reports and the pill would spin "loading…" forever. Show it's the host
-  // that's missing, not an in-progress analysis.
+  // In a plain browser there's no host to run the indexer, so the readiness poll
+  // never reports and the pill would spin "loading…" forever. Show it's the
+  // desktop app that's missing, not an in-progress analysis.
   const nativeMissing = !isNativeAvailable();
-  // null = the client agent hasn't reported yet (poll spinning up the host indexer).
+  // null = the coding task hasn't reported yet (poll spinning up the indexer).
   let tone: 'loading' | 'active' | 'ready' | 'idle' | 'error';
   if (nativeMissing) tone = 'idle';
   else if (!readiness) tone = 'loading';
   else if (anyError) tone = 'error';
   else if (anyActive) tone = 'active';
-  else if (archReady && idxReady) tone = 'ready';
+  else if (idxReady) tone = 'ready';
   else tone = 'idle';
 
   const dotColor = {
@@ -5663,17 +5660,6 @@ function CodebaseReadinessPill({
   }[tone];
   const pulse = tone === 'active';
 
-  const archLabel = (() => {
-    if (!arch) return 'Architecture: …';
-    if (arch.status === 'building') {
-      return arch.filesAnalyzed != null && arch.filesTotal
-        ? `Architecture: building (${arch.filesAnalyzed}/${arch.filesTotal})`
-        : 'Architecture: building';
-    }
-    if (arch.status === 'ready') return 'Architecture: ready';
-    if (arch.status === 'failed') return 'Architecture: failed';
-    return 'Architecture: not started';
-  })();
   const idxLabel = (() => {
     if (!indexer) return 'Semantic index: …';
     if (indexer.status === 'indexing') {
@@ -5721,13 +5707,13 @@ function CodebaseReadinessPill({
   // Full-detail tooltip. The loading state has no numbers to show yet (the host
   // hasn't reported), so explain WHAT is loading + what to expect rather than a
   // bare "loading…" — this is the "codebase: loading" report the tester hit.
-  const detailLines = [archLabel, idxLabel];
+  const detailLines = [idxLabel];
   if (tone === 'loading') {
     detailLines.push(
       '',
       'The host indexer is starting up. On first use it downloads a Python',
       'runtime + embedding model — this can take a few minutes, especially on',
-      'Windows. Semantic search and architecture-aware answers turn on once it',
+      'Windows. Semantic search turns on once it',
       'reports ready. If it stays here for many minutes, the indexer likely',
       'failed to install; reopen the project or report it from this session.',
     );
@@ -5736,7 +5722,7 @@ function CodebaseReadinessPill({
       '',
       'Analysis runs on your machine and can take several minutes on a large',
       'repo (or on Windows, where the indexer is slower). The agent keeps',
-      'working while this runs — semantic search + architecture-aware answers',
+      'working while this runs — semantic search',
       'sharpen once it reaches ready. If it never gets there, reopen the',
       'project or report it from this session.',
     );
@@ -5744,7 +5730,7 @@ function CodebaseReadinessPill({
     detailLines.length = 0;
     detailLines.push(
       'Open this project in the Ugly Studio desktop app to enable semantic',
-      'search + architecture analysis (a browser tab has no host to run them).',
+      'semantic search (a browser tab has no host to run it).',
     );
   }
   const tooltip = [
@@ -6156,7 +6142,7 @@ CodingAgentChatProps = {}) {
   // carries: whether the native host is present, the project path (Windows vs
   // posix), the client-side readiness the pill reflects (null ⇒ still loading),
   // AND a FRESH host `codebase.status` pulled at submit time (async provider) so
-  // we see the actual indexer/architecture state rather than the last poll.
+  // we see the actual indexer state rather than the last poll.
   const codebaseReadinessRef = useRef<unknown>(null);
   codebaseReadinessRef.current = codebaseReadiness ?? null;
   // Shared by BOTH pill render sites (empty-session + active-session toolbars),
@@ -8626,9 +8612,7 @@ function CodingAgentInputArea({
     (input.trim().length > 0 ||
       pendingSkill !== null ||
       attachments.length > 0);
-  const archActive = readiness?.architecture.status === 'building';
-  const idxActive = readiness?.indexer.status === 'indexing';
-  const codebaseAnalysisActive = archActive || idxActive;
+  const codebaseAnalysisActive = readiness?.indexer.status === 'indexing';
   const placeholder = awaitingAskUser
     ? 'Agent is waiting on your answer above\u2026'
     : pendingSkill
@@ -8745,7 +8729,7 @@ function CodingAgentInputArea({
         >
           {/* Codebase readiness moved out of the input area into a
               compact pill in the panel header next to ContextMeter —
-              full architecture / index status surfaces via tooltip on
+              full index status surfaces via tooltip on
               hover. See `CodebaseReadinessPill`. */}
           {attachments.length > 0 && (
             <div
