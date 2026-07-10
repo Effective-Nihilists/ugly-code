@@ -36,6 +36,7 @@ export function composeSessionSnapshot(args: {
   currentStepId?: SessionSnapshot['currentStepId'];
   currentStepIter?: number;
   pendingStepReviews?: SessionSnapshot['pendingStepReviews'];
+  pendingAskUsers?: SessionSnapshot['pendingAskUsers'];
   cost: number;
   promptTokens: number;
   completionTokens: number;
@@ -81,7 +82,7 @@ export function composeSessionSnapshot(args: {
     modelDisplayLabel: '',
     lastViewedAt: 0,
     pendingPermissions: [],
-    pendingAskUsers: [],
+    pendingAskUsers: args.pendingAskUsers ?? [],
     pendingStepReviews: args.pendingStepReviews ?? [],
     eval: null,
   };

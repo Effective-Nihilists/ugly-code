@@ -150,15 +150,12 @@ defineTask({
     worktreeBehind: async () => ({ behind: await behindCount(sessionId, t.params.projectPath ?? null) }),
 
     // ── Interactive turn controls (C1) ─────────────────────────────────
-    // The `ask_user` tool (client/agent/tools/askUser.ts) is chat-based — it ends
-    // the turn with the question and the user answers in their next message,
-    // rather than the monolith's pending-card + answer-RPC flow, so answerAskUser
-    // stays card-inactive. The step-review gate IS live: the pattern driver emits
-    // pendingStepReviews and parks on SPEC / DIAGNOSE (pauseForUserReviewAfter),
-    // and answerStepReview resolves that parked gate.
-    //   • answerAskUser → resolves a broker request when one is pending (ready for
-    //     a future card-based ask_user), else ok:false (phantom card).
-    //   • answerStepReview → resolves the driver's parked review gate (broker).
+    // The `ask_user` tool pauses the turn and shows the AskUserCard; the user
+    // answers via the card's chips, "Other…" text input, or by typing a free-text
+    // message (which resolves the oldest pending entry). answerAskUser resolves
+    // the broker promise so the LLM continues with the answer as the tool result.
+    // The step-review gate also uses a parked promise: pendingStepReviews emits
+    // on SPEC / DIAGNOSE (pauseForUserReviewAfter), answerStepReview resolves it.
     //   • compact → ack; the agent framework's AgentController auto-compacts at
     //     maxContextTokens and exposes no manual compaction, so there's nothing to
     //     force — returning ok avoids a spurious error banner.

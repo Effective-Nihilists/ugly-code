@@ -25,6 +25,7 @@ import { dispatchTool, isUglyAppProject, killSessionBashProcs } from '../../agen
 import { setMemoryWriteHook } from '../../agent/tools/memory';
 import { registeredToolSpecs } from '../../agent/tools/registry';
 import { sessionToolSpecs } from '../../agent/tools/gating';
+import { awaitAskUser, answerPendingAskUser, rejectAllAskUser } from './askUserBroker';
 import { discoverSkills, formatAvailableSkills } from '../hooks/skillDiscovery';
 import type { StepFn } from '../../agent/engine';
 import {
@@ -304,35 +305,80 @@ const fetchSocket: RunAgentSocket = {
 // dir (with its PORT), while the main session falls back to the open project
 // (relative paths pass through, unchanged behavior). getSessionWorkspace is sync
 // (cached); ensureSessionWorkspace runs once up-front per session (see below).
-function makeToolHandlers(sessionId: string): Record<string, (input: unknown) => Promise<string>> {
+function makeToolHandlers(
+  sessionId: string,
+  state: SessionAgentState,
+): Record<string, (input: unknown) => Promise<string>> {
   // Core tools (legacy inline switch) + every registered tool — both dispatch
-  // through dispatchTool, which routes the registry first.
+  // through dispatchTool, which routes the registry first.  EXCEPT ask_user:
+  // that tool pauses the turn and awaits a user answer via the broker card.
   const names = [...AGENT_TOOL_NAMES, ...registeredToolSpecs().map((s) => s.name)];
   return Object.fromEntries(
-    names.map((n) => [
-      n,
-      (input: unknown) => {
-        const ws = getSessionWorkspace(sessionId);
-        const dir = ws?.isWorktree ? ws.dir : getActiveProjectPath();
-        return dispatchTool(n, input, {
-          sessionId,
-          projectDir: dir,
-          // Carry the session's real permission axis to the daemon SandboxMode
-          // (read live — this closure runs at tool-call time, after the state is
-          // registered) so the axis actually affects the runtime: 'yolo' skips the
-          // sandbox, 'edit' applies the normal edit-mode ACL. Previously hardcoded
-          // 'edit', so 'yolo' had no effect for in-process (ugly.bot) sessions.
-          mode: sessions.get(sessionId)?.permissionMode ?? 'edit',
-          // Model-call for subagents (delegate/agent): one turn via the same
-          // agentStep endpoint the main loop uses.
-          step: ((req: unknown) =>
-            fetchSocket.request('agentStep', req)) as unknown as StepFn,
-          ...(ws?.isWorktree ? { workspaceDir: ws.dir } : {}),
-          ...(ws?.port ? { port: ws.port } : {}),
-          ...(ws?.databaseUrl ? { databaseUrl: ws.databaseUrl } : {}),
-        });
-      },
-    ]),
+    names.map((n) => {
+      // ask_user: park the turn, show the AskUserCard, wait for the user's answer.
+      if (n === 'ask_user') {
+        return [
+          n,
+          async (input: unknown) => {
+            const p = (input ?? {}) as Record<string, unknown>;
+            const question = (typeof p.question === 'string' ? p.question : '').trim();
+            if (!question) return 'ask_user: `question` is required';
+            const rawOpts = Array.isArray(p.options)
+              ? (p.options as unknown[]).map((o) => String(o))
+              : [];
+            // Convert flat strings to {label, description} for the card schema.
+            const opts = rawOpts.map((o) => ({ label: o, description: '' }));
+            const toolCallId = 'ask_' + Math.random().toString(36).slice(2, 11);
+            // Park a pendingAskUser entry so the UI renders the AskUserCard.
+            state.pendingAskUsers = [
+              ...state.pendingAskUsers,
+              {
+                id: toolCallId,
+                sessionId,
+                toolCallId,
+                question,
+                options: opts,
+              },
+            ];
+            emitTelemetry(state, sessionId);
+            try {
+              const answer = await awaitAskUser(toolCallId);
+              return answer;
+            } finally {
+              state.pendingAskUsers = state.pendingAskUsers.filter(
+                (p) => p.toolCallId !== toolCallId,
+              );
+              emitTelemetry(state, sessionId);
+            }
+          },
+        ];
+      }
+      // All other tools: dispatch through the standard path.
+      return [
+        n,
+        (input: unknown) => {
+          const ws = getSessionWorkspace(sessionId);
+          const dir = ws?.isWorktree ? ws.dir : getActiveProjectPath();
+          return dispatchTool(n, input, {
+            sessionId,
+            projectDir: dir,
+            // Carry the session's real permission axis to the daemon SandboxMode
+            // (read live — this closure runs at tool-call time, after the state is
+            // registered) so the axis actually affects the runtime: 'yolo' skips the
+            // sandbox, 'edit' applies the normal edit-mode ACL. Previously hardcoded
+            // 'edit', so 'yolo' had no effect for in-process (ugly.bot) sessions.
+            mode: sessions.get(sessionId)?.permissionMode ?? 'edit',
+            // Model-call for subagents (delegate/agent): one turn via the same
+            // agentStep endpoint the main loop uses.
+            step: ((req: unknown) =>
+              fetchSocket.request('agentStep', req)) as unknown as StepFn,
+            ...(ws?.isWorktree ? { workspaceDir: ws.dir } : {}),
+            ...(ws?.port ? { port: ws.port } : {}),
+            ...(ws?.databaseUrl ? { databaseUrl: ws.databaseUrl } : {}),
+          });
+        },
+      ];
+    }),
   );
 }
 
@@ -388,6 +434,9 @@ interface SessionAgentState {
   /** Parked `pauseForUserReviewAfter` gates awaiting the user's approve/iterate
    *  reply. Echoed in `session_state` so the IDE renders the StepReviewCard. */
   pendingStepReviews: SessionSnapshot['pendingStepReviews'];
+  /** Parked ask_user tool calls awaiting the user's answer. Echoed in
+   *  `session_state` so the IDE renders the AskUserCard. */
+  pendingAskUsers: SessionSnapshot['pendingAskUsers'];
   /** True while a turn is running for this session. A message sent while true is
    *  STEERED into the live turn (controller.steer) rather than starting a new turn or
    *  throwing "a turn is already in progress" (the controller is single-flight). */
@@ -771,6 +820,7 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
     currentStepId: s.currentStep?.id ?? null,
     currentStepIter: s.currentStepIter,
     pendingStepReviews: s.pendingStepReviews,
+    pendingAskUsers: s.pendingAskUsers,
     cost: s.cost,
     promptTokens: s.promptTokens,
     completionTokens: s.completionTokens,
@@ -866,6 +916,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     resolvedPattern: null,
     currentStepIter: 0,
     pendingStepReviews: [],
+    pendingAskUsers: [],
     turnRunning: false,
   };
   applySelection(state, selection);
@@ -925,7 +976,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       const stepGated = filterToolsForStep(sessionToolSpecs({ mode, isUglyApp }), state.currentStep);
       return filterToolsByToolset(stepGated, toolsetBySession.get(sessionId));
     },
-    toolHandlers: makeToolHandlers(sessionId),
+    toolHandlers: makeToolHandlers(sessionId, state),
     // Turn cap is EVAL-ONLY. The framework's `maxTurns` counts against a
     // controller-LIFETIME total that is NEVER reset per user message (runAgent
     // `send()` doesn't clear `totals`), and `budgetExceeded()` is checked BEFORE
@@ -1141,6 +1192,14 @@ export async function runClientAgentTurn(
   // failing with "a turn is already in progress" or deferring it to a whole new turn.
   // Show + persist it so it's part of the transcript at its real position.
   if (state.turnRunning) {
+    // If an ask_user card is parked, treat this free-text message as the answer
+    // (instead of steering into the live turn where the LLM is blocked on the
+    // tool promise). Resolve the oldest pending entry and let the LLM continue.
+    if (state.pendingAskUsers.length > 0) {
+      const head = state.pendingAskUsers[0];
+      if (head) answerPendingAskUser(head.toolCallId, userText);
+      return;
+    }
     const steerMsgId = persistRow(state, sessionId, 'user', userText);
     emitMessage(emit, sessionId, 'user', [{ type: 'text', data: { text: userText } }], { id: steerMsgId, action: 'created' });
     state.controller.steer(userText);
@@ -1472,6 +1531,7 @@ async function parkForStepReview(
  *  shell running on the host ("clicked stop, bash still running"). */
 export function abortClientAgent(sessionId: string): void {
   rejectStepReviewsForSession(sessionId); // release any parked review gate first
+  rejectAllAskUser(); // release any parked ask_user tool promises
   const killed = killSessionBashProcs(sessionId);
   if (killed) console.info('[clientAgent:abort]', JSON.stringify({ sessionId, killedBashProcs: killed }));
   sessions.get(sessionId)?.controller.abort();
@@ -1492,6 +1552,7 @@ export function clearClientAgentSession(sessionId: string): void {
   // the project is unchanged, so the pill stays accurate and the next turn reuses them.
   stopCodebasePoll(sessionId);
   rejectStepReviewsForSession(sessionId); // release any parked review gate
+  rejectAllAskUser(); // release any parked ask_user tool promise
   killSessionBashProcs(sessionId); // stop any shell work before we drop the session
   const s = sessions.get(sessionId);
   if (!s) return;
