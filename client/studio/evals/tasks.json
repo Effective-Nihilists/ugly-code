@@ -2062,5 +2062,59 @@
         "description": "Proportional (floored) over a hidden suite the agent never sees: a sequential baseline, conservation of total balance under many concurrent transfers, no overdraft under competing concurrent withdrawals, and no deadlock on opposite-direction transfers of the same pair."
       }
     ]
+  },
+  {
+    "name": "l6-spec-conformance",
+    "level": 6,
+    "kind": "feature",
+    "turns": [
+      "Read TICKET.md and then ALL of SPEC.md. We are adopting the TARIFF-1 billing specification; SPEC.md in this repo is the complete and final spec, and it is the only authority \u2014 TARIFF-1 is not any existing billing system, and where it differs from how billing usually works, the spec wins. The errata section at the end is normative and overrides earlier sections.\n\nImplement `computeInvoice` in src/tariff.ts so the engine conforms to SPEC.md exactly. The public vectors in examples/ (run with `npm test`) are a small teaching set, NOT the acceptance suite \u2014 acceptance is a much larger hidden vector set covering every section and every erratum, judged by exact deep-equality of the full invoice (every line code, every amount, every ordering).\n\nDo not modify src/types.ts, examples/, or tests/examples.test.ts.\n\nWork autonomously until it is done. Do not stop to present a plan or ask for approval."
+    ],
+    "fixture": "./fixture",
+    "budget": {
+      "maxTurns": 100,
+      "maxCostUsd": 10,
+      "timeoutMs": 10800000
+    },
+    "successCriteria": "Exact conformance to the invented TARIFF-1 spec, including all six errata that override the main text: per-segment allowances (E1), cap before discount (E2), CEIL on the highest charged tier with HALF-EVEN below (E3), TRUNC base-fee proration (E4), volume boundaries belonging to the lower tier (E5), and credit ties broken by amount descending (E6) \u2014 plus segmentation with same-effective-day conflicts, last-day-plan discount/cap/minimum, tax on top-ups, credit expiry filtering, zero-line omission, and canonical line ordering. Graded by 195 hidden vectors (143 core + 52 interaction) generated from a host-side reference implementation; floor() scoring means full credit on a gate requires passing 100% of its vectors. Calibration: a correct-except-errata implementation scores 89/143 and 21/52 \u2192 2/5.",
+    "tags": [
+      "ts",
+      "vitest",
+      "spec-conformance",
+      "long-horizon",
+      "endurance",
+      "hidden-tests",
+      "billing",
+      "careful-reading",
+      "agentic"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l6-spec-conformance.git",
+    "ticketPath": "TICKET.md",
+    "reproSetup": {
+      "commands": [
+        "npm install --no-audit --no-fund",
+        "npm install --no-save vitest@^2 typescript@^5"
+      ],
+      "perCommandTimeoutMs": 240000
+    },
+    "gates": [
+      {
+        "name": "typecheck clean",
+        "points": 1,
+        "kind": "tsc"
+      },
+      {
+        "name": "conformance: core vectors",
+        "points": 2,
+        "kind": "hiddenTests:core",
+        "description": "143 hidden single-segment vectors covering every section: tier modes and boundaries, rounding rules per amended \u00a72.1/\u00a79, allowances, discount TRUNC and scope, cap, minimum, tax, credit ordering and expiry, admission and validation. floor(2 x passed/143): 2 points requires all 143."
+      },
+      {
+        "name": "conformance: interaction vectors",
+        "points": 2,
+        "kind": "hiddenTests:interaction",
+        "description": "52 hidden multi-segment vectors: plan changes and same-effective-day conflicts, TRUNC proration, per-segment allowances and tier restarts, last-day-plan discount/cap/minimum, cap-before-discount ordering, credits over capped totals, full-pipeline compounds. floor(2 x passed/52): 2 points requires all 52."
+      }
+    ]
   }
 ]

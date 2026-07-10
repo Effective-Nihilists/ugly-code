@@ -156,9 +156,12 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
       checks.push({ name: r.label ? `${gate.name} (${r.label})` : gate.name, passed: r.passed, detail: r.detail });
       detMax += pts;
       detScore += r.awarded;
-    } else if (kind === 'hiddenTests') {
+    } else if (kind === 'hiddenTests' || kind.startsWith('hiddenTests:')) {
       // Inject a regression suite the agent never saw, run it, remove it.
-      const r = await runHiddenTests(input, deps, pts);
+      // `hiddenTests:<key>` selects a named suite when a task vendors several
+      // (registry key `<taskName>#<key>`), e.g. spec-conformance core vs interaction.
+      const key = kind.startsWith('hiddenTests:') ? kind.slice('hiddenTests:'.length) : '';
+      const r = await runHiddenTests(input, deps, pts, key);
       checks.push({ name: r.label ? `${gate.name} (${r.label})` : gate.name, passed: r.passed, detail: r.detail });
       detMax += pts;
       detScore += r.awarded;
@@ -373,9 +376,10 @@ async function countChangedLines(projectPath: string, dir: string, deps: GradeDe
  * it cannot be read, tuned to, or deleted; written in, run, then removed so it
  * does not pollute the diff that later gates measure.
  */
-async function runHiddenTests(input: GradeInput, deps: GradeDeps, pts: number): Promise<MutationOutcome> {
-  const suite = getHiddenSuite(input.taskName);
-  if (!suite) return { awarded: 0, passed: false, detail: `no hidden suite registered for ${input.taskName}` };
+async function runHiddenTests(input: GradeInput, deps: GradeDeps, pts: number, key = ''): Promise<MutationOutcome> {
+  const registryKey = key ? `${input.taskName}#${key}` : input.taskName;
+  const suite = getHiddenSuite(registryKey);
+  if (!suite) return { awarded: 0, passed: false, detail: `no hidden suite registered for ${registryKey}` };
   if (!deps.writeFile) return { awarded: 0, passed: false, detail: 'grader deps lack writeFile — cannot inject hidden tests' };
 
   try {
