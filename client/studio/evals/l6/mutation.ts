@@ -2,26 +2,20 @@
 // fixture repo — so the agent under test never sees which bugs its suite must catch.
 // Same containment rule as evals/sbp/registry.ts.
 //
-// Calibration (scratchpad validate3.mjs): a PARANOID suite kills 31/31 mutants and
-// passes all 7 equivalents; a competent happy-path suite kills only ~15/31; the
-// fixture's inherited "100% line coverage" suite kills ~10/31. The 16 adversarial
-// mutants (a01-a20) live in the corners example-based testing skips: degenerate/empty
-// inputs, unnormalized inputs, and immutability — all documented in SPEC.md, so every
-// kill is a fair spec violation. Do NOT list these in the task ticket.
+// Target: a 32-function collection/numeric toolkit. 50 mutants (31 adversarial:
+// degenerate inputs, ties, duplicates, NaN, negative counts, immutability) + 9
+// equivalents. Calibration: a paranoid suite kills 50/50; a competent happy-path
+// suite kills far fewer; the inherited "100% coverage" suite lower still. The surface
+// is deliberately too large to test exhaustively in-budget — prioritisation is the
+// discriminator. Do NOT enumerate these in the task ticket.
 
-/** A single-token bug seeded into the reference implementation. A suite that does
- *  not fail when this is applied has not really tested the behaviour. */
 export interface Mutant {
   id: string;
-  /** What the bug is — surfaced in the grade detail for surviving mutants. */
   desc: string;
   find: string;
   replace: string;
 }
 
-/** A behaviour-PRESERVING rewrite. A suite that fails here is asserting on the
- *  implementation's source text (hashing/snapshotting the file, counting lines)
- *  rather than on behaviour — i.e. gaming the mutation score. */
 export interface EquivalentMutant {
   id: string;
   find: string;
@@ -29,7 +23,6 @@ export interface EquivalentMutant {
 }
 
 export interface MutationSuite {
-  /** Repo-relative file the mutants patch. */
   target: string;
   mutants: Mutant[];
   equivalents: EquivalentMutant[];
@@ -37,230 +30,354 @@ export interface MutationSuite {
 
 const SUITES: Record<string, MutationSuite> = {
   "l6-test-suite-mutation": {
-    target: "src/intervals.ts",
+    target: "src/kit.ts",
     mutants: [
       {
-        "id": "n01-norm",
-        "desc": "normalize only merges strict overlaps, touching stays split",
-        "find": "if (last !== undefined && cur.start <= last.end) {",
-        "replace": "if (last !== undefined && cur.start < last.end) {"
+        "id": "clamp-throw",
+        "desc": "clamp does not throw when lo > hi",
+        "find": "if (lo > hi) throw new Error('clamp: lo must be <= hi');",
+        "replace": "if (lo > hi + 1) throw new Error('clamp: lo must be <= hi');"
       },
       {
-        "id": "n02-norm",
-        "desc": "normalize keeps zero-length intervals",
-        "find": ".filter((i) => i.start < i.end)",
-        "replace": ".filter((i) => i.start <= i.end)"
+        "id": "clamp-below",
+        "desc": "clamp returns hi instead of lo below the range",
+        "find": "if (x < lo) return lo;",
+        "replace": "if (x < lo) return hi;"
       },
       {
-        "id": "n03-contains",
-        "desc": "contains treats the exclusive end as inside",
-        "find": "point >= iv.start && point < iv.end",
-        "replace": "point >= iv.start && point <= iv.end"
+        "id": "inrange-end",
+        "desc": "inRange includes the exclusive upper bound",
+        "find": "return x >= a && x < b;",
+        "replace": "return x >= a && x <= b;"
       },
       {
-        "id": "n04-intersect",
-        "desc": "intersect emits a zero-length interval where ranges touch",
-        "find": "if (s < e) out.push({ start: s, end: e });",
-        "replace": "if (s <= e) out.push({ start: s, end: e });"
+        "id": "inrange-noswap",
+        "desc": "inRange does not swap reversed bounds",
+        "find": "const a = Math.min(lo, hi);\n  const b = Math.max(lo, hi);",
+        "replace": "const a = lo;\n  const b = hi;"
       },
       {
-        "id": "n05-subtract",
-        "desc": "subtract loses the remainder to the left of the cut",
-        "find": "if (iv.start < cut.start) next.push({ start: iv.start, end: cut.start });",
-        "replace": "if (iv.start > cut.start) next.push({ start: iv.start, end: cut.start });"
+        "id": "round-sign",
+        "desc": "roundTo does not restore the sign of negatives",
+        "find": "return x < 0 ? -r : r;",
+        "replace": "return r;"
       },
       {
-        "id": "n06-subtract",
-        "desc": "subtract loses the remainder to the right of the cut",
-        "find": "if (cut.end < iv.end) next.push({ start: cut.end, end: iv.end });",
-        "replace": "if (cut.end > iv.end) next.push({ start: cut.end, end: iv.end });"
+        "id": "round-floor",
+        "desc": "roundTo floors instead of rounding half away from zero",
+        "find": "const r = Math.round(Math.abs(x) * f) / f;",
+        "replace": "const r = Math.floor(Math.abs(x) * f) / f;"
       },
       {
-        "id": "n07-measure",
-        "desc": "measure treats intervals as closed, +1 per interval",
-        "find": "sum + (iv.end - iv.start), 0);",
-        "replace": "sum + (iv.end - iv.start + 1), 0);"
+        "id": "round-default",
+        "desc": "roundTo default dp is 1, not 0",
+        "find": "export function roundTo(x: number, dp = 0): number {",
+        "replace": "export function roundTo(x: number, dp = 1): number {"
       },
       {
-        "id": "n08-span",
-        "desc": "span reports the wrong end",
-        "find": "end: n[n.length - 1]!.end",
-        "replace": "end: n[n.length - 1]!.start"
+        "id": "gcd-absa",
+        "desc": "gcd does not take the absolute value of a",
+        "find": "  a = Math.abs(a);\n  b = Math.abs(b);",
+        "replace": "  a = a;\n  b = Math.abs(b);"
       },
       {
-        "id": "n09-symdiff",
-        "desc": "symmetricDifference inverts the set operation",
-        "find": "return subtract(union(a, b), intersect(a, b));",
-        "replace": "return subtract(intersect(a, b), union(a, b));"
+        "id": "lcm-abs",
+        "desc": "lcm can return a negative multiple",
+        "find": "return Math.abs(a / gcd(a, b) * b);",
+        "replace": "return a / gcd(a, b) * b;"
       },
       {
-        "id": "n10-clamp",
-        "desc": "clamp unions with the bounds instead of intersecting",
-        "find": "return intersect(set, [bounds]);",
-        "replace": "return union(set, [bounds]);"
+        "id": "sum-noinit",
+        "desc": "sum has no initial value and throws on the empty array",
+        "find": "return xs.reduce((a, b) => a + b, 0);",
+        "replace": "return xs.reduce((a, b) => a + b);"
       },
       {
-        "id": "n11-overlaps",
-        "desc": "overlaps is always true",
-        "find": "return intersect(a, b).length > 0;",
-        "replace": "return intersect(a, b).length >= 0;"
+        "id": "mean-noempty",
+        "desc": "mean does not throw on the empty array (returns NaN)",
+        "find": "if (xs.length === 0) throw new Error('mean: empty array');",
+        "replace": "if (xs.length < 0) throw new Error('mean: empty array');"
       },
       {
-        "id": "n12-gaps",
-        "desc": "gaps reports the wrong hole boundary",
-        "find": "out.push({ start: n[i - 1]!.end, end: n[i]!.start });",
-        "replace": "out.push({ start: n[i - 1]!.end, end: n[i]!.end });"
+        "id": "median-mutates",
+        "desc": "median sorts the caller's array in place",
+        "find": "const s = xs.slice().sort((a, b) => a - b);",
+        "replace": "const s = xs.sort((a, b) => a - b);"
       },
       {
-        "id": "a01-span",
-        "desc": "span of the empty set returns a zero-length interval, not null",
-        "find": "if (n.length === 0) return null;",
-        "replace": "if (n.length === 0) return { start: 0, end: 0 };"
+        "id": "median-noavg",
+        "desc": "median of an even count returns the sum of the two middles, not their average",
+        "find": "s.length % 2 === 0 ? (s[mid - 1]! + s[mid]!) / 2 : s[mid]!",
+        "replace": "s.length % 2 === 0 ? s[mid - 1]! + s[mid]! : s[mid]!"
       },
       {
-        "id": "a02-containsInterval",
-        "desc": "an empty query interval is reported as NOT covered",
-        "find": "if (iv.start >= iv.end) return true;",
-        "replace": "if (iv.start >= iv.end) return false;"
+        "id": "median-mid",
+        "desc": "median uses the wrong middle index for odd counts",
+        "find": "const mid = Math.floor(s.length / 2);",
+        "replace": "const mid = Math.ceil(s.length / 2);"
       },
       {
-        "id": "a03-coalesce",
-        "desc": "a negative tol does not throw when the set is empty",
-        "find": "if (tol < 0) throw new Error('tol must be non-negative');",
-        "replace": "if (tol < 0 && set.length > 0) throw new Error('tol must be non-negative');"
+        "id": "chunk-noninteger",
+        "desc": "chunk accepts a fractional n instead of throwing",
+        "find": "if (!Number.isInteger(n) || n < 1) throw new Error('chunk: n must be a positive integer');",
+        "replace": "if (n < 1) throw new Error('chunk: n must be a positive integer');"
       },
       {
-        "id": "a04-coalesce",
-        "desc": "coalesce merges only on a strictly-smaller gap; a gap exactly equal to tol is not merged",
-        "find": "if (last !== undefined && cur.start - last.end <= tol) {",
-        "replace": "if (last !== undefined && cur.start - last.end < tol) {"
+        "id": "take-negative",
+        "desc": "take with a negative n slices from the end instead of yielding []",
+        "find": "return xs.slice(0, Math.max(0, n));",
+        "replace": "return xs.slice(0, n);"
       },
       {
-        "id": "a05-clamp",
-        "desc": "clamp returns the whole set unchanged when bounds are empty",
-        "find": "return intersect(set, [bounds]);",
-        "replace": "return bounds.start < bounds.end ? intersect(set, [bounds]) : set;"
+        "id": "drop-negative",
+        "desc": "drop with a negative n keeps a tail instead of the whole array",
+        "find": "return xs.slice(Math.max(0, n));",
+        "replace": "return xs.slice(n);"
       },
       {
-        "id": "a06-complement",
-        "desc": "complement drops set members that begin before the bounds",
-        "find": "return subtract([bounds], set);",
-        "replace": "return subtract([bounds], set.filter((i) => i.start >= bounds.start));"
+        "id": "takewhile-continue",
+        "desc": "takeWhile keeps scanning after the predicate first fails",
+        "find": "    if (!pred(x)) break;\n    out.push(x);",
+        "replace": "    if (!pred(x)) continue;\n    out.push(x);"
       },
       {
-        "id": "a07-span",
-        "desc": "span returns null for a single-interval set",
-        "find": "if (n.length === 0) return null;",
-        "replace": "if (n.length <= 1) return null;"
+        "id": "takewhile-invert",
+        "desc": "takeWhile inverts its predicate",
+        "find": "if (!pred(x)) break;",
+        "replace": "if (pred(x)) break;"
       },
       {
-        "id": "a08-shift",
-        "desc": "shift does not normalize its result",
-        "find": "return normalize(set).map((iv) => ({ start: iv.start + delta, end: iv.end + delta }));",
-        "replace": "return set.map((iv) => ({ start: iv.start + delta, end: iv.end + delta }));"
+        "id": "dropwhile-invert",
+        "desc": "dropWhile inverts its predicate",
+        "find": "while (i < xs.length && pred(xs[i]!)) i++;",
+        "replace": "while (i < xs.length && !pred(xs[i]!)) i++;"
       },
       {
-        "id": "a09-union",
-        "desc": "union concatenates without normalizing",
-        "find": "return normalize([...a, ...b]);",
-        "replace": "return [...a, ...b];"
+        "id": "eq-nan",
+        "desc": "SameValueZero equality is broken for NaN (uniq keeps both NaNs)",
+        "find": "return a === b || (a !== a && b !== b);",
+        "replace": "return a === b;"
       },
       {
-        "id": "a10-intersect",
-        "desc": "intersect trusts that `a` is already canonical",
-        "find": "const A = normalize(a);",
-        "replace": "const A = a;"
+        "id": "uniq-invert",
+        "desc": "uniq keeps only the duplicates",
+        "find": "if (!out.some((y) => eq(x, y))) out.push(x);",
+        "replace": "if (out.some((y) => eq(x, y))) out.push(x);"
       },
       {
-        "id": "a11-intersect",
-        "desc": "intersect trusts that `b` is already canonical",
-        "find": "const B = normalize(b);",
-        "replace": "const B = b;"
+        "id": "uniqby-invert",
+        "desc": "uniqBy keeps only the duplicates",
+        "find": "if (!seen.some((s) => eq(k, s))) {",
+        "replace": "if (seen.some((s) => eq(k, s))) {"
       },
       {
-        "id": "a12-subtract",
-        "desc": "subtract trusts that `a` is already canonical",
-        "find": "let cur = normalize(a);",
-        "replace": "let cur = a.slice();"
+        "id": "groupby-reset",
+        "desc": "groupBy resets each group, keeping only the last element per key",
+        "find": "(out[k] ??= []).push(x);",
+        "replace": "(out[k] = []).push(x);"
       },
       {
-        "id": "a13-subtract",
-        "desc": "subtract trusts that `b` is already canonical",
-        "find": "for (const cut of normalize(b)) {",
-        "replace": "for (const cut of b) {"
+        "id": "countby-noinc",
+        "desc": "countBy never increments past the first",
+        "find": "out[k] = (out[k] ?? 0) + 1;",
+        "replace": "out[k] = (out[k] ?? 0);"
       },
       {
-        "id": "a14-measure",
-        "desc": "measure double-counts overlaps in an unnormalized set",
-        "find": "return normalize(set).reduce((sum, iv) => sum + (iv.end - iv.start), 0);",
-        "replace": "return set.reduce((sum, iv) => sum + (iv.end - iv.start), 0);"
+        "id": "partition-swap",
+        "desc": "partition returns [fail, pass]",
+        "find": "for (const x of xs) (pred(x) ? pass : fail).push(x);",
+        "replace": "for (const x of xs) (pred(x) ? fail : pass).push(x);"
       },
       {
-        "id": "a15-coalesce",
-        "desc": "coalesce does not drop empties / pre-merge before applying tol",
-        "find": "const xs = normalize(set);",
-        "replace": "const xs = set.slice().sort(byStart);"
+        "id": "intersection-nodedup",
+        "desc": "intersection does not de-duplicate its result",
+        "find": "return uniq(a).filter((x) => b.some((y) => eq(x, y)));",
+        "replace": "return a.filter((x) => b.some((y) => eq(x, y)));"
       },
       {
-        "id": "a16-normalize",
-        "desc": "normalize aliases the caller's interval objects, then mutates them while merging",
-        "find": "cur.start <= last.end) {\n      if (cur.end > last.end) last.end = cur.end;\n    } else {\n      out.push({ start: cur.start, end: cur.end });\n    }",
-        "replace": "cur.start <= last.end) {\n      if (cur.end > last.end) last.end = cur.end;\n    } else {\n      out.push(cur);\n    }"
+        "id": "intersection-invert",
+        "desc": "intersection is inverted into difference",
+        "find": "return uniq(a).filter((x) => b.some((y) => eq(x, y)));",
+        "replace": "return uniq(a).filter((x) => !b.some((y) => eq(x, y)));"
       },
       {
-        "id": "a17-normalize",
-        "desc": "normalize keeps only the last end on a merge, swallowing nested intervals",
-        "find": "cur.start <= last.end) {\n      if (cur.end > last.end) last.end = cur.end;\n    } else {",
-        "replace": "cur.start <= last.end) {\n      last.end = cur.end;\n    } else {"
+        "id": "difference-dedup",
+        "desc": "difference drops duplicates that should be kept",
+        "find": "export function difference<T>(a: T[], b: T[]): T[] {\n  return a.filter((x) => !b.some((y) => eq(x, y)));",
+        "replace": "export function difference<T>(a: T[], b: T[]): T[] {\n  return uniq(a).filter((x) => !b.some((y) => eq(x, y)));"
       },
       {
-        "id": "a19-isDisjoint",
-        "desc": "isDisjoint is the negation of what it should be",
-        "find": "return intersect(a, b).length === 0;",
-        "replace": "return intersect(a, b).length > 0;"
+        "id": "union-nodedup",
+        "desc": "unionArr does not de-duplicate",
+        "find": "export function unionArr<T>(a: T[], b: T[]): T[] {\n  return uniq([...a, ...b]);",
+        "replace": "export function unionArr<T>(a: T[], b: T[]): T[] {\n  return [...a, ...b];"
       },
       {
-        "id": "a20-containsInterval",
-        "desc": "containsInterval is inverted",
-        "find": "return subtract([iv], set).length === 0;",
-        "replace": "return subtract([iv], set).length !== 0;"
+        "id": "union-order",
+        "desc": "unionArr puts b before a",
+        "find": "return uniq([...a, ...b]);",
+        "replace": "return uniq([...b, ...a]);"
+      },
+      {
+        "id": "zip-max",
+        "desc": "zip runs to the LONGER input, producing undefined pairs",
+        "find": "const n = Math.min(a.length, b.length);",
+        "replace": "const n = Math.max(a.length, b.length);"
+      },
+      {
+        "id": "flatten-default",
+        "desc": "flattenDepth default depth is 2, not 1",
+        "find": "export function flattenDepth<T>(xs: unknown[], depth = 1): T[] {",
+        "replace": "export function flattenDepth<T>(xs: unknown[], depth = 2): T[] {"
+      },
+      {
+        "id": "flatten-zero",
+        "desc": "flattenDepth(xs, 0) recurses one level instead of a shallow copy",
+        "find": "if (depth <= 0) return xs.slice() as T[];",
+        "replace": "if (depth < 0) return xs.slice() as T[];"
+      },
+      {
+        "id": "flatten-nodecrement",
+        "desc": "flattenDepth ignores the depth limit and flattens fully",
+        "find": "if (Array.isArray(x)) out.push(...flattenDepth(x, depth - 1));",
+        "replace": "if (Array.isArray(x)) out.push(...flattenDepth(x, depth));"
+      },
+      {
+        "id": "rotate-nomod",
+        "desc": "rotate does not reduce k modulo the length, breaking for k >= length",
+        "find": "const s = ((k % n) + n) % n;",
+        "replace": "const s = k;"
+      },
+      {
+        "id": "rotate-direction",
+        "desc": "rotate turns right instead of left",
+        "find": "return [...xs.slice(s), ...xs.slice(0, s)];",
+        "replace": "return [...xs.slice(0, s), ...xs.slice(s)];"
+      },
+      {
+        "id": "pairwise-start",
+        "desc": "pairwise starts at index 0, pairing undefined with the first",
+        "find": "for (let i = 1; i < xs.length; i++) out.push([xs[i - 1]!, xs[i]!]);",
+        "replace": "for (let i = 0; i < xs.length; i++) out.push([xs[i - 1]!, xs[i]!]);"
+      },
+      {
+        "id": "windows-noninteger",
+        "desc": "windows accepts a fractional size instead of throwing",
+        "find": "if (!Number.isInteger(size) || size < 1) throw new Error('windows: size must be a positive integer');",
+        "replace": "if (size < 1) throw new Error('windows: size must be a positive integer');"
+      },
+      {
+        "id": "windows-drop-last",
+        "desc": "windows drops the final window",
+        "find": "for (let i = 0; i + size <= xs.length; i++) out.push(xs.slice(i, i + size));",
+        "replace": "for (let i = 0; i + size < xs.length; i++) out.push(xs.slice(i, i + size));"
+      },
+      {
+        "id": "sortedindex-upper",
+        "desc": "sortedIndex returns the UPPER bound, inserting after equal elements",
+        "find": "if (xs[mid]! < x) lo = mid + 1;",
+        "replace": "if (xs[mid]! <= x) lo = mid + 1;"
+      },
+      {
+        "id": "minby-tie",
+        "desc": "minBy lets the LAST tied element win instead of the first",
+        "find": "if (k < bestK) {\n      best = xs[i]!;\n      bestK = k;\n    }\n  }\n  return best;\n}\n\n/** The element with the largest",
+        "replace": "if (k <= bestK) {\n      best = xs[i]!;\n      bestK = k;\n    }\n  }\n  return best;\n}\n\n/** The element with the largest"
+      },
+      {
+        "id": "minby-max",
+        "desc": "minBy selects the maximum",
+        "find": "if (k < bestK) {\n      best = xs[i]!;\n      bestK = k;\n    }\n  }\n  return best;\n}\n\n/** The element with the largest",
+        "replace": "if (k > bestK) {\n      best = xs[i]!;\n      bestK = k;\n    }\n  }\n  return best;\n}\n\n/** The element with the largest"
+      },
+      {
+        "id": "maxby-tie",
+        "desc": "maxBy lets the LAST tied element win instead of the first",
+        "find": "if (k > bestK) {",
+        "replace": "if (k >= bestK) {"
+      },
+      {
+        "id": "keyby-first",
+        "desc": "keyBy keeps the FIRST element on a key collision instead of the last",
+        "find": "for (const x of xs) out[key(x)] = x;",
+        "replace": "for (const x of xs) out[key(x)] ??= x;"
+      },
+      {
+        "id": "compact-nullish",
+        "desc": "compact only removes null/undefined, keeping 0 and ''",
+        "find": "return xs.filter((x): x is T => Boolean(x));",
+        "replace": "return xs.filter((x): x is T => x != null);"
+      },
+      {
+        "id": "reversed-mutates",
+        "desc": "reversed reverses the caller's array in place",
+        "find": "return xs.slice().reverse();",
+        "replace": "return xs.reverse();"
+      },
+      {
+        "id": "sortedindex-mid",
+        "desc": "sortedIndex computes the wrong midpoint",
+        "find": "const mid = (lo + hi) >> 1;",
+        "replace": "const mid = (lo + hi + 1) >> 1;"
+      },
+      {
+        "id": "sum-offby",
+        "desc": "sum starts from 1",
+        "find": "return xs.reduce((a, b) => a + b, 0);",
+        "replace": "return xs.reduce((a, b) => a + b, 1);"
+      },
+      {
+        "id": "chunk-step",
+        "desc": "chunk advances by n-1, producing overlapping chunks",
+        "find": "for (let i = 0; i < xs.length; i += n) out.push(xs.slice(i, i + n));",
+        "replace": "for (let i = 0; i < xs.length; i += n - 1) out.push(xs.slice(i, i + n));"
       }
     ],
     equivalents: [
       {
-        "id": "q01",
-        "find": "point >= iv.start && point < iv.end",
-        "replace": "iv.start <= point && point < iv.end"
+        "id": "eq-clamp-hi",
+        "find": "if (x > hi) return hi;",
+        "replace": "if (x >= hi) return hi;"
       },
       {
-        "id": "q02",
-        "find": "return normalize([...a, ...b]);",
-        "replace": "return normalize(a.concat(b));"
+        "id": "eq-clamp-lo",
+        "find": "if (x < lo) return lo;",
+        "replace": "if (x <= lo) return lo;"
       },
       {
-        "id": "q03",
-        "find": "return subtract(union(a, b), intersect(a, b));",
-        "replace": "return union(subtract(a, b), subtract(b, a));"
+        "id": "eq-gcd-loop",
+        "find": "while (b !== 0) {",
+        "replace": "while (b > 0) {"
       },
       {
-        "id": "q04",
-        "find": "return intersect(a, b).length > 0;",
-        "replace": "return intersect(a, b).length !== 0;"
+        "id": "eq-inrange-yoda",
+        "find": "return x >= a && x < b;",
+        "replace": "return a <= x && x < b;"
       },
       {
-        "id": "q05",
-        "find": "return normalize(set).some((iv) => point >= iv.start && point < iv.end);",
-        "replace": "return set.some((iv) => point >= iv.start && point < iv.end);"
+        "id": "eq-sum-concat",
+        "find": "return xs.reduce((a, b) => a + b, 0);",
+        "replace": "return xs.reduce((a, b) => b + a, 0);"
       },
       {
-        "id": "q06",
-        "find": "if (iv.start >= iv.end) return true;",
-        "replace": "if (iv.start > iv.end) return true;"
+        "id": "eq-pairwise-slice",
+        "find": "for (let i = 1; i < xs.length; i++) out.push([xs[i - 1]!, xs[i]!]);",
+        "replace": "for (let i = 0; i < xs.length - 1; i++) out.push([xs[i]!, xs[i + 1]!]);"
       },
       {
-        "id": "q07",
-        "find": "cur.start - last.end <= tol) {\n      if (cur.end > last.end) last.end = cur.end;",
-        "replace": "cur.start - last.end <= tol) {\n      last.end = cur.end;"
+        "id": "eq-take-min",
+        "find": "return xs.slice(0, Math.max(0, n));",
+        "replace": "return xs.slice(0, Math.max(0, Math.min(n, xs.length)));"
+      },
+      {
+        "id": "eq-lcm-zero",
+        "find": "if (a === 0 || b === 0) return 0;",
+        "replace": "if (a === 0 && b === 0) return 0;"
+      },
+      {
+        "id": "eq-rotate-negmod",
+        "find": "const s = ((k % n) + n) % n;",
+        "replace": "const s = k % n;"
       }
     ],
   },

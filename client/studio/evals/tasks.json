@@ -1919,9 +1919,9 @@
     "budget": {
       "maxTurns": 40,
       "maxCostUsd": 3,
-      "timeoutMs": 1800000
+      "timeoutMs": 2400000
     },
-    "successCriteria": "The agent writes a behaviour-driven suite under tests/ that pins every clause of SPEC.md across all 16 exported functions \u2014 including the parts happy-path testing skips: empty/single-element sets, empty query intervals, negative-tol errors, boundary tolerances, unnormalized inputs, and input immutability. Grading is mechanical: each of 31 hidden single-token bugs is seeded into src/intervals.ts and the suite must go red; 7 behaviour-preserving rewrites must NOT make it go red. Editing src/, shipping a suite red against the correct implementation, or asserting on implementation source text all score 0.",
+    "successCriteria": "The agent writes a behaviour-driven suite under tests/ that pins every clause of SPEC.md across all 32 exported functions of the toolkit \u2014 including the parts happy-path testing skips: empty/single-element inputs, negative counts, ties (first-wins), duplicates, NaN/SameValueZero equality, boundary conditions, and input immutability. The surface is deliberately larger than can be tested exhaustively in the budget, so prioritisation is the skill under test. Grading is mechanical: each of 50 hidden single-token bugs is seeded into src/kit.ts and the suite must go red; 9 behaviour-preserving rewrites must NOT make it go red. Editing src/, shipping a suite red against the correct implementation, or asserting on implementation source text all score 0.",
     "tags": [
       "testing",
       "mutation-score",
@@ -1949,7 +1949,7 @@
         "name": "seeded bugs caught",
         "points": 4,
         "kind": "mutationScore",
-        "description": "Proportional: floor(4 x killed/31), where a mutant is killed when the agent's suite fails with that bug seeded into src/intervals.ts. A suite that misses a bug has not proved the module correct, so partial credit never rounds up. Zero if src/ was modified, if the suite is red against the correct implementation, or if it fails on any of the 7 behaviour-preserving rewrites."
+        "description": "Proportional: floor(4 x killed/50), where a mutant is killed when the agent's suite fails with that bug seeded into src/kit.ts. A suite that misses a bug has not proved the module correct, so partial credit never rounds up. Zero if src/ was modified, if the suite is red against the correct implementation, or if it fails on any of the 9 behaviour-preserving rewrites."
       }
     ]
   },
