@@ -8,7 +8,7 @@ import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
 import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, ensureCodebaseAnalysis, type AgentSelection } from './clientAgent';
 import { killSessionBashProcs } from '../../agent/tools';
-import { setCodebaseProvider } from '../../agent/indexer/provider';
+import { setCodebaseProvider, codebaseProvider } from '../../agent/indexer/provider';
 import { localCodebaseProvider } from '../../agent/indexer/codebase';
 import { installTaskErrorLog } from './taskErrorLog';
 import {
@@ -111,6 +111,29 @@ defineTask({
     // via codingSessionListMessages, same as before).
     // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
     getState: async () => ({ sessionId, projectPath: t.params.projectPath ?? null }),
+
+    // ── Codebase indexer, exposed to the RENDERER ──────────────────────────
+    // The indexer runs here (the task's Node child), so renderer-side callers —
+    // the CodebaseSearch panel, feedback diagnostics — reach it through these
+    // RPCs instead of the removed host `codebase.*` channel. The daemon is a
+    // machine singleton, so any live task can service any project's request.
+    // eslint-disable-next-line @typescript-eslint/require-await -- RPC contract
+    codebaseStatus: async (p: { projectPath: string }) =>
+      codebaseProvider().indexerReadiness(p.projectPath),
+    codebaseSearch: async (p: {
+      projectPath: string;
+      query: string;
+      limit: number;
+      mode: import('../../agent/indexer/client').SearchMode;
+      worktreeRoot?: string;
+    }) =>
+      codebaseProvider().search(
+        p.projectPath,
+        p.query,
+        p.limit,
+        p.mode,
+        p.worktreeRoot ? { worktreeRoot: p.worktreeRoot } : undefined,
+      ),
 
     // ── Finish-session pipeline (ported into the task so it runs against the
     //    worktree with real host git via createNodeUglyNative). Emits

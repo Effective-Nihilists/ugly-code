@@ -89,7 +89,7 @@ import {
   resolveSlashSelection,
   type Skill,
 } from '../hooks/useSlashCommands';
-import { useSocket, getActiveProjectPath } from '../hooks/useSocket';
+import { useSocket, getActiveProjectPath, codebaseCall } from '../hooks/useSocket';
 import { isTool } from '../../../shared/agent';
 import { native } from 'ugly-app/native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -108,7 +108,6 @@ import {
   supportsReasoningClient,
 } from './ReasoningSelector';
 import { capSessionBundle } from './sessionFeedbackBundle';
-import { fetchCodebaseStatus } from '../agent/codebaseReadiness';
 import { CodebaseStatsModal } from './CodebaseStatsModal';
 
 // ── Shared helpers ──────────────────────────────────────────────────
@@ -6164,7 +6163,7 @@ CodingAgentChatProps = {}) {
           };
           if (isNativeAvailable() && cwd) {
             try {
-              diag.freshStatus = await fetchCodebaseStatus(cwd);
+              diag.freshStatus = await codebaseCall('codebaseStatus', { projectPath: cwd });
             } catch (e) {
               diag.statusError = e instanceof Error ? e.message : String(e);
             }

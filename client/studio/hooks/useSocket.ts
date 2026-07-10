@@ -123,6 +123,23 @@ export { getActiveProjectPath, setActiveProjectPath, getActiveRepoPath, readAuth
 // useCodingAgentChat consumes them unchanged.
 const sessionTaskIds = new Map<string, string>();
 const listenedTaskIds = new Set<string>();
+
+/**
+ * Reach the codebase indexer (which lives in the coding task) from the RENDERER,
+ * where the removed host `codebase.*` channel used to be called. The daemon is a
+ * machine singleton, so ANY live coding task can service any project's request —
+ * try each known task id until one answers. Returns null when none is running.
+ */
+export async function codebaseCall<T>(method: string, payload: unknown): Promise<T | null> {
+  for (const id of sessionTaskIds.values()) {
+    try {
+      return await native.task.call<T>(id, method, payload);
+    } catch {
+      /* dead/stale task — try the next */
+    }
+  }
+  return null;
+}
 function readAuthTokenCookie(): string {
   try {
     const m = document.cookie.split('; ').find((c) => c.startsWith('auth_token='));

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Search, ChevronDown, ChevronRight } from 'lucide-react';
-import { installUglyNative } from 'ugly-app/native';
-import { getActiveProjectPath } from '../hooks/useSocket';
+import { getActiveProjectPath, codebaseCall } from '../hooks/useSocket';
 import { dispatchTool } from '../../agent/tools';
 import { provenance, type SearchHit, type SearchResponse, type SearchMode } from '../../agent/tools/searchResponse';
 import { resultLabel, snippet, parseGrepHits } from './codebaseSearchFormat';
@@ -39,9 +38,14 @@ export function CodebaseSearch({ onOpen }: { onOpen: (path: string, line: number
         );
         setState({ kind: 'grep', hits: parseGrepHits(text) });
       } else {
-        const resp = (await installUglyNative().invoke('codebase.search' as never, {
+        // Index-backed modes run in the coding task (the daemon lives there).
+        const resp = await codebaseCall<SearchResponse>('codebaseSearch', {
           projectPath, mode, query: q, limit,
-        } as never)) as SearchResponse;
+        });
+        if (!resp) {
+          setState({ kind: 'error', error: 'No active coding session — open one to run index search.' });
+          return;
+        }
         setState({ kind: 'response', resp });
       }
     } catch (e) {

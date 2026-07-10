@@ -3,26 +3,33 @@ import { parseCodebaseReadinessEvent } from '../../client/studio/agent/codebaseR
 
 // The producer emits `event.payload = { payload: <readiness> }`; the consumer passes that
 // `event.payload` straight in. These tests pin the double-unwrap + validation contract that
-// keeps a malformed/older-host push from crashing the header pill.
+// keeps a malformed push from crashing the header pill. Readiness is indexer-only now
+// (the architecture-doc surface was removed).
 const wrap = (readiness: unknown) => ({ payload: readiness });
 
 describe('parseCodebaseReadinessEvent', () => {
   it('unwraps and returns a well-formed readiness (indexing)', () => {
     const r = {
-      architecture: { status: 'building', filesAnalyzed: 3, filesTotal: 10 },
-      indexer: { status: 'indexing', indexedChunks: 5, totalChunks: 42 },
+      indexer: { status: 'indexing', indexedChunks: 5, totalChunks: 42, phase: 'embedding' },
     };
     expect(parseCodebaseReadinessEvent(wrap(r))).toEqual(r);
   });
 
   it('returns the ready shape verbatim', () => {
-    const r = { architecture: { status: 'ready' }, indexer: { status: 'ready', totalChunks: 100 } };
+    const r = { indexer: { status: 'ready', totalChunks: 100 } };
     expect(parseCodebaseReadinessEvent(wrap(r))).toEqual(r);
   });
 
-  it('returns null for a bad indexer status (older/mismatched host)', () => {
-    const r = { architecture: { status: 'ready' }, indexer: { status: 'bogus' } };
-    expect(parseCodebaseReadinessEvent(wrap(r))).toBeNull();
+  it('carries the daemon-down diagnostics through', () => {
+    const r = {
+      indexer: { status: 'indexing' },
+      diagnostics: { message: 'The indexer daemon has not been started yet.', lastError: null, logTail: '' },
+    };
+    expect(parseCodebaseReadinessEvent(wrap(r))).toEqual(r);
+  });
+
+  it('returns null for a bad indexer status (mismatched producer)', () => {
+    expect(parseCodebaseReadinessEvent(wrap({ indexer: { status: 'bogus' } }))).toBeNull();
   });
 
   it('returns null when the inner payload is missing entirely', () => {
@@ -30,8 +37,7 @@ describe('parseCodebaseReadinessEvent', () => {
     expect(parseCodebaseReadinessEvent(undefined)).toBeNull();
   });
 
-  it('returns null when required sub-objects are absent', () => {
-    expect(parseCodebaseReadinessEvent(wrap({ indexer: { status: 'ready' } }))).toBeNull();
-    expect(parseCodebaseReadinessEvent(wrap({ architecture: { status: 'ready' } }))).toBeNull();
+  it('returns null when the indexer sub-object is absent', () => {
+    expect(parseCodebaseReadinessEvent(wrap({ diagnostics: { message: 'x' } }))).toBeNull();
   });
 });

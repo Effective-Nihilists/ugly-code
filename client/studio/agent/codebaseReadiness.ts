@@ -3,7 +3,6 @@
 // session folds it into its session_state stream. The indexer runs locally in the task via
 // `codebaseProvider()` (moved out of ugly-studio so it ships with a deploy). The
 // architecture-doc surface was removed.
-import { installUglyNative } from 'ugly-app/native';
 import { codebaseProvider } from '../../agent/indexer/provider';
 
 /** SessionSnapshot.codebaseReadiness shape (kept loose to avoid a cross-package type dep).
@@ -26,18 +25,6 @@ export interface CodebaseReadiness {
 }
 
 const pollers = new Map<string, ReturnType<typeof setInterval>>();
-
-/** One-shot fresh read of the indexer status for a project. Used to enrich feedback
- *  reports (a "codebase: analyzing" report should carry the actual indexer state at
- *  submit time, not just the last polled snapshot). */
-export async function fetchCodebaseStatus(cwd: string): Promise<unknown> {
-  return inv('codebase.status', { projectPath: cwd });
-}
-
-// The raw UglyNative (with .invoke) — the facade exposes typed namespaces but no generic
-// invoke, and `codebase.*` is a host-only channel with no facade method.
-const inv = (channel: string, payload: unknown): Promise<unknown> =>
-  installUglyNative().invoke(channel as never, payload as never);
 
 // Sessions whose worktree overlay has been reconciled once (on first 'ready').
 const reconciled = new Set<string>();
