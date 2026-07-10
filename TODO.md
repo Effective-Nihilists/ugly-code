@@ -114,7 +114,28 @@ The #1 discriminator (the only one whose gap grows with capability).
       blocks the desync-the-store cheat. Calibrated: buggy 2/4, naive-lock 2/4 (deadlock),
       correct 4/4. **opus 5/5** — wrote ordered locks AND handled the `from===to` reentrancy
       deadlock I hadn't even tested (107s, $0.52, store unchanged → genuine).
-- [ ] L6.2 endurance-build ← the one untried axis; long-horizon coherence, not a single insight
+- [x] **l6-spec-conformance (TARIFF-1)** — BUILT + calibrated, the anti-opus flagship.
+      Structural diagnosis of why opus 5/5'd everything: full visibility, a trustworthy
+      runnable oracle, one critical decision, short horizon. This task inverts all four:
+      an INVENTED ~19-section billing spec whose rules deliberately diverge from industry
+      convention (training priors hurt), with a normative errata section at the end
+      overriding six earlier clauses (E1 per-segment allowances, E2 cap-before-discount,
+      E3 top-tier CEIL, E4 TRUNC proration, E5 volume boundary→lower tier, E6 credit ties
+      by amount desc). 195 hidden vectors (143 core + 52 interaction) generated from a
+      host-side reference impl; fixture ships 13 teaching vectors. floor() ⇒ full gate
+      credit needs 100%. Calibrated through the real injected-vitest path: reference 5/5;
+      a correct-except-errata "skim" impl 89/143 + 21/52 → **2/5**; every erratum costs
+      5–46 vectors. New `hiddenTests:<key>` keyed-suite gate support.
+- [x] **l6-compound-incident** — BUILT + calibrated, the misleading-oracle task. One
+      symptom (wrong day-2 revenue report), three jointly-necessary causes: stale memo
+      keyed by pageSize only (A), paginate drops the last record of every full page (B),
+      ingestAll is forEach(async) fire-and-forget (C). The visible repro stays red until
+      ALL THREE are fixed — verified across the full 2³ matrix — so a correct single fix
+      reads as a failed fix (the incident report says two engineers already reverted
+      "failed" fixes). Hidden per-cause probes + non-repro-data e2e give the gradient:
+      0–1 causes → 2/5, 2 → 3/5, 3 → 5/5.
+- [ ] l6-amnesia-relay — forced context loss across fresh sessions; needs a small
+      `freshSessionPerTurn` harness feature. Third breaker if T1/T2 don't land.
 - [ ] L6.5 type-level-api
 - [ ] add `level: 6` to the ladder + UI grouping; wire per-task multi-run + mean/spread
 - [ ] first full L6 round (3 models × 3 runs), report the separation
