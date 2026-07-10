@@ -5,8 +5,8 @@
 // auto-supplement. The `.specs` virtual path is still dropped.
 
 import type { TextGenTool } from 'ugly-app/shared';
-import { installUglyNative } from 'ugly-app/native';
-import { formatSearchResult, type SearchResponse } from './searchResponse';
+import { codebaseProvider } from '../indexer/provider';
+import { formatSearchResult } from './searchResponse';
 import { drainDirty } from './codebaseDirty';
 import type { ToolModule } from './registry';
 import type { ToolContext } from '../tools';
@@ -78,22 +78,18 @@ async function runIndexSearch(
   const dirtyFiles = ctx?.sessionId ? drainDirty(ctx.sessionId) : [];
   if (dirtyFiles.length) {
     try {
-      await installUglyNative().invoke('codebase.update' as never, {
-        projectPath,
-        files: dirtyFiles,
-        ...(ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : {}),
-      } as never);
+      await codebaseProvider().update(projectPath, dirtyFiles, ctx?.workspaceDir ?? undefined);
     } catch {
       /* best-effort freshness — search proceeds on the current index */
     }
   }
-  const resp = (await installUglyNative().invoke('codebase.search' as never, {
+  const resp = await codebaseProvider().search(
     projectPath,
+    args.pattern,
+    typeof args.limit === 'number' ? args.limit : 10,
     mode,
-    query: args.pattern,
-    limit: typeof args.limit === 'number' ? args.limit : 10,
-    ...(ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : {}),
-  } as never)) as SearchResponse;
+    ctx?.workspaceDir ? { worktreeRoot: ctx.workspaceDir } : undefined,
+  );
   return formatSearchResult(resp);
 }
 

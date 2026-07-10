@@ -8,6 +8,8 @@ import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
 import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, ensureCodebaseAnalysis, type AgentSelection } from './clientAgent';
 import { killSessionBashProcs } from '../../agent/tools';
+import { setCodebaseProvider } from '../../agent/indexer/provider';
+import { localCodebaseProvider } from '../../agent/indexer/codebase';
 import { installTaskErrorLog } from './taskErrorLog';
 import {
   abandonSession,
@@ -29,6 +31,11 @@ const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage
 // node:fs / child_process. ugly-app's permissions read platform lazily, so this body-level
 // install (after the imports) is respected.
 g.UglyNative = createNodeUglyNative();
+
+// Install the in-process codebase indexer (moved out of ugly-studio). This runs
+// only in the task's Node child; the grep tool + readiness poll call through
+// `codebaseProvider()`, which falls back to the host channel everywhere else.
+setCodebaseProvider(localCodebaseProvider);
 
 // sessionWorkspace persists worktree prefs to localStorage; give it an in-memory shim.
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- DOM lib types localStorage as always-present, but this runs in a Node task child where it is genuinely undefined.
