@@ -26,8 +26,22 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { INDEXER_VERSION } from './indexerVersion.js';
+import { buildId } from '../../../shared/Build.js';
 
-const ASSET_BASE = '/coding-agent/indexer';
+// Where the assets live at the origin, most-specific first.
+//
+// PROD (Cloudflare Worker): only `/{buildId}/…`, `/assets/…`, `/favicon.ico`
+// and single-segment image/font files are served from R2 — a nested `.json`/`.py`
+// under `/coding-agent/indexer/` falls through to the SPA shell (HTML 200). The
+// R2 objects DO exist under `builds/{buildId}/…`, reachable at `/{buildId}/…`.
+//
+// DEV (`ugly-app dev`, vite): `public/*` is served at the ROOT, and there is no
+// `/{buildId}/` route, so the buildId path 404s and the root path wins.
+//
+// Trying both, in this order, covers prod and dev. It happens once per indexer
+// version (then the `.complete` sentinel short-circuits), so the extra probe is
+// negligible.
+const ASSET_BASES = [`/${buildId}/coding-agent/indexer`, `/coding-agent/indexer`];
 
 export interface IndexerManifest {
   version: string;
@@ -113,17 +127,32 @@ export async function ensureIndexerSources(): Promise<string> {
   return inflight;
 }
 
-async function fetchManifest(): Promise<IndexerManifest> {
-  const res = await fetch(`${ASSET_BASE}/manifest.json`);
-  if (!res.ok) {
-    throw new Error(`indexer manifest fetch failed: HTTP ${res.status}`);
+/**
+ * Fetch `<base>/<name>` from the first ASSET_BASE that returns a real asset.
+ *
+ * The SPA fallback answers unknown paths with `text/html` 200, so a bare status
+ * check isn't enough — a `content-type: text/html` response means "route not
+ * found, here's the app shell", which we skip.
+ */
+async function fetchFromOrigin(name: string): Promise<Response> {
+  let lastStatus = 0;
+  for (const base of ASSET_BASES) {
+    const res = await fetch(`${base}/${name}`);
+    lastStatus = res.status;
+    if (!res.ok) continue;
+    if ((res.headers.get('content-type') ?? '').includes('text/html')) continue; // SPA shell
+    return res;
   }
+  throw new Error(`indexer asset ${name} not served by the origin (last HTTP ${lastStatus})`);
+}
+
+async function fetchManifest(): Promise<IndexerManifest> {
+  const res = await fetchFromOrigin('manifest.json');
   return (await res.json()) as IndexerManifest;
 }
 
 async function fetchAsset(name: string): Promise<Uint8Array> {
-  const res = await fetch(`${ASSET_BASE}/${name}`);
-  if (!res.ok) throw new Error(`indexer asset ${name} fetch failed: HTTP ${res.status}`);
+  const res = await fetchFromOrigin(name);
   return new Uint8Array(await res.arrayBuffer());
 }
 
