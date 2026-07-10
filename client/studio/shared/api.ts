@@ -321,7 +321,9 @@ export const CodebaseReadinessSchema = z.object({
   // and this strict parse silently threw it away. Surface it instead.
   diagnostics: z
     .object({
-      lastError: z.string().optional(),
+      /** Plain-language daemon state — "not running", "not answering", etc. */
+      message: z.string().optional(),
+      lastError: z.string().nullish(),
       logTail: z.string().optional(),
     })
     .optional(),

@@ -72,3 +72,44 @@ describe('CodebaseReadinessSchema', () => {
     expect(r.success).toBe(false);
   });
 });
+
+describe('daemon-down payload (the real bug)', () => {
+  // Captured verbatim from `routeCodebase('codebase.status')` with a dead daemon.
+  const daemonDown = {
+    indexer: { status: 'indexing' },
+    architecture: { status: 'idle' },
+    diagnostics: {
+      message:
+        'The indexer daemon (pid 24174, started 3h ago) is no longer running — it crashed, was killed, or the machine slept. Restarting it.',
+      lastError: null,
+      logTail: '',
+    },
+  };
+
+  it('parses, keeping the explanatory message', () => {
+    const r = CodebaseReadinessSchema.safeParse(daemonDown);
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.diagnostics?.message).toContain('no longer running');
+  });
+
+  it('accepts a null lastError (the daemon died AFTER a successful spawn)', () => {
+    // `.optional()` alone rejected null here, which would have dropped the whole
+    // reading and left the pill on "analyzing…" with no diagnostics at all.
+    expect(CodebaseReadinessSchema.safeParse(daemonDown).success).toBe(true);
+  });
+
+  it('is distinguishable from a healthy daemon that is genuinely indexing', () => {
+    const healthy = CodebaseReadinessSchema.parse({
+      indexer: { status: 'indexing', phase: 'embedding', indexedChunks: 10, totalChunks: 100 },
+      architecture: { status: 'building' },
+    });
+    const down = CodebaseReadinessSchema.parse(daemonDown);
+    // Both report status 'indexing'. The ONLY signal is diagnostics.message +
+    // absent counts — which is exactly what the modal keys off.
+    expect(healthy.indexer.status).toBe(down.indexer.status);
+    expect(healthy.diagnostics).toBeUndefined();
+    expect(down.diagnostics?.message).toBeTruthy();
+    expect(down.indexer.totalChunks).toBeUndefined();
+  });
+});

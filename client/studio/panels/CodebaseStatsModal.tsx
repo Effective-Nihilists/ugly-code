@@ -212,7 +212,27 @@ export function CodebaseStatsModal({
     return 0;
   })();
 
-  const hasError = indexer?.status === 'error' || arch?.status === 'failed' || !!diagnostics;
+  // The daemon is down / starting when the host couldn't read a status at all.
+  // It reports that as `status: 'indexing'` with no counts, which is otherwise
+  // indistinguishable from a healthy daemon mid-index — so key off the message
+  // the host now sends, not off the status.
+  const daemonMessage = diagnostics?.message;
+  const noProgressYet = !indexer?.totalChunks && !indexer?.totalFiles;
+  const daemonDown = !!daemonMessage && noProgressYet;
+
+  // Only render the diagnostics block when it actually contains something. It
+  // used to appear (empty) merely because `diagnostics` existed.
+  // Note `||` is deliberate in spirit but expressed field-by-field: every value
+  // here is a string, and an EMPTY string must count as "nothing to show".
+  const hasDiagnostics = [
+    daemonMessage,
+    diagnostics?.lastError,
+    diagnostics?.logTail?.trim(),
+    indexer?.error,
+    arch?.error,
+  ].some((v) => typeof v === 'string' && v.length > 0);
+
+  const pctKnown = indexer?.status === 'ready' || !noProgressYet;
 
   return (
     <Modal open={open} onClose={onClose} size="md" ariaLabel="Codebase analysis">
@@ -232,48 +252,53 @@ export function CodebaseStatsModal({
         ) : (
           <>
             <Section title="Semantic index">
-              <div style={{ marginBottom: 10 }}>
-                <PhaseStepper active={indexer?.phase} />
-              </div>
-              <div style={{ marginBottom: 10 }}>
-                <ProgressBar pct={pct} />
-              </div>
-              <Row label="Status" value={indexer?.status ?? '—'} />
-              <Row
-                label="Files"
-                value={
-                  indexer?.totalFiles
-                    ? `${indexer.indexedFiles ?? 0} / ${indexer.totalFiles}`
-                    : '—'
-                }
-              />
-              <Row
-                label="Chunks"
-                value={
-                  indexer?.totalChunks
-                    ? `${indexer.indexedChunks ?? 0} / ${indexer.totalChunks}`
-                    : '—'
-                }
-              />
-              <Row label="Files / sec" value={fmtRate(indexer?.filesPerSec, 'files')} />
-              <Row label="Chunks / sec" value={fmtRate(indexer?.chunksPerSec, 'chunks')} />
-              <Row
-                label="Estimated finish"
-                value={
-                  indexer?.status === 'ready'
-                    ? 'done'
-                    : indexer?.etaSeconds != null
-                      ? fmtDuration(indexer.etaSeconds)
-                      : /* No rate yet: either nothing has been embedded (a warm
-                           resume reuses everything off disk) or the embedder is
-                           still loading. Don't invent a number. */
-                        'estimating…'
-                }
-              />
-              <Row
-                label="Elapsed"
-                value={indexer?.elapsedSeconds != null ? fmtDuration(indexer.elapsedSeconds) : '—'}
-              />
+              {daemonDown ? (
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 4px' }}>
+                  {daemonMessage}
+                </p>
+              ) : (
+                <>
+                  {indexer?.phase && (
+                    <div style={{ marginBottom: 10 }}>
+                      <PhaseStepper active={indexer.phase} />
+                    </div>
+                  )}
+                  {pctKnown && (
+                    <div style={{ marginBottom: 10 }}>
+                      <ProgressBar pct={pct} />
+                    </div>
+                  )}
+                </>
+              )}
+              <Row label="Status" value={daemonDown ? 'starting' : indexer?.status ?? '—'} />
+              {!!indexer?.totalFiles && (
+                <Row label="Files" value={`${indexer.indexedFiles ?? 0} / ${indexer.totalFiles}`} />
+              )}
+              {!!indexer?.totalChunks && (
+                <Row label="Chunks" value={`${indexer.indexedChunks ?? 0} / ${indexer.totalChunks}`} />
+              )}
+              {/* Rates and ETA only exist once embedding has started. Rendering
+                  four "—" rows next to an "estimating…" was the bulk of the
+                  modal's empty-looking body. */}
+              {indexer?.filesPerSec != null && (
+                <Row label="Files / sec" value={fmtRate(indexer.filesPerSec, 'files')} />
+              )}
+              {indexer?.chunksPerSec != null && (
+                <Row label="Chunks / sec" value={fmtRate(indexer.chunksPerSec, 'chunks')} />
+              )}
+              {(indexer?.status === 'ready' || indexer?.etaSeconds != null) && (
+                <Row
+                  label="Estimated finish"
+                  value={
+                    indexer.status === 'ready'
+                      ? 'done'
+                      : fmtDuration(indexer.etaSeconds ?? 0)
+                  }
+                />
+              )}
+              {indexer?.elapsedSeconds != null && (
+                <Row label="Elapsed" value={fmtDuration(indexer.elapsedSeconds)} />
+              )}
             </Section>
 
             <Section title="Architecture map">
@@ -286,8 +311,13 @@ export function CodebaseStatsModal({
               ) : null}
             </Section>
 
-            {hasError && (
+            {hasDiagnostics && (
               <Section title="Diagnostics">
+                {daemonMessage && !daemonDown && (
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+                    {daemonMessage}
+                  </p>
+                )}
                 {indexer?.error && (
                   <p style={{ fontSize: 12, color: '#e53935', margin: '0 0 8px' }}>{indexer.error}</p>
                 )}

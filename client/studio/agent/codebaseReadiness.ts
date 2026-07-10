@@ -22,7 +22,7 @@ export interface CodebaseReadiness {
     error?: string;
   };
   architecture?: { status?: string; filesAnalyzed?: number; filesTotal?: number; lastWrittenAt?: number; error?: string };
-  diagnostics?: { lastError?: string; logTail?: string };
+  diagnostics?: { message?: string; lastError?: string | null; logTail?: string };
 }
 
 const pollers = new Map<string, ReturnType<typeof setInterval>>();
