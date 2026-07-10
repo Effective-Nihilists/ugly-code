@@ -299,3 +299,36 @@ denylist "fixes" break functionality. Zero judge gates.
   opus-breaker candidate. Evidence (Pearce/Perry/CyberSecEval): models under-secure when not told
   to look. Predicted opus ~5-8/12 exploits. Same fixture, same hidden grade, second ticket only.
   Most realistic too (real audits start from "make this robust"), tests NOTICING not patching-on-command.
+
+---
+
+## Family B (build a real product, objective grading) — BUILT + RUN (2026-07-10)
+
+`l6-build-sokoban`: build a Sokoban game to a spec; graded by a NEW `uxFlows` gate that
+builds the app, serves the static client, and plays it in headless chromium — scoring a
+hidden 25-flow Playwright battery (board/cell contract, move rules, undo/restart, win
+lifecycle, WASD, on-screen controls, level advance) + `__uglyInspect` overlap & safe-area.
+Zero LLM judge, no backend. Runner + battery vendored in `evals/l6/uxflows.ts`.
+
+- Validated end-to-end: reference Sokoban in a scaffolded ugly-app = 25/25; empty scaffold ~2/25.
+- The runner independently caught a REAL overlapping-controls bug in an existing opus breakout build.
+- **opus 25/25** ($3.41, 54 turns, 470s) — a correct, polished Sokoban. First scored 23/25, but
+  BOTH misses were grader over-strictness: opus conditionally renders the win banner
+  (`{solved && <div data-id=win>}`, idiomatic + spec-compliant), and my "hidden at start" check
+  threw on the absent node. Fixed to be render-strategy-agnostic; re-verified opus 25/25.
+
+Sokoban chosen for full determinism (no RNG) so the battery asserts exact board state after
+exact key sequences. LESSON: single-reference calibration is insufficient — a second valid
+implementation (opus's conditional render) exposed the grader brittleness. Calibrate against
+≥2 idiomatically-different correct implementations.
+
+### L6-REAL scoreboard so far (opus)
+| task | family | opus | note |
+|---|---|---|---|
+| l6-security-audit (unprimed) | D security | 19/19 (12/12 exploits) | proactively secured; breaker missed |
+| l6-security-hardening (primed) | D security | not yet run | discriminator variant |
+| l6-build-sokoban | B build | 25/25 | perfect build; grader now robust + discriminating |
+
+Opus aces every real-world task too. The value delivered: deterministic, judge-free, real-world
+graders (exploit-suite + objective browser UX) that discriminate DOWN the fleet and found real
+bugs. Remaining breaker candidate: Family A out-of-repo-invariant incident. Family C (harness) unbuilt.
