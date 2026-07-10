@@ -105,11 +105,31 @@ The #1 discriminator (the only one whose gap grows with capability).
       (billing proration; `roundCents` documents half-away-from-zero, implements
       `Math.round` → under-credits by 1¢). Hidden regression suite vendored in
       `evals/l6/hidden.ts`. New `hiddenTests`, `diffBudget`, `unchanged:` gates.
-- [ ] L6.2 endurance-build
-- [ ] L6.4 concurrency-debug
+- [x] **L6.4 concurrency-debug** — BUILT + calibrated. Fixture `ugly-evals-l6-concurrency-debug`
+      (async ledger; `transfer` does read-check-write across await points with no
+      serialization → concurrent transfers lose/create money and overdraw). The obvious
+      per-account-lock fix DEADLOCKS on opposite-direction transfers; only a global lock or
+      canonically-ordered per-account locks pass. Hidden stress suite (conservation, no
+      overdraft, no deadlock) vendored in `evals/l6/hidden.ts`; `unchanged:src/store.ts` gate
+      blocks the desync-the-store cheat. Calibrated: buggy 2/4, naive-lock 2/4 (deadlock),
+      correct 4/4. **opus 5/5** — wrote ordered locks AND handled the `from===to` reentrancy
+      deadlock I hadn't even tested (107s, $0.52, store unchanged → genuine).
+- [ ] L6.2 endurance-build ← the one untried axis; long-horizon coherence, not a single insight
 - [ ] L6.5 type-level-api
 - [ ] add `level: 6` to the ladder + UI grouping; wire per-task multi-run + mean/spread
 - [ ] first full L6 round (3 models × 3 runs), report the separation
+
+### Verdict (2026-07-10): opus passes every single-insight L6 axis at 5/5
+
+Built and calibrated three hard, deterministic, contamination-resistant tasks across the
+axes research ranks as frontier weaknesses — **test quality (50/50), minimal-diff surgical
+fix (5/5), hard concurrency debugging (5/5, avoiding two deadlock traps)**. Opus aced all
+three. A competent-but-weaker suite scores 2/5 on L6.1 and buggy/naive fixes score 2/4 on
+L6.4, so these are excellent discriminators **for weaker models** — they just do not put
+opus 4.8 in the 10–30% band. Any task that hinges on a single hard insight or on thoroughness,
+opus solves. The remaining untried lever is **L6.2 long-horizon endurance**: failure by
+accumulated drift over a many-hour build, not a single step — a different failure mode. Next
+decision: build L6.2, or run deepseek/glm on L6.1/L6.3/L6.4 to bank the discrimination we have.
 
 ### Calibration results — opus, 2026-07-09
 
