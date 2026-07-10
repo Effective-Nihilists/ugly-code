@@ -13,8 +13,8 @@ Perf logs are written only by the deployed Worker, so this is prod-only:
 npx ugly-app perf            # add --limit <n> as needed
 ```
 
-If it reports "No prod Neon DB found", the app hasn't been published yet — run
-`ugly-app publish` first.
+If it reports "No prod Neon DB found", the app hasn't been deployed yet — run
+`npm run deploy` first.
 
 For each slow path:
 1. Find the source of the slowdown

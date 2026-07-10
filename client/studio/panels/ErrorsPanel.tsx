@@ -3,7 +3,7 @@ import { DevProdToggle } from '../components/DevProdToggle';
 import { useSocket } from '../hooks/useSocket';
 import { useStudioUserSetting } from '../hooks/useStudioUserSetting';
 import { useProdDeployGate } from '../hooks/useProdDeployGate';
-import { ProdPublishGate } from './ProdPublishGate';
+import { ProdDeployGate } from './ProdDeployGate';
 import { GitRepoSelector } from './GitRepoSelector';
 
 interface ErrorSummary {
@@ -57,9 +57,9 @@ export interface ErrorsPanelProps {
   forceDev?: boolean;
   /** Hide the panel header when rendered inside an outer tab bar. */
   hideHeader?: boolean;
-  /** Route to the Publish tab (shown when prod errors are requested but the
+  /** Route to the Deploy tab (shown when prod errors are requested but the
    *  project was never deployed, so there's no prod error log yet). */
-  onPublish?: () => void;
+  onDeploy?: () => void;
   /**
    * When rendered inside SessionLayout, this is the active session's
    * compositeId. The list query filters by it so the Errors tab shows
@@ -75,7 +75,7 @@ export function ErrorsPanel({
   forceDev,
   hideHeader,
   studioSessionId,
-  onPublish,
+  onDeploy,
 }: ErrorsPanelProps = {}) {
   const socket = useSocket();
   const [storedMode, setStoredMode] = useStudioUserSetting<'dev' | 'prod'>(
@@ -125,7 +125,7 @@ export function ErrorsPanel({
   }, [mode, studioSessionId, gated]);
 
   if (mode === 'prod' && prodDeploy === 'undeployed') {
-    return <ProdPublishGate what="error log" onPublish={onPublish} />;
+    return <ProdDeployGate what="error log" onDeploy={onDeploy} />;
   }
 
   return (

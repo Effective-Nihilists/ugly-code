@@ -13,8 +13,8 @@ Feedback is written only by the deployed app, so this is prod-only:
 npx ugly-app feedback            # add --limit <n> as needed
 ```
 
-If it reports "No prod Neon DB found", the app hasn't been published yet — run
-`ugly-app publish` first.
+If it reports "No prod Neon DB found", the app hasn't been deployed yet — run
+`npm run deploy` first.
 
 For each piece of feedback:
 1. Understand the user's issue or request

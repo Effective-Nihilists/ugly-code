@@ -17,8 +17,8 @@ npx ugly-app errors --level error   # filter by level
 npx ugly-app errors --json          # machine-readable
 ```
 
-If it reports "No prod Neon DB found", the app hasn't been published yet — run
-`ugly-app publish` first.
+If it reports "No prod Neon DB found", the app hasn't been deployed yet — run
+`npm run deploy` first.
 
 ## Tips
 - `source: 'server'` = server-side error, `source: 'browser'` = client-side

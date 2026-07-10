@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { useProdDeployGate } from '../hooks/useProdDeployGate';
-import { ProdPublishGate } from './ProdPublishGate';
+import { ProdDeployGate } from './ProdDeployGate';
 import { GitRepoSelector } from './GitRepoSelector';
 
 // The Studio Feedback tab — the `ugly-app feedback` CLI, in-app: list the
@@ -23,7 +23,7 @@ interface FeedbackItem {
 }
 
 export interface FeedbackPanelProps {
-  onPublish?: () => void;
+  onDeploy?: () => void;
   /** Sessions the user can hand a report to ("existing session" picker). */
   sessions?: { compositeId: string; title: string }[];
   /** Seed a coding session (existing id, or null = new) with a fix prompt. */
@@ -54,7 +54,7 @@ function statusBadge(status: string): React.ReactElement {
   return <span style={badge(bg, fg)}>{status}</span>;
 }
 
-export function FeedbackPanel({ onPublish, sessions = [], onSendToAgent }: FeedbackPanelProps = {}): React.ReactElement {
+export function FeedbackPanel({ onDeploy, sessions = [], onSendToAgent }: FeedbackPanelProps = {}): React.ReactElement {
   const socket = useSocket();
   const deploy = useProdDeployGate(true);
   const [items, setItems] = React.useState<FeedbackItem[]>([]);
@@ -110,10 +110,10 @@ export function FeedbackPanel({ onPublish, sessions = [], onSendToAgent }: Feedb
   );
 
   if (deploy === 'checking') {
-    return <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Checking publish status…</div>;
+    return <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Checking deploy status…</div>;
   }
   if (deploy === 'undeployed') {
-    return <ProdPublishGate what="feedback" onPublish={onPublish} />;
+    return <ProdDeployGate what="feedback" onDeploy={onDeploy} />;
   }
 
   return (

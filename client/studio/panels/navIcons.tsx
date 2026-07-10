@@ -11,7 +11,7 @@ function Svg({ children }: { children: React.ReactNode }): React.ReactElement {
   );
 }
 
-export const PublishIcon = (): React.ReactElement => (
+export const DeployIcon = (): React.ReactElement => (
   <Svg><path d="M4 12a8 8 0 0 1 16 0" /><circle cx={12} cy={12} r={1.5} fill="currentColor" /></Svg>
 );
 export const DatabaseIcon = (): React.ReactElement => (

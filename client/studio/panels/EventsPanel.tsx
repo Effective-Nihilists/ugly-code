@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { useProdDeployGate } from '../hooks/useProdDeployGate';
-import { ProdPublishGate } from './ProdPublishGate';
+import { ProdDeployGate } from './ProdDeployGate';
 import { GitRepoSelector } from './GitRepoSelector';
 
 interface EventItem {
@@ -33,11 +33,11 @@ const card: React.CSSProperties = {
 export interface EventsPanelProps {
   /** Hide the panel's own title bar when rendered inside an outer tab surface. */
   hideHeader?: boolean;
-  /** Route to Publish (shown when the project was never deployed — no prod events). */
-  onPublish?: () => void;
+  /** Route to Deploy (shown when the project was never deployed — no prod events). */
+  onDeploy?: () => void;
 }
 
-export function EventsPanel({ hideHeader, onPublish }: EventsPanelProps = {}) {
+export function EventsPanel({ hideHeader, onDeploy }: EventsPanelProps = {}) {
   const socket = useSocket();
   const [topEvents, setTopEvents] = useState<
     { eventName: string; count: number }[]
@@ -64,7 +64,7 @@ export function EventsPanel({ hideHeader, onPublish }: EventsPanelProps = {}) {
   }, [deploy]);
 
   if (deploy === 'undeployed') {
-    return <ProdPublishGate what="events" onPublish={onPublish} />;
+    return <ProdDeployGate what="events" onDeploy={onDeploy} />;
   }
 
   return (

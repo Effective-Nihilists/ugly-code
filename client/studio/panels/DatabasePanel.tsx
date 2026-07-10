@@ -90,12 +90,12 @@ export interface DatabasePanelProps {
   forceProd?: boolean;
   forceDev?: boolean;
   hideHeader?: boolean;
-  /** Route the user to the Publish tab (shown when the prod DB isn't provisioned
+  /** Route the user to the Deploy tab (shown when the prod DB isn't provisioned
    *  yet because the project was never deployed). */
-  onPublish?: () => void;
+  onDeploy?: () => void;
 }
 
-export function DatabasePanel({ forceProd, forceDev, onPublish }: DatabasePanelProps = {}) {
+export function DatabasePanel({ forceProd, forceDev, onDeploy }: DatabasePanelProps = {}) {
   const activeRepo = useActiveRepoPath();
   const [storedMode, setStoredMode] = useStudioUserSetting<DbMode>('panel.database.mode', 'dev');
   const mode: DbMode = forceProd ? 'prod' : forceDev ? 'dev' : storedMode;
@@ -161,12 +161,12 @@ export function DatabasePanel({ forceProd, forceDev, onPublish }: DatabasePanelP
   if (mode === 'prod' && prodDeployed === 'checking') {
     return (
       <div data-id="database-panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Centered>Checking publish status…</Centered>
+        <Centered>Checking deploy status…</Centered>
       </div>
     );
   }
   if (mode === 'prod' && prodDeployed === 'no') {
-    return <ProdPublishGate onPublish={onPublish} />;
+    return <ProdDeployGate onDeploy={onDeploy} />;
   }
 
   return (
@@ -217,7 +217,7 @@ export function DatabasePanel({ forceProd, forceDev, onPublish }: DatabasePanelP
 }
 
 // Shown for the prod DB when the project was never deployed (no Neon yet).
-function ProdPublishGate({ onPublish }: { onPublish?: () => void }) {
+function ProdDeployGate({ onDeploy }: { onDeploy?: () => void }) {
   return (
     <div
       data-id="database-panel"
@@ -230,12 +230,12 @@ function ProdPublishGate({ onPublish }: { onPublish?: () => void }) {
         No production database yet
       </span>
       <span style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 420, lineHeight: 1.5 }}>
-        This project hasn’t been published, so there’s no production database to
-        browse. Publish it first to provision Neon — then your prod data shows up here.
+        This project hasn’t been deployed, so there’s no production database to
+        browse. Deploy it first to provision Neon — then your prod data shows up here.
       </span>
-      {onPublish && (
-        <button data-id="db-publish-first" onClick={onPublish} style={btnStyle('primary')}>
-          Publish project →
+      {onDeploy && (
+        <button data-id="db-deploy-first" onClick={onDeploy} style={btnStyle('primary')}>
+          Deploy project →
         </button>
       )}
     </div>

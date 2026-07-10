@@ -16,8 +16,8 @@ npx ugly-app perf --limit 100
 npx ugly-app perf --json          # machine-readable
 ```
 
-If it reports "No prod Neon DB found", the app hasn't been published yet — run
-`ugly-app publish` first.
+If it reports "No prod Neon DB found", the app hasn't been deployed yet — run
+`npm run deploy` first.
 
 # Notes
 <!-- Claude: append observations here -->

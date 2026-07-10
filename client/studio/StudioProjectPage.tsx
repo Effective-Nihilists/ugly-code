@@ -23,7 +23,7 @@ import { ProdPanel } from './panels/ProdPanel';
 import { PreviewPanel } from './panels/PreviewPanel';
 import { FilePanel } from './panels/FilePanel';
 import {
-  PublishIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon,
+  DeployIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon,
   AgentIcon, PreviewIcon, FileIcon, GitIcon,
 } from './panels/navIcons';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -31,12 +31,12 @@ import { useIsMobile } from './hooks/useIsMobile';
 // Two nav surfaces:
 //  - Session top tab picker (per-session, dev-scoped): Agent / Preview / File /
 //    Git / Database.
-//  - Sidebar footer (prod-scoped views): Publish / Database(prod) / Errors /
+//  - Sidebar footer (prod-scoped views): Deploy / Database(prod) / Errors /
 //    Events / Workers / Terminal. Errors/Events/Workers are prod-only; Database
 //    appears in both (dev in the top tabs, prod in the sidebar).
 type WorkspaceTab =
   | 'chat' | 'preview' | 'file' | 'git' | 'database'
-  | 'publish' | 'prodDatabase' | 'errors' | 'events' | 'workers' | 'terminal' | 'feedback';
+  | 'deploy' | 'prodDatabase' | 'errors' | 'events' | 'workers' | 'terminal' | 'feedback';
 const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: 'chat', label: 'Agent' },
   { id: 'preview', label: 'Preview' },
@@ -46,8 +46,11 @@ const TABS: { id: WorkspaceTab; label: string }[] = [
 ];
 const ALL_TABS: WorkspaceTab[] = [
   'chat', 'preview', 'file', 'git', 'database',
-  'publish', 'prodDatabase', 'errors', 'events', 'workers', 'terminal', 'feedback',
+  'deploy', 'prodDatabase', 'errors', 'events', 'workers', 'terminal', 'feedback',
 ];
+// The deploy tab used to be `publish`, and that id is written into the URL
+// (`?tab=publish`). Keep old links and restored windows working.
+const LEGACY_TAB_IDS: Record<string, WorkspaceTab> = { publish: 'deploy' };
 // Icons for the per-session view sub-nav (rendered under the active session row in
 // the sidebar). Keyed by the same ids as TABS. The session-scoped views
 // (chat/preview/file/git/database) now live in the sidebar, not a top tab bar.
@@ -70,10 +73,17 @@ function readSidebarW(): number {
 
 // The open tab + active session live in the URL (alongside ?path=) so a reload
 // restores exactly where you were.
+function isWorkspaceTab(value: string): value is WorkspaceTab {
+  return (ALL_TABS as string[]).includes(value);
+}
 function readWorkspaceUrl(): { tab: WorkspaceTab | null; session: string | null } {
   const p = new URLSearchParams(window.location.search);
-  const t = p.get('tab') as WorkspaceTab | null;
-  return { tab: t && ALL_TABS.includes(t) ? t : null, session: p.get('session') };
+  const raw = p.get('tab');
+  const t = raw !== null ? LEGACY_TAB_IDS[raw] ?? raw : null;
+  return {
+    tab: t !== null && isWorkspaceTab(t) ? t : null,
+    session: p.get('session'),
+  };
 }
 function writeWorkspaceUrl(tab: WorkspaceTab, session: string | null): void {
   const url = new URL(window.location.href);
@@ -332,7 +342,7 @@ export default function StudioProjectPage({
       onClick: () => { setTab(t.id); closeDrawer(); },
     })),
     footerNav: [
-      { id: 'publish', label: 'Publish', icon: <PublishIcon />, active: tab === 'publish', onClick: () => { setTab('publish'); closeDrawer(); } },
+      { id: 'deploy', label: 'Deploy', icon: <DeployIcon />, active: tab === 'deploy', onClick: () => { setTab('deploy'); closeDrawer(); } },
       { id: 'prodDatabase', label: 'Database', icon: <DatabaseIcon />, active: tab === 'prodDatabase', onClick: () => { setTab('prodDatabase'); closeDrawer(); } },
       { id: 'errors', label: 'Errors', icon: <ErrorsIcon />, active: tab === 'errors', onClick: () => { setTab('errors'); closeDrawer(); } },
       { id: 'events', label: 'Events', icon: <EventsIcon />, active: tab === 'events', onClick: () => { setTab('events'); closeDrawer(); } },
@@ -412,11 +422,11 @@ export default function StudioProjectPage({
           {tab === 'git' && <div style={S.pane}><GitPanel /></div>}
           {tab === 'database' && <div style={S.paneScroll}><DatabasePanel forceDev /></div>}
           {/* Sidebar prod views */}
-          {tab === 'publish' && <div style={S.pane}><ProdPanel /></div>}
-          {tab === 'prodDatabase' && <div style={S.paneScroll}><DatabasePanel forceProd onPublish={() => { setTab('publish'); }} /></div>}
-          {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel forceProd onPublish={() => { setTab('publish'); }} /></div>}
-          {tab === 'events' && <div style={S.paneScroll}><EventsPanel onPublish={() => { setTab('publish'); }} /></div>}
-          {tab === 'feedback' && <div style={S.paneScroll}><FeedbackPanel onPublish={() => { setTab('publish'); }} sessions={stored.map((s) => ({ compositeId: s.compositeId, title: s.title }))} onSendToAgent={sendFeedbackToAgent} /></div>}
+          {tab === 'deploy' && <div style={S.pane}><ProdPanel /></div>}
+          {tab === 'prodDatabase' && <div style={S.paneScroll}><DatabasePanel forceProd onDeploy={() => { setTab('deploy'); }} /></div>}
+          {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel forceProd onDeploy={() => { setTab('deploy'); }} /></div>}
+          {tab === 'events' && <div style={S.paneScroll}><EventsPanel onDeploy={() => { setTab('deploy'); }} /></div>}
+          {tab === 'feedback' && <div style={S.paneScroll}><FeedbackPanel onDeploy={() => { setTab('deploy'); }} sessions={stored.map((s) => ({ compositeId: s.compositeId, title: s.title }))} onSendToAgent={sendFeedbackToAgent} /></div>}
           {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel forceProd /></div>}
           {tab === 'terminal' && <div style={S.pane}><TerminalPanel /></div>}
         </div>
@@ -460,7 +470,7 @@ export default function StudioProjectPage({
 // list reuses TABS for its own labels (these match).
 const ALL_TAB_LABELS: Record<WorkspaceTab, string> = {
   chat: 'Agent', preview: 'Preview', file: 'File', git: 'Git', database: 'Database',
-  publish: 'Publish', prodDatabase: 'Database', errors: 'Errors', events: 'Events', feedback: 'Feedback',
+  deploy: 'Deploy', prodDatabase: 'Database', errors: 'Errors', events: 'Events', feedback: 'Feedback',
   workers: 'Workers', terminal: 'Terminal',
 };
 

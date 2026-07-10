@@ -17,10 +17,9 @@ type UglyProcess = ReturnType<typeof native.process.spawn>;
 const PUBLISH_TOOLS = ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'];
 
 /**
- * Prod / Publish panel. Mirrors the monolith's PublishTab: shows the deployed
- * Prod / Publish panel. Mirrors the monolith's PublishTab: shows the deployed
- * target (live URL + last deploy) and runs `ugly-app publish` for the open
- * project, streaming the orchestrator's output. The monolith drove a PTY over a
+ * Prod / Deploy panel. Mirrors the monolith's PublishTab: shows the deployed
+ * target (live URL + last deploy) and runs the ugly-app deploy pipeline for the
+ * open project, streaming the orchestrator's output. The monolith drove a PTY over a
  * sidecar; here we spawn it over the native bridge (same as the scaffold) and
  * stream stdout/stderr into a console.
  */
@@ -74,6 +73,10 @@ export function ProdPanel(): React.ReactElement {
       // fail with "not logged in to ugly.bot" for a Studio-only user. Passed via env
       // (not interpolated) so the JWT's quotes don't need shell-escaping.
       const authJson = uglyBotAuthJson();
+      // Deliberately `ugly-app publish`, not `ugly-app deploy`: this runs the
+      // CLI out of the OPENED PROJECT's node_modules, which may pin an older
+      // ugly-app that predates the `deploy` rename. `publish` is a permanent
+      // alias, so it works against every version.
       const cmd = authJson
         ? 'mkdir -p "$HOME/.ugly-bot" && printf "%s\\n" "$UGLY_BOT_AUTH_JSON" > "$HOME/.ugly-bot/auth.json"; pnpm exec ugly-app publish'
         : 'pnpm exec ugly-app publish';
@@ -167,7 +170,7 @@ export function ProdPanel(): React.ReactElement {
         )}
       </div>
       <div ref={scrollRef} data-id="prod-output" style={S.console}>
-        <ConsoleText text={output || (running ? 'Starting publish…' : 'Press Deploy to run `ugly-app publish` (Neon + Cloudflare provisioning + Workers deploy).')} TextComponent={LinkifiedText} />
+        <ConsoleText text={output || (running ? 'Starting deploy…' : 'Press Deploy to run the ugly-app deploy pipeline (Neon + Cloudflare provisioning + Workers deploy).')} TextComponent={LinkifiedText} />
       </div>
       {running && (
         <div style={S.inputRow}>

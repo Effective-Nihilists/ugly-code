@@ -6,12 +6,12 @@ import React from 'react';
  * of a raw connection error we prompt the user to publish first (with a button to
  * the Publish tab). `what` names the resource (e.g. "database", "error log").
  */
-export function ProdPublishGate({
+export function ProdDeployGate({
   what,
-  onPublish,
+  onDeploy,
 }: {
   what: string;
-  onPublish?: () => void;
+  onDeploy?: () => void;
 }): React.ReactElement {
   return (
     <div
@@ -28,16 +28,16 @@ export function ProdPublishGate({
         This project hasn’t been published, so there’s no production {what} to show.
         Publish it first to provision it — then it’ll appear here.
       </span>
-      {onPublish && (
+      {onDeploy && (
         <button
           data-id="publish-first"
-          onClick={onPublish}
+          onClick={onDeploy}
           style={{
             background: 'var(--accent)', color: 'var(--on-accent, #fff)', border: 'none',
             borderRadius: 6, padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}
         >
-          Publish project →
+          Deploy project →
         </button>
       )}
     </div>

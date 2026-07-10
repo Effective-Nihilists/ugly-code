@@ -16,8 +16,8 @@ npx ugly-app feedback --limit 100
 npx ugly-app feedback --json        # machine-readable
 ```
 
-If it reports "No prod Neon DB found", the app hasn't been published yet — run
-`ugly-app publish` first.
+If it reports "No prod Neon DB found", the app hasn't been deployed yet — run
+`npm run deploy` first.
 
 ## Types: `bug`, `design`, `feature`
 - Each report includes the `url`/`page`, `userId` (null = logged out), and the
