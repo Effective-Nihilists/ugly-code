@@ -80,8 +80,8 @@ async function resolveTilde(root: string): Promise<string> {
   // Fast path: Node-like runtime with HOME env var (no process spawn needed)
   try {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (typeof process !== 'undefined' && (process as { env?: Record<string, string> }).env?.['HOME']) {
-      return root.replace(/^~/, (process as { env: Record<string, string> }).env['HOME']!);
+    if (typeof process !== 'undefined' && (process as { env?: Record<string, string> }).env?.HOME) {
+      return root.replace(/^~/, (process as { env: Record<string, string> }).env.HOME);
     }
   } catch { /* not a Node runtime */ }
 

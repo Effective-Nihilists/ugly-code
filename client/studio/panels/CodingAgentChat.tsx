@@ -94,6 +94,7 @@ import { isTool } from '../../../shared/agent';
 import { native } from 'ugly-app/native';
 import { useTheme } from '../theme/ThemeProvider';
 import { shortcut } from '../utils/platform';
+import { timeAgoShort } from '../utils/timeAgo';
 import { EvalScorecard } from './EvalScorecard';
 import { type FinishFailureInfo } from './FinishFailurePopup';
 import { type SubscriptionProvider } from './ModelSelector';
@@ -937,12 +938,16 @@ function TodoList({
 }) {
   return (
     <div
+      data-id="todo-list"
       style={{
         padding: '6px 10px',
         display: 'flex',
         flexDirection: 'column',
         gap: 3,
         fontSize: 12,
+        background: 'var(--bg-secondary)',
+        borderRadius: 8,
+        margin: '8px 0',
       }}
     >
       {todos.map((todo, i) => {
@@ -4428,6 +4433,17 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
             {msg.content}
           </div>
         )}
+        {msg.created_at != null && msg.created_at > 0 && (
+          <span
+            style={{
+              fontSize: 10,
+              color: 'var(--text-muted)',
+              marginTop: 2,
+            }}
+          >
+            {timeAgoShort(msg.created_at)}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -4543,6 +4559,18 @@ function AssistantMessage({
           }}
         >
           {msg.content && <div>{renderAssistantContent(msg.content)}</div>}
+          {msg.created_at != null && msg.created_at > 0 && (
+            <span
+              style={{
+                fontSize: 10,
+                color: 'var(--text-muted)',
+                display: 'block',
+                marginTop: 4,
+              }}
+            >
+              {timeAgoShort(msg.created_at)}
+            </span>
+          )}
           {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- boolean render guard: empty model string should not force the footer */}
           {(msg.model || (checkpointsEnabled && onRestoreCheckpoint)) && (
             <div
