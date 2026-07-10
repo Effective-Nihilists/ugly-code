@@ -3056,8 +3056,23 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
               if (cancelled) return;
               const msgs = page.messages ?? [];
               if (msgs.length === 0) break;
-              allHistory = [...msgs, ...allHistory];
-              hasMore = Boolean(page.hasMore);
+              // Dedup: drop any message already in allHistory (race: server may return
+              // the same page twice, or messages may overlap across pages).
+              const existingIds = new Set(allHistory.map((m) => m.id));
+              const newMsgs = msgs.filter((m) => !existingIds.has(m.id));
+              if (newMsgs.length === 0) break;
+              allHistory = [...newMsgs, ...allHistory];
+              // Trim to WINDOW_MAX — prepending older messages may push past the limit.
+              // Drop from the OLDEST end (start) to keep the newest messages visible.
+              let trimmed = false;
+              if (allHistory.length > WINDOW_MAX) {
+                const drop = allHistory.length - WINDOW_MAX;
+                allHistory = allHistory.slice(drop);
+                trimmed = true;
+              }
+              // hasMore: false when the server says no more older pages, true
+              // otherwise. When we trimmed we know there's more regardless.
+              hasMore = trimmed || Boolean(page.hasMore);
               beforeId = msgs[0].id;
               exhausted = !hasMore;
             }
@@ -3070,9 +3085,13 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
               allHistory.length, !exhausted,
             );
             // Replay history through the same handlers used for live
-            // streaming events. We don't preserve a `firstTurnSent` flag
-            // here — the server already tracks it.
+            // streaming events. Skip messages already known (race dedup).
+            // We don't preserve a `firstTurnSent` flag here — the server
+            // already tracks it.
+            const replayedIds = new Set<string>();
             for (const m of allHistory) {
+              if (replayedIds.has(m.id)) continue;
+              replayedIds.add(m.id);
               if (m.role === 'assistant') processAssistantMessage(m, 'created');
               else if (m.role === 'tool') processToolMessage(m);
               else if (m.role === 'judge') processJudgeMessage(m);
