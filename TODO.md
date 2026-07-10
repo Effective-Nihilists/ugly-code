@@ -332,3 +332,24 @@ implementation (opus's conditional render) exposed the grader brittleness. Calib
 Opus aces every real-world task too. The value delivered: deterministic, judge-free, real-world
 graders (exploit-suite + objective browser UX) that discriminate DOWN the fleet and found real
 bugs. Remaining breaker candidate: Family A out-of-repo-invariant incident. Family C (harness) unbuilt.
+
+### Family B gradient — CONFIRMED (2026-07-10)
+The uxFlows grader discriminates precisely and diagnostically (no LLM judge):
+| build | score | notes |
+|---|---|---|
+| correct reference / opus | 25/25 | perfect |
+| reference + 3 realistic defects | **19/25** | failing flows = the exact defects: 4× undo, on-screen restart, overlap |
+| empty scaffold | ~2/25 | floor |
+The 6 failures on the defective build named exactly the injected bugs (broken undo, overlapping
+restart/next, ...) — the grader tells you WHAT broke, not just a number.
+
+### Harness bug found: proxy-model dispatch fails on long-`setup` tasks
+glm scored 5/5 on bug-fix-null-check (light fixture) but produced ZERO work on l6-build-sokoban
+(HomePage untouched, no dist, no history entry) — twice. opus (local claude CLI) ran the same
+task fine. The difference: l6-build-sokoban's `setup` is a full `ugly-app@latest init` scaffold +
+`playwright install`, minutes long; the ugly.bot-proxy-dispatched agent turn (glm/deepseek via
+runClientAgentTurn) does not survive that setup and never starts, ending at the
+"codebaseProvider() called before setCodebaseProvider" indexer warning. FLEET RUNS on scaffold-
+setup tasks (build-sokoban, boss-*) are currently blocked for proxy models until this is fixed
+(establish the proxy agent connection AFTER setup, or lengthen the pre-turn timeout). Not a
+grader bug — the uxFlows grader itself is model-agnostic and works.
