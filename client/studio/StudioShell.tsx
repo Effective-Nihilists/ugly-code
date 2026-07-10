@@ -97,8 +97,20 @@ export default function StudioShell(): React.ReactElement {
   React.useEffect(() => {
     const onOpenSettings = (): void => { setSettingsOpen(true); };
     window.addEventListener('ugly-studio:open-settings', onOpenSettings);
+    // Cmd/Ctrl+, — the platform-standard Settings shortcut. Bound at the SHELL,
+    // not a screen, so settings are reachable from every logged-in view: the
+    // project page, the project picker, the create-project progress screen, and
+    // the blocking binaries-install gate (which renders no chrome at all).
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === ',' && (e.metaKey || e.ctrlKey) && !e.altKey) {
+        e.preventDefault();
+        setSettingsOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('ugly-studio:open-settings', onOpenSettings);
+      window.removeEventListener('keydown', onKey);
     };
   }, []);
 

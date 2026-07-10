@@ -18,6 +18,7 @@ import { timeAgoShort } from '../utils/timeAgo';
 import { EvalPickerModal } from './EvalPickerModal';
 import { ManifestoFooter } from './ManifestoFooter';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { SettingsIcon } from './navIcons';
 
 /**
  * Render text with each word in its own animated <span>. Words cascade
@@ -155,7 +156,7 @@ export function ProjectOnboarding({
   // now persistent at the Editor root and reads platform from
   // ChromeContext directly, so this prop is no longer needed here.
   platform: _platform,
-  onOpenSettings: _onOpenSettings,
+  onOpenSettings,
   leaving,
 }: ProjectOnboardingProps): React.ReactElement {
   // Top bar intentionally stays neutral — no per-view content. The
@@ -518,6 +519,7 @@ export function ProjectOnboarding({
       className="us-picker-exit"
       data-leaving={leaving ? 'true' : 'false'}
       style={{
+        position: 'relative',
         // Shrink the whole page to the area ABOVE the on-screen keyboard. The native
         // iOS shell overlays the keyboard so the viewport never shrinks on its own;
         // subtracting the measured keyboard height keeps the scrollable form within
@@ -539,6 +541,36 @@ export function ProjectOnboarding({
         paddingRight: 'var(--safe-area-inset-right)',
       }}
     >
+      {/* No project is open, so there's no sidebar to hang Settings off. Without
+          this the picker screen has no way in (Cmd/Ctrl+, also works, bound at
+          the shell). */}
+      {onOpenSettings && (
+        <button
+          data-id="onboarding-open-settings"
+          type="button"
+          onClick={onOpenSettings}
+          title="Settings"
+          aria-label="Settings"
+          style={{
+            position: 'absolute',
+            top: 'calc(var(--safe-area-inset-top) + 14px)',
+            right: 18,
+            zIndex: 2,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 32,
+            height: 32,
+            color: 'var(--text-secondary)',
+            background: 'transparent',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            cursor: 'pointer',
+          }}
+        >
+          <SettingsIcon />
+        </button>
+      )}
       <main
         style={{
           flex: 1,
