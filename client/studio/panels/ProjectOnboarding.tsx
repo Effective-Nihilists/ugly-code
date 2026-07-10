@@ -716,7 +716,7 @@ export function ProjectOnboarding({
                           type="checkbox"
                           checked={newFeatures.has(f.id)}
                           onChange={() => { toggleFeature(f.id); }}
-                          style={{ marginTop: 3, cursor: 'pointer' }}
+                          style={{ marginTop: 3, cursor: 'pointer' }} data-id="input"
                         />
                         <span>
                           <span style={featureNameStyle}>{f.label}</span>

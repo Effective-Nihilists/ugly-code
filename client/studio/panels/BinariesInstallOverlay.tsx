@@ -248,7 +248,7 @@ export default function BinariesInstallOverlay(): ReactElement | null {
                 cursor: 'pointer',
                 fontSize: 12.5,
                 fontWeight: 700,
-              }}
+              }} data-id="retry"
             >
               <RotateCw size={13} />
               Retry
@@ -266,7 +266,7 @@ export default function BinariesInstallOverlay(): ReactElement | null {
                 cursor: 'pointer',
                 fontSize: 12.5,
                 fontWeight: 600,
-              }}
+              }} data-id="dismiss"
             >
               Dismiss
             </button>

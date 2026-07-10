@@ -74,7 +74,7 @@ export function CodebaseSearch({ onOpen }: { onOpen: (path: string, line: number
 
   return (
     <div style={S.root} data-id="codebase-search">
-      <button style={S.header} onClick={() => { setOpen((o) => !o); }}>
+      <button style={S.header} onClick={() => { setOpen((o) => !o); }} data-id="button">
         {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         <Search size={13} />
         <span style={{ fontWeight: 600 }}>Search</span>
@@ -115,7 +115,7 @@ export function CodebaseSearch({ onOpen }: { onOpen: (path: string, line: number
                 <button
                   style={S.hitLabel}
                   onClick={() => { onOpen(h.file_path, h.start_line); }}
-                  title={h.file_path}
+                  title={h.file_path} data-id="button-2"
                 >
                   {resultLabel(h)}
                 </button>

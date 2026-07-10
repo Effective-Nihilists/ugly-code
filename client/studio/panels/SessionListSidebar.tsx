@@ -1006,7 +1006,7 @@ function SessionRowList({
                 ? {}
                 : { onArchive: () => { onArchiveSession(s.compositeId); } })}
               compact={isChild}
-              deleting={deleting}
+              deleting={deleting} data-id="session-row"
             />
           </AnimatedRow>
           {showViews && sessionViews && <SessionSubNav items={sessionViews} />}
