@@ -1,9 +1,12 @@
 // Drives the chat header's codebaseReadiness pill from the client agent (the host task):
 // kicks off the host's semantic indexer + architecture doc on session start, then polls
 // status and hands each reading back so the session folds it into its session_state stream.
-// `codebase.*` is a host-only native channel (server/coding-agent/codebaseNative.ts); the
-// task reaches it directly on desktop and via the host bridge on the proxy.
+// The INDEXER half now runs locally in the task via `codebaseProvider()` (moved out of
+// ugly-studio so it ships with a deploy); the ARCHITECTURE half stays on the host
+// `codebase.architecture` channel. `fetchCodebaseStatus` (renderer feedback path) still
+// reads the host `codebase.status`.
 import { installUglyNative } from 'ugly-app/native';
+import { codebaseProvider } from '../../agent/indexer/provider';
 
 /** SessionSnapshot.codebaseReadiness shape (kept loose to avoid a cross-package type dep).
  *  Mirrors `CodebaseReadinessSchema` in ../shared/api.ts — keep the two in step. */
@@ -52,17 +55,39 @@ export function startCodebasePoll(
   worktreeRoot?: string,
 ): void {
   if (!cwd || pollers.has(sessionId)) return;
-  void inv('codebase.ensureIndex', { projectPath: cwd }).catch(() => undefined);
+  // The INDEXER half runs locally in the task (codebaseProvider), so its bug
+  // fixes ship with a deploy. The ARCHITECTURE half stays on the host — its
+  // generator pulls in the ~7 MB TypeScript compiler, too heavy for the task
+  // bundle — and is kicked + read through `codebase.architecture`.
+  codebaseProvider().ensureIndex(cwd);
+  void inv('codebase.architecture', { projectPath: cwd }).catch(() => undefined);
   const tick = async (): Promise<void> => {
     try {
-      const r = (await inv('codebase.status', { projectPath: cwd })) as CodebaseReadiness;
+      const local = await codebaseProvider().indexerReadiness(cwd);
+      // `codebase.architecture` returns { architecture } and re-kicks the
+      // (deduped) background build; a failure just leaves architecture idle.
+      const archRes = (await inv('codebase.architecture', { projectPath: cwd }).catch(
+        () => null,
+      )) as { architecture?: CodebaseReadiness['architecture'] } | null;
+      // Undefined only when the host call FAILED — kept distinct from a real
+      // 'idle' so the settle check below matches the original semantics.
+      const architecture = archRes?.architecture;
+
+      const r: CodebaseReadiness = {
+        indexer: local.indexer,
+        architecture: architecture ?? { status: 'idle' },
+        ...(local.diagnostics ? { diagnostics: local.diagnostics } : {}),
+      };
       onReadiness(r);
-      const idx = r.indexer?.status;
+
+      const idx = local.indexer.status;
       if (idx === 'ready' && worktreeRoot && worktreeRoot !== cwd && !reconciled.has(sessionId)) {
         reconciled.add(sessionId);
-        void inv('codebase.reconcile', { projectPath: cwd, worktreeRoot }).catch(() => undefined);
+        codebaseProvider().reconcile(cwd, worktreeRoot);
       }
-      const arch = r.architecture?.status;
+      // Match the pre-move settle rule exactly: absent (host failed) or a
+      // terminal architecture status ends the poll; idle/building keep it alive.
+      const arch = architecture?.status;
       const idxDone = idx === 'ready' || idx === 'error';
       const archDone = !arch || arch === 'ready' || arch === 'failed';
       if (idxDone && archDone) stopCodebasePoll(sessionId);

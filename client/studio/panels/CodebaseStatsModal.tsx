@@ -1,20 +1,16 @@
 // Detailed codebase-analysis stats, opened by clicking the header's
 // "Codebase: …" pill.
 //
-// Why this polls on its own: `startCodebasePoll` (agent/codebaseReadiness.ts)
-// self-stops the moment the indexer + architecture both settle, and it only
-// pushes through `session_state`. A modal opened after that would freeze on the
-// last pushed reading, and while indexing it would tick at the poll's 3s. So the
-// modal drives its own 1s read of `codebase.status` and stops when settled.
+// Data comes from the live `seed` prop — the readiness the coding task streams
+// through `session_state` from its own poll (now backed by the LOCAL indexer, so
+// diagnostics + self-heal ship with a deploy). It deliberately does NOT poll the
+// host `codebase.status` channel itself: on an installed Studio that is the
+// pre-fix code and shows an empty Diagnostics box.
 import React from 'react';
-import { installUglyNative, isNativeAvailable } from 'ugly-app/native';
+import { isNativeAvailable } from 'ugly-app/native';
 import { Modal } from '../system/modal/Modal';
-import { getActiveProjectPath } from '../projectPath';
-import { CodebaseReadinessSchema } from '../shared/api';
 
 type Readiness = import('../shared/api').SessionSnapshot['codebaseReadiness'];
-
-const POLL_MS = 1000;
 
 /** The daemon's phases, in the order it walks them. */
 const PHASES = ['scanning', 'chunking', 'embedding', 'committing'] as const;
@@ -40,15 +36,6 @@ function fmtDuration(seconds: number): string {
 function fmtRate(n: number | undefined, unit: string): string {
   if (n == null || !Number.isFinite(n)) return '—';
   return `${n >= 10 ? n.toFixed(0) : n.toFixed(1)}/s ${unit}`;
-}
-
-async function readStatus(projectPath: string): Promise<Readiness | null> {
-  const raw = await installUglyNative().invoke(
-    'codebase.status' as never,
-    { projectPath } as never,
-  );
-  const parsed = CodebaseReadinessSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
 }
 
 // ── Small presentational pieces ──────────────────────────────────────────────
@@ -147,58 +134,14 @@ export function CodebaseStatsModal({
   seed: Readiness | null;
 }): React.ReactElement {
   const nativeMissing = !isNativeAvailable();
-  const [live, setLive] = React.useState<Readiness | null>(seed ?? null);
-
-  // Re-seed whenever the session pushes a fresher reading than we hold.
-  React.useEffect(() => {
-    if (seed) setLive(seed);
-  }, [seed]);
-
-  React.useEffect(() => {
-    if (!open || nativeMissing) return;
-    const projectPath = getActiveProjectPath();
-    if (!projectPath) return;
-
-    // Held in an object so `tick` (defined before the interval exists) can clear
-    // it. Safe: `tick` awaits before reaching `stop()`, so the synchronous
-    // `run.id = setInterval(...)` below has always executed by then.
-    const run: {
-      id: ReturnType<typeof setInterval> | undefined;
-      cancelled: boolean;
-    } = { id: undefined, cancelled: false };
-
-    const stop = (): void => {
-      if (run.id !== undefined) {
-        clearInterval(run.id);
-        run.id = undefined;
-      }
-    };
-
-    const tick = async (): Promise<void> => {
-      try {
-        const r = await readStatus(projectPath);
-        if (run.cancelled || !r) return;
-        setLive(r);
-        const idx = r.indexer.status;
-        const arch = r.architecture.status;
-        const settled =
-          (idx === 'ready' || idx === 'error') &&
-          (arch === 'ready' || arch === 'failed' || arch === 'idle');
-        // Stop once nothing can change again — no point holding a 1s timer open
-        // behind an idle modal.
-        if (settled) stop();
-      } catch {
-        /* daemon spinning up / transient forwarding blip — keep polling */
-      }
-    };
-
-    void tick();
-    run.id = setInterval(() => void tick(), POLL_MS);
-    return () => {
-      run.cancelled = true;
-      stop();
-    };
-  }, [open, nativeMissing]);
+  // Reflect the live `seed` — the readiness the coding task streams from its own
+  // poll (now backed by the LOCAL indexer, so its diagnostics + self-heal ship
+  // with a deploy). No independent poll here: the previous one hit the host
+  // `codebase.status` channel directly, which on an installed Studio is the
+  // pre-fix code and shows an empty Diagnostics box. The task poll runs (and
+  // keeps emitting) as long as the index is unsettled — i.e. exactly while a
+  // daemon is down or busy — which is when this modal has anything to say.
+  const live = seed ?? null;
 
   const indexer = live?.indexer;
   const arch = live?.architecture;
