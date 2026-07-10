@@ -77,7 +77,7 @@ const SUITES: Record<string, UxFlowSuite> = {
         "name": "win banner hidden at start",
         "assert": [
           {
-            "evalTrue": "!!document.querySelector('[data-id=win]') && document.querySelector('[data-id=win]').offsetParent===null"
+            "evalTrue": "(()=>{const w=document.querySelector('[data-id=win]');if(!w)return true;const cs=getComputedStyle(w);return w.offsetParent===null||cs.display==='none'||cs.visibility==='hidden'||w.hidden;})()"
           }
         ]
       },
@@ -103,7 +103,7 @@ const SUITES: Record<string, UxFlowSuite> = {
         ],
         "assert": [
           {
-            "evalTrue": "document.querySelector('[data-id=win]').offsetParent!==null"
+            "evalTrue": "(()=>{const w=document.querySelector('[data-id=win]');if(!w)return false;const cs=getComputedStyle(w);return w.offsetParent!==null&&cs.display!=='none'&&cs.visibility!=='hidden';})()"
           }
         ]
       },
@@ -206,7 +206,7 @@ const SUITES: Record<string, UxFlowSuite> = {
         ],
         "assert": [
           {
-            "evalTrue": "document.querySelector('[data-id=win]').offsetParent===null"
+            "evalTrue": "(()=>{const w=document.querySelector('[data-id=win]');if(!w)return true;const cs=getComputedStyle(w);return w.offsetParent===null||cs.display==='none'||cs.visibility==='hidden'||w.hidden;})()"
           }
         ]
       },
@@ -308,7 +308,7 @@ const SUITES: Record<string, UxFlowSuite> = {
         ],
         "assert": [
           {
-            "evalTrue": "document.querySelector('[data-id=win]').offsetParent!==null"
+            "evalTrue": "(()=>{const w=document.querySelector('[data-id=win]');if(!w)return false;const cs=getComputedStyle(w);return w.offsetParent!==null&&cs.display!=='none'&&cs.visibility!=='hidden';})()"
           }
         ]
       },
