@@ -123,6 +123,7 @@ export interface GitRepoSelectorProps {
 
 export function GitRepoSelector({ projectPath }: GitRepoSelectorProps): React.ReactElement {
   const [repos, setRepos] = React.useState<GitRepo[]>(() => getCachedRepos());
+  const [busy, setBusy] = React.useState(() => getCachedRepos().length === 0);
   const [repoValue, setRepoValue] = useQueryParam(REPO_PARAM);
 
   // Snapshot the original project root on mount — this is the parent folder
@@ -132,15 +133,18 @@ export function GitRepoSelector({ projectPath }: GitRepoSelectorProps): React.Re
   rootPathRef.current ??= projectPath ?? getActiveProjectPath();
 
   // Scan for repos from the ORIGINAL root (not the selected repo).
+  // Uses findAndCacheGitRepos which deduplicates concurrent calls.
   React.useEffect(() => {
     const cached = getCachedRepos();
     if (cached.length > 0) {
       setRepos(cached);
+      setBusy(false);
       return;
     }
     const root = rootPathRef.current;
-    if (!root) return;
-    void findAndCacheGitRepos(root).then((r) => { setRepos(r); });
+    if (!root) { setBusy(false); return; }
+    setBusy(true);
+    void findAndCacheGitRepos(root).then((r) => { setRepos(r); setBusy(false); }).catch(() => { setBusy(false); });
   }, []);
 
   // Default to the first repo if nothing selected yet.
@@ -168,6 +172,9 @@ export function GitRepoSelector({ projectPath }: GitRepoSelectorProps): React.Re
   }, []);
 
   if (repos.length < 2) {
+    if (busy) {
+      return <span style={{ ...selectStyle, opacity: 0.5, cursor: 'default' }}>Scanning…</span>;
+    }
     return (
       <span title={repos[0]?.path ?? ''} style={{ ...selectStyle, opacity: 0.5, cursor: 'default' }}>
         {repos[0]?.name ?? '(no repos)'}

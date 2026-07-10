@@ -3625,23 +3625,23 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // Persist header axis CHANGES to THIS session (server) and remember them as the
   // user's default for new sessions. Guarded so the initial seed above doesn't
   // re-persist or overwrite the user default.
-  const sessionStarted = messages.length > 0;
+  // NB: we persist per-session config IMMEDIATELY (not just after the first turn).
+  // Deferring to `sessionStarted` meant that a reload before sending any message
+  // lost the user's axis picks — the seed effect above falls back to user defaults,
+  // which only update alongside session config writes below.
   useEffect(() => {
     if (!sessionId || configSeededRef.current !== sessionId) return;
     const config = axesToConfig({ model, modelMode: coerceModelMode(modelMode), permissionMode, reasoningEffort, patternMode });
     const json = JSON.stringify(config);
     if (json === lastPersistedConfigRef.current) return;
     lastPersistedConfigRef.current = json;
-    // Persist to THIS session only if its doc already exists (has turns) — a
-    // not-yet-started session gets its config from the worker's first persistMeta,
-    // so writing here would create an empty doc. Always remember the pick as the
-    // user default for new sessions.
-    if (sessionStarted) void writeServerConfig(sessionId, config);
+    // Always persist per-session config so reloads survive.
+    void writeServerConfig(sessionId, config);
     if (app) {
       const socket = app.socket as unknown as { request(n: string, i: unknown): Promise<unknown> };
       void socket.request('updateUserSettings', { codingAgent: { sessionDefaults: config } }).catch(() => {/* best-effort */});
     }
-  }, [model, modelMode, permissionMode, reasoningEffort, patternMode, sessionId, app, sessionStarted]);
+  }, [model, modelMode, permissionMode, reasoningEffort, patternMode, sessionId, app]);
 
   const switchReasoningEffort = useCallback(
     (next: ReasoningEffort) => {

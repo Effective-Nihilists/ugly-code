@@ -1,7 +1,7 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
 import { getActiveProjectPath } from '../hooks/useSocket';
-import { findAndCacheGitRepos, type GitRepo } from './findGitRepos';
+import { findAndCacheGitRepos, getCachedRepos, type GitRepo } from './findGitRepos';
 import { GitRepoSelector, useQueryParam } from './GitRepoSelector';
 
 // A real git workspace: status (staged/unstaged/untracked) + colored diff +
@@ -80,7 +80,8 @@ export function GitPanel(): React.ReactElement {
   const [commits, setCommits] = React.useState<Commit[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
-  const [repos, setRepos] = React.useState<GitRepo[]>([]);
+  const [repos, setRepos] = React.useState<GitRepo[]>(() => getCachedRepos());
+  const [repoScanBusy, setRepoScanBusy] = React.useState(() => getCachedRepos().length === 0);
   const [activeRepo] = useQueryParam('repo');
   // Whether `cwd` is actually a git repo. The root (e.g. ~/Documents/GitHub) often
   // isn't — it just holds nested repos — so we must never surface git's raw
@@ -90,11 +91,17 @@ export function GitPanel(): React.ReactElement {
   // Effective working directory: the selected repo or the active project root.
   const cwd = activeRepo ?? getActiveProjectPath() ?? '';
 
-  // Scan for nested .git dirs on mount.
+  // Scan for nested .git dirs on mount (deduplicated with GitRepoSelector).
   React.useEffect(() => {
     const root = getActiveProjectPath();
     console.log('[GitPanel] mount, scanning repos under', root);
-    if (root) void findAndCacheGitRepos(root).then((r) => { console.log('[GitPanel] repos loaded', r.length); setRepos(r); });
+    if (!root) { setRepoScanBusy(false); return; }
+    setRepoScanBusy(true);
+    void findAndCacheGitRepos(root).then((r) => {
+      console.log('[GitPanel] repos loaded', r.length);
+      setRepos(r);
+      setRepoScanBusy(false);
+    }).catch(() => { setRepoScanBusy(false); });
   }, []);
 
   const refresh = React.useCallback(async () => {
@@ -196,9 +203,11 @@ export function GitPanel(): React.ReactElement {
 
       <div style={S.body}>
         <div style={S.left}>
-          {!isRepo ? (
+          {repoScanBusy ? (
+            <div style={S.empty}>Scanning for repositories…</div>
+          ) : !isRepo ? (
             <div style={S.empty}>
-              Not a git repository.{repos.length > 0 ? ' Pick a repo from the menu above.' : ''}
+              {repos.length > 0 ? 'Pick a repo from the menu above.' : 'No git repositories found in this project.'}
             </div>
           ) : view === 'changes' ? (
             files.length === 0 ? (

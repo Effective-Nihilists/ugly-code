@@ -72,26 +72,32 @@ async function annotateUglyApp(repos: GitRepo[]): Promise<GitRepo[]> {
   return Promise.all(checks);
 }
 
-/** Resolve a leading `~` to an absolute home-directory path by asking the host
- *  shell. Falls back to the raw input if bash isn't available. */
-function resolveTilde(root: string): Promise<string> {
-  if (!root.startsWith('~')) return Promise.resolve(root);
+/** Resolve a leading `~` to an absolute home-directory path. Tries the host
+ *  shell first; falls back to the environment HOME variable; last resort is
+ *  the raw input (native.fs.readdir will surface a clear error). */
+async function resolveTilde(root: string): Promise<string> {
+  if (!root.startsWith('~')) return root;
+  // Fast path: Node-like runtime with HOME env var (no process spawn needed)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (typeof process !== 'undefined' && (process as { env?: Record<string, string> }).env?.['HOME']) {
+      return root.replace(/^~/, (process as { env: Record<string, string> }).env['HOME']!);
+    }
+  } catch { /* not a Node runtime */ }
+
+  // Slow path: ask the host shell (needed in webview sandboxes)
   return new Promise<string>((resolve) => {
     let out = '';
     try {
       const p = native.process.spawn('bash', ['-lc', 'echo "$HOME"']);
       p.onStdout((c) => (out += c));
-      p.onError(() => { resolve(root); }); // fall back to raw path
+      p.onError(() => { resolve(root); });
       p.onExit((code) => {
         const home = out.trim();
-        if (code === 0 && home.length > 0) {
-          resolve(root.replace(/^~/, home));
-        } else {
-          resolve(root); // fall back
-        }
+        resolve(code === 0 && home.length > 0 ? root.replace(/^~/, home) : root);
       });
     } catch {
-      resolve(root); // no process permission — hope native.fs handles tilde
+      resolve(root);
     }
   });
 }
@@ -128,7 +134,12 @@ export function isRepoUglyApp(repoPath: string): boolean {
   return cachedRepos.some((r) => r.path === repoPath && r.isUglyApp);
 }
 
+let scanPromise: Promise<GitRepo[]> | null = null;
+
 export async function findAndCacheGitRepos(root: string): Promise<GitRepo[]> {
-  cachedRepos = await findGitRepos(root);
-  return cachedRepos;
+  // Deduplicate concurrent calls — only one scan runs at a time.
+  if (!scanPromise) {
+    scanPromise = findGitRepos(root).then((r) => { cachedRepos = r; return r; }).finally(() => { scanPromise = null; });
+  }
+  return scanPromise;
 }
