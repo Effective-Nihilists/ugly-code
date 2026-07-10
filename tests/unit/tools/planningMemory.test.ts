@@ -3,12 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetMock, mockFiles } from '../../helpers/uglyNativeMock';
 import { todosTool } from '../../../client/agent/tools/todos';
 import { scratchpadTool } from '../../../client/agent/tools/scratchpad';
-import {
-  memorySaveTool,
-  memoryReadTool,
-  memoryListTool,
-  memoryDeleteTool,
-} from '../../../client/agent/tools/memory';
+import { memoryAddTool } from '../../../client/agent/tools/memory';
 import { askUserTool } from '../../../client/agent/tools/askUser';
 
 beforeEach(() => resetMock({ files: {} }));
@@ -47,17 +42,10 @@ describe('scratchpad', () => {
   });
 });
 
-describe('memory_*', () => {
-  it('save -> list -> read -> delete', async () => {
-    await memorySaveTool.run({ name: 'api-style', content: 'Use req()/authReq().' }, { projectDir: '/proj' });
-    expect([...mockFiles().keys()].some((k) => k.includes('/.ugly-studio/memory/'))).toBe(true);
-    const list = await memoryListTool.run({}, { projectDir: '/proj' });
-    expect(list).toContain('api-style');
-    const read = await memoryReadTool.run({ name: 'api-style' }, { projectDir: '/proj' });
-    expect(read).toContain('req()');
-    await memoryDeleteTool.run({ name: 'api-style' }, { projectDir: '/proj' });
-    const after = await memoryListTool.run({}, { projectDir: '/proj' });
-    expect(after).not.toContain('api-style');
+describe('memory_add', () => {
+  it('appends to MEMORY.md', async () => {
+    await memoryAddTool.run({ content: 'Use req()/authReq() for API calls.' }, { projectDir: '/proj' });
+    expect([...mockFiles().keys()].some((k) => k.endsWith('/MEMORY.md'))).toBe(true);
   });
 });
 

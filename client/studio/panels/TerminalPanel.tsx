@@ -1,12 +1,11 @@
 import React from 'react';
-import { getActiveProjectPath } from '../hooks/useSocket';
+import { useActiveRepoPath } from '../panels/GitRepoSelector';
 import { InteractiveTerminal } from '../components/InteractiveTerminal';
 
-/** The Terminal tab: an interactive terminal bound to the open project's dir.
- *  Guard (moved here from the old inline logic): with no project open there is
- *  no cwd to run in, so show a hint instead of a live prompt. */
+/** The Terminal tab: an interactive terminal bound to the selected repo's dir
+ *  (falls back to the active project root when no repo is selected). */
 export function TerminalPanel(): React.ReactElement {
-  const cwd = getActiveProjectPath();
+  const cwd = useActiveRepoPath();
   if (!cwd) {
     return (
       <div data-id="terminal-panel" style={S.empty}>
