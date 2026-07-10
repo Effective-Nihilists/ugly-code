@@ -96,8 +96,8 @@ async function runReproSetup(task: { reproSetup?: { commands: string[] } }, proj
 }
 
 const cliGradeDeps: GradeDeps = {
-  run: async (cmd, args, cwd) => {
-    const r = await spawnCollect(cmd, args, { cwd });
+  run: async (cmd, args, cwd, timeoutMs) => {
+    const r = await spawnCollect(cmd, args, { cwd, ...(timeoutMs ? { timeoutMs } : {}) });
     return { out: r.stdout + r.stderr, code: r.code };
   },
   readFile: async (p) => {

@@ -13,8 +13,12 @@ import { getHiddenSuite } from './l6/hidden';
 
 /** IO seam so the gate logic is unit-testable without a real daemon. */
 export interface GradeDeps {
-  /** Run a command in `cwd`; resolve combined output + exit code. */
-  run(cmd: string, args: string[], cwd: string): Promise<{ out: string; code: number | null }>;
+  /** Run a command in `cwd`; resolve combined output + exit code. When `timeoutMs`
+   *  is set the process is killed on timeout and resolves with `code: null` — the
+   *  mutationScore gate relies on this so a mutant that makes the agent's suite
+   *  hang (e.g. a synchronous infinite loop vitest cannot interrupt) is scored as
+   *  detected instead of wedging the whole eval. */
+  run(cmd: string, args: string[], cwd: string, timeoutMs?: number): Promise<{ out: string; code: number | null }>;
   readFile(path: string): Promise<string>;
   exists(path: string): Promise<boolean>;
   /** Required by the `mutationScore` / `hiddenTests` gates, which write files into the project. */
@@ -376,7 +380,7 @@ async function runHiddenTests(input: GradeInput, deps: GradeDeps, pts: number): 
 
   try {
     await deps.writeFile(joinPath(input.projectPath, suite.path), suite.content);
-    const r = await deps.run('npx', ['vitest', 'run', suite.path], input.projectPath);
+    const r = await deps.run('npx', ['vitest', 'run', suite.path], input.projectPath, 90_000);
     const { passed: np, total: nt } = parseVitestCounts(r.out);
     if (nt === 0) return { awarded: 0, passed: false, detail: `hidden suite did not run (exit ${r.code ?? 'null'})` };
     return {
@@ -412,7 +416,12 @@ async function scoreMutations(input: GradeInput, deps: GradeDeps, pts: number): 
   const cwd = input.projectPath;
   const targetPath = joinPath(cwd, suite.target);
   const srcDir = suite.target.replace(/\/[^/]*$/, '');
-  const vitest = (): Promise<{ out: string; code: number | null }> => deps.run('npx', ['vitest', 'run'], cwd);
+  // Per-mutant timeout: a mutant can turn the agent's suite into a synchronous
+  // infinite loop, which vitest's own test-timeout cannot interrupt. Kill it and
+  // count the mutant as detected (the bug did manifest — as a hang).
+  const MUTANT_TIMEOUT_MS = 90_000;
+  const vitest = (timeoutMs?: number): Promise<{ out: string; code: number | null }> =>
+    deps.run('npx', ['vitest', 'run'], cwd, timeoutMs);
 
   const status = await deps.run('git', ['status', '--porcelain', '--', srcDir], cwd);
   if (status.out.trim()) {
@@ -420,15 +429,17 @@ async function scoreMutations(input: GradeInput, deps: GradeDeps, pts: number): 
   }
 
   const reference = await deps.readFile(targetPath);
-  if ((await vitest()).code !== 0) {
-    return { awarded: 0, passed: false, detail: 'suite is red against the correct implementation' };
+  if ((await vitest(MUTANT_TIMEOUT_MS)).code !== 0) {
+    return { awarded: 0, passed: false, detail: 'suite is red against the correct implementation (or hung on it)' };
   }
 
   try {
     for (const eq of suite.equivalents) {
       if (!reference.includes(eq.find)) continue;
       await writeFile(targetPath, reference.replace(eq.find, eq.replace));
-      if ((await vitest()).code !== 0) {
+      // A behaviour-preserving rewrite cannot hang; a timeout here (code null) is
+      // treated as "did not fail", so it never wrongly zeros a legitimate suite.
+      if ((await vitest(MUTANT_TIMEOUT_MS)).code === 1) {
         return {
           awarded: 0,
           passed: false,
@@ -444,7 +455,9 @@ async function scoreMutations(input: GradeInput, deps: GradeDeps, pts: number): 
         continue;
       }
       await writeFile(targetPath, reference.replace(m.find, m.replace));
-      if ((await vitest()).code === 0) survivors.push(`${m.id}: ${m.desc}`);
+      // code 0 = suite green = mutant survived. A non-zero exit OR a timeout
+      // (code null, the mutant hung the suite) both count as the mutant killed.
+      if ((await vitest(MUTANT_TIMEOUT_MS)).code === 0) survivors.push(`${m.id}: ${m.desc}`);
     }
 
     const total = suite.mutants.length;

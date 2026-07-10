@@ -327,10 +327,10 @@ const SUITES: Record<string, MutationSuite> = {
         "replace": "return xs.reduce((a, b) => a + b, 1);"
       },
       {
-        "id": "chunk-step",
-        "desc": "chunk advances by n-1, producing overlapping chunks",
+        "id": "chunk-size",
+        "desc": "chunk drops the last element of each chunk",
         "find": "for (let i = 0; i < xs.length; i += n) out.push(xs.slice(i, i + n));",
-        "replace": "for (let i = 0; i < xs.length; i += n - 1) out.push(xs.slice(i, i + n));"
+        "replace": "for (let i = 0; i < xs.length; i += n) out.push(xs.slice(i, i + n - 1));"
       }
     ],
     equivalents: [
