@@ -36,9 +36,9 @@ export interface RawEvalTask {
   /** Host-side workspace prep run after clone (SBP tasks: uv venv + pip install)
    *  so the agent + grader can run the repo's tests. */
   reproSetup?: { commands: string[]; perCommandTimeoutMs?: number; env?: Record<string, string> };
-  /** Curated capability-ladder level 1-5 (simple bug fix → real-world agentic).
-   *  Authored on the 25 ladder tasks; when absent the picker falls back to the
-   *  derived `difficulty`. Purely a UI grouping signal — the CLI ignores it. */
+  /** Curated capability-ladder level 1-6 (simple bug fix → real-world agentic →
+   *  brutal discriminators). Authored on the ladder tasks; when absent the picker
+   *  falls back to the derived `difficulty`. A UI grouping signal — the CLI ignores it. */
   level?: number;
 }
 

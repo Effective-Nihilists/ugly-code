@@ -91,14 +91,51 @@ The #1 discriminator (the only one whose gap grows with capability).
 
 ## Build order & status
 
-- [ ] **L6.1 test-suite-mutation** — fixture (module + spec + hidden mutants + bait test)
-      + deterministic mutation-kill grader + task def → run on claude / glm / deepseek. ← in progress
+- [x] **L6.1 test-suite-mutation** — BUILT + RUNNING. Fixture
+      `ugly-evals-l6-test-suite-mutation` (11-function interval-set + spec + an inherited
+      "100% line coverage" bait suite). 22 mutants + 7 equivalent mutants vendored in
+      `evals/l6/mutation.ts`. New `mutationScore` gate.
+- [x] **L6.3 surgical-fix** — BUILT + RUNNING. Fixture `ugly-evals-l6-surgical-fix`
+      (billing proration; `roundCents` documents half-away-from-zero, implements
+      `Math.round` → under-credits by 1¢). Hidden regression suite vendored in
+      `evals/l6/hidden.ts`. New `hiddenTests`, `diffBudget`, `unchanged:` gates.
 - [ ] L6.2 endurance-build
-- [ ] L6.3 surgical-fix
 - [ ] L6.4 concurrency-debug
 - [ ] L6.5 type-level-api
 - [ ] add `level: 6` to the ladder + UI grouping; wire per-task multi-run + mean/spread
 - [ ] first full L6 round (3 models × 3 runs), report the separation
+
+### Calibration results — opus, 2026-07-09
+
+The two tasks WORK: deterministic, gradient-scored, and hack-resistant (all three
+zero-conditions verified). They are **not yet brutal** — opus is nowhere near the
+10–30% target of principle 1.
+
+| run | result | cost | turns |
+|---|---|---|---|
+| L6.1, 12 mutants, spec listed the invariants | 12/12 killed → 5/5 | $0.55 | 9 |
+| L6.1, 22 mutants, invariant checklist removed | 22/22 killed → 5/5 | $0.56 | 10 |
+| L6.1, ticket no longer discloses mutation grading | **21/22** killed | $0.82 | 11 |
+| L6.3, surgical fix | 1-line fix in the shared chokepoint, own regression test, 2-line diff, hidden suite 8/8 → 5/5 | $0.32 | 11 |
+
+Findings that generalise to the rest of L6:
+
+1. **Do not disclose the grading function.** The first ticket told the agent its suite
+   would be mutation-tested. Removing that sentence was the only change that ever moved
+   the score. State the engineering goal, never the scoring mechanism.
+2. **`round()` was eating the gradient.** `round(4 × 21/22) = 4` → a suite that missed a
+   real bug still printed 5/5. Both proportional gates now **floor**. Any task whose
+   score is `round(pts × k/n)` is hiding its own signal.
+3. **The only mutant that survived was a degenerate-input one** (`clamp` with empty
+   bounds). Opus tests stated behaviour exhaustively and skips inputs the spec does not
+   name. That is the seam to attack: mutants that only die under degenerate, adversarial,
+   or property-based inputs.
+4. **Scale is the missing axis.** A ~150-line pure module is tractable for a frontier
+   model no matter how many mutants it carries. To reach 10–30%, the mutation target must
+   be a large unfamiliar codebase where *choosing what to test* is the hard part — which
+   also folds in the "understand very complex codebases" axis.
+5. `assistantTurns` never exceeded 11 and cost never exceeded $0.82. Nothing here is
+   long-horizon yet; L6.2 endurance remains the untested axis.
 
 Grading lives in `client/studio/evals/` (gate kinds + SBP host-side grader); fixtures at
 `github.com/Effective-Nihilists/ugly-evals-l6-*` with hidden faults/grader vendored so they

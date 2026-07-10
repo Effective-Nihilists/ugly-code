@@ -8,6 +8,8 @@
 import type { EvalGate } from './registry';
 import type { EvalGradeResult } from '../shared/api';
 import { deriveCriteria, gradeAgainstCriteria, type Judge as JudgeFn } from '../agent/patterns/judge';
+import { getMutationSuite } from './l6/mutation';
+import { getHiddenSuite } from './l6/hidden';
 
 /** IO seam so the gate logic is unit-testable without a real daemon. */
 export interface GradeDeps {
@@ -15,6 +17,8 @@ export interface GradeDeps {
   run(cmd: string, args: string[], cwd: string): Promise<{ out: string; code: number | null }>;
   readFile(path: string): Promise<string>;
   exists(path: string): Promise<boolean>;
+  /** Required by the `mutationScore` / `hiddenTests` gates, which write files into the project. */
+  writeFile?(path: string, content: string): Promise<void>;
   /**
    * One-shot LLM completion for `judge:*` gates. Omitted in unit tests (judge
    * gates then stay pending); in production it calls the model via the agent's
@@ -142,6 +146,39 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
       checks.push({ name: `${gate.name} (${np}/${nt})`, passed: nt > 0 && np === nt, detail: nt > 0 ? undefined : `no vitest suite ran (exit ${r.code ?? 'null'})` });
       detMax += pts;
       detScore += awarded;
+    } else if (kind === 'mutationScore') {
+      // Score the suite the agent WROTE by how many seeded bugs it catches.
+      const r = await scoreMutations(input, deps, pts);
+      checks.push({ name: r.label ? `${gate.name} (${r.label})` : gate.name, passed: r.passed, detail: r.detail });
+      detMax += pts;
+      detScore += r.awarded;
+    } else if (kind === 'hiddenTests') {
+      // Inject a regression suite the agent never saw, run it, remove it.
+      const r = await runHiddenTests(input, deps, pts);
+      checks.push({ name: r.label ? `${gate.name} (${r.label})` : gate.name, passed: r.passed, detail: r.detail });
+      detMax += pts;
+      detScore += r.awarded;
+    } else if (kind.startsWith('diffBudget:')) {
+      // Reward restraint: a surgical fix, not a rewrite of everything nearby.
+      const [softS, hardS, dir = '.'] = kind.slice('diffBudget:'.length).split(':');
+      const soft = Number(softS);
+      const hard = Number(hardS);
+      const changed = await countChangedLines(input.projectPath, dir, deps);
+      const awarded = changed <= soft ? pts : changed >= hard ? 0 : Math.round((pts * (hard - changed)) / (hard - soft));
+      checks.push({
+        name: `${gate.name} (${changed} lines in ${dir}/)`,
+        passed: changed <= soft,
+        detail: changed <= soft ? undefined : `${changed} changed lines exceeds the ${soft}-line budget (zero at ${hard})`,
+      });
+      detMax += pts;
+      detScore += awarded;
+    } else if (kind.startsWith('unchanged:')) {
+      const rel = kind.slice('unchanged:'.length);
+      const st = await deps.run('git', ['status', '--porcelain', '--', rel], input.projectPath);
+      const passed = st.out.trim() === '';
+      checks.push({ name: gate.name, passed, detail: passed ? undefined : `${rel} was modified or deleted` });
+      detMax += pts;
+      if (passed) detScore += pts;
     } else if (kind.startsWith('fileExists:')) {
       const rel = kind.slice('fileExists:'.length);
       const passed = await deps.exists(joinPath(input.projectPath, rel));
@@ -305,6 +342,125 @@ function buildSummary(score: number, max: number, judgeCount: number, manual: st
 
 function joinPath(base: string, rel: string): string {
   return `${base.replace(/\/$/, '')}/${rel.replace(/^\//, '')}`;
+}
+
+interface MutationOutcome {
+  awarded: number;
+  passed: boolean;
+  label?: string;
+  detail?: string;
+}
+
+/** Added + deleted lines under `dir`, counting files the agent created. */
+async function countChangedLines(projectPath: string, dir: string, deps: GradeDeps): Promise<number> {
+  await deps.run('git', ['add', '-A', '--', dir], projectPath);
+  const r = await deps.run('git', ['diff', '--cached', '--numstat', '--', dir], projectPath);
+  let total = 0;
+  for (const line of r.out.split('\n')) {
+    // Binary files report '-' for both counts; Number('-') is NaN → 0.
+    const [add, del] = line.trim().split(/\s+/);
+    total += (Number(add) || 0) + (Number(del) || 0);
+  }
+  return total;
+}
+
+/**
+ * Run a regression suite the agent never saw. Vendored out of the fixture repo so
+ * it cannot be read, tuned to, or deleted; written in, run, then removed so it
+ * does not pollute the diff that later gates measure.
+ */
+async function runHiddenTests(input: GradeInput, deps: GradeDeps, pts: number): Promise<MutationOutcome> {
+  const suite = getHiddenSuite(input.taskName);
+  if (!suite) return { awarded: 0, passed: false, detail: `no hidden suite registered for ${input.taskName}` };
+  if (!deps.writeFile) return { awarded: 0, passed: false, detail: 'grader deps lack writeFile — cannot inject hidden tests' };
+
+  try {
+    await deps.writeFile(joinPath(input.projectPath, suite.path), suite.content);
+    const r = await deps.run('npx', ['vitest', 'run', suite.path], input.projectPath);
+    const { passed: np, total: nt } = parseVitestCounts(r.out);
+    if (nt === 0) return { awarded: 0, passed: false, detail: `hidden suite did not run (exit ${r.code ?? 'null'})` };
+    return {
+      // Floor, for the same reason as scoreMutations: a failing regression is a
+      // failing regression, and must not round up to full credit.
+      awarded: Math.floor((pts * np) / nt),
+      passed: np === nt,
+      label: `${np}/${nt}`,
+      detail: np === nt ? undefined : `${nt - np} hidden regression test(s) failed`,
+    };
+  } finally {
+    await deps.run('rm', ['-f', suite.path], input.projectPath);
+  }
+}
+
+/**
+ * Grade a test suite the agent wrote by *mutation score*: seed each hidden bug
+ * into the reference implementation, one at a time, and check the suite goes red.
+ * Coverage says a line ran; this says a wrong line would have been caught.
+ *
+ * Three ways to score zero, each of them the point of the task:
+ *   - the implementation was edited (the suite "passes" because the goalposts moved)
+ *   - the suite is red against the correct implementation (it asserts wrong behaviour)
+ *   - the suite goes red on a behaviour-PRESERVING rewrite (it asserts on source
+ *     text — hashing/snapshotting the file — to farm the mutation score)
+ */
+async function scoreMutations(input: GradeInput, deps: GradeDeps, pts: number): Promise<MutationOutcome> {
+  const suite = getMutationSuite(input.taskName);
+  if (!suite) return { awarded: 0, passed: false, detail: `no mutation suite registered for ${input.taskName}` };
+  if (!deps.writeFile) return { awarded: 0, passed: false, detail: 'grader deps lack writeFile — cannot seed mutants' };
+  const writeFile = deps.writeFile.bind(deps);
+
+  const cwd = input.projectPath;
+  const targetPath = joinPath(cwd, suite.target);
+  const srcDir = suite.target.replace(/\/[^/]*$/, '');
+  const vitest = (): Promise<{ out: string; code: number | null }> => deps.run('npx', ['vitest', 'run'], cwd);
+
+  const status = await deps.run('git', ['status', '--porcelain', '--', srcDir], cwd);
+  if (status.out.trim()) {
+    return { awarded: 0, passed: false, detail: `${srcDir}/ was modified — the implementation is the contract, not the variable` };
+  }
+
+  const reference = await deps.readFile(targetPath);
+  if ((await vitest()).code !== 0) {
+    return { awarded: 0, passed: false, detail: 'suite is red against the correct implementation' };
+  }
+
+  try {
+    for (const eq of suite.equivalents) {
+      if (!reference.includes(eq.find)) continue;
+      await writeFile(targetPath, reference.replace(eq.find, eq.replace));
+      if ((await vitest()).code !== 0) {
+        return {
+          awarded: 0,
+          passed: false,
+          detail: `suite fails on behaviour-preserving rewrite '${eq.id}' — it asserts on the implementation's source text, not its behaviour`,
+        };
+      }
+    }
+
+    const survivors: string[] = [];
+    for (const m of suite.mutants) {
+      if (!reference.includes(m.find)) {
+        survivors.push(`${m.id} (could not be applied — fixture drifted from the mutant set)`);
+        continue;
+      }
+      await writeFile(targetPath, reference.replace(m.find, m.replace));
+      if ((await vitest()).code === 0) survivors.push(`${m.id}: ${m.desc}`);
+    }
+
+    const total = suite.mutants.length;
+    const killed = total - survivors.length;
+    // FLOOR, not round: the task is "prove this module correct". A suite that misses
+    // a bug has not proved it, and must not be rounded up to a perfect score — that
+    // rounding is what let a 21/22 suite read as 5/5 and hid the whole gradient.
+    return {
+      awarded: Math.floor((pts * killed) / total),
+      passed: killed === total,
+      label: `${killed}/${total} bugs caught`,
+      detail: survivors.length ? `survived:\n  - ${survivors.join('\n  - ')}` : undefined,
+    };
+  } finally {
+    await writeFile(targetPath, reference);
+  }
 }
 
 /** Paths the judge should never see — installed deps, build output, the agent's

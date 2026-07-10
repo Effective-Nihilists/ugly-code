@@ -108,6 +108,10 @@ const cliGradeDeps: GradeDeps = {
     const { native } = await import('ugly-app/native');
     return native.fs.exists(p);
   },
+  writeFile: async (p, content) => {
+    const { native } = await import('ugly-app/native');
+    await native.fs.writeFile(p, content);
+  },
   // 5-level grader judge — a STRONG LOCAL critic (claude-cli, default Sonnet) grades
   // the rubric, per CODING.md §17.13 ("critic quality is load-bearing"). Local so it
   // doesn't depend on the deployed server exposing /api/agentStep (which the current
