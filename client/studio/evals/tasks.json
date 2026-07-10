@@ -2348,5 +2348,58 @@
         "description": "Hidden 25-flow Playwright battery the agent never sees: boot without errors, board/cell rendering, player start position, move counter, wall blocking, box pushing onto goals, no double-push, WASD, undo (incl. box), restart, on-screen controls, level advance, level-2 solvability, win banner hidden-until-solved, plus __uglyInspect overlap and mobile safe-area cleanliness. floor(25 x passed/25)."
       }
     ]
+  },
+  {
+    "name": "l6-resurrect-incident",
+    "level": 6,
+    "kind": "bug-fix",
+    "ticketPath": "INCIDENT.md",
+    "turns": [
+      "Read INCIDENT.md. Since v0.1.101, every coding-agent message completes instantly with no output. Diagnose and fix it so a sent message streams its whole turn to completion again, without bringing back the mid-turn 'task.call timed out' error bubble, and without swallowing genuine failures (a coding task that fails to start must still surface an error). Do not edit src/host.js (the vendored native-host shim). Add regression tests. Work autonomously until it is done. Do not stop to present a plan or ask for approval."
+    ],
+    "fixture": "./fixture",
+    "budget": {
+      "maxTurns": 50,
+      "maxCostUsd": 4,
+      "timeoutMs": 3600000
+    },
+    "successCriteria": "A double-misdirection debugging incident. The v0.1.101 'fix' made the coding task's onCall handler fire-and-forget to dodge a task.call timeout error bubble \u2014 but the vendored host (src/host.js) drives a task's frame delivery ONLY while onCall is pending and finalises the task the instant onCall settles, so fire-and-forget aborts every turn with zero frames. The correct fix reverts onCall to AWAIT the whole turn AND, on the renderer, swallows the now-benign task.call timeout (frames stream via task.listen and the UI ends the turn on the agent_finished frame, not on the RPC) while still surfacing genuine ensureCodingTask failures. A naive re-fix that awaits but keeps showing the timeout reintroduces the original error bubble; a lazy fix that swallows all errors hides real failures. src/host.js must be unchanged (the invariant is external). Graded by 3 hidden probes: turn streams to completion, long turn completes with no error bubble, genuine task-creation failure surfaces. Only the correct fix passes all 3.",
+    "tags": [
+      "ts",
+      "vitest",
+      "debugging",
+      "double-misdirection",
+      "async",
+      "host-bridge",
+      "regression",
+      "hidden-tests",
+      "agentic"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l6-resurrect-incident.git",
+    "reproSetup": {
+      "commands": [
+        "npm install --no-audit --no-fund",
+        "npm install --no-save vitest@^2 typescript@^5"
+      ],
+      "perCommandTimeoutMs": 240000
+    },
+    "gates": [
+      {
+        "name": "typecheck clean",
+        "points": 1,
+        "kind": "tsc"
+      },
+      {
+        "name": "host shim unchanged",
+        "points": 1,
+        "kind": "unchanged:src/host.js"
+      },
+      {
+        "name": "incident fixed (hidden probes)",
+        "points": 3,
+        "kind": "hiddenTests",
+        "description": "floor(3 x passed/3): (1) a sent message streams its whole turn to completion \u2014 kills the fire-and-forget cause; (2) a long turn completes with no error bubble \u2014 kills the naive await-but-show-timeout re-fix; (3) a genuine task-creation failure still surfaces \u2014 kills the swallow-all fix. Only the correct fix (await the turn + swallow only the benign send-RPC timeout + surface real failures) passes all three."
+      }
+    ]
   }
 ]
