@@ -31,7 +31,10 @@
     "upgrade": "node -e \"const e=require('child_process').execSync,x=require('fs').existsSync,g=require('fs').readdirSync;g('node_modules').filter(f=>f.startsWith('.ugly-app-')).forEach(f=>require('fs').rmSync('node_modules/'+f,{recursive:true,force:true}));e(x('yarn.lock')?'yarn add ugly-app@latest':x('pnpm-lock.yaml')?'pnpm add ugly-app@latest':'npm install ugly-app@latest',{stdio:'inherit'});e('node node_modules/ugly-app/dist/cli/index.js upgrade',{stdio:'inherit'})\"",
     "cli": "tsx client/cli/index.ts",
     "test:e2e:smoke": "RUN_REAL_SMOKE=1 playwright test agent.smoke --project=chromium",
-    "build:tasks": "ugly-app build:tasks"
+    "build:tasks": "ugly-app build:tasks",
+    "indexer:manifest": "node scripts/build-indexer-manifest.mjs",
+    "prebuild": "node scripts/build-indexer-manifest.mjs",
+    "predev": "node scripts/build-indexer-manifest.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

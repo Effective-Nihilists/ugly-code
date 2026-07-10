@@ -1,0 +1,12 @@
+# onnxruntime variants by platform — they're mutually exclusive wheels.
+# - macOS: default `onnxruntime` ships with CoreMLExecutionProvider (uses ANE/GPU).
+# - Windows: `onnxruntime-directml` ships with DmlExecutionProvider (any DX12 GPU).
+# - Linux: default `onnxruntime` is CPU-only. For NVIDIA, swap to onnxruntime-gpu.
+onnxruntime>=1.18; sys_platform != "win32"
+onnxruntime-directml>=1.18; sys_platform == "win32"
+tokenizers>=0.19
+numpy>=1.26
+sqlite-vec>=0.1.1
+tree-sitter>=0.22
+tree-sitter-languages>=1.10
+flask>=3.0

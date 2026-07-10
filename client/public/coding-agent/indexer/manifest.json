@@ -1,0 +1,45 @@
+{
+  "version": "b87726539ec7d2df",
+  "files": [
+    {
+      "path": "chunker.py",
+      "sha256": "fdee4fbb4e6f7f73bbfef5cea5c5deae43b9f4d3b37c8f6bfb09260fc9a77a23",
+      "bytes": 17122
+    },
+    {
+      "path": "embedder.py",
+      "sha256": "16f00778d1c265da97c278f09b8c612568412c01bcb8ce6050d31902045867ce",
+      "bytes": 12383
+    },
+    {
+      "path": "hybrid.py",
+      "sha256": "f54163df164d1cc1c0683dd811b8427bcd995e7e88893edd25783a2744ef7c07",
+      "bytes": 1936
+    },
+    {
+      "path": "overlay.py",
+      "sha256": "5b06dbff9214a9ded9b834824ed1efde95e90549b9c5b24e7449d7b78a31e886",
+      "bytes": 5656
+    },
+    {
+      "path": "requirements.txt",
+      "sha256": "a3876bac0e0c3bc2741ce235e7c9ddf4146ba3cbdd697a6cd5cd179777fd536d",
+      "bytes": 524
+    },
+    {
+      "path": "reranker.py",
+      "sha256": "4909f1ac0a3470baa2e2031267ea5ce56f6cc8e385e529035796270ef27eaf86",
+      "bytes": 5261
+    },
+    {
+      "path": "server.py",
+      "sha256": "72df2b1aec75fb64083b44c2ee70a6dbb958b23045f66b699bd8630bb131f376",
+      "bytes": 31176
+    },
+    {
+      "path": "store.py",
+      "sha256": "f355c93b38b5c8eca2b5fab734304c4a996b0b90c1dd58a99ed323c03deed26a",
+      "bytes": 19906
+    }
+  ]
+}
