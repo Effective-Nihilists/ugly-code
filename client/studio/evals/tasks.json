@@ -2010,5 +2010,57 @@
         "description": "Full credit at <=12 changed lines under src/ (the defect is one line); decays linearly to zero at 40."
       }
     ]
+  },
+  {
+    "name": "l6-concurrency-debug",
+    "level": 6,
+    "kind": "bug-fix",
+    "turns": [
+      "Read INCIDENT.md. INC-4417: the async money ledger conserves balances perfectly when transfers run one at a time, but under concurrent load money is created or destroyed and accounts occasionally go negative. Every existing test is green.\n\nFind the defect and fix it so that, no matter how many transfers run concurrently, money is conserved and no account is ever overdrawn \u2014 and the system keeps making progress (it must not lock up or livelock). Add a regression test under tests/. Do not weaken the existing tests.\n\n`src/store.ts` models a real asynchronous database; its async contract is fixed and must not change (making it synchronous is not a fix). `src/mutex.ts` provides a correct AsyncMutex you may use.\n\nWork autonomously until it is done. Do not stop to present a plan or ask for approval."
+    ],
+    "fixture": "./fixture",
+    "budget": {
+      "maxTurns": 40,
+      "maxCostUsd": 3,
+      "timeoutMs": 1800000
+    },
+    "successCriteria": "Ledger.transfer does a read-check-write across await points (get from-balance, check funds, get to-balance, set both) with no serialization, so concurrent transfers interleave and lose updates / overdraw. The fix must serialize the critical section using the provided AsyncMutex \u2014 either a single global lock, or per-account locks acquired in a canonical (e.g. account-id-sorted) order. A NAIVE per-account fix that locks `from` then `to` DEADLOCKS when two transfers touch the same pair in opposite directions, and must not pass. src/store.ts must be unchanged (removing its async ticks trivially hides the bug and is not a real fix). Grading is a hidden concurrency stress suite: conservation of total balance, no overdraft, and completion within a deadline (no deadlock), plus a sequential baseline.",
+    "tags": [
+      "ts",
+      "vitest",
+      "concurrency",
+      "race-condition",
+      "deadlock",
+      "hidden-tests",
+      "debugging",
+      "agentic"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l6-concurrency-debug.git",
+    "ticketPath": "INCIDENT.md",
+    "reproSetup": {
+      "commands": [
+        "npm install --no-audit --no-fund",
+        "npm install --no-save vitest@^2 typescript@^5"
+      ],
+      "perCommandTimeoutMs": 240000
+    },
+    "gates": [
+      {
+        "name": "typecheck clean",
+        "points": 1,
+        "kind": "tsc"
+      },
+      {
+        "name": "store async contract unchanged",
+        "points": 1,
+        "kind": "unchanged:src/store.ts"
+      },
+      {
+        "name": "concurrency stress suite",
+        "points": 3,
+        "kind": "hiddenTests",
+        "description": "Proportional (floored) over a hidden suite the agent never sees: a sequential baseline, conservation of total balance under many concurrent transfers, no overdraft under competing concurrent withdrawals, and no deadlock on opposite-direction transfers of the same pair."
+      }
+    ]
   }
 ]
