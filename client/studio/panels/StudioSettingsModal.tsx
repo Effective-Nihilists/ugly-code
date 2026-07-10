@@ -9,6 +9,7 @@ import {
 } from '../components/AgentAxisSelector';
 import { ModelPicker } from '../components/ModelPicker';
 import { useSocket } from '../hooks/useSocket';
+import { useGlmCodingKey } from '../hooks/useGlmCodingKey';
 import {
   setStudioUserSetting,
   useStudioUserSetting,
@@ -109,6 +110,109 @@ function Section({
       {children}
       {hint && <div style={hintCss}>{hint}</div>}
     </div>
+  );
+}
+
+/**
+ * The Z.ai GLM Coding Plan key. The only provider credential the studio stores.
+ *
+ * Lives in the Neon per-user settings doc (not the host-disk studio settings)
+ * because the SERVER reads it to forward on each agentStep. Until one is saved,
+ * the `GLM Coding Plan` model is hidden from the picker and the server refuses
+ * the turn — ugly.bot never falls back to a shared Z.ai account.
+ */
+function GlmCodingKeySection(): React.ReactElement {
+  const { key, hydrated, save } = useGlmCodingKey();
+  const [draft, setDraft] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const configured = !!key;
+  const commit = async (next: string | null): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      await save(next);
+      setDraft('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section
+      title="GLM Coding Plan key"
+      hint="Your Z.ai Coding Plan key. Turns run on your own flat-rate subscription — ugly.bot relays the request and bills nothing. Without a key the model is hidden."
+    >
+      {configured ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 12, color: '#4caf50' }}>
+            {/* Never echo the key back; show only that one is set. */}
+            Key configured
+          </span>
+          <button
+            data-id="settings-glm-key-remove"
+            type="button"
+            disabled={busy}
+            onClick={() => void commit(null)}
+            style={{
+              fontFamily: 'var(--font-label)',
+              fontSize: 10.5,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'var(--text-secondary)',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              padding: '4px 10px',
+              cursor: busy ? 'default' : 'pointer',
+            }}
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            data-id="settings-glm-key-input"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={hydrated ? 'Paste your Z.ai Coding Plan key' : 'Loading…'}
+            value={draft}
+            disabled={!hydrated || busy}
+            onChange={(e) => { setDraft(e.target.value); }}
+            style={{ ...selectCss, flex: 1 }}
+          />
+          <button
+            data-id="settings-glm-key-save"
+            type="button"
+            disabled={!hydrated || busy || draft.trim() === ''}
+            onClick={() => void commit(draft)}
+            style={{
+              fontFamily: 'var(--font-label)',
+              fontSize: 10.5,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'var(--text-secondary)',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              padding: '4px 12px',
+              cursor: draft.trim() === '' || busy ? 'default' : 'pointer',
+              opacity: draft.trim() === '' || busy ? 0.5 : 1,
+            }}
+          >
+            Save
+          </button>
+        </div>
+      )}
+      {error && (
+        <div style={{ fontSize: 12, color: '#e53935', marginTop: 6 }}>{error}</div>
+      )}
+    </Section>
   );
 }
 
@@ -252,6 +356,9 @@ export function StudioSettingsModal({
     <Modal open={open} onClose={onClose} size="md" ariaLabel="Studio settings">
       <Modal.Header>Settings</Modal.Header>
       <Modal.Body>
+        {/* ── GLM Coding Plan key ── */}
+        <GlmCodingKeySection />
+
         {/* ── Pattern default ── */}
         <Section
           title="Pattern default"

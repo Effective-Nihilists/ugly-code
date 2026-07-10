@@ -14,7 +14,7 @@
 //     tools. Cheaper (skips the large AGENT_SYSTEM_PROMPT) and avoids the model
 //     emitting a tool_use block where the caller expected JSON/prose.
 import { uglyBotRequest } from 'ugly-app';
-import type { TextGenModel } from 'ugly-app/shared';
+import { isByoKeyTextGenModel, type TextGenModel } from 'ugly-app/shared';
 import { AGENT_DEFAULT_MODEL, AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
 
 export interface AgentStepInput {
@@ -24,15 +24,43 @@ export interface AgentStepInput {
   maxTokens?: number;
 }
 
+export interface AgentStepDeps {
+  /**
+   * Read the caller's own provider key for BYO-subscription models
+   * (`glm_coding_plan`). Injected because the two server entries reach the
+   * settings doc through different DB handles. Only called when the selected
+   * model actually needs a key — an ordinary metered turn never touches Neon.
+   */
+  loadByoKey?: (userId: string) => Promise<string | undefined>;
+}
+
 export async function agentStepHandler(
-  _userId: string,
+  userId: string,
   { messages: history, model, noTools, maxTokens }: AgentStepInput,
+  deps: AgentStepDeps = {},
 ): Promise<{ message: AgentMessage }> {
+  const resolvedModel = model ? (model as TextGenModel) : AGENT_DEFAULT_MODEL;
+
+  // BYO-subscription models bill the user's own provider plan. ugly.bot refuses
+  // the call without the key (it will NOT fall back to the shared account), so
+  // fail here with a message that says what to do rather than surfacing a 401.
+  let apiKey: string | undefined;
+  if (isByoKeyTextGenModel(resolvedModel)) {
+    apiKey = await deps.loadByoKey?.(userId);
+    if (!apiKey) {
+      throw new Error(
+        `${resolvedModel} needs your own provider key. Add your Z.ai GLM Coding Plan key in Settings.`,
+      );
+    }
+  }
+
   const data = await uglyBotRequest('textGen', {
-    model: model ? (model as TextGenModel) : AGENT_DEFAULT_MODEL,
+    model: resolvedModel,
     messages: noTools ? history : [{ role: 'system', content: AGENT_SYSTEM_PROMPT }, ...history],
     ...(noTools ? {} : { tools: AGENT_TOOLS }),
     options: { maxTokens: maxTokens ?? 8192 },
+    // Forwarded per request; ugly.bot relays it to Z.ai and never persists it.
+    ...(apiKey ? { apiKey } : {}),
   });
   if (!data?.message) throw new Error('Agent step failed: no response from model');
   return { message: data.message as AgentMessage };

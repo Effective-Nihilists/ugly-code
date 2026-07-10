@@ -43,6 +43,17 @@ export const codingAgentSettingsSchema = z.object({
   superSpecModels: z.array(z.string()).optional(),
   superSynthesisModel: z.string().optional(),
   superInjectionStyle: z.enum(['advisory', 'imperative']).optional(),
+  /**
+   * Z.ai GLM Coding Plan API key. The ONLY provider credential stored here.
+   *
+   * It is forwarded to ugly.bot on each `agentStep` (never stored there) and
+   * bills against the user's own flat-rate subscription rather than ugly.bot's
+   * metered account. Without it the `glm_coding_plan` model is hidden in the
+   * picker and rejected by ugly.bot.
+   *
+   * Stored in plaintext in the Neon settings blob, like every other field here.
+   */
+  glmCodingKey: z.string().optional(),
   // The user's LAST-picked session config (model + run modes), remembered so a NEW
   // coding session defaults to it. Per-session picks live on the session itself
   // (CodingSession.config); this is only the seed for freshly-created sessions.
@@ -84,6 +95,8 @@ export const userSettingsPatchSchema = z.object({
       superSpecModels: z.array(z.string()).optional(),
       superSynthesisModel: z.string().nullable().optional(),
       superInjectionStyle: z.enum(['advisory', 'imperative']).nullable().optional(),
+      // `null` clears the stored key (see mergeUserSettings).
+      glmCodingKey: z.string().nullable().optional(),
       // Remembered defaults for new sessions (see CodingSession.config).
       sessionDefaults: sessionConfigDefaultsSchema.optional(),
     })
@@ -167,6 +180,13 @@ function mergeOptional(
   if (judgeModel !== undefined) out.judgeModel = judgeModel;
   const pickerModel = p.pickerModel === undefined ? ca.pickerModel : p.pickerModel ?? undefined;
   if (pickerModel !== undefined) out.pickerModel = pickerModel;
+  // `null` clears the stored key (the Settings "Remove" action). Note the
+  // asymmetry with the knobs above: `out` is spread AFTER `...ca`, so simply
+  // omitting a field leaves the base value in place — it can never clear it.
+  // To actually remove the key the property must be present and undefined.
+  if (p.glmCodingKey === null) out.glmCodingKey = undefined;
+  else if (p.glmCodingKey !== undefined) out.glmCodingKey = p.glmCodingKey;
+  else if (ca.glmCodingKey !== undefined) out.glmCodingKey = ca.glmCodingKey;
   const pollinator = strN(p.pollinator, ca.pollinator);
   if (pollinator !== undefined) out.pollinator = pollinator;
   if (p.pollinatorEnabled !== undefined) out.pollinatorEnabled = p.pollinatorEnabled;

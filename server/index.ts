@@ -18,7 +18,7 @@ import { enableCollab } from 'ugly-app/collab/server';
 import type { WorkerHandlers } from 'ugly-app/shared';
 import { dbDefaults } from 'ugly-app/shared';
 import { messages, requests } from '../shared/api';
-import { AGENT_SYSTEM_PROMPT, AGENT_TOOLS } from '../shared/agent';
+import { AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
 import { agentTurnHandler } from 'ugly-app/agent/server';
 import { agentStepHandler } from './agentStepHandler';
 import type { Todo, RecentProject } from '../shared/collections';
@@ -67,7 +67,17 @@ const app = createApp(
     // Coding agent step — tool-enabled loop step (default) OR a clean no-tools
     // completion (`noTools`) for the pattern engine's aux calls. Shared with the
     // Worker entry via agentStepHandler so the deploy can't miss it.
-    agentStep: agentStepHandler,
+    // Return type annotated explicitly: the body reads `app.db`, so inference
+    // would otherwise cycle back through `app`'s own initializer (TS7022/7023).
+    agentStep: async (userId, input): Promise<{ message: AgentMessage }> =>
+      agentStepHandler(userId, input, {
+        // Only invoked for BYO-subscription models (glm_coding_plan); an
+        // ordinary metered turn never reads the settings doc.
+        loadByoKey: async (uid): Promise<string | undefined> => {
+          const doc = await app.db.getDoc(collections.userSettings, uid);
+          return parseStoredUserSettings(doc?.data).codingAgent.glmCodingKey;
+        },
+      }),
 
     createTodo: async (userId, { text }) => {
       const _id = nanoid();

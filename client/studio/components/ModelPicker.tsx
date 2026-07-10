@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getCodingAgentModels, type CodingAgentModel } from 'ugly-app/shared';
+import { getCodingAgentModels, type CodingAgentModel, isByoKeyTextGenModel } from 'ugly-app/shared';
 import {
   agenticCostTier,
   agenticPriceIndex,
@@ -11,6 +11,7 @@ import {
   type SubscriptionKey,
 } from '../shared/model-rankings';
 import { Popover } from '../system';
+import { useGlmCodingKey } from '../hooks/useGlmCodingKey';
 
 /**
  * Unified model picker. One component for every model-selection surface
@@ -275,6 +276,8 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
 
   // Detect the local Claude CLI; when present, surface the claude-cli rows.
   const [claudeCliAvailable, setClaudeCliAvailable] = useState(false);
+  // Gates the BYO `glm_coding_plan` row (see the groups memo below).
+  const { key: glmKey } = useGlmCodingKey();
   useEffect(() => {
     let cancelled = false;
     void import('../agent/claudeCliDetect').then(({ detectClaudeCli }) =>
@@ -297,7 +300,10 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
   // the metered ugly.bot proxy).
   const groups = useMemo(() => {
     const all: CodingAgentModel[] = [
-      ...BASE_MODELS,
+      // `glm_coding_plan` runs on the USER's own Z.ai subscription key; without
+      // one the server rejects the turn. Hide the row rather than offer a dead
+      // option — same "no locked stubs" rule as the removed BYO subscriptions.
+      ...BASE_MODELS.filter((m) => !isByoKeyTextGenModel(m.id) || !!glmKey),
       ...(claudeCliAvailable ? CLAUDE_CLI_MODELS : []),
     ];
     const bySub = new Map<SubscriptionKey, CodingAgentModel[]>();
@@ -311,7 +317,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
     // Sort within each group by SWE-bench desc, then weighted price asc.
     for (const arr of bySub.values()) arr.sort(sortBySweAndCost);
     return bySub;
-  }, [family, claudeCliAvailable]);
+  }, [family, claudeCliAvailable, glmKey]);
 
   // ── Trigger label resolution
   const triggerText = useMemo(() => {
