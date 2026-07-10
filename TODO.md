@@ -246,3 +246,56 @@ Two engineering lessons from the scale-up, both now fixed:
 Grading lives in `client/studio/evals/` (gate kinds + SBP host-side grader); fixtures at
 `github.com/Effective-Nihilists/ugly-evals-l6-*` with hidden faults/grader vendored so they
 never enter the agent's workspace.
+
+---
+
+## L6-REAL: real-world evals (pivot 2026-07-10, model=fable)
+
+User critique of the puzzle set: mutation/surgical/concurrency/compound/TARIFF-1 are all "find
+the planted trick" — opus 5/5 all. Real programming = build real things + fix real incidents +
+harden real code. Mined the actual repos for real-world evals that STILL grade deterministically.
+
+### Family A — Resurrect real production incidents (real debugging, hidden regression tests)
+From ugly-code/ugly-studio git history; check out the pre-fix commit, hand the real incident
+report, grade with hidden tests derived from the ACTUAL fix. Top "brutal" candidates:
+- **send-rpc-instant-abort** (ugly-code 787bc54, pre=2881187): DOUBLE misdirection — the pre-fix
+  state contains a plausible recent "fix" that IS the cause; correct fix requires an undocumented
+  host-bridge lifecycle invariant that lives OUTSIDE the repo; naive fix reintroduces the original
+  bug. This breaks opus's "read everything" pillar because the invariant isn't in the codebase.
+- **stale-build-task-reuse** (4d63f0e): "the fix didn't work" but it's fine — stale task never
+  restarts onto new build; un-pinned cache fill in a different fn than the reader.
+- **stale-task-restart-race** (725c3f7): async race in an unpatchable host taskManager; needs a
+  renderer-side workaround + non-obvious listener re-registration.
+- **lifetime-turn-budget-stuck** (50712fb): budget bug two layers down in consumed framework; a
+  misleading code comment asserts the wrong invariant.
+- ugly-studio headless-gradeable: disposed-frame-safesend-crash (isDestroyed() lies), dup-ipc-
+  handlers-dead-topbar, releases-range-spa-fallback, perf-snapshots-null-envelope, dock-icon-heal-flood.
+
+### Family B — Build a real product, graded OBJECTIVELY (no judge)
+ugly-app ships a deterministic quality surface via `ugly-app/playwright` + `__uglyInspect`:
+pageerror/console.error==[], waitForApp (app mounted), overlaps, safe-area violations, route
+transitions, native-bridge-contract (installUglyNativeMock), **cross-client-sync (two browser
+contexts vs one dev server over /ws)**, static gates (build/tsc/lint counts). Score = fraction of
+a 20-30 flow battery + quality gates. This is the "build a game" family with an objective grader.
+Caveats found: expectClean temporal checks are ~0ms-windowed (assert on inspectWindow manually);
+keyboard.coveredInputs is dead headless; long-tasks/jank are machine-load sensitive (generous budgets).
+
+### Family C — Improve the harness FOR REAL (singularity test, ship code not DESIGN.md)
+Graded by whether a WEAK model's deterministic-gate scores rise under the agent's modified harness.
+Needs ~2-3 days plumbing (UGLY_HARNESS_DIR dynamic import + N-repeat parallel grading runner +
+deterministic-gate filter). 16 concrete unbuilt ideas mined from the 3 L5 DESIGN.md's (syntactic
+edit gate, LSP-diagnostics-in-tool-result, nearest-match edit recovery, findings-preserving
+compaction, diff-format fallback…). Highest value, highest effort — deferred.
+
+### Family D — Security hardening (real-world, exploit-suite grading) ← BUILDING FIRST
+"Acme Notes" service, 12 real vulns / 9 classes (IDOR, SQLi+scope, path traversal abs/encoded, JWT
+alg:none, predictable reset token, SSRF literal/encoded/redirect, proto pollution __proto__/
+constructor, mass-assignment). Hidden supertest EXPLOIT suite: floor(12 × closed/12), 1pt/vuln.
+Public functional suite must stay green with 3 dangerous-looking-but-legit inputs → blanket
+denylist "fixes" break functionality. Zero judge gates.
+- **Variant A (primed ticket "harden for a security audit")**: strong discriminator, opus ~80%,
+  smooth gradient, weaker fleet ~45%.
+- **Variant B (UNPRIMED ticket "make it production-ready", never says security)**: the real
+  opus-breaker candidate. Evidence (Pearce/Perry/CyberSecEval): models under-secure when not told
+  to look. Predicted opus ~5-8/12 exploits. Same fixture, same hidden grade, second ticket only.
+  Most realistic too (real audits start from "make this robust"), tests NOTICING not patching-on-command.
