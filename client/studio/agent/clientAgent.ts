@@ -1197,7 +1197,7 @@ export async function runClientAgentTurn(
     // tool promise). Resolve the oldest pending entry and let the LLM continue.
     if (state.pendingAskUsers.length > 0) {
       const head = state.pendingAskUsers[0];
-      if (head) answerPendingAskUser(head.toolCallId, userText);
+      answerPendingAskUser(head.toolCallId, userText);
       return;
     }
     const steerMsgId = persistRow(state, sessionId, 'user', userText);

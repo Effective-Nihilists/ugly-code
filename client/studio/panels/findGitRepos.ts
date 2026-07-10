@@ -138,8 +138,6 @@ let scanPromise: Promise<GitRepo[]> | null = null;
 
 export async function findAndCacheGitRepos(root: string): Promise<GitRepo[]> {
   // Deduplicate concurrent calls — only one scan runs at a time.
-  if (!scanPromise) {
-    scanPromise = findGitRepos(root).then((r) => { cachedRepos = r; return r; }).finally(() => { scanPromise = null; });
-  }
+  scanPromise ??= findGitRepos(root).then((r) => { cachedRepos = r; return r; }).finally(() => { scanPromise = null; });
   return scanPromise;
 }
