@@ -44,3 +44,8 @@ export const AgentIcon = (): React.ReactElement => (
 export const FeedbackIcon = (): React.ReactElement => (
   <Svg><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></Svg>
 );
+
+/** Tests: a flask/beaker with a check. */
+export const TestsIcon = (): React.ReactElement => (
+  <Svg><path d="M9 3h6" /><path d="M10 3v6.5L5.5 17a2 2 0 0 0 1.7 3h5.3" /><path d="M14 3v6.5l1.2 2" /><path d="M15 18l2 2 4-4" /></Svg>
+);

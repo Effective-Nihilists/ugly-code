@@ -1,0 +1,26 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.0, pytest-9.1.1, pluggy-1.6.0 -- /opt/homebrew/opt/python@3.13/bin/python3.13
+cachedir: .pytest_cache
+rootdir: /private/tmp/claude-502/-Users-admin-Documents-GitHub-app/63992882-3fe7-41cc-99ba-8bcc4bde1877/scratchpad/ptfix
+collecting ... collected 6 items
+
+tests/test_demo.py::test_passes PASSED                                   [ 16%]
+tests/test_demo.py::test_fails FAILED                                    [ 33%]
+tests/test_demo.py::test_skipped SKIPPED (nope)                          [ 50%]
+tests/test_demo.py::TestGroup::test_in_class PASSED                      [ 66%]
+tests/test_demo.py::test_param[1] PASSED                                 [ 83%]
+tests/test_demo.py::test_param[2] PASSED                                 [100%]
+
+=================================== FAILURES ===================================
+__________________________________ test_fails __________________________________
+
+    def test_fails():
+>       assert 1 == 2, "one is not two"
+E       AssertionError: one is not two
+E       assert 1 == 2
+
+tests/test_demo.py:7: AssertionError
+- generated xml file: /private/tmp/claude-502/-Users-admin-Documents-GitHub-app/63992882-3fe7-41cc-99ba-8bcc4bde1877/scratchpad/fx/pytest.xml -
+=========================== short test summary info ============================
+FAILED tests/test_demo.py::test_fails - AssertionError: one is not two
+==================== 1 failed, 4 passed, 1 skipped in 0.01s ====================

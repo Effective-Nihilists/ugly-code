@@ -1,0 +1,54 @@
+
+Running 8 tests using 2 workers
+
+  ✓  1 [firefox] › .__pwfix/tests/demo.spec.ts:3:3 › demo group › passes fine (4ms)
+  ✓  2 [chromium] › .__pwfix/tests/demo.spec.ts:3:3 › demo group › passes fine (4ms)
+  ✘  4 [firefox] › .__pwfix/tests/demo.spec.ts:4:3 › demo group › fails hard (2ms)
+  ✘  3 [chromium] › .__pwfix/tests/demo.spec.ts:4:3 › demo group › fails hard (2ms)
+  -  5 [firefox] › .__pwfix/tests/demo.spec.ts:5:8 › demo group › is skipped
+  -  7 [chromium] › .__pwfix/tests/demo.spec.ts:5:8 › demo group › is skipped
+  ✓  6 [firefox] › .__pwfix/tests/demo.spec.ts:6:3 › demo group › has [brackets] and (parens) (3ms)
+  ✓  8 [chromium] › .__pwfix/tests/demo.spec.ts:6:3 › demo group › has [brackets] and (parens) (3ms)
+
+
+  1) [chromium] › .__pwfix/tests/demo.spec.ts:4:3 › demo group › fails hard ────────────────────────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 1
+
+      2 | test.describe('demo group', () => {
+      3 |   test('passes fine', async () => { expect(1).toBe(1); });
+    > 4 |   test('fails hard', async () => { expect(1).toBe(2); });
+        |                                              ^
+      5 |   test.skip('is skipped', async () => { expect(1).toBe(1); });
+      6 |   test('has [brackets] and (parens)', async () => { expect(1).toBe(1); });
+      7 | });
+        at /Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts:4:46
+
+    Error Context: test-results/demo-demo-group-fails-hard-chromium/error-context.md
+
+  2) [firefox] › .__pwfix/tests/demo.spec.ts:4:3 › demo group › fails hard ─────────────────────────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 1
+
+      2 | test.describe('demo group', () => {
+      3 |   test('passes fine', async () => { expect(1).toBe(1); });
+    > 4 |   test('fails hard', async () => { expect(1).toBe(2); });
+        |                                              ^
+      5 |   test.skip('is skipped', async () => { expect(1).toBe(1); });
+      6 |   test('has [brackets] and (parens)', async () => { expect(1).toBe(1); });
+      7 | });
+        at /Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts:4:46
+
+    Error Context: test-results/demo-demo-group-fails-hard-firefox/error-context.md
+
+  2 failed
+    [chromium] › .__pwfix/tests/demo.spec.ts:4:3 › demo group › fails hard ─────────────────────────
+    [firefox] › .__pwfix/tests/demo.spec.ts:4:3 › demo group › fails hard ──────────────────────────
+  2 skipped
+  4 passed (949ms)

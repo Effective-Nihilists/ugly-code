@@ -1,0 +1,477 @@
+{
+  "config": {
+    "argv": [
+      "/opt/homebrew/Cellar/node@22/22.22.1_3/bin/node",
+      "/Users/admin/Documents/GitHub/ugly-code/node_modules/.pnpm/playwright@1.61.0/node_modules/playwright/cli.js",
+      "test",
+      "-c",
+      ".__pwfix/pw.config.ts",
+      "--reporter=list,json"
+    ],
+    "configFile": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/pw.config.ts",
+    "rootDir": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/admin/Documents/GitHub/ugly-code/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/admin/Documents/GitHub/ugly-code/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 5,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "demo.spec.ts",
+      "file": "demo.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "demo group",
+          "file": "demo.spec.ts",
+          "line": 2,
+          "column": 6,
+          "specs": [
+            {
+              "title": "passes fine",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T02:41:47.426Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "05384557491ebd602dd7-1ed2631f06bd9eade670",
+              "file": "demo.spec.ts",
+              "line": 3,
+              "column": 3
+            },
+            {
+              "title": "fails hard",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 2,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m\n    at /Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts:4:46",
+                        "location": {
+                          "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                          "column": 46,
+                          "line": 4
+                        },
+                        "snippet": "  2 | test.describe('demo group', () => {\n  3 |   test('passes fine', async () => { expect(1).toBe(1); });\n> 4 |   test('fails hard', async () => { expect(1).toBe(2); });\n    |                                              ^\n  5 |   test.skip('is skipped', async () => { expect(1).toBe(1); });\n  6 |   test('has [brackets] and (parens)', async () => { expect(1).toBe(1); });\n  7 | });"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                            "column": 46,
+                            "line": 4
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m\n\n  2 | test.describe('demo group', () => {\n  3 |   test('passes fine', async () => { expect(1).toBe(1); });\n> 4 |   test('fails hard', async () => { expect(1).toBe(2); });\n    |                                              ^\n  5 |   test.skip('is skipped', async () => { expect(1).toBe(1); });\n  6 |   test('has [brackets] and (parens)', async () => { expect(1).toBe(1); });\n  7 | });\n    at /Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts:4:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T02:41:47.453Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/admin/Documents/GitHub/ugly-code/test-results/demo-demo-group-fails-hard-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                        "column": 46,
+                        "line": 4
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "05384557491ebd602dd7-b4c8ccf2d6f3f6656dd7",
+              "file": "demo.spec.ts",
+              "line": 4,
+              "column": 3
+            },
+            {
+              "title": "is skipped",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                        "line": 5,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T02:41:47.883Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                            "line": 5,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "05384557491ebd602dd7-4da08a6825b65df28d87",
+              "file": "demo.spec.ts",
+              "line": 5,
+              "column": 8
+            },
+            {
+              "title": "has [brackets] and (parens)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T02:41:47.883Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "05384557491ebd602dd7-2775505d23a14cd27796",
+              "file": "demo.spec.ts",
+              "line": 6,
+              "column": 3
+            },
+            {
+              "title": "passes fine",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T02:41:47.425Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "05384557491ebd602dd7-997432414035baf2707e",
+              "file": "demo.spec.ts",
+              "line": 3,
+              "column": 3
+            },
+            {
+              "title": "fails hard",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 2,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m\n    at /Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts:4:46",
+                        "location": {
+                          "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                          "column": 46,
+                          "line": 4
+                        },
+                        "snippet": "  2 | test.describe('demo group', () => {\n  3 |   test('passes fine', async () => { expect(1).toBe(1); });\n> 4 |   test('fails hard', async () => { expect(1).toBe(2); });\n    |                                              ^\n  5 |   test.skip('is skipped', async () => { expect(1).toBe(1); });\n  6 |   test('has [brackets] and (parens)', async () => { expect(1).toBe(1); });\n  7 | });"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                            "column": 46,
+                            "line": 4
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m\n\n  2 | test.describe('demo group', () => {\n  3 |   test('passes fine', async () => { expect(1).toBe(1); });\n> 4 |   test('fails hard', async () => { expect(1).toBe(2); });\n    |                                              ^\n  5 |   test.skip('is skipped', async () => { expect(1).toBe(1); });\n  6 |   test('has [brackets] and (parens)', async () => { expect(1).toBe(1); });\n  7 | });\n    at /Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts:4:46"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T02:41:47.453Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/admin/Documents/GitHub/ugly-code/test-results/demo-demo-group-fails-hard-firefox/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                        "column": 46,
+                        "line": 4
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "05384557491ebd602dd7-ad8acfb8f272c711fea8",
+              "file": "demo.spec.ts",
+              "line": 4,
+              "column": 3
+            },
+            {
+              "title": "is skipped",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                        "line": 5,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T02:41:47.880Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/Users/admin/Documents/GitHub/ugly-code/.__pwfix/tests/demo.spec.ts",
+                            "line": 5,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "05384557491ebd602dd7-4699d12aae73c4bd4ca2",
+              "file": "demo.spec.ts",
+              "line": 5,
+              "column": 8
+            },
+            {
+              "title": "has [brackets] and (parens)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 3,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T02:41:47.881Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "05384557491ebd602dd7-e76b552032a3d66bfa70",
+              "file": "demo.spec.ts",
+              "line": 6,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-10T02:41:46.965Z",
+    "duration": 949.299,
+    "expected": 4,
+    "skipped": 2,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}

@@ -1,0 +1,27 @@
+TAP version 13
+1..4
+ok 1 - tests/unit/__tmp_fail.test.ts > fixture suite > passes # time=0.69ms
+not ok 2 - tests/unit/__tmp_fail.test.ts > fixture suite > fails with a diff # time=4.70ms
+    ---
+    error:
+        name: "AssertionError"
+        message: "expected { a: 1 } to deeply equal { a: 2 }"
+    at: "/Users/admin/Documents/GitHub/ugly-code/tests/unit/__tmp_fail.test.ts:4:52"
+    actual: "Object {
+  \"a\": 1,
+}"
+    expected: "Object {
+  \"a\": 2,
+}"
+    ...
+ok 3 - tests/unit/__tmp_fail.test.ts > fixture suite > is skipped # SKIP
+not ok 4 - tests/unit/__tmp_fail.test.ts > fixture suite > has a special [name] with (regex) chars # time=0.49ms
+    ---
+    error:
+        name: "AssertionError"
+        message: "expected 2 to be 3 // Object.is equality"
+    at: "/Users/admin/Documents/GitHub/ugly-code/tests/unit/__tmp_fail.test.ts:6:67"
+    actual: "2"
+    expected: "3"
+    ...
+JSON report written to /private/tmp/claude-502/-Users-admin-Documents-GitHub-app/63992882-3fe7-41cc-99ba-8bcc4bde1877/scratchpad/fx/vitest-fail.json

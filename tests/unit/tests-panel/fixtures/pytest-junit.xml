@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="1" tests="6" time="0.015" timestamp="2026-07-09T19:42:06.823706-07:00" hostname="Justins-MacBook-Pro.local"><testcase classname="tests.test_demo" name="test_passes" time="0.000" /><testcase classname="tests.test_demo" name="test_fails" time="0.000"><failure message="AssertionError: one is not two&#10;assert 1 == 2">def test_fails():
+&gt;       assert 1 == 2, "one is not two"
+E       AssertionError: one is not two
+E       assert 1 == 2
+
+tests/test_demo.py:7: AssertionError</failure></testcase><testcase classname="tests.test_demo" name="test_skipped" time="0.000"><skipped type="pytest.skip" message="nope">/private/tmp/claude-502/-Users-admin-Documents-GitHub-app/63992882-3fe7-41cc-99ba-8bcc4bde1877/scratchpad/ptfix/tests/test_demo.py:9: nope</skipped></testcase><testcase classname="tests.test_demo.TestGroup" name="test_in_class" time="0.000" /><testcase classname="tests.test_demo" name="test_param[1]" time="0.000" /><testcase classname="tests.test_demo" name="test_param[2]" time="0.000" /></testsuite></testsuites>

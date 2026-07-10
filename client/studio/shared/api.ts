@@ -1914,37 +1914,13 @@ export const requests = defineRequests({
     output: z.object({ ok: z.boolean(), output: z.string() }),
   }),
 
-  // Tests — unified vitest + playwright test explorer
-  listTests: req({
-    input: z.object({
-      projectPath: z.string().optional(),
-    }),
-    output: z.object({
-      tests: z.array(
-        z.object({
-          id: z.string(),
-          kind: z.enum(['vitest', 'playwright']),
-          file: z.string(),
-          name: z.string(),
-        }),
-      ),
-    }),
-  }),
-
-  runAllTests: req({
-    input: z.object({
-      projectPath: z.string().optional(),
-    }),
-    output: z.object({ ok: z.boolean() }),
-  }),
-
-  runTest: req({
-    input: z.object({
-      projectPath: z.string().optional(),
-      testId: z.string(),
-    }),
-    output: z.object({ ok: z.boolean() }),
-  }),
+  // NOTE: `listTests` / `runAllTests` / `runTest` used to be declared here with
+  // no handler and no caller. They're gone: the Tests panel spawns runners
+  // directly through `native.process.spawn` (see panels/TestsPanel.tsx), like
+  // every other panel. A request/response contract can't carry live per-test
+  // streaming — there is no app-level SSE/WS; process output rides the native
+  // `process.stdout:<id>` event — and the old `runTest(testId: string)` shape
+  // couldn't carry a per-runner selector anyway.
 
   // Preview capture
   capturePreview: req({

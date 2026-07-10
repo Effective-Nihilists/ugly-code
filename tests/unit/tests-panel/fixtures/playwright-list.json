@@ -1,0 +1,4628 @@
+{
+  "config": {
+    "argv": [
+      "/opt/homebrew/Cellar/node@22/22.22.1_3/bin/node",
+      "/Users/admin/Documents/GitHub/ugly-code/node_modules/.pnpm/playwright@1.61.0/node_modules/playwright/cli.js",
+      "test",
+      "--list",
+      "--reporter=json"
+    ],
+    "configFile": "/Users/admin/Documents/GitHub/ugly-code/playwright.config.ts",
+    "rootDir": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/admin/Documents/GitHub/ugly-code/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/admin/Documents/GitHub/ugly-code/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/Users/admin/Documents/GitHub/ugly-code/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 5,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:4321",
+      "reuseExistingServer": true,
+      "timeout": 120000,
+      "env": {
+        "PORT": "4321"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "agent.spec.ts",
+      "file": "agent.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "drives a tool round-trip: tool_use → native fs → tool_result → final answer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "00574607846d83245288-b790398148b3f82c6fc9",
+          "file": "agent.spec.ts",
+          "line": 11,
+          "column": 1
+        },
+        {
+          "title": "drives a tool round-trip: tool_use → native fs → tool_result → final answer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "00574607846d83245288-511dc4f56e6b4460dc4e",
+          "file": "agent.spec.ts",
+          "line": 11,
+          "column": 1
+        },
+        {
+          "title": "drives a tool round-trip: tool_use → native fs → tool_result → final answer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "00574607846d83245288-87ccb06608ee2ededbdf",
+          "file": "agent.spec.ts",
+          "line": 11,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "app.spec.ts",
+      "file": "app.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "App startup",
+          "file": "app.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "logged-out home shows the Studio landing page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-8376e318143513ffe0b5",
+              "file": "app.spec.ts",
+              "line": 4,
+              "column": 3
+            },
+            {
+              "title": "landing page offers a download",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-d262c75246e5f0dfa702",
+              "file": "app.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "navigating to a non-existent route returns 404",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-11495c48486a0bd7dd3c",
+              "file": "app.spec.ts",
+              "line": 16,
+              "column": 3
+            },
+            {
+              "title": "logged-out home shows the Studio landing page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-8eafbe0b12f3d93bb886",
+              "file": "app.spec.ts",
+              "line": 4,
+              "column": 3
+            },
+            {
+              "title": "landing page offers a download",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-a7e4de47f6d8db1bb0ff",
+              "file": "app.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "navigating to a non-existent route returns 404",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-0bd9014cffd48207d2c0",
+              "file": "app.spec.ts",
+              "line": 16,
+              "column": 3
+            },
+            {
+              "title": "logged-out home shows the Studio landing page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-c28d99b05077cd04eb9b",
+              "file": "app.spec.ts",
+              "line": 4,
+              "column": 3
+            },
+            {
+              "title": "landing page offers a download",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-0dbdeb0496457e0420c8",
+              "file": "app.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "navigating to a non-existent route returns 404",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-33b8599374f0dbf2243f",
+              "file": "app.spec.ts",
+              "line": 16,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Auth flow",
+          "file": "app.spec.ts",
+          "line": 24,
+          "column": 6,
+          "specs": [
+            {
+              "title": "auth-demo page shows login prompt when unauthenticated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-15d3ee0cf49bc30d6c13",
+              "file": "app.spec.ts",
+              "line": 25,
+              "column": 3
+            },
+            {
+              "title": "login button opens OAuth popup",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-9f417831301fc47ae1ba",
+              "file": "app.spec.ts",
+              "line": 35,
+              "column": 3
+            },
+            {
+              "title": "auth/verify endpoint rejects invalid code",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-2aeee12460a61e6ec662",
+              "file": "app.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "auth-demo page shows login prompt when unauthenticated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-79c35bca1cd1f4538aca",
+              "file": "app.spec.ts",
+              "line": 25,
+              "column": 3
+            },
+            {
+              "title": "login button opens OAuth popup",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-a90759795697548922d3",
+              "file": "app.spec.ts",
+              "line": 35,
+              "column": 3
+            },
+            {
+              "title": "auth/verify endpoint rejects invalid code",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-b372d913f090fb7d6647",
+              "file": "app.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "auth-demo page shows login prompt when unauthenticated",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-41aeb422ac5f0c9177e4",
+              "file": "app.spec.ts",
+              "line": 25,
+              "column": 3
+            },
+            {
+              "title": "login button opens OAuth popup",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-d42ff9a0c416ec16cc5f",
+              "file": "app.spec.ts",
+              "line": 35,
+              "column": 3
+            },
+            {
+              "title": "auth/verify endpoint rejects invalid code",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "c31ff144dc4fee3acd0a-4d5e627e39d9951e5c0f",
+              "file": "app.spec.ts",
+              "line": 49,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "auth.spec.ts",
+      "file": "auth.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "authenticated session (real cookie)",
+          "file": "auth.spec.ts",
+          "line": 14,
+          "column": 6,
+          "specs": [
+            {
+              "title": "injected auth cookie renders the logged-in auth-demo view",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-3034dfa16e643a3dd0e4",
+              "file": "auth.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "injected auth cookie renders the logged-in auth-demo view",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-b8bd542dfa8892566936",
+              "file": "auth.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "injected auth cookie renders the logged-in auth-demo view",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-a143510a1a5b3b9794c1",
+              "file": "auth.spec.ts",
+              "line": 17,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "harness-real.spec.ts",
+      "file": "harness-real.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "coding harness — real filesystem",
+          "file": "harness-real.spec.ts",
+          "line": 19,
+          "column": 6,
+          "specs": [
+            {
+              "title": "agent edits a real file on disk; every workspace tab renders",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Set RUN_REAL_SMOKE=1, be logged in (~/.ugly-bot/auth.json), DB-backed dev server",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e/harness-real.spec.ts",
+                        "line": 20,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7135a292d8e2a3568273-166a6454e9b057813867",
+              "file": "harness-real.spec.ts",
+              "line": 22,
+              "column": 3
+            },
+            {
+              "title": "a non-main session is isolated in its own git worktree",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Set RUN_REAL_SMOKE=1, be logged in (~/.ugly-bot/auth.json), DB-backed dev server",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e/harness-real.spec.ts",
+                        "line": 20,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7135a292d8e2a3568273-1c2983e8bd6356cc12ea",
+              "file": "harness-real.spec.ts",
+              "line": 85,
+              "column": 3
+            },
+            {
+              "title": "agent edits a real file on disk; every workspace tab renders",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Set RUN_REAL_SMOKE=1, be logged in (~/.ugly-bot/auth.json), DB-backed dev server",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e/harness-real.spec.ts",
+                        "line": 20,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7135a292d8e2a3568273-f896e00c31b9e2f0b718",
+              "file": "harness-real.spec.ts",
+              "line": 22,
+              "column": 3
+            },
+            {
+              "title": "a non-main session is isolated in its own git worktree",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Set RUN_REAL_SMOKE=1, be logged in (~/.ugly-bot/auth.json), DB-backed dev server",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e/harness-real.spec.ts",
+                        "line": 20,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7135a292d8e2a3568273-b00d36e9ea4f9a784cb9",
+              "file": "harness-real.spec.ts",
+              "line": 85,
+              "column": 3
+            },
+            {
+              "title": "agent edits a real file on disk; every workspace tab renders",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Set RUN_REAL_SMOKE=1, be logged in (~/.ugly-bot/auth.json), DB-backed dev server",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e/harness-real.spec.ts",
+                        "line": 20,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7135a292d8e2a3568273-a3248873ddc5d6afd3a6",
+              "file": "harness-real.spec.ts",
+              "line": 22,
+              "column": 3
+            },
+            {
+              "title": "a non-main session is isolated in its own git worktree",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Set RUN_REAL_SMOKE=1, be logged in (~/.ugly-bot/auth.json), DB-backed dev server",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e/harness-real.spec.ts",
+                        "line": 20,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7135a292d8e2a3568273-99414c28366be0316056",
+              "file": "harness-real.spec.ts",
+              "line": 85,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "inspect.spec.ts",
+      "file": "inspect.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "inspect helper",
+          "file": "inspect.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [
+            {
+              "title": "clean fixture page produces empty arrays",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-7e361b441499786bd71f",
+              "file": "inspect.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "captures intentional CLS",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-dc3c70ea1b7c4bdfb243",
+              "file": "inspect.spec.ts",
+              "line": 23,
+              "column": 3
+            },
+            {
+              "title": "captures overlapping interactive controls",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-1d7ef989a1100bfddc0a",
+              "file": "inspect.spec.ts",
+              "line": 33,
+              "column": 3
+            },
+            {
+              "title": "captures safe-area violations on iOS",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-1fc364097013d746fccb",
+              "file": "inspect.spec.ts",
+              "line": 43,
+              "column": 3
+            },
+            {
+              "title": "captures keyboard covering input",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-5db9ab41ef5f6a2004eb",
+              "file": "inspect.spec.ts",
+              "line": 59,
+              "column": 3
+            },
+            {
+              "title": "SPA navigation lands in route.transitions",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-fd3c8d13cea2b9be8f5c",
+              "file": "inspect.spec.ts",
+              "line": 71,
+              "column": 3
+            },
+            {
+              "title": "clean fixture page produces empty arrays",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-f6c11e4d5f98cd1025e8",
+              "file": "inspect.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "captures intentional CLS",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-8e7c81f4f281c45ba1dc",
+              "file": "inspect.spec.ts",
+              "line": 23,
+              "column": 3
+            },
+            {
+              "title": "captures overlapping interactive controls",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-842962220fe31aed43c6",
+              "file": "inspect.spec.ts",
+              "line": 33,
+              "column": 3
+            },
+            {
+              "title": "captures safe-area violations on iOS",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-950515a23b77351ed99b",
+              "file": "inspect.spec.ts",
+              "line": 43,
+              "column": 3
+            },
+            {
+              "title": "captures keyboard covering input",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-37585215145b19105bae",
+              "file": "inspect.spec.ts",
+              "line": 59,
+              "column": 3
+            },
+            {
+              "title": "SPA navigation lands in route.transitions",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-34f80111e9d830ea98ca",
+              "file": "inspect.spec.ts",
+              "line": 71,
+              "column": 3
+            },
+            {
+              "title": "clean fixture page produces empty arrays",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-56868da2168496cbd819",
+              "file": "inspect.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "captures intentional CLS",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-055eb3f37805475a63ac",
+              "file": "inspect.spec.ts",
+              "line": 23,
+              "column": 3
+            },
+            {
+              "title": "captures overlapping interactive controls",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-352ea8f1a8865401a0d9",
+              "file": "inspect.spec.ts",
+              "line": 33,
+              "column": 3
+            },
+            {
+              "title": "captures safe-area violations on iOS",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-48e3d5b958720eba5c17",
+              "file": "inspect.spec.ts",
+              "line": 43,
+              "column": 3
+            },
+            {
+              "title": "captures keyboard covering input",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-132ab89f6e339b17c7e2",
+              "file": "inspect.spec.ts",
+              "line": 59,
+              "column": 3
+            },
+            {
+              "title": "SPA navigation lands in route.transitions",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4d7033aa85c9c36f7a97-3a86ac65b76d644d69c4",
+              "file": "inspect.spec.ts",
+              "line": 71,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "mobile-layout.spec.ts",
+      "file": "mobile-layout.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Mobile workspace — nav drawer",
+          "file": "mobile-layout.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "drawer opens, switches view, and closes; no horizontal overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-1b471820088f72cbfb7e",
+              "file": "mobile-layout.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "database pane does not overflow the viewport at phone width",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-c8bd8ca6f41cf804277f",
+              "file": "mobile-layout.spec.ts",
+              "line": 44,
+              "column": 3
+            },
+            {
+              "title": "respects safe-area insets (simulated notch) in the workspace",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-f2c17790ca169392927f",
+              "file": "mobile-layout.spec.ts",
+              "line": 57,
+              "column": 3
+            },
+            {
+              "title": "project picker fits a phone with no horizontal overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-8073380e71115c3301ce",
+              "file": "mobile-layout.spec.ts",
+              "line": 83,
+              "column": 3
+            },
+            {
+              "title": "project picker hero clears the top safe-area inset (simulated notch)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-51303857a4afef08b75a",
+              "file": "mobile-layout.spec.ts",
+              "line": 93,
+              "column": 3
+            },
+            {
+              "title": "drawer opens, switches view, and closes; no horizontal overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-ce169df6831f471976d8",
+              "file": "mobile-layout.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "database pane does not overflow the viewport at phone width",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-589f958c8eeb01965bd1",
+              "file": "mobile-layout.spec.ts",
+              "line": 44,
+              "column": 3
+            },
+            {
+              "title": "respects safe-area insets (simulated notch) in the workspace",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-671384cfa77c440d393f",
+              "file": "mobile-layout.spec.ts",
+              "line": 57,
+              "column": 3
+            },
+            {
+              "title": "project picker fits a phone with no horizontal overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-ad859bef4c71f3bac374",
+              "file": "mobile-layout.spec.ts",
+              "line": 83,
+              "column": 3
+            },
+            {
+              "title": "project picker hero clears the top safe-area inset (simulated notch)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-ebee39a381e3137f5307",
+              "file": "mobile-layout.spec.ts",
+              "line": 93,
+              "column": 3
+            },
+            {
+              "title": "drawer opens, switches view, and closes; no horizontal overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-983002e75d9774443fdc",
+              "file": "mobile-layout.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "database pane does not overflow the viewport at phone width",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-e6ac039464ee1dc55481",
+              "file": "mobile-layout.spec.ts",
+              "line": 44,
+              "column": 3
+            },
+            {
+              "title": "respects safe-area insets (simulated notch) in the workspace",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-af5dda58d61fa1dfeb34",
+              "file": "mobile-layout.spec.ts",
+              "line": 57,
+              "column": 3
+            },
+            {
+              "title": "project picker fits a phone with no horizontal overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-d0b9e4591ee071853412",
+              "file": "mobile-layout.spec.ts",
+              "line": 83,
+              "column": 3
+            },
+            {
+              "title": "project picker hero clears the top safe-area inset (simulated notch)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-9b90d7ff3d098a062289",
+              "file": "mobile-layout.spec.ts",
+              "line": 93,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Mobile landing page",
+          "file": "mobile-layout.spec.ts",
+          "line": 108,
+          "column": 6,
+          "specs": [
+            {
+              "title": "landing has no horizontal overflow at phone width",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-68b21af07ba351b6cf6a",
+              "file": "mobile-layout.spec.ts",
+              "line": 109,
+              "column": 3
+            },
+            {
+              "title": "nav bar respects the top safe-area inset (simulated notch)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-fef8c789b90bc03bc923",
+              "file": "mobile-layout.spec.ts",
+              "line": 119,
+              "column": 3
+            },
+            {
+              "title": "landing has no horizontal overflow at phone width",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-7fc7d5c32bcb7726554b",
+              "file": "mobile-layout.spec.ts",
+              "line": 109,
+              "column": 3
+            },
+            {
+              "title": "nav bar respects the top safe-area inset (simulated notch)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-4aa762e914c92e4a15ea",
+              "file": "mobile-layout.spec.ts",
+              "line": 119,
+              "column": 3
+            },
+            {
+              "title": "landing has no horizontal overflow at phone width",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-5cf53215f3035b3e33c4",
+              "file": "mobile-layout.spec.ts",
+              "line": 109,
+              "column": 3
+            },
+            {
+              "title": "nav bar respects the top safe-area inset (simulated notch)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "2463d90220c817a01905-3cc674b11dc323a404a3",
+              "file": "mobile-layout.spec.ts",
+              "line": 119,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "native-gate.spec.ts",
+      "file": "native-gate.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "spawning a bundled tool WITHOUT requesting the process permission is denied",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-0e307bc6fc08874be504",
+          "file": "native-gate.spec.ts",
+          "line": 66,
+          "column": 1
+        },
+        {
+          "title": "a NON-bundled tool is denied even after it is requested (\"not a bundled tool\")",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-2a0e8346f7fb14e56dd6",
+          "file": "native-gate.spec.ts",
+          "line": 76,
+          "column": 1
+        },
+        {
+          "title": "fs is denied until the fs capability is granted, then confined to the scoped folder",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-6ee753202345fbf5cce0",
+          "file": "native-gate.spec.ts",
+          "line": 84,
+          "column": 1
+        },
+        {
+          "title": "once bundled AND granted, a real process runs (confined)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-319327b433b04f48451e",
+          "file": "native-gate.spec.ts",
+          "line": 102,
+          "column": 1
+        },
+        {
+          "title": "REGRESSION: with the daemon's OLD allowlist (no bash), Create Project's spawn is denied",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-9786a26617c41d65f12d",
+          "file": "native-gate.spec.ts",
+          "line": 112,
+          "column": 1
+        },
+        {
+          "title": "spawning a bundled tool WITHOUT requesting the process permission is denied",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-babcce8d52e4c83a6c33",
+          "file": "native-gate.spec.ts",
+          "line": 66,
+          "column": 1
+        },
+        {
+          "title": "a NON-bundled tool is denied even after it is requested (\"not a bundled tool\")",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-3b1f424f0f7bc1b211a5",
+          "file": "native-gate.spec.ts",
+          "line": 76,
+          "column": 1
+        },
+        {
+          "title": "fs is denied until the fs capability is granted, then confined to the scoped folder",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-cbf47930dee9ffce0f63",
+          "file": "native-gate.spec.ts",
+          "line": 84,
+          "column": 1
+        },
+        {
+          "title": "once bundled AND granted, a real process runs (confined)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-ddb4efda4fc6078340f7",
+          "file": "native-gate.spec.ts",
+          "line": 102,
+          "column": 1
+        },
+        {
+          "title": "REGRESSION: with the daemon's OLD allowlist (no bash), Create Project's spawn is denied",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-32e2e79d3b37e24a4cd7",
+          "file": "native-gate.spec.ts",
+          "line": 112,
+          "column": 1
+        },
+        {
+          "title": "spawning a bundled tool WITHOUT requesting the process permission is denied",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-e88cdb464c5814efa2c8",
+          "file": "native-gate.spec.ts",
+          "line": 66,
+          "column": 1
+        },
+        {
+          "title": "a NON-bundled tool is denied even after it is requested (\"not a bundled tool\")",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-d937a31ca19990664862",
+          "file": "native-gate.spec.ts",
+          "line": 76,
+          "column": 1
+        },
+        {
+          "title": "fs is denied until the fs capability is granted, then confined to the scoped folder",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-afc6e27b0ee9339350ec",
+          "file": "native-gate.spec.ts",
+          "line": 84,
+          "column": 1
+        },
+        {
+          "title": "once bundled AND granted, a real process runs (confined)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-0d65ebb792e68215f38b",
+          "file": "native-gate.spec.ts",
+          "line": 102,
+          "column": 1
+        },
+        {
+          "title": "REGRESSION: with the daemon's OLD allowlist (no bash), Create Project's spawn is denied",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "254b884e8ca75d9b3a5e-3ab1b9e49e681f3ffb4b",
+          "file": "native-gate.spec.ts",
+          "line": 112,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "native-sandbox.spec.ts",
+      "file": "native-sandbox.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "sandbox lifecycle: status → initialize → status flips → teardown",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7f2f3c6021aefcff4ed-f2696e3be73ad1373c28",
+          "file": "native-sandbox.spec.ts",
+          "line": 34,
+          "column": 1
+        },
+        {
+          "title": "an unsupported host reports supported:false and refuses initialize",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7f2f3c6021aefcff4ed-94c2f24a532bf4c3556f",
+          "file": "native-sandbox.spec.ts",
+          "line": 54,
+          "column": 1
+        },
+        {
+          "title": "process.spawn carries opts.sandbox to the daemon boundary",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7f2f3c6021aefcff4ed-de5d64019eb5eefa84f5",
+          "file": "native-sandbox.spec.ts",
+          "line": 62,
+          "column": 1
+        },
+        {
+          "title": "sandbox lifecycle: status → initialize → status flips → teardown",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7f2f3c6021aefcff4ed-c2388c4843221b72a1f4",
+          "file": "native-sandbox.spec.ts",
+          "line": 34,
+          "column": 1
+        },
+        {
+          "title": "an unsupported host reports supported:false and refuses initialize",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7f2f3c6021aefcff4ed-f100198e94f3ea1b3761",
+          "file": "native-sandbox.spec.ts",
+          "line": 54,
+          "column": 1
+        },
+        {
+          "title": "process.spawn carries opts.sandbox to the daemon boundary",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7f2f3c6021aefcff4ed-6fa3c59579a964e78a27",
+          "file": "native-sandbox.spec.ts",
+          "line": 62,
+          "column": 1
+        },
+        {
+          "title": "sandbox lifecycle: status → initialize → status flips → teardown",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7f2f3c6021aefcff4ed-924143e9b382d4d897f5",
+          "file": "native-sandbox.spec.ts",
+          "line": 34,
+          "column": 1
+        },
+        {
+          "title": "an unsupported host reports supported:false and refuses initialize",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7f2f3c6021aefcff4ed-d7df1c67c4d214b21be3",
+          "file": "native-sandbox.spec.ts",
+          "line": 54,
+          "column": 1
+        },
+        {
+          "title": "process.spawn carries opts.sandbox to the daemon boundary",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7f2f3c6021aefcff4ed-6ac314cde52a748caf20",
+          "file": "native-sandbox.spec.ts",
+          "line": 62,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "preview-render.spec.ts",
+      "file": "preview-render.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Preview panel renders a real dev server (not stranded on auth)",
+          "file": "preview-render.spec.ts",
+          "line": 32,
+          "column": 6,
+          "specs": [
+            {
+              "title": "the app mounts inside the panel iframe and does not redirect to /oauth/silent",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set RUN_REAL_PREVIEW=1 + PREVIEW_URL=<running dev server>",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e/preview-render.spec.ts",
+                        "line": 33,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "3acbbb061f9ec9cf9acd-c7112a12069d8f6e7d7c",
+              "file": "preview-render.spec.ts",
+              "line": 36,
+              "column": 3
+            },
+            {
+              "title": "the app mounts inside the panel iframe and does not redirect to /oauth/silent",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set RUN_REAL_PREVIEW=1 + PREVIEW_URL=<running dev server>",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e/preview-render.spec.ts",
+                        "line": 33,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "3acbbb061f9ec9cf9acd-05025c5dd4b7099883d9",
+              "file": "preview-render.spec.ts",
+              "line": 36,
+              "column": 3
+            },
+            {
+              "title": "the app mounts inside the panel iframe and does not redirect to /oauth/silent",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set RUN_REAL_PREVIEW=1 + PREVIEW_URL=<running dev server>",
+                      "location": {
+                        "file": "/Users/admin/Documents/GitHub/ugly-code/tests/e2e/preview-render.spec.ts",
+                        "line": 33,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "3acbbb061f9ec9cf9acd-2160bcb8a858693abac8",
+              "file": "preview-render.spec.ts",
+              "line": 36,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "project-url.spec.ts",
+      "file": "project-url.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "project URL (?path=)",
+          "file": "project-url.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "opening a project reflects its local path in the URL",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-002b1379f8c601b5a3c6",
+              "file": "project-url.spec.ts",
+              "line": 13,
+              "column": 3
+            },
+            {
+              "title": "a ?path= URL deep-links straight into the workspace",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-0296a2f9ec3c23a24ec6",
+              "file": "project-url.spec.ts",
+              "line": 21,
+              "column": 3
+            },
+            {
+              "title": "Back from an open project returns to the picker and clears the path",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-0a73663c579ac8829674",
+              "file": "project-url.spec.ts",
+              "line": 30,
+              "column": 3
+            },
+            {
+              "title": "opening a project reflects its local path in the URL",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-505163f67bac3aea2c7e",
+              "file": "project-url.spec.ts",
+              "line": 13,
+              "column": 3
+            },
+            {
+              "title": "a ?path= URL deep-links straight into the workspace",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-ba3002df08eefc49ff1c",
+              "file": "project-url.spec.ts",
+              "line": 21,
+              "column": 3
+            },
+            {
+              "title": "Back from an open project returns to the picker and clears the path",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-146daa051d29485a31b4",
+              "file": "project-url.spec.ts",
+              "line": 30,
+              "column": 3
+            },
+            {
+              "title": "opening a project reflects its local path in the URL",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-b200d5520e21e9c14ea6",
+              "file": "project-url.spec.ts",
+              "line": 13,
+              "column": 3
+            },
+            {
+              "title": "a ?path= URL deep-links straight into the workspace",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-6720f50205156e34f442",
+              "file": "project-url.spec.ts",
+              "line": 21,
+              "column": 3
+            },
+            {
+              "title": "Back from an open project returns to the picker and clears the path",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-a8374d5bc93d8aad57af",
+              "file": "project-url.spec.ts",
+              "line": 30,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "workspace URL (?tab= / ?session=)",
+          "file": "project-url.spec.ts",
+          "line": 40,
+          "column": 6,
+          "specs": [
+            {
+              "title": "the workspace tab is restored from the URL (survives reload)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-0e3b840d19d60d58f0da",
+              "file": "project-url.spec.ts",
+              "line": 41,
+              "column": 3
+            },
+            {
+              "title": "selecting a tab writes ?tab= to the URL",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-5a72ae346e9ec2c46cb8",
+              "file": "project-url.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "the workspace tab is restored from the URL (survives reload)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-24bfd4bf1aac13a877d3",
+              "file": "project-url.spec.ts",
+              "line": 41,
+              "column": 3
+            },
+            {
+              "title": "selecting a tab writes ?tab= to the URL",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-a0a4f3d3b2fad8a74a60",
+              "file": "project-url.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "the workspace tab is restored from the URL (survives reload)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-30a16d92562ea704734c",
+              "file": "project-url.spec.ts",
+              "line": 41,
+              "column": 3
+            },
+            {
+              "title": "selecting a tab writes ?tab= to the URL",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "fdb3cbfd7f1cad56fae4-b47551a892349bb16eb4",
+              "file": "project-url.spec.ts",
+              "line": 49,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "recents.spec.ts",
+      "file": "recents.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Recent projects — cross-device sync",
+          "file": "recents.spec.ts",
+          "line": 19,
+          "column": 6,
+          "specs": [
+            {
+              "title": "opening a project records it (stamped with this device) and it syncs to the picker",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "60ba6c8ad80490478900-320f30fa43e873215819",
+              "file": "recents.spec.ts",
+              "line": 22,
+              "column": 3
+            },
+            {
+              "title": "opening a project records it (stamped with this device) and it syncs to the picker",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "60ba6c8ad80490478900-126e96c9e7555336ee61",
+              "file": "recents.spec.ts",
+              "line": 22,
+              "column": 3
+            },
+            {
+              "title": "opening a project records it (stamped with this device) and it syncs to the picker",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "60ba6c8ad80490478900-50561b475143591fa1b5",
+              "file": "recents.spec.ts",
+              "line": 22,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "scroll.spec.ts",
+      "file": "scroll.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "ScrollView",
+          "file": "scroll.spec.ts",
+          "line": 109,
+          "column": 6,
+          "specs": [
+            {
+              "title": "large list: first items are visible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-5b81ffbdbc0b86c81505",
+              "file": "scroll.spec.ts",
+              "line": 110,
+              "column": 3
+            },
+            {
+              "title": "large list: content overflows container",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-3660cdc48c2902cbe95c",
+              "file": "scroll.spec.ts",
+              "line": 116,
+              "column": 3
+            },
+            {
+              "title": "large list: mouse wheel scrolling changes scrollTop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-df1e143ec5c0d605d111",
+              "file": "scroll.spec.ts",
+              "line": 121,
+              "column": 3
+            },
+            {
+              "title": "large list: scrolling to bottom reveals last item",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-622153e5f4be5865c297",
+              "file": "scroll.spec.ts",
+              "line": 133,
+              "column": 3
+            },
+            {
+              "title": "short list: all items visible without scrolling",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-67d4aae170e010bce21e",
+              "file": "scroll.spec.ts",
+              "line": 145,
+              "column": 3
+            },
+            {
+              "title": "short list: content does not overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-cbe9b3d1e1ec7fac602c",
+              "file": "scroll.spec.ts",
+              "line": 152,
+              "column": 3
+            },
+            {
+              "title": "scrollbar is hidden (no scrollbar gutter)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-116486bf3c8eb2b1f9db",
+              "file": "scroll.spec.ts",
+              "line": 159,
+              "column": 3
+            },
+            {
+              "title": "large list: first items are visible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-06246f2994881621561f",
+              "file": "scroll.spec.ts",
+              "line": 110,
+              "column": 3
+            },
+            {
+              "title": "large list: content overflows container",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-b6865f89243bbe622fcb",
+              "file": "scroll.spec.ts",
+              "line": 116,
+              "column": 3
+            },
+            {
+              "title": "large list: mouse wheel scrolling changes scrollTop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-0f8699132047fa71d6c9",
+              "file": "scroll.spec.ts",
+              "line": 121,
+              "column": 3
+            },
+            {
+              "title": "large list: scrolling to bottom reveals last item",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-9cd9b270e0ea462ae8f3",
+              "file": "scroll.spec.ts",
+              "line": 133,
+              "column": 3
+            },
+            {
+              "title": "short list: all items visible without scrolling",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-895ccda0de5e21199025",
+              "file": "scroll.spec.ts",
+              "line": 145,
+              "column": 3
+            },
+            {
+              "title": "short list: content does not overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-589871ed2ab5e83ac1f9",
+              "file": "scroll.spec.ts",
+              "line": 152,
+              "column": 3
+            },
+            {
+              "title": "scrollbar is hidden (no scrollbar gutter)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-7ad4422b422132856bbe",
+              "file": "scroll.spec.ts",
+              "line": 159,
+              "column": 3
+            },
+            {
+              "title": "large list: first items are visible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-fa1b90c968c305f209e2",
+              "file": "scroll.spec.ts",
+              "line": 110,
+              "column": 3
+            },
+            {
+              "title": "large list: content overflows container",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-94827d0e2552055537fb",
+              "file": "scroll.spec.ts",
+              "line": 116,
+              "column": 3
+            },
+            {
+              "title": "large list: mouse wheel scrolling changes scrollTop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-671d92ce6b0a89ac3505",
+              "file": "scroll.spec.ts",
+              "line": 121,
+              "column": 3
+            },
+            {
+              "title": "large list: scrolling to bottom reveals last item",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-7802d1076619cf7c13a4",
+              "file": "scroll.spec.ts",
+              "line": 133,
+              "column": 3
+            },
+            {
+              "title": "short list: all items visible without scrolling",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-6660c8a8ea2723ffe68c",
+              "file": "scroll.spec.ts",
+              "line": 145,
+              "column": 3
+            },
+            {
+              "title": "short list: content does not overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-12f09bb886fbda08c6d7",
+              "file": "scroll.spec.ts",
+              "line": 152,
+              "column": 3
+            },
+            {
+              "title": "scrollbar is hidden (no scrollbar gutter)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-4beeb4621e433ab902ef",
+              "file": "scroll.spec.ts",
+              "line": 159,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "SimpleScrollView",
+          "file": "scroll.spec.ts",
+          "line": 167,
+          "column": 6,
+          "specs": [
+            {
+              "title": "large list: first items are visible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-da2aeb5bd683d33a62a5",
+              "file": "scroll.spec.ts",
+              "line": 168,
+              "column": 3
+            },
+            {
+              "title": "large list: content overflows container",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-fd19e00e1151fa3d24ea",
+              "file": "scroll.spec.ts",
+              "line": 175,
+              "column": 3
+            },
+            {
+              "title": "large list: mouse wheel scrolling changes scrollTop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-8726e057799fc213882d",
+              "file": "scroll.spec.ts",
+              "line": 180,
+              "column": 3
+            },
+            {
+              "title": "large list: scrolling to bottom reveals last item",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-1d5c63ac7b49d2c66524",
+              "file": "scroll.spec.ts",
+              "line": 192,
+              "column": 3
+            },
+            {
+              "title": "short list: all items visible without scrolling",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-c1b743c02c8360a899d8",
+              "file": "scroll.spec.ts",
+              "line": 204,
+              "column": 3
+            },
+            {
+              "title": "short list: content does not overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-3df1c171afd2d22cecf6",
+              "file": "scroll.spec.ts",
+              "line": 212,
+              "column": 3
+            },
+            {
+              "title": "scrollbar is hidden (no scrollbar gutter)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-c94a636ed1a7e4019f91",
+              "file": "scroll.spec.ts",
+              "line": 219,
+              "column": 3
+            },
+            {
+              "title": "touch events are wired up",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-3b51c45e9daad4cfda4c",
+              "file": "scroll.spec.ts",
+              "line": 224,
+              "column": 3
+            },
+            {
+              "title": "large list: first items are visible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-e0a928d7207e35126278",
+              "file": "scroll.spec.ts",
+              "line": 168,
+              "column": 3
+            },
+            {
+              "title": "large list: content overflows container",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-4d0c43d9ec038557506f",
+              "file": "scroll.spec.ts",
+              "line": 175,
+              "column": 3
+            },
+            {
+              "title": "large list: mouse wheel scrolling changes scrollTop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-8288f3bfab97a38e7b1f",
+              "file": "scroll.spec.ts",
+              "line": 180,
+              "column": 3
+            },
+            {
+              "title": "large list: scrolling to bottom reveals last item",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-6af8007dbc275a865c8d",
+              "file": "scroll.spec.ts",
+              "line": 192,
+              "column": 3
+            },
+            {
+              "title": "short list: all items visible without scrolling",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-9f1e05786d1d037672ac",
+              "file": "scroll.spec.ts",
+              "line": 204,
+              "column": 3
+            },
+            {
+              "title": "short list: content does not overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-cde9d6c7ae7172c00056",
+              "file": "scroll.spec.ts",
+              "line": 212,
+              "column": 3
+            },
+            {
+              "title": "scrollbar is hidden (no scrollbar gutter)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-36a5c1a66d03d238193c",
+              "file": "scroll.spec.ts",
+              "line": 219,
+              "column": 3
+            },
+            {
+              "title": "touch events are wired up",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-693427d87cbc14c0f16f",
+              "file": "scroll.spec.ts",
+              "line": 224,
+              "column": 3
+            },
+            {
+              "title": "large list: first items are visible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-9391a5ebe847ba1d2f0f",
+              "file": "scroll.spec.ts",
+              "line": 168,
+              "column": 3
+            },
+            {
+              "title": "large list: content overflows container",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-83f798280010366aaed1",
+              "file": "scroll.spec.ts",
+              "line": 175,
+              "column": 3
+            },
+            {
+              "title": "large list: mouse wheel scrolling changes scrollTop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-a6a8231acf9e2ff204d4",
+              "file": "scroll.spec.ts",
+              "line": 180,
+              "column": 3
+            },
+            {
+              "title": "large list: scrolling to bottom reveals last item",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-7965725c87b1fc2d8be5",
+              "file": "scroll.spec.ts",
+              "line": 192,
+              "column": 3
+            },
+            {
+              "title": "short list: all items visible without scrolling",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-d2adf05958142d7b2536",
+              "file": "scroll.spec.ts",
+              "line": 204,
+              "column": 3
+            },
+            {
+              "title": "short list: content does not overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-9889ee88ef83d77da238",
+              "file": "scroll.spec.ts",
+              "line": 212,
+              "column": 3
+            },
+            {
+              "title": "scrollbar is hidden (no scrollbar gutter)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-7c4d12f1cae929b6efb2",
+              "file": "scroll.spec.ts",
+              "line": 219,
+              "column": 3
+            },
+            {
+              "title": "touch events are wired up",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-79e11b1b6cd89c5d3f90",
+              "file": "scroll.spec.ts",
+              "line": 224,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "FlatList",
+          "file": "scroll.spec.ts",
+          "line": 309,
+          "column": 6,
+          "specs": [
+            {
+              "title": "large list: first items are visible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-a42ddf346b013abb10e0",
+              "file": "scroll.spec.ts",
+              "line": 310,
+              "column": 3
+            },
+            {
+              "title": "large list: content overflows container",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-cf8413be4ad0aaf4add2",
+              "file": "scroll.spec.ts",
+              "line": 317,
+              "column": 3
+            },
+            {
+              "title": "large list: mouse wheel scrolling changes scrollTop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-6554e101e84b76d78807",
+              "file": "scroll.spec.ts",
+              "line": 322,
+              "column": 3
+            },
+            {
+              "title": "large list: scrolling to bottom reveals last item",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-cc287082427175f9e039",
+              "file": "scroll.spec.ts",
+              "line": 334,
+              "column": 3
+            },
+            {
+              "title": "short list: all items visible without scrolling",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-f4a5efd82935cf00bccf",
+              "file": "scroll.spec.ts",
+              "line": 346,
+              "column": 3
+            },
+            {
+              "title": "short list: content does not overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-27c804a613c12eadabe4",
+              "file": "scroll.spec.ts",
+              "line": 354,
+              "column": 3
+            },
+            {
+              "title": "scrollbar is hidden (no scrollbar gutter)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-fc8d870068bd474a0f0c",
+              "file": "scroll.spec.ts",
+              "line": 361,
+              "column": 3
+            },
+            {
+              "title": "large list: first items are visible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-2e9ba862af8eb7d95380",
+              "file": "scroll.spec.ts",
+              "line": 310,
+              "column": 3
+            },
+            {
+              "title": "large list: content overflows container",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-232adbb8eb220be851db",
+              "file": "scroll.spec.ts",
+              "line": 317,
+              "column": 3
+            },
+            {
+              "title": "large list: mouse wheel scrolling changes scrollTop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-11e09ca1def918b3cac1",
+              "file": "scroll.spec.ts",
+              "line": 322,
+              "column": 3
+            },
+            {
+              "title": "large list: scrolling to bottom reveals last item",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-8b4a710f2905e431f5cf",
+              "file": "scroll.spec.ts",
+              "line": 334,
+              "column": 3
+            },
+            {
+              "title": "short list: all items visible without scrolling",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-986716ad611e4a148d74",
+              "file": "scroll.spec.ts",
+              "line": 346,
+              "column": 3
+            },
+            {
+              "title": "short list: content does not overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-a0a2b63c1eb2e6f6a302",
+              "file": "scroll.spec.ts",
+              "line": 354,
+              "column": 3
+            },
+            {
+              "title": "scrollbar is hidden (no scrollbar gutter)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-f900672e55928b7e66de",
+              "file": "scroll.spec.ts",
+              "line": 361,
+              "column": 3
+            },
+            {
+              "title": "large list: first items are visible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-89c50208537841a35a41",
+              "file": "scroll.spec.ts",
+              "line": 310,
+              "column": 3
+            },
+            {
+              "title": "large list: content overflows container",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-0b9daae6dfb9887a49d4",
+              "file": "scroll.spec.ts",
+              "line": 317,
+              "column": 3
+            },
+            {
+              "title": "large list: mouse wheel scrolling changes scrollTop",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-50ee9862255d643b9732",
+              "file": "scroll.spec.ts",
+              "line": 322,
+              "column": 3
+            },
+            {
+              "title": "large list: scrolling to bottom reveals last item",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-8903258fe6c3ffdb8295",
+              "file": "scroll.spec.ts",
+              "line": 334,
+              "column": 3
+            },
+            {
+              "title": "short list: all items visible without scrolling",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-be9a788cca5a05e6340f",
+              "file": "scroll.spec.ts",
+              "line": 346,
+              "column": 3
+            },
+            {
+              "title": "short list: content does not overflow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-a6b4c0b80c69dcf2c6dc",
+              "file": "scroll.spec.ts",
+              "line": 354,
+              "column": 3
+            },
+            {
+              "title": "scrollbar is hidden (no scrollbar gutter)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8f7bc8310c9f408a5a85-89c4533011556c17bcc9",
+              "file": "scroll.spec.ts",
+              "line": 361,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "studio.spec.ts",
+      "file": "studio.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Studio shell — real app",
+          "file": "studio.spec.ts",
+          "line": 16,
+          "column": 6,
+          "specs": [
+            {
+              "title": "home renders the real project picker with restored styles",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-ecd18d92ca0ca17d75c5",
+              "file": "studio.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "Create Project shows live progress, streams init output, then opens",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-9cf0c3623c44f8ef0d90",
+              "file": "studio.spec.ts",
+              "line": 39,
+              "column": 3
+            },
+            {
+              "title": "opening a project reaches the real agent chat (NewSessionHero)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-460230119d333d0e2f58",
+              "file": "studio.spec.ts",
+              "line": 70,
+              "column": 3
+            },
+            {
+              "title": "branch-mode dropdown renders in the new session hero and opens the popover",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-3d67402e988cc73a15b0",
+              "file": "studio.spec.ts",
+              "line": 80,
+              "column": 3
+            },
+            {
+              "title": "branch-mode dropdown value persists across reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-e81a94fea84ba4bf054b",
+              "file": "studio.spec.ts",
+              "line": 101,
+              "column": 3
+            },
+            {
+              "title": "chat renders the user message + assistant reply (no crash)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-846d90893e092d232d7c",
+              "file": "studio.spec.ts",
+              "line": 124,
+              "column": 3
+            },
+            {
+              "title": "chat history accumulates across turns",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-cd7f2cfe2c7ddc2535bc",
+              "file": "studio.spec.ts",
+              "line": 143,
+              "column": 3
+            },
+            {
+              "title": "chat runs the session as a background task",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-e084ad7d5f0590f8ba7b",
+              "file": "studio.spec.ts",
+              "line": 173,
+              "column": 3
+            },
+            {
+              "title": "/clear wipes the conversation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-ac64a3b4e7c50b9036d8",
+              "file": "studio.spec.ts",
+              "line": 230,
+              "column": 3
+            },
+            {
+              "title": "Run eval lists the ported eval tasks",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-4ccb51e25e23c066e61c",
+              "file": "studio.spec.ts",
+              "line": 293,
+              "column": 3
+            },
+            {
+              "title": "home renders the real project picker with restored styles",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-946885f5dd2846612c61",
+              "file": "studio.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "Create Project shows live progress, streams init output, then opens",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-4e0e6ebbdec55559503f",
+              "file": "studio.spec.ts",
+              "line": 39,
+              "column": 3
+            },
+            {
+              "title": "opening a project reaches the real agent chat (NewSessionHero)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-10e6aefd4409880b5f80",
+              "file": "studio.spec.ts",
+              "line": 70,
+              "column": 3
+            },
+            {
+              "title": "branch-mode dropdown renders in the new session hero and opens the popover",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-d27f5e6748769b5ffd0c",
+              "file": "studio.spec.ts",
+              "line": 80,
+              "column": 3
+            },
+            {
+              "title": "branch-mode dropdown value persists across reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-91d73a97df40a1d86aa9",
+              "file": "studio.spec.ts",
+              "line": 101,
+              "column": 3
+            },
+            {
+              "title": "chat renders the user message + assistant reply (no crash)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-12e817c3aba11ef75679",
+              "file": "studio.spec.ts",
+              "line": 124,
+              "column": 3
+            },
+            {
+              "title": "chat history accumulates across turns",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-5fc26d7c54eb178db453",
+              "file": "studio.spec.ts",
+              "line": 143,
+              "column": 3
+            },
+            {
+              "title": "chat runs the session as a background task",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-158b3937e9e43b0e53d3",
+              "file": "studio.spec.ts",
+              "line": 173,
+              "column": 3
+            },
+            {
+              "title": "/clear wipes the conversation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-3c5619c40710a8265d3d",
+              "file": "studio.spec.ts",
+              "line": 230,
+              "column": 3
+            },
+            {
+              "title": "Run eval lists the ported eval tasks",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-680f26c6cb870985e819",
+              "file": "studio.spec.ts",
+              "line": 293,
+              "column": 3
+            },
+            {
+              "title": "home renders the real project picker with restored styles",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-942bc378de14138b13ee",
+              "file": "studio.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "Create Project shows live progress, streams init output, then opens",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-0a36d09665aeca559416",
+              "file": "studio.spec.ts",
+              "line": 39,
+              "column": 3
+            },
+            {
+              "title": "opening a project reaches the real agent chat (NewSessionHero)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-aad53949af5ad10d0e06",
+              "file": "studio.spec.ts",
+              "line": 70,
+              "column": 3
+            },
+            {
+              "title": "branch-mode dropdown renders in the new session hero and opens the popover",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-084e69a069e25fe9572d",
+              "file": "studio.spec.ts",
+              "line": 80,
+              "column": 3
+            },
+            {
+              "title": "branch-mode dropdown value persists across reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-f1c2442af82209d9257e",
+              "file": "studio.spec.ts",
+              "line": 101,
+              "column": 3
+            },
+            {
+              "title": "chat renders the user message + assistant reply (no crash)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-280e031e0055b1eefdb9",
+              "file": "studio.spec.ts",
+              "line": 124,
+              "column": 3
+            },
+            {
+              "title": "chat history accumulates across turns",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-3c17901f89aa8bce9b0f",
+              "file": "studio.spec.ts",
+              "line": 143,
+              "column": 3
+            },
+            {
+              "title": "chat runs the session as a background task",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-617c3963e37cec9ad92c",
+              "file": "studio.spec.ts",
+              "line": 173,
+              "column": 3
+            },
+            {
+              "title": "/clear wipes the conversation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-f55cf40fab9d53832dcc",
+              "file": "studio.spec.ts",
+              "line": 230,
+              "column": 3
+            },
+            {
+              "title": "Run eval lists the ported eval tasks",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "64bdea7002f9c9cea9f4-382da24475635e1ffb6a",
+              "file": "studio.spec.ts",
+              "line": 293,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-10T02:41:09.654Z",
+    "duration": 69.61000000000001,
+    "expected": 0,
+    "skipped": 210,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

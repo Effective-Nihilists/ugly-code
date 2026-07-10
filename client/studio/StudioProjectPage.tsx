@@ -18,12 +18,13 @@ import { EventsPanel } from './panels/EventsPanel';
 import { FeedbackPanel } from './panels/FeedbackPanel';
 import { WorkersPanel } from './panels/WorkersPanel';
 import { GitPanel } from './panels/GitPanel';
+import { TestsPanel } from './panels/TestsPanel';
 import { TerminalPanel } from './panels/TerminalPanel';
 import { ProdPanel } from './panels/ProdPanel';
 import { PreviewPanel } from './panels/PreviewPanel';
 import { FilePanel } from './panels/FilePanel';
 import {
-  DeployIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon,
+  DeployIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon, TestsIcon,
   AgentIcon, PreviewIcon, FileIcon, GitIcon,
 } from './panels/navIcons';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -35,17 +36,18 @@ import { useIsMobile } from './hooks/useIsMobile';
 //    Events / Workers / Terminal. Errors/Events/Workers are prod-only; Database
 //    appears in both (dev in the top tabs, prod in the sidebar).
 type WorkspaceTab =
-  | 'chat' | 'preview' | 'file' | 'git' | 'database'
+  | 'chat' | 'preview' | 'file' | 'git' | 'tests' | 'database'
   | 'deploy' | 'prodDatabase' | 'errors' | 'events' | 'workers' | 'terminal' | 'feedback';
 const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: 'chat', label: 'Agent' },
   { id: 'preview', label: 'Preview' },
   { id: 'file', label: 'File' },
   { id: 'git', label: 'Git' },
+  { id: 'tests', label: 'Tests' },
   { id: 'database', label: 'Database' },
 ];
 const ALL_TABS: WorkspaceTab[] = [
-  'chat', 'preview', 'file', 'git', 'database',
+  'chat', 'preview', 'file', 'git', 'tests', 'database',
   'deploy', 'prodDatabase', 'errors', 'events', 'workers', 'terminal', 'feedback',
 ];
 // The deploy tab used to be `publish`, and that id is written into the URL
@@ -59,6 +61,7 @@ const SESSION_VIEW_ICONS: Record<string, React.ReactNode> = {
   preview: <PreviewIcon />,
   file: <FileIcon />,
   git: <GitIcon />,
+  tests: <TestsIcon />,
   database: <DatabaseIcon />,
 };
 
@@ -420,6 +423,7 @@ export default function StudioProjectPage({
           {tab === 'preview' && <div style={S.pane}><PreviewPanel sessionId={activeSessionId} /></div>}
           {tab === 'file' && <div style={S.pane}><FilePanel openTarget={pendingFile} onOpened={clearPendingFile} /></div>}
           {tab === 'git' && <div style={S.pane}><GitPanel /></div>}
+          {tab === 'tests' && <div style={S.pane}><TestsPanel /></div>}
           {tab === 'database' && <div style={S.paneScroll}><DatabasePanel forceDev /></div>}
           {/* Sidebar prod views */}
           {tab === 'deploy' && <div style={S.pane}><ProdPanel /></div>}
@@ -469,7 +473,7 @@ export default function StudioProjectPage({
 // Display label per tab — drives the mobile header title + the drawer Views
 // list reuses TABS for its own labels (these match).
 const ALL_TAB_LABELS: Record<WorkspaceTab, string> = {
-  chat: 'Agent', preview: 'Preview', file: 'File', git: 'Git', database: 'Database',
+  chat: 'Agent', preview: 'Preview', file: 'File', git: 'Git', tests: 'Tests', database: 'Database',
   deploy: 'Deploy', prodDatabase: 'Database', errors: 'Errors', events: 'Events', feedback: 'Feedback',
   workers: 'Workers', terminal: 'Terminal',
 };
