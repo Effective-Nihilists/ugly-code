@@ -21,6 +21,7 @@ import { messages, requests } from '../shared/api';
 import { AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
 import { agentTurnHandler } from 'ugly-app/agent/server';
 import { agentStepHandler } from './agentStepHandler';
+import { makeResolveApiKey } from './byoKey';
 import type { Todo, RecentProject } from '../shared/collections';
 import { collections } from '../shared/collections';
 import { makeCodingSessionHandlers } from './codingSessionHandlers';
@@ -62,7 +63,14 @@ const app = createApp(
   { requests, messages, pages },
   {
     // Standardized client-driven agent turn (ugly-app/agent) — the studio path.
-    agentTurn: agentTurnHandler({ tools: AGENT_TOOLS, systemPrompt: AGENT_SYSTEM_PROMPT }),
+    agentTurn: agentTurnHandler({
+      tools: AGENT_TOOLS,
+      systemPrompt: AGENT_SYSTEM_PROMPT,
+      // Same BYO-key resolution as the Worker entry, so dev matches prod.
+      // `getDb` (late-bound, set in setOnAfterStart) rather than `app.db`:
+      // reading `app` here cycles back through its own initializer (TS7022).
+      resolveApiKey: makeResolveApiKey(getDb),
+    }),
 
     // Coding agent step — tool-enabled loop step (default) OR a clean no-tools
     // completion (`noTools`) for the pattern engine's aux calls. Shared with the

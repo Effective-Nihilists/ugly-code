@@ -38,6 +38,7 @@ import {
   parseStoredUserSettings,
 } from '../shared/userSettings';
 import type { UserSettings } from '../shared/userSettings';
+import { makeResolveApiKey } from './byoKey';
 
 // The per-request TypedDB is set on the app context before each fetch handler
 // runs (createWorkersApp). The coding-session handlers read it lazily.
@@ -51,7 +52,15 @@ const workersDb = (): TypedDB => {
 // chat (client-driven loop) calls `agentTurn`; session persistence (survive
 // reload) is the codingSession* set, shared with the Node entry (server/index.ts).
 const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
-  agentTurn: agentTurnHandler({ tools: AGENT_TOOLS, systemPrompt: AGENT_SYSTEM_PROMPT }),
+  agentTurn: agentTurnHandler({
+    tools: AGENT_TOOLS,
+    systemPrompt: AGENT_SYSTEM_PROMPT,
+    // BYO-subscription models (glm_coding_plan) run on the user's own provider
+    // key, read server-side. This is the PROD path: agentStep isn't registered
+    // here (see the note below), so without this the main turn would reach
+    // ugly.bot keyless and be refused.
+    resolveApiKey: makeResolveApiKey(workersDb),
+  }),
   // NOTE: `agentStep` is intentionally NOT registered here. Its handler calls
   // `uglyBotRequest`, which transitively imports node `fs`/`path` (framework
   // SchemaCheck) that can't bundle for the Cloudflare Workers runtime. The
