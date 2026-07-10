@@ -37,7 +37,7 @@ export interface IndexerManifest {
 /** Root of the on-disk cache, shared with the Python's model cache. */
 export function cacheRoot(): string {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.['UGLY_STUDIO_CACHE'] ?? join(homedir(), '.ugly-studio');
+  return env?.UGLY_STUDIO_CACHE ?? join(homedir(), '.ugly-studio');
 }
 
 /** Directory the daemon is (or will be) run from, for this exact source version. */
