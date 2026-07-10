@@ -2116,5 +2116,53 @@
         "description": "52 hidden multi-segment vectors: plan changes and same-effective-day conflicts, TRUNC proration, per-segment allowances and tier restarts, last-day-plan discount/cap/minimum, cap-before-discount ordering, credits over capped totals, full-pipeline compounds. floor(2 x passed/52): 2 points requires all 52."
       }
     ]
+  },
+  {
+    "name": "l6-compound-incident",
+    "level": 6,
+    "kind": "bug-fix",
+    "turns": [
+      "Read INCIDENT.md. INC-5150: the end-of-day revenue summary is wrong; `npm run repro` reproduces it deterministically and the existing tests are green. Two engineers have already fixed 'something', watched the repro keep failing, decided they were wrong, and reverted \u2014 their diffs are gone, and it is possible they were right.\n\nFind and fix the real defects in src/ so `npm run repro` prints PASS for the right reasons. Do not modify the repro script or its expected values. Keep `npm test` green and keep the exported APIs (Store, ingestBatch, ingestAll, paginate, pageCount, renderSummary, clearMemo) intact. Add regression tests under tests/ for what you fix.\n\nWork autonomously until it is done. Do not stop to present a plan or ask for approval."
+    ],
+    "fixture": "./fixture",
+    "budget": {
+      "maxTurns": 60,
+      "maxCostUsd": 5,
+      "timeoutMs": 3600000
+    },
+    "successCriteria": "Three jointly-necessary defects, each independently real: (A) renderSummary memoizes by pageSize only, so a second render serves the first render's stale summary after new data lands \u2014 the cache key must reflect the data, or the memo must go; (B) paginate slices start..start+pageSize-1, silently dropping the last record of every full page; (C) ingestAll uses forEach(async ...), returning before ingestion completes. The visible repro passes ONLY when all three are fixed (verified across the full 2^3 matrix), so 'my fix didn't help' is misleading evidence by design. Graded by hidden per-cause behavioural probes plus exact end-to-end summaries on data different from the repro's, so hardcoding the repro's expected constant earns nothing.",
+    "tags": [
+      "ts",
+      "vitest",
+      "debugging",
+      "compound-cause",
+      "misleading-oracle",
+      "hidden-tests",
+      "async",
+      "cache",
+      "agentic"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l6-compound-incident.git",
+    "ticketPath": "INCIDENT.md",
+    "reproSetup": {
+      "commands": [
+        "npm install --no-audit --no-fund",
+        "npm install --no-save vitest@^2 typescript@^5 tsx@^4"
+      ],
+      "perCommandTimeoutMs": 240000
+    },
+    "gates": [
+      {
+        "name": "typecheck clean",
+        "points": 1,
+        "kind": "tsc"
+      },
+      {
+        "name": "per-cause probes + end-to-end",
+        "points": 4,
+        "kind": "hiddenTests",
+        "description": "floor(4 x passed/8) over hidden probes: cache freshness after new data (cause A, 2), exact page contents (cause B, 2), ingestion completeness at resolve (cause C, 2), and exact two-phase end-to-end summaries on non-repro data (2). Calibrated: 0-1 causes fixed -> 1/4, 2 causes -> 2/4, all three -> 4/4."
+      }
+    ]
   }
 ]
