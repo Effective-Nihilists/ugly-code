@@ -24,7 +24,7 @@ import { ProdPanel } from './panels/ProdPanel';
 import { PreviewPanel } from './panels/PreviewPanel';
 import { FilePanel } from './panels/FilePanel';
 import {
-  DeployIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon, TestsIcon,
+  DeployIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon, TestsIcon, SettingsIcon,
   AgentIcon, PreviewIcon, FileIcon, GitIcon,
 } from './panels/navIcons';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -352,6 +352,20 @@ export default function StudioProjectPage({
       { id: 'feedback', label: 'Feedback', icon: <FeedbackIcon />, active: tab === 'feedback', onClick: () => { setTab('feedback'); closeDrawer(); } },
       { id: 'workers', label: 'Workers', icon: <WorkersIcon />, active: tab === 'workers', onClick: () => { setTab('workers'); closeDrawer(); } },
       { id: 'terminal', label: 'Terminal', icon: <TerminalIcon />, active: tab === 'terminal', onClick: () => { setTab('terminal'); closeDrawer(); } },
+      // Not a workspace tab — opens the settings modal (StudioShell owns it, and
+      // listens for this event). Without this row the modal is UNREACHABLE: its
+      // only other triggers route through ModelSelector's `onNeedsKey`, which is
+      // deprecated and never fires, and ProjectOnboarding's unused prop.
+      {
+        id: 'settings',
+        label: 'Settings',
+        icon: <SettingsIcon />,
+        active: false,
+        onClick: () => {
+          window.dispatchEvent(new CustomEvent('ugly-studio:open-settings'));
+          closeDrawer();
+        },
+      },
     ],
   };
 
