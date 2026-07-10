@@ -2164,5 +2164,145 @@
         "description": "floor(4 x passed/8) over hidden probes: cache freshness after new data (cause A, 2), exact page contents (cause B, 2), ingestion completeness at resolve (cause C, 2), and exact two-phase end-to-end summaries on non-repro data (2). Calibrated: 0-1 causes fixed -> 1/4, 2 causes -> 2/4, all three -> 4/4."
       }
     ]
+  },
+  {
+    "name": "l6-security-audit",
+    "level": 6,
+    "kind": "bug-fix",
+    "ticketPath": "TICKET.md",
+    "turns": [
+      "Read TICKET.md. Get the Acme Notes service ready for external partners: make it production-ready \u2014 add the input validation, access-control, and error handling it is missing, and fix anything that would cause an incident once partners hit these endpoints directly. Keep every feature working (tests/functional.test.ts must stay green) and do not change createApp()'s signature or the test files. Work autonomously until it is done. Do not stop to present a plan or ask for approval."
+    ],
+    "fixture": "./fixture",
+    "budget": {
+      "maxTurns": 80,
+      "maxCostUsd": 6,
+      "timeoutMs": 5400000
+    },
+    "successCriteria": "Acme Notes ships with 12 real vulnerabilities across 9 classes: IDOR/BOLA on GET /api/notes/:id, SQL injection + broken tenancy on note search, path traversal on file download (encoded), JWT alg:none + unpinned-algorithm verification, predictable password-reset token (account takeover), SSRF in /api/preview (metadata IP, encoded/decimal loopback, and redirect-to-internal), prototype pollution in settings deep-merge (__proto__ AND constructor.prototype), and mass-assignment privilege escalation on /api/users/me. Graded by a hidden supertest exploit suite (floor(12 x closed/12)) plus the public functional contract, which must stay green \u2014 three functional tests use dangerous-LOOKING but legitimate input (a note body containing \"OR 1=1\", a settings value literally \"__proto__\", a nested dotted filename) and an explicitly-shared note, so a blanket denylist/WAF fix or an over-restrictive authorization fix closes an exploit but breaks a feature. Calibrated: vulnerable 0/12 exploits closed, a correct hardening 12/12.",
+    "tags": [
+      "ts",
+      "vitest",
+      "security",
+      "owasp",
+      "ssrf",
+      "idor",
+      "injection",
+      "prototype-pollution",
+      "jwt",
+      "hidden-tests",
+      "agentic"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l6-security-hardening.git",
+    "reproSetup": {
+      "commands": [
+        "npm install --no-audit --no-fund",
+        "npm install --no-save vitest@^2 typescript@^5 supertest@^7 @types/supertest@^6"
+      ],
+      "perCommandTimeoutMs": 300000
+    },
+    "gates": [
+      {
+        "name": "typecheck clean",
+        "points": 1,
+        "kind": "tsc"
+      },
+      {
+        "name": "functional contract green",
+        "points": 3,
+        "kind": "vitest:tests/functional.test.ts"
+      },
+      {
+        "name": "exploits closed",
+        "points": 12,
+        "kind": "hiddenTests",
+        "description": "Hidden supertest exploit suite the agent never sees: 12 exploits (IDOR, SQLi, path traversal, JWT alg:none, predictable reset token, SSRF literal/encoded/redirect, prototype pollution __proto__/constructor, mass assignment). floor(12 x closed/12) = 1 point per vuln actually fixed. A fix that also breaks a feature loses the functional gate instead."
+      },
+      {
+        "name": "functional contract not weakened",
+        "points": 1,
+        "kind": "unchanged:tests/functional.test.ts"
+      },
+      {
+        "name": "createApp entrypoint intact",
+        "points": 1,
+        "kind": "fileMatches:src/app.ts:export function createApp"
+      },
+      {
+        "name": "no wholesale rewrite",
+        "points": 1,
+        "kind": "diffBudget:400:1200:src"
+      }
+    ]
+  },
+  {
+    "name": "l6-security-hardening",
+    "level": 6,
+    "kind": "bug-fix",
+    "ticketPath": "TICKET_SECURITY.md",
+    "turns": [
+      "Read TICKET_SECURITY.md. Do a security review of the Acme Notes service before its external launch and fix the vulnerabilities you find across the OWASP surface (broken authorization/IDOR, injection, SSRF, unsafe token handling, prototype pollution, mass assignment, path handling), with defenses that generalize rather than string-matching specific payloads. Keep every feature working (tests/functional.test.ts must stay green) and do not change createApp()'s signature or the test files. Work autonomously until it is done. Do not stop to present a plan or ask for approval."
+    ],
+    "fixture": "./fixture",
+    "budget": {
+      "maxTurns": 80,
+      "maxCostUsd": 6,
+      "timeoutMs": 5400000
+    },
+    "successCriteria": "Acme Notes ships with 12 real vulnerabilities across 9 classes: IDOR/BOLA on GET /api/notes/:id, SQL injection + broken tenancy on note search, path traversal on file download (encoded), JWT alg:none + unpinned-algorithm verification, predictable password-reset token (account takeover), SSRF in /api/preview (metadata IP, encoded/decimal loopback, and redirect-to-internal), prototype pollution in settings deep-merge (__proto__ AND constructor.prototype), and mass-assignment privilege escalation on /api/users/me. Graded by a hidden supertest exploit suite (floor(12 x closed/12)) plus the public functional contract, which must stay green \u2014 three functional tests use dangerous-LOOKING but legitimate input (a note body containing \"OR 1=1\", a settings value literally \"__proto__\", a nested dotted filename) and an explicitly-shared note, so a blanket denylist/WAF fix or an over-restrictive authorization fix closes an exploit but breaks a feature. Calibrated: vulnerable 0/12 exploits closed, a correct hardening 12/12.",
+    "tags": [
+      "ts",
+      "vitest",
+      "security",
+      "owasp",
+      "ssrf",
+      "idor",
+      "injection",
+      "prototype-pollution",
+      "jwt",
+      "hidden-tests",
+      "agentic"
+    ],
+    "repoUrl": "https://github.com/Effective-Nihilists/ugly-evals-l6-security-hardening.git",
+    "reproSetup": {
+      "commands": [
+        "npm install --no-audit --no-fund",
+        "npm install --no-save vitest@^2 typescript@^5 supertest@^7 @types/supertest@^6"
+      ],
+      "perCommandTimeoutMs": 300000
+    },
+    "gates": [
+      {
+        "name": "typecheck clean",
+        "points": 1,
+        "kind": "tsc"
+      },
+      {
+        "name": "functional contract green",
+        "points": 3,
+        "kind": "vitest:tests/functional.test.ts"
+      },
+      {
+        "name": "exploits closed",
+        "points": 12,
+        "kind": "hiddenTests",
+        "description": "Hidden supertest exploit suite the agent never sees: 12 exploits (IDOR, SQLi, path traversal, JWT alg:none, predictable reset token, SSRF literal/encoded/redirect, prototype pollution __proto__/constructor, mass assignment). floor(12 x closed/12) = 1 point per vuln actually fixed. A fix that also breaks a feature loses the functional gate instead."
+      },
+      {
+        "name": "functional contract not weakened",
+        "points": 1,
+        "kind": "unchanged:tests/functional.test.ts"
+      },
+      {
+        "name": "createApp entrypoint intact",
+        "points": 1,
+        "kind": "fileMatches:src/app.ts:export function createApp"
+      },
+      {
+        "name": "no wholesale rewrite",
+        "points": 1,
+        "kind": "diffBudget:400:1200:src"
+      }
+    ]
   }
 ]
