@@ -91,10 +91,16 @@ The #1 discriminator (the only one whose gap grows with capability).
 
 ## Build order & status
 
-- [x] **L6.1 test-suite-mutation** — BUILT + RUNNING. Fixture
-      `ugly-evals-l6-test-suite-mutation` (11-function interval-set + spec + an inherited
-      "100% line coverage" bait suite). 22 mutants + 7 equivalent mutants vendored in
-      `evals/l6/mutation.ts`. New `mutationScore` gate.
+- [x] **L6.1 test-suite-mutation** — BUILT. Fixture `ugly-evals-l6-test-suite-mutation`.
+      SCALED (2026-07-10) from an 11-function interval module to a **32-function
+      collection/numeric toolkit** (`src/kit.ts`), so the surface is too large to test
+      exhaustively in-budget and *prioritisation* becomes the discriminator. **50 mutants
+      (31 adversarial) + 9 equivalents** vendored in `evals/l6/mutation.ts`. Calibrated
+      offline (scratchpad `build_kit_mutants.py` + `calib3.mjs`, esbuild-transform +
+      worker-per-mutant with a timeout): paranoid golden kills 50/50, all 9 equivalents
+      survive, a competent happy-path suite kills only **18/50 → 2/5**. `mutationScore`
+      gate now passes a per-mutant vitest timeout (a mutant can make the suite a
+      synchronous infinite loop vitest cannot interrupt — one hung a run for 30+ min).
 - [x] **L6.3 surgical-fix** — BUILT + RUNNING. Fixture `ugly-evals-l6-surgical-fix`
       (billing proration; `roundCents` documents half-away-from-zero, implements
       `Math.round` → under-credits by 1¢). Hidden regression suite vendored in
@@ -136,6 +142,26 @@ Findings that generalise to the rest of L6:
    also folds in the "understand very complex codebases" axis.
 5. `assistantTurns` never exceeded 11 and cost never exceeded $0.82. Nothing here is
    long-horizon yet; L6.2 endurance remains the untested axis.
+
+### Update — 2026-07-10: scaled L6.1 to 32 functions, opus 5/5 → 4/5 → (rerun in flight)
+
+On the 16-function version opus killed **29/31 → 4/5** (missed only the two deepest
+degenerate-input mutants) — near-ceiling. Acting on finding #4, scaled to a **32-function
+kit** with 50 mutants concentrated in the corners (empty/single inputs, ties, duplicates,
+NaN, negative counts, immutability). Competent happy-path testing now scores **18/50 → 2/5**,
+so weaker models should crater; whether *opus* rations effort or still tests exhaustively is
+what the run measures — opus wrote an 816-line suite (not obviously rationing).
+
+Two engineering lessons from the scale-up, both now fixed:
+- **A mutant can hang the grader.** `chunk` with a step of `n-1` and `n=1` is a *synchronous*
+  infinite loop; vitest's test-timeout can't interrupt sync loops, so `vitest run` hangs
+  forever and wedged a grading run for 30+ min. `mutationScore`/`hiddenTests` now pass a
+  per-mutant `timeoutMs` (→ `spawnCollect` kill); a timed-out mutant counts as killed.
+- **Calibrate before shipping — it catches unfair mutants.** The offline golden/equivalent
+  matrix flagged two "mutants" that were actually behaviour-preserving (`lcm ||→&&`,
+  `rotate` negative-index via JS `slice`) and they were reclassified as equivalents.
+- **Grading is O(mutants) vitest cold-starts** (~50 runs). Under machine load this is minutes;
+  calibrate offline with esbuild-transform + a worker-per-mutant, never 50 vitest boots.
 
 Grading lives in `client/studio/evals/` (gate kinds + SBP host-side grader); fixtures at
 `github.com/Effective-Nihilists/ugly-evals-l6-*` with hidden faults/grader vendored so they
