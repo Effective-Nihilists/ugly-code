@@ -111,6 +111,37 @@ import { fetchCodebaseStatus } from '../agent/codebaseReadiness';
 
 // ── Shared helpers ──────────────────────────────────────────────────
 
+// Shared 1s ticker — all elapsed timers (BashCard, DevServerCard) share a
+// single setInterval instead of each spawning its own. The interval auto-
+// starts on first subscription and auto-stops when no one is listening.
+let _tickerTimer: ReturnType<typeof setInterval> | null = null;
+let _tickerSubs = 0;
+const _tickerListeners = new Set<() => void>();
+
+function _ensureTicker(): void {
+  if (_tickerTimer) return;
+  _tickerTimer = setInterval(() => {
+    for (const fn of _tickerListeners) fn();
+  }, 1000);
+}
+function _releaseTicker(): void {
+  if (_tickerSubs > 0) return;
+  if (_tickerTimer) { clearInterval(_tickerTimer); _tickerTimer = null; }
+}
+
+/** Subscribe to a shared 1s heartbeat. Returns the unsubscribe function.
+ *  The interval auto-starts/stops so zero-card scenarios use zero CPU. */
+function subscribeTicker(fn: () => void): () => void {
+  _tickerListeners.add(fn);
+  _tickerSubs++;
+  _ensureTicker();
+  return () => {
+    _tickerListeners.delete(fn);
+    _tickerSubs--;
+    _releaseTicker();
+  };
+}
+
 /** Safe clipboard write with a brief visual ack via setter. */
 function useCopyButton(): [string | null, (key: string, text: string) => void] {
   const [copied, setCopied] = useState<string | null>(null);
@@ -1682,8 +1713,8 @@ function BashCard({
       ? Number(meta.end_time) - Number(meta.start_time)
       : null;
   const running = tool.status === 'running' || tool.status === 'executing';
-  // Live elapsed timer for running commands. Owns its own 1Hz interval
-  // so it only ticks while a command is actually running.
+  // Live elapsed timer for running commands. Uses a shared 1Hz ticker
+  // so multiple concurrent tool cards share one interval.
   const [liveElapsed, setLiveElapsed] = useState(0);
   const startRef = useRef<number | null>(null);
   useEffect(() => {
@@ -1698,10 +1729,10 @@ function BashCard({
     // yet so the timer doesn't sit at zero.
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- `!x` also re-seeds on a 0 timestamp; `??=` would not
     if (!startRef.current) startRef.current = tool.startedAt ?? Date.now();
-    const t = setInterval(() => {
+    const unsub = subscribeTicker(() => {
       setLiveElapsed(Date.now() - (startRef.current ?? Date.now()));
-    }, 1000);
-    return () => { clearInterval(t); };
+    });
+    return unsub;
   }, [running, tool.startedAt]);
   // Remaining time until the executor's timeout fires. Surfaced via
   // tool_progress `meta` event when the bash tool starts. Undefined
@@ -1987,7 +2018,7 @@ function DevServerCard({
     running && tool.liveOutput ? tool.liveOutput : tool.result ?? '';
   // Live elapsed timer + remaining-until-timeout. Same pattern as
   // BashCard so a wedged dev server feels symmetrical with a wedged
-  // bash command. Owns its own 1Hz interval so it only ticks while a
+  // bash command. Uses a shared 1Hz ticker so it only ticks while a
   // call is actually running.
   const [liveElapsed, setLiveElapsed] = useState(0);
   const startRef = useRef<number | null>(null);
@@ -1999,10 +2030,10 @@ function DevServerCard({
     }
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- `!x` also re-seeds on a 0 timestamp; `??=` would not
     if (!startRef.current) startRef.current = tool.startedAt ?? Date.now();
-    const t = setInterval(() => {
+    const unsub = subscribeTicker(() => {
       setLiveElapsed(Date.now() - (startRef.current ?? Date.now()));
-    }, 1000);
-    return () => { clearInterval(t); };
+    });
+    return unsub;
   }, [running, tool.startedAt]);
   const remainingMs =
     tool.timeoutMs != null && running

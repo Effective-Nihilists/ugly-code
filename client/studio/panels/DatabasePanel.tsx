@@ -399,7 +399,7 @@ function CollectionDetail({
   // Auto-refresh (live tail).
   useEffect(() => {
     if (!autoRefresh) return;
-    const id = setInterval(() => void run(page), 3000);
+    const id = setInterval(() => void run(page), 5000);
     return () => { clearInterval(id); };
   }, [autoRefresh, run, page]);
 

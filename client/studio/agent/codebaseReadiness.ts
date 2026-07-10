@@ -57,7 +57,7 @@ export function startCodebasePoll(
     }
   };
   void tick();
-  const timer = setInterval(() => void tick(), 1500);
+  const timer = setInterval(() => void tick(), 3000);
   pollers.set(sessionId, timer);
 }
 

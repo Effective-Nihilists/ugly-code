@@ -302,7 +302,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
 
   // Bridge: honor dev-server start/stop requests the coding agent writes via the
   // control file (devServerControl.ts) — the agent runs in the task context and
-  // can't call startDev/stopDev directly. Poll ~1.5s; act on each new nonce once.
+  // can't call startDev/stopDev directly. Poll ~3s; act on each new nonce once.
   const lastCtlNonce = React.useRef<string | null>(null);
   React.useEffect(() => {
     const proj = activeRepo;
@@ -317,7 +317,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
         if (c.cmd === 'stop') stopDev(devKey);
         else startDev(devKey, proj, port, sessionId ? getSessionWorkspace(sessionId)?.databaseUrl : undefined); // start | restart
       });
-    }, 1500);
+    }, 3000);
     return () => { cancelled = true; clearInterval(id); };
   }, [activeRepo, devKey, port, sessionId]);
 
@@ -343,7 +343,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   // Fallback while the ready marker hasn't matched yet (unusual dev server, or a
   // reload that landed before the server was listening / mid Vite cold-optimize —
   // the old code latched after ONE early reload and stuck on connection-refused
-  // forever). Retry-reload every 4s until the marker fires, capped at ~60s.
+  // forever). Retry-reload every 6s until the marker fires, capped at ~60s.
   React.useEffect(() => {
     if (!dev.running) return;
     const token = dev.startToken;
@@ -352,8 +352,8 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
       if (reloadedTokenRef.current === token) { clearInterval(id); return; }
       n += 1;
       setReloadKey((k) => k + 1);
-      if (n >= 15) clearInterval(id);
-    }, 4000);
+      if (n >= 10) clearInterval(id);
+    }, 6000);
     return () => { clearInterval(id); };
   }, [dev.running, dev.startToken]);
 

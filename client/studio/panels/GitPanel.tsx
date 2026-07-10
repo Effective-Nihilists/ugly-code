@@ -110,7 +110,7 @@ export function GitPanel(): React.ReactElement {
 
   React.useEffect(() => {
     void refresh();
-    const t = setInterval(() => void refresh(), 4000);
+    const t = setInterval(() => void refresh(), 10000);
     return () => { clearInterval(t); };
   }, [refresh]);
 
