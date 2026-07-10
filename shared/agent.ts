@@ -271,6 +271,8 @@ These rules override everything else. Follow them strictly:
 
 7. **TOOL CONSTRAINTS**: Only use tools in your active catalog. When you reach for a capability that isn't there, call \`tool_search\` with a one-line description; if nothing matches, call \`tool_request\` with a proposed name + purpose. Do NOT hallucinate tool names; do NOT attempt \`apply_patch\` / \`apply_diff\` — they don't exist.
 
+8. **PYTHON → python_exec**: Run Python code through \`python_exec\`, NOT \`bash\`. \`python_exec\` uses the project's \`uv\` environment, isolates execution, and has timeout protection. \`bash python script.py\` or inline \`python3 -c "..."\` are unreliable and may pick up the wrong Python (system vs project). Only use \`bash\` for system commands, not Python.
+
 </critical_rules>
 
 <communication_style>

@@ -55,6 +55,8 @@ export interface GrepArgs {
   after_lines?: number;
   /** Caps the semantic pass (mode="semantic"). Default 10. */
   limit?: number;
+  /** Max wall-clock ms for ripgrep (mode="exact"/"auto"). Default 30000. */
+  timeout_ms?: number;
 }
 
 /** Index-backed search over the host (`codebase.search`): `fts` (BM25 keyword),
@@ -119,11 +121,15 @@ export function buildRgArgs(args: GrepArgs): string[] {
   return a;
 }
 
-/** The exact ripgrep pass. */
+/** The exact ripgrep pass. Defaults head_limit to 200 to prevent runaway scans. */
 async function runExact(args: GrepArgs, ctx: ToolContext | undefined): Promise<string> {
   const root = projectRoot(ctx) ?? undefined;
-  const { stdout, stderr, code } = await spawnCollect('rg', buildRgArgs(args), {
+  // Default head_limit caps matches to prevent grep from running forever on huge repos.
+  const effectiveArgs = { ...args, head_limit: args.head_limit ?? 200 };
+  const { stdout, stderr, code } = await spawnCollect('rg', buildRgArgs(effectiveArgs), {
     ...(root ? { cwd: root } : {}),
+    // Agent can override via timeout_ms arg; default 30s for ripgrep
+    timeoutMs: typeof args.timeout_ms === 'number' ? args.timeout_ms : 30_000,
   });
   // ripgrep: 0 = matches, 1 = no matches, 2 = error.
   if (code === 1) return `(no matches for ${JSON.stringify(args.pattern)})`;
@@ -314,6 +320,7 @@ const SPEC: TextGenTool = {
       before_lines: { type: 'number', description: 'Context lines before each match (content mode).' },
       after_lines: { type: 'number', description: 'Context lines after each match (content mode).' },
       limit: { type: 'number', description: 'Cap the semantic-pass results (mode="semantic"). Default 10.' },
+      timeout_ms: { type: 'number', description: 'Max wall-clock ms for ripgrep (mode="exact"/"auto"). Default 30000.' },
     },
     required: ['pattern'],
     additionalProperties: false,

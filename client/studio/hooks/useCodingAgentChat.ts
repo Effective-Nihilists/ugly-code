@@ -594,8 +594,8 @@ const BACKEND = {
   exitType: 'codingAgent:exit',
 } as const;
 
-const WINDOW_MAX = 100;
-const PAGE_SIZE = 20;
+const WINDOW_MAX = 500;
+const PAGE_SIZE = 40;
 
 /**
  * Pure converter from a raw AgentMessage (as returned by

@@ -11,23 +11,43 @@ export interface SpawnResult {
   code: number | null;
 }
 
+export interface SpawnCollectOpts {
+  cwd?: string;
+  timeoutMs?: number;
+}
+
 export function spawnCollect(
   cmd: string,
   args: string[],
-  opts: Parameters<typeof native.process.spawn>[2] = {},
+  opts: SpawnCollectOpts = {},
 ): Promise<SpawnResult> {
+  const { cwd, timeoutMs } = opts;
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const settle = (result: SpawnResult): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(result);
+    };
     try {
-      const proc = native.process.spawn(cmd, args, opts);
-      proc.onStdout((c) => (stdout += c));
-      proc.onStderr((c) => (stderr += c));
-      proc.onError((e) => { resolve({ stdout, stderr: stderr + e, code: null }); });
-      proc.onExit((code) => { resolve({ stdout, stderr, code }); });
+      const proc = native.process.spawn(cmd, args, { ...(cwd ? { cwd } : {}) });
+      proc.onStdout((c: string) => (stdout += c));
+      proc.onStderr((c: string) => (stderr += c));
+      proc.onError((e: string) => { settle({ stdout, stderr: stderr + e, code: null }); });
+      proc.onExit((code: number | null) => { settle({ stdout, stderr, code }); });
+      if (timeoutMs) {
+        timer = setTimeout(() => {
+          try { proc.kill(); } catch { /* already gone */ }
+          settle({ stdout: stdout.trimEnd(), stderr: stderr + `\n[timed out after ${Math.round(timeoutMs / 1000)}s]`, code: null });
+        }, timeoutMs);
+      }
     } catch (e) {
       console.error('[spawnTool:spawn]', JSON.stringify({ cmd, args, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
-      resolve({ stdout, stderr: (e as Error).message, code: null });
+      settle({ stdout, stderr: (e as Error).message, code: null });
     }
   });
 }
