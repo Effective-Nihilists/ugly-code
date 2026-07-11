@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { InferDocType } from 'ugly-app/shared';
-import { defineCollections } from 'ugly-app/shared';
+import { defineCollections, d1 } from 'ugly-app/shared';
 import { sessionConfigSchema } from './sessionConfig';
 
 // ─── Coding-agent session collections (own module ON PURPOSE) ────────────────
@@ -86,36 +86,40 @@ export function compareCodingMessages(
   return a.seq - b.seq || (a.kind === 'summary' ? -1 : 0) - (b.kind === 'summary' ? -1 : 0);
 }
 
+// INFERENCE-BUDGET NOTE: with `db: d1` on the meta, INLINE `indexes: [...]` tuples
+// tip TypeScript's mapped-type inference budget — `defineCollections` then bails
+// and collapses the collection type. Keep each index list in an already-widened
+// `IndexDef[]`-typed module const and reference it (mirrors shared/collections.ts).
+const codingSessionIndexes: { fields: Record<string, 1 | -1> }[] = [
+  // Composite expression indexes matching the handler filter shapes. One per query:
+  //   userId+projectId+kind     → codingSessionUpsert (find existing 'main')
+  //   userId+projectId+archived → codingSessionList (active sessions)
+  // (`updated` is a system column, so codingSessionList's sort{updated:-1} is
+  // exempt from the index-coverage check; these buy filter locality and credit
+  // every filtered field.)
+  { fields: { userId: 1, projectId: 1, kind: 1 } },
+  { fields: { userId: 1, projectId: 1, archived: 1 } },
+];
+const codingSessionMessageIndexes: { fields: Record<string, 1 | -1> }[] = [
+  // Handlers filter sessionId+userId(+compacted) and sort by `seq` (a JSONB field,
+  // so it MUST be indexed on D1). Trailing `seq` lets the transcript read come back
+  // index-ordered before the JS numeric re-sort (compareCodingMessages).
+  { fields: { sessionId: 1, userId: 1, compacted: 1, seq: 1 } },
+  { fields: { sessionId: 1, userId: 1, seq: 1 } },
+];
+
 export const codingCollections = defineCollections({
   codingSession: {
     schema: CodingSessionSchema,
-    meta: { cache: false, trackable: false, public: false, cascadeFrom: null },
-    // Composite expression indexes — ugly-app >=0.1.759 emits multi-field btrees
-    // over `((data->>'a'), (data->>'b'), …)` matching the handler filter shapes
-    // (earlier versions SILENTLY skipped composite defs → prod had only the GIN
-    // index). One per query:
-    //   userId+projectId+kind     → codingSessionUpsert (find existing 'main')
-    //   userId+projectId+archived → codingSessionList (active sessions)
-    // (`updated` is a real TIMESTAMPTZ column, not JSONB, so the list's sort can't
-    // ride the index — these buy filter locality; the per-field PostgresIndexes
-    // check is satisfied because a composite index credits every one of its fields.)
-    indexes: [
-      { fields: { userId: 1, projectId: 1, kind: 1 } },
-      { fields: { userId: 1, projectId: 1, archived: 1 } },
-    ],
+    meta: { cache: false, trackable: false, public: false, cascadeFrom: null, db: d1 },
+    indexes: codingSessionIndexes,
   },
   codingSessionMessage: {
     schema: CodingSessionMessageSchema,
     // No cascade — sessions are soft-archived (archived:true), never hard-deleted,
     // so the transcript is preserved. (Cascade would key on `codingSessionId`; we
     // use `sessionId`.)
-    meta: { cache: false, trackable: false, public: false, cascadeFrom: null },
-    // Composite (ugly-app >=0.1.759). Handlers filter sessionId+userId(+compacted);
-    // `seq` is a JSONB field, so trailing it lets the transcript read come back
-    // index-ordered before the JS numeric re-sort (compareCodingMessages).
-    indexes: [
-      { fields: { sessionId: 1, userId: 1, compacted: 1, seq: 1 } },
-      { fields: { sessionId: 1, userId: 1, seq: 1 } },
-    ],
+    meta: { cache: false, trackable: false, public: false, cascadeFrom: null, db: d1 },
+    indexes: codingSessionMessageIndexes,
   },
 });

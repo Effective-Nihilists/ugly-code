@@ -1,6 +1,5 @@
 import {
   createApp,
-  pgQuery,
   emailSend,
   flushPerf,
   recordFeedback,
@@ -38,23 +37,27 @@ import es from '../shared/lang/es';
 import { pages } from '../shared/pages';
 import { stringsDef } from '../shared/strings';
 
-const cronHandlers: WorkerHandlers<typeof cronTasks> = {
-  dailyCleanup: async () => {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const result = await pgQuery(
-      `DELETE FROM docs_todo WHERE (data->>'done')::boolean = true AND (data->'updated')::bigint < $1`,
-      [thirtyDaysAgo.getTime()],
-    );
-    console.log(`[Cron] dailyCleanup: deleted ${result.rowCount} old completed todos`);
-  },
-};
-
 // Late-bound TypedDB (set in setOnAfterStart) so the shared coding-session
 // handler factory can read `app.db` without a circular `app`-type reference.
 let typedDbRef: TypedDB | null = null;
 const getDb = (): TypedDB => {
   if (!typedDbRef) throw new Error('TypedDB not initialized yet');
   return typedDbRef;
+};
+
+const cronHandlers: WorkerHandlers<typeof cronTasks> = {
+  dailyCleanup: async () => {
+    // Portable delete via TypedDB (works on D1 AND Neon) — replaces a raw
+    // Postgres `pgQuery` DELETE. `updated` is the framework-maintained system
+    // column; an epoch-number bound works on both engines. `done` is indexed on
+    // the todo collection so D1 accepts this filtered delete.
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    await getDb().deleteQuery(collections.todo, {
+      done: true,
+      updated: { $lt: thirtyDaysAgo },
+    });
+    console.log('[Cron] dailyCleanup: swept old completed todos');
+  },
 };
 
 const app = createApp(

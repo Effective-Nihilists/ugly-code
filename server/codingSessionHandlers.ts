@@ -26,6 +26,41 @@ type CodingSessionHandlers = Pick<
   | 'codingSessionClearMessages'
 >;
 
+// A message's `content` is `JSON.stringify(rawContent)`. A single unbounded tool
+// result (e.g. a recursive file listing) can balloon a row past D1's ~1 MB
+// per-row limit — the write then fails with SQLITE_TOOBIG. Cap it here, the one
+// persistence chokepoint: deep-truncate long string LEAVES (keeping the JSON
+// structure + any `tool_use_id`, so the transcript stays parseable and
+// resume-safe) and re-stringify. Only kicks in on outliers; typical rows (~8 KB)
+// pass through untouched.
+const MAX_CONTENT_BYTES = 512 * 1024; // stay well under D1's 1 MB row cap
+const MAX_LEAF_BYTES = 100 * 1024;
+function truncateLeaf(s: string): string {
+  return s.length <= MAX_LEAF_BYTES
+    ? s
+    : `${s.slice(0, MAX_LEAF_BYTES)}…[truncated ${s.length - MAX_LEAF_BYTES} chars]`;
+}
+function deepTruncate(v: unknown): unknown {
+  if (typeof v === 'string') return truncateLeaf(v);
+  if (Array.isArray(v)) return v.map(deepTruncate);
+  if (v && typeof v === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v)) out[k] = deepTruncate(val);
+    return out;
+  }
+  return v;
+}
+export function capMessageContent(content: string): string {
+  if (content.length <= MAX_CONTENT_BYTES) return content;
+  try {
+    return JSON.stringify(deepTruncate(JSON.parse(content)));
+  } catch {
+    // Non-JSON content (shouldn't happen — it's always stringified) — hard cap to
+    // a valid JSON string so reads never choke on a torn value.
+    return JSON.stringify(`${content.slice(0, MAX_CONTENT_BYTES)}…[truncated]`);
+  }
+}
+
 /** `getDb` returns the per-request TypedDB (app.db on Node, typedDb on Workers). */
 export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHandlers {
   return {
@@ -74,7 +109,8 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       if (sess && sess.userId !== userId) throw new Error('Session not found');
       const doc: CodingSessionMessage = {
         _id: `${sessionId}:${seq}`,
-        sessionId, userId, seq, role, kind: 'message', compacted: false, content,
+        sessionId, userId, seq, role, kind: 'message', compacted: false,
+        content: capMessageContent(content),
         ...dbDefaults(),
       };
       await db.setDoc(collections.codingSessionMessage, doc);
@@ -100,7 +136,7 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       const summary: CodingSessionMessage = {
         _id: summaryId,
         sessionId, userId, seq: summarySeq, role: 'user', kind: 'summary', compacted: false,
-        content: JSON.stringify(summaryText),
+        content: capMessageContent(JSON.stringify(summaryText)),
         ...dbDefaults(),
       };
       await db.setDoc(collections.codingSessionMessage, summary);

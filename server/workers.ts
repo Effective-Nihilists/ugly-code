@@ -17,6 +17,7 @@
 import {
   CollectionDO,
   SessionDO,
+  createTypedDB,
   createWorkersApp,
   getAppContext,
 } from 'ugly-app/server/adapter/workers';
@@ -137,12 +138,25 @@ const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
   },
 };
 
+// The `scheduled` (cron) handler runs outside a fetch request, so there is no
+// per-request `getAppContext().typedDb`. createTypedDB binds to the globally
+// installed adapter (set up at boot) and does no I/O until called, so a
+// module-level singleton is safe here.
+const cronDb = createTypedDB(collections);
+
 // Cron handlers run on Cloudflare Cron Triggers (matches the schedule
 // declared in `shared/cron.ts`).
 const cronHandlers: WorkerHandlers<typeof cronTasks> = {
-  // eslint-disable-next-line @typescript-eslint/require-await
   dailyCleanup: async () => {
-    // Implement in your Worker: e.g. prune old rows via Hyperdrive or D1.
+    // Portable sweep of old completed todos (works on D1 AND Neon). Matches the
+    // Node entry (server/index.ts). `updated` is the system column; an epoch
+    // number binds correctly on both engines. `done` is indexed on the todo
+    // collection so D1 accepts this filtered delete.
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    await cronDb.deleteQuery(collections.todo, {
+      done: true,
+      updated: { $lt: thirtyDaysAgo },
+    });
   },
 };
 

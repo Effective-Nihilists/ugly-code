@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { InferDocType } from 'ugly-app/shared';
-import { defineCollections } from 'ugly-app/shared';
+import { defineCollections, d1 } from 'ugly-app/shared';
 import { codingCollections } from './codingCollections';
 import type { CodingSession, CodingSessionMessage } from './codingCollections';
 
@@ -81,37 +81,53 @@ export type {
 //                  socket.trackDocs(collections.message, { keys: { chatId: '...' } }, cb)
 //
 // After adding a collection, run: npm run db:schema-gen && npm run db:migrate
+// INFERENCE-BUDGET NOTE: with `db: d1` on every collection, INLINE `indexes: [...]`
+// tuples tip TypeScript's mapped-type inference budget — `defineCollections` then
+// bails and EVERY `collections.X` collapses to `... | undefined`, breaking tsc
+// across the app. Keep each index list in an already-widened `IndexDef[]`-typed
+// module const (below) and reference it — that stays under budget.
+const todoIndexes: { fields: Record<string, 1 | -1> }[] = [
+  // Every read is getDoc by _id; the only filtered access is the dailyCleanup
+  // cron `deleteQuery({ done: true, updated: { $lt } })`. D1 throws on an
+  // unindexed filter field, so index `done` (`updated` is a system column and
+  // is exempt from the index-coverage check).
+  { fields: { done: 1 } },
+];
+const recentProjectIndexes: { fields: Record<string, 1 | -1> }[] = [
+  // Every read filters by userId (a user's recent projects). `trackKeys` does
+  // NOT create a btree expression index, so declare one explicitly.
+  { fields: { userId: 1 } },
+];
+
 const baseCollections = defineCollections({
   todo: {
     schema: TodoSchema,
-    meta: { cache: false, trackable: true, public: false, cascadeFrom: null, trackKeys: ['userId'] },
+    meta: { cache: false, trackable: true, public: false, cascadeFrom: null, trackKeys: ['userId'], db: d1 },
+    indexes: todoIndexes,
   },
   conversation: {
     schema: ConversationSchema,
-    meta: { cache: false, trackable: false, public: false, cascadeFrom: null },
+    meta: { cache: false, trackable: false, public: false, cascadeFrom: null, db: d1 },
   },
   message: {
     schema: MessageSchema,
-    meta: { cache: false, trackable: false, public: false, cascadeFrom: 'conversation', trackKeys: ['conversationId'] },
+    meta: { cache: false, trackable: false, public: false, cascadeFrom: 'conversation', trackKeys: ['conversationId'], db: d1 },
   },
   collabDoc: {
     schema: CollabDocSchema,
-    meta: { cache: false, trackable: false, public: false, cascadeFrom: null },
+    meta: { cache: false, trackable: false, public: false, cascadeFrom: null, db: d1 },
   },
   recentProject: {
     schema: RecentProjectSchema,
-    meta: { cache: false, trackable: true, public: false, cascadeFrom: null, trackKeys: ['userId'] },
-    // Every read filters by userId (a user's recent projects). `trackKeys` does
-    // NOT create a btree expression index, so declare one explicitly — otherwise
-    // db:init leaves only the GIN index and PostgresIndexes warns per query.
-    indexes: [{ fields: { userId: 1 } }],
+    meta: { cache: false, trackable: true, public: false, cascadeFrom: null, trackKeys: ['userId'], db: d1 },
+    indexes: recentProjectIndexes,
   },
   userSettings: {
     schema: UserSettingsSchema,
     // Trackable + userId key so a settings change fans out to the user's other
     // devices/sessions via trackDocs. Reads are getDoc by _id (=userId), so the
     // primary key covers lookups — no extra btree index needed.
-    meta: { cache: false, trackable: true, public: false, cascadeFrom: null, trackKeys: ['userId'] },
+    meta: { cache: false, trackable: true, public: false, cascadeFrom: null, trackKeys: ['userId'], db: d1 },
   },
 });
 
