@@ -428,3 +428,18 @@ deepseek is genuinely strong — near-opus. The finest-grained grader (mutationS
 is what surfaces the gap: opus writes a more thorough suite (all 50) vs deepseek's 48. This is exactly
 the deterministic, verified, per-point discrimination the L6 suite was built for. Graders proven with a
 proxy model: vitest, hiddenTests, mutationScore. Last to prove: uxFlows.
+
+### COMPLETE trustworthy scoreboard + all 4 graders proven (2026-07-11)
+| task | grader | opus | deepseek (verified) |
+|---|---|---|---|
+| bug-fix-null-check | vitest | 5/5 | 5/5 |
+| l6-resurrect-incident | hiddenTests | 5/5 | 5/5 |
+| l6-test-suite-mutation | mutationScore | 5/5 (50/50) | 4/5 (48/50) |
+| l6-build-sokoban | uxFlows | 25/25 | 25/25 (indep. audited; 598-LOC game) |
+
+ALL FOUR grader mechanisms (vitest, hiddenTests, mutationScore, uxFlows) now proven with the
+proxy-model path — the dispatch fix held even on the heavy `ugly-app init` scaffold task. Harness
+is STABLE and trustworthy. deepseek_v4_pro is near-opus: ties 3/4, 1 point behind only on the
+50-mutant gradient (opus's suite is marginally more thorough). Total deepseek spend across all 4
+verified runs: ~$0.10. The cost-discipline directive worked — we hardened the harness cheaply and
+now have real fleet numbers instead of artifacts.
