@@ -7,6 +7,8 @@ import { runClientAgentTurn } from '../studio/agent/clientAgent';
 import { isClaudeCliModel, runClaudeCliTurn } from '../studio/agent/claudeCliAgent';
 import { setSessionStore } from '../studio/agent/sessionStore';
 import { makeFsSessionStore } from '../studio/agent/fsSessionStore';
+import { setCodebaseProvider } from '../agent/indexer/provider';
+import { localCodebaseProvider } from '../agent/indexer/codebase';
 
 export interface DriverCfg { projectPath: string; sessionId: string; origin: string; token: string; storeRoot: string }
 
@@ -74,6 +76,13 @@ export async function bootDriver(cfg: DriverCfg): Promise<void> {
     }
     return realFetch(input, init);
   });
+
+  // Install the in-process codebase indexer, exactly as coding-task.ts does at task
+  // boot. Without this the client agent's grep tool + readiness poll call
+  // codebaseProvider() with no impl installed, which THROWS since the host fallback
+  // was removed (78cad4d) — aborting every proxy-model (glm/deepseek) eval turn before
+  // it starts. claude-cli models use their own tools and are unaffected.
+  setCodebaseProvider(localCodebaseProvider);
 }
 
 export async function runTurn(
