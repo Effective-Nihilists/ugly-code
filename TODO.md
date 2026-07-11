@@ -416,3 +416,15 @@ premise was PARTLY a broken-harness artifact — proxy models were scored 0 for 
 Real discrimination requires re-running the fleet on the fixed harness. Per cost discipline: deepseek
 only for now; glm paused. Graders proven with a proxy model so far: vitest, hiddenTests. Still to
 prove: mutationScore, uxFlows (needs the fixed dispatch on the scaffold task).
+
+### First TRUSTWORTHY discrimination (2026-07-11, fixed harness, deepseek verified)
+| task | grader | opus | deepseek | note |
+|---|---|---|---|---|
+| bug-fix-null-check | vitest | 5/5 | 5/5 | tie |
+| l6-resurrect-incident | hiddenTests | 5/5 | 5/5 | deepseek solved the double-misdirection too |
+| l6-test-suite-mutation | mutationScore | 5/5 (50/50) | **4/5 (48/50)** | deepseek missed clamp-throw + takewhile-stop; equivalents clean (no cheat) |
+
+deepseek is genuinely strong — near-opus. The finest-grained grader (mutationScore, 50-mutant gradient)
+is what surfaces the gap: opus writes a more thorough suite (all 50) vs deepseek's 48. This is exactly
+the deterministic, verified, per-point discrimination the L6 suite was built for. Graders proven with a
+proxy model: vitest, hiddenTests, mutationScore. Last to prove: uxFlows.
