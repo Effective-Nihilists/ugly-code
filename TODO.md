@@ -391,3 +391,28 @@ render). Reusable across every future task and model.
 Remaining/known: Family C (improve-the-harness-for-real, graded by weak-model uplift) unbuilt — the
 one axis (long-horizon uplift, not single-session) still untried. Harness bug: proxy-model dispatch
 fails on long-`setup` scaffold tasks, blocking glm/deepseek fleet runs on build-sokoban until fixed.
+
+---
+
+## HARNESS STABILIZATION (2026-07-11) — two proxy-model eval bugs fixed; fleet numbers were artifacts
+
+Every prior glm/deepseek eval result was invalid due to TWO bugs that only hit the proxy-model
+(client-agent) path, never the claude-cli (opus) path:
+1. **bootDriver never installed the codebase provider.** After 78cad4d dropped the host fallback +
+   1a5a94c routed grep/readiness through codebaseProvider(), the client agent threw at boot →
+   0 work, no history, exit 0 (silent). Fix: bootDriver installs localCodebaseProvider like coding-task.
+2. **eval graded the base project dir, but the client agent worked in a git worktree.** deepseek
+   fully SOLVED bug-fix-null-check (correct fix, tests green) but scored 0/5 because its edits were in
+   `.ugly-studio/worktrees/<session>/`, invisible to the grader. Fix: eval forces `branchMode: 'main'`.
+
+**Verified with deepseek_v4_pro (harness now stable):**
+| task | grader | before fix | after fix |
+|---|---|---|---|
+| bug-fix-null-check | vitest gates | 0/5 (solved, worktree) | **5/5** ($0.001) |
+| l6-resurrect-incident | hiddenTests (3 probes) | (dispatch dead) | **5/5** ($0.009, correct fix) |
+
+**Big implication:** deepseek matches opus (5/5, 5/5) on these two. The "opus dominates the fleet"
+premise was PARTLY a broken-harness artifact — proxy models were scored 0 for work they actually did.
+Real discrimination requires re-running the fleet on the fixed harness. Per cost discipline: deepseek
+only for now; glm paused. Graders proven with a proxy model so far: vitest, hiddenTests. Still to
+prove: mutationScore, uxFlows (needs the fixed dispatch on the scaffold task).
