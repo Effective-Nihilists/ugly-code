@@ -244,13 +244,17 @@ export async function runEval(cfg: {
   // making the comparison unfair. The runner's own maxTurns nudge/resume still bound total work.
   setSessionMaxTurns(sessionId, task.budget.maxTurns);
   if (cfg.toolset && isToolset(cfg.toolset)) setSessionToolset(sessionId, cfg.toolset);
-  const selection = cfg.model || cfg.pattern || cfg.modelMode
-    ? {
-        ...(cfg.model ? { model: cfg.model } : {}),
-        ...(cfg.pattern ? { patternMode: cfg.pattern as never } : {}),
-        ...(cfg.modelMode ? { modelMode: cfg.modelMode } : {}),
-      }
-    : undefined;
+  // branchMode 'main': every eval run operates directly on the cloned project dir
+  // (which the grader inspects). Without this the client agent (glm/deepseek) works
+  // in an isolated .ugly-studio/worktrees/<session> worktree, edits it, passes its
+  // own tests there — and the grader, pointed at the base project dir, sees ZERO
+  // changes and scores 0/N. claude-cli already runs in the project dir directly.
+  const selection = {
+    branchMode: 'main' as const,
+    ...(cfg.model ? { model: cfg.model } : {}),
+    ...(cfg.pattern ? { patternMode: cfg.pattern as never } : {}),
+    ...(cfg.modelMode ? { modelMode: cfg.modelMode } : {}),
+  };
   // Capture the pattern the engine resolved to (echoed in every session_state
   // snapshot) so the CLI + e2e tests can assert classifier routing accuracy.
   let resolvedPattern: string | null = null;
