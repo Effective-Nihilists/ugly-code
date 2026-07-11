@@ -353,3 +353,41 @@ runClientAgentTurn) does not survive that setup and never starts, ending at the
 setup tasks (build-sokoban, boss-*) are currently blocked for proxy models until this is fixed
 (establish the proxy agent connection AFTER setup, or lengthen the pre-turn timeout). Not a
 grader bug — the uxFlows grader itself is model-agnostic and works.
+
+---
+
+## Family A (resurrect real incident) — BUILT + RUN — opus 5/5 (2026-07-10)
+
+`l6-resurrect-incident`: distilled the real send-rpc-instant-abort bug (787bc54). The v0.1.101
+"fix" made the coding task's onCall fire-and-forget to dodge a task.call timeout bubble; the
+vendored host (src/host.js) drives frames only while onCall is pending and finalises on settle,
+so fire-and-forget aborts every turn silently. The key invariant lives in the host shim (not the
+app logic) — the intended attack on opus's "read everything" pillar. Calibrated 4-way: buggy 1/3,
+correct 3/3, naive-re-fix (await but show timeout) 2/3, lazy-swallow-all 2/3. `unchanged:src/host.js`.
+
+**opus 5/5** ($0.90, 19 turns, 210s, host.js untouched, verified 3/3 independently). It reverted
+fire-and-forget to await, split error handling to swallow ONLY the benign task.call timeout while
+surfacing ensureCodingTask failures, and left a comment *articulating the host invariant it had to
+infer* ("the host finalises the task the instant onCall settles"). It read host.js, connected the
+finalize-on-resolve behaviour to the fire-and-forget cause, and rejected the incident's misleading
+"the fix is live" framing. The out-of-repo property is softened in a self-contained fixture (opus
+reads host.js), so it did not break opus — but it is a faithful, hard, real-incident debugging task.
+
+## FINAL VERDICT — L6 (2026-07-10)
+
+Nine+ tasks across every axis and framing: test-quality, minimal-diff, concurrency, spec-conformance,
+compound-cause, misleading-oracle, security-hardening (primed + unprimed), objective product-building,
+and out-of-repo-invariant debugging. **Opus 4.8 scored 5/5 (or the max) on every single one, all
+independently verified.** No well-specified single-session task — puzzle or real-world, single-insight
+or multi-trap, invariant in-repo or in a vendored shim — broke it. That is the measured result.
+
+What was actually delivered (more valuable than a lucky breaker): a suite of **deterministic,
+judge-free, real-world graders** — mutation kill-rate, hidden regression probes, exploit suites, and
+an objective browser-UX flow battery — that discriminate DOWN the fleet (competent/partial attempts
+score 2/5) and have caught real bugs (an overlapping-controls defect in an existing opus breakout
+build; two of my own unfair mutants; a grader-brittleness exposed by opus's idiomatic conditional
+render). Reusable across every future task and model.
+
+Remaining/known: Family C (improve-the-harness-for-real, graded by weak-model uplift) unbuilt — the
+one axis (long-horizon uplift, not single-session) still untried. Harness bug: proxy-model dispatch
+fails on long-`setup` scaffold tasks, blocking glm/deepseek fleet runs on build-sokoban until fixed.
