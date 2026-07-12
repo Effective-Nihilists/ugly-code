@@ -3092,7 +3092,13 @@ function autolinkChatMarkdown(text: string): string {
 
 /** Ugly-app's MarkdownViewer. Needs an explicit pixel width (for image
  *  sizing, table overflow, etc.), so we measure the container. */
-function ChatMarkdown({ text }: { text: string }) {
+function ChatMarkdown({
+  text,
+  streaming,
+}: {
+  text: string;
+  streaming?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const openUri = useContext(OpenUriContext);
@@ -3123,6 +3129,7 @@ function ChatMarkdown({ text }: { text: string }) {
           width={width}
           markdown={linked}
           isDark={isDark}
+          streaming={streaming ?? false}
           {...(handleOpenUri ? { openUri: handleOpenUri } : {})}
         />
       )}
@@ -3130,13 +3137,16 @@ function ChatMarkdown({ text }: { text: string }) {
   );
 }
 
-function renderAssistantContent(text: string): React.ReactNode[] {
+function renderAssistantContent(
+  text: string,
+  streaming?: boolean,
+): React.ReactNode[] {
   const segments = splitThinkSegments(text);
   return segments.map((seg, i) =>
     seg.kind === 'think' ? (
       <ReasoningBlock key={`r${i}`} body={seg.body} />
     ) : (
-      <ChatMarkdown key={`t${i}`} text={seg.body} />
+      <ChatMarkdown key={`t${i}`} text={seg.body} streaming={streaming ?? false} />
     ),
   );
 }
@@ -4579,7 +4589,9 @@ function AssistantMessage({
             position: 'relative',
           }}
         >
-          {msg.content && <div>{renderAssistantContent(msg.content)}</div>}
+          {msg.content && (
+            <div>{renderAssistantContent(msg.content, msg.isStreaming)}</div>
+          )}
           {msg.created_at != null && msg.created_at > 0 && (
             <span
               style={{
