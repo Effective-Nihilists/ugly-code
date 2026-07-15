@@ -24,7 +24,7 @@ import { ProdPanel } from './panels/ProdPanel';
 import { PreviewPanel } from './panels/PreviewPanel';
 import { FilePanel } from './panels/FilePanel';
 import {
-  DeployIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon, TestsIcon, SettingsIcon,
+  DeployIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon, TestsIcon,
   AgentIcon, PreviewIcon, FileIcon, GitIcon,
 } from './panels/navIcons';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -352,21 +352,15 @@ export default function StudioProjectPage({
       { id: 'feedback', label: 'Feedback', icon: <FeedbackIcon />, active: tab === 'feedback', onClick: () => { setTab('feedback'); closeDrawer(); } },
       { id: 'workers', label: 'Workers', icon: <WorkersIcon />, active: tab === 'workers', onClick: () => { setTab('workers'); closeDrawer(); } },
       { id: 'terminal', label: 'Terminal', icon: <TerminalIcon />, active: tab === 'terminal', onClick: () => { setTab('terminal'); closeDrawer(); } },
-      // Not a workspace tab — opens the settings modal (StudioShell owns it, and
-      // listens for this event). Without this row the modal is UNREACHABLE: its
-      // only other triggers route through ModelSelector's `onNeedsKey`, which is
-      // deprecated and never fires, and ProjectOnboarding's unused prop.
-      {
-        id: 'settings',
-        label: 'Settings',
-        icon: <SettingsIcon />,
-        active: false,
-        onClick: () => {
-          window.dispatchEvent(new CustomEvent('ugly-studio:open-settings'));
-          closeDrawer();
-        },
-      },
     ],
+    // Settings lives in the sidebar's top header bar (a global preference,
+    // not a workspace tab). StudioShell owns the modal and listens for this
+    // event. Kept as a CustomEvent so the desktop shell + any other host can
+    // intercept without a prop drilled all the way up.
+    onOpenSettings: () => {
+      window.dispatchEvent(new CustomEvent('ugly-studio:open-settings'));
+      closeDrawer();
+    },
   };
 
   const activeViewLabel = ALL_TAB_LABELS[tab];

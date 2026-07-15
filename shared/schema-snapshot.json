@@ -1,0 +1,537 @@
+{
+  "authMagicLink": {
+    "fields": {
+      "consumedAt": {
+        "type": "number",
+        "required": true,
+        "nullable": true
+      },
+      "email": {
+        "type": "string",
+        "required": true
+      },
+      "expiresAt": {
+        "type": "number",
+        "required": true
+      },
+      "requestIp": {
+        "type": "string",
+        "required": true,
+        "nullable": true
+      },
+      "requestedAt": {
+        "type": "number",
+        "required": true
+      },
+      "tokenHash": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "indexes": [
+      {
+        "fields": {
+          "email": 1
+        }
+      },
+      {
+        "fields": {
+          "expiresAt": 1
+        },
+        "ttl": 86400
+      }
+    ]
+  },
+  "authIdentity": {
+    "fields": {
+      "createdAt": {
+        "type": "number",
+        "required": true
+      },
+      "email": {
+        "type": "string",
+        "required": true,
+        "nullable": true
+      },
+      "lastLoginAt": {
+        "type": "number",
+        "required": true
+      },
+      "name": {
+        "type": "string",
+        "required": true,
+        "nullable": true
+      },
+      "provider": {
+        "type": "enum",
+        "values": [
+          "magic-link",
+          "google",
+          "uglybot"
+        ],
+        "required": true
+      },
+      "providerKey": {
+        "type": "string",
+        "required": true
+      },
+      "userId": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "indexes": [
+      {
+        "fields": {
+          "providerKey": 1
+        }
+      },
+      {
+        "fields": {
+          "userId": 1
+        }
+      }
+    ]
+  },
+  "debugLogSession": {
+    "fields": {
+      "active": {
+        "type": "boolean",
+        "required": true,
+        "default": false
+      },
+      "expiresAt": {
+        "type": "number",
+        "required": true,
+        "default": 0
+      },
+      "grep": {
+        "type": "string",
+        "required": true,
+        "nullable": true,
+        "default": null
+      },
+      "level": {
+        "type": "enum",
+        "values": [
+          "log",
+          "info",
+          "warn",
+          "error",
+          "debug"
+        ],
+        "required": true,
+        "nullable": true,
+        "default": null
+      },
+      "operatorId": {
+        "type": "string",
+        "required": true,
+        "default": ""
+      },
+      "projectId": {
+        "type": "string",
+        "required": true,
+        "default": ""
+      },
+      "source": {
+        "type": "enum",
+        "values": [
+          "browser",
+          "server",
+          "both"
+        ],
+        "required": true,
+        "default": "browser"
+      },
+      "startedAt": {
+        "type": "number",
+        "required": true,
+        "default": 0
+      },
+      "updatedAt": {
+        "type": "number",
+        "required": true,
+        "default": 0
+      },
+      "userId": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "indexes": [
+      {
+        "fields": {
+          "userId": 1
+        }
+      },
+      {
+        "fields": {
+          "expiresAt": 1
+        },
+        "ttl": 3600
+      }
+    ]
+  },
+  "debugLogStream": {
+    "fields": {
+      "userId": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "indexes": [
+      {
+        "fields": {
+          "userId": 1
+        }
+      }
+    ]
+  },
+  "todo": {
+    "fields": {
+      "done": {
+        "type": "boolean",
+        "required": true
+      },
+      "text": {
+        "type": "string",
+        "required": true
+      },
+      "userId": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "indexes": [
+      {
+        "fields": {
+          "done": 1
+        }
+      }
+    ]
+  },
+  "conversation": {
+    "fields": {
+      "title": {
+        "type": "string",
+        "required": true,
+        "default": ""
+      },
+      "type": {
+        "type": "string",
+        "required": true,
+        "default": "ai-chat"
+      }
+    }
+  },
+  "message": {
+    "fields": {
+      "conversationId": {
+        "type": "string",
+        "required": true
+      },
+      "text": {
+        "type": "string",
+        "required": true
+      },
+      "userId": {
+        "type": "string",
+        "required": true
+      }
+    }
+  },
+  "collabDoc": {
+    "fields": {
+      "lastSyncedAt": {
+        "type": "number",
+        "required": true
+      },
+      "serialized": {
+        "type": "string",
+        "required": true,
+        "nullable": true
+      },
+      "yjsState": {
+        "type": "string",
+        "required": true
+      }
+    }
+  },
+  "recentProject": {
+    "fields": {
+      "deviceId": {
+        "type": "string",
+        "required": true
+      },
+      "deviceLabel": {
+        "type": "string",
+        "required": true
+      },
+      "lastOpened": {
+        "type": "number",
+        "required": true
+      },
+      "name": {
+        "type": "string",
+        "required": true
+      },
+      "path": {
+        "type": "string",
+        "required": true
+      },
+      "userId": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "indexes": [
+      {
+        "fields": {
+          "userId": 1
+        }
+      }
+    ]
+  },
+  "userSettings": {
+    "fields": {
+      "data": {
+        "type": "string",
+        "required": true
+      },
+      "userId": {
+        "type": "string",
+        "required": true
+      }
+    }
+  },
+  "codingSession": {
+    "fields": {
+      "archived": {
+        "type": "boolean",
+        "required": true
+      },
+      "branch": {
+        "type": "string",
+        "required": false
+      },
+      "config": {
+        "type": "object",
+        "fields": {
+          "mode": {
+            "type": "union",
+            "variants": [
+              {
+                "type": "object",
+                "fields": {
+                  "kind": {
+                    "type": "literal",
+                    "values": [
+                      "auto"
+                    ],
+                    "required": true
+                  }
+                },
+                "required": true
+              },
+              {
+                "type": "object",
+                "fields": {
+                  "kind": {
+                    "type": "literal",
+                    "values": [
+                      "max"
+                    ],
+                    "required": true
+                  }
+                },
+                "required": true
+              },
+              {
+                "type": "object",
+                "fields": {
+                  "kind": {
+                    "type": "literal",
+                    "values": [
+                      "single"
+                    ],
+                    "required": true
+                  },
+                  "model": {
+                    "type": "string",
+                    "required": true
+                  }
+                },
+                "required": true
+              },
+              {
+                "type": "object",
+                "fields": {
+                  "kind": {
+                    "type": "literal",
+                    "values": [
+                      "group"
+                    ],
+                    "required": true
+                  },
+                  "models": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "required": true
+                    },
+                    "required": true
+                  },
+                  "personas": {
+                    "type": "record",
+                    "valueType": {
+                      "type": "string",
+                      "required": true
+                    },
+                    "required": false
+                  }
+                },
+                "required": true
+              }
+            ],
+            "required": true
+          },
+          "model": {
+            "type": "string",
+            "required": true
+          },
+          "pattern": {
+            "type": "enum",
+            "values": [
+              "none",
+              "auto",
+              "spec-build-verify",
+              "super-spec-build-verify",
+              "quick-edit",
+              "investigate-fix",
+              "super-investigate-fix",
+              "chat-qa",
+              "chat-advisory"
+            ],
+            "required": true
+          },
+          "perm": {
+            "type": "enum",
+            "values": [
+              "edit",
+              "yolo",
+              "claude-plan"
+            ],
+            "required": true
+          },
+          "reasoning": {
+            "type": "enum",
+            "values": [
+              "off",
+              "low",
+              "medium",
+              "high",
+              "max"
+            ],
+            "required": true
+          }
+        },
+        "required": false
+      },
+      "costUsd": {
+        "type": "number",
+        "required": true
+      },
+      "lastError": {
+        "type": "string",
+        "required": false
+      },
+      "messageCount": {
+        "type": "number",
+        "required": true
+      },
+      "model": {
+        "type": "string",
+        "required": true
+      },
+      "projectId": {
+        "type": "string",
+        "required": true
+      },
+      "sessionId": {
+        "type": "string",
+        "required": true
+      },
+      "status": {
+        "type": "string",
+        "required": true
+      },
+      "title": {
+        "type": "string",
+        "required": true
+      },
+      "userId": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "indexes": [
+      {
+        "fields": {
+          "userId": 1,
+          "projectId": 1,
+          "archived": 1
+        }
+      }
+    ]
+  },
+  "codingSessionMessage": {
+    "fields": {
+      "compacted": {
+        "type": "boolean",
+        "required": true
+      },
+      "content": {
+        "type": "string",
+        "required": true
+      },
+      "kind": {
+        "type": "string",
+        "required": true
+      },
+      "role": {
+        "type": "string",
+        "required": true
+      },
+      "seq": {
+        "type": "number",
+        "required": true
+      },
+      "sessionId": {
+        "type": "string",
+        "required": true
+      },
+      "userId": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "indexes": [
+      {
+        "fields": {
+          "sessionId": 1,
+          "userId": 1,
+          "compacted": 1,
+          "seq": 1
+        }
+      },
+      {
+        "fields": {
+          "sessionId": 1,
+          "userId": 1,
+          "seq": 1
+        }
+      }
+    ]
+  }
+}

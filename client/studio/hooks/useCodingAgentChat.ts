@@ -3040,99 +3040,137 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
 
         if (initialSessionId) {
           try {
-            // Load history up to WINDOW_MAX messages on mount — don't make the user
-            // click "load older" after every reload just to see more than 20 messages.
-            let allHistory: WireMessage[] = [];
-            let beforeId: string | undefined;
-            let hasMore = false;
-            let exhausted = false;
-            while (!exhausted && allHistory.length < WINDOW_MAX) {
-              const page = (await agentApi(backend.chatListMessages, {
-                sessionId: newId,
-                limit: PAGE_SIZE,
-                ...(beforeId ? { beforeId } : {}),
-              })) as { messages?: WireMessage[]; hasMore?: boolean };
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
-              if (cancelled) return;
-              const msgs = page.messages ?? [];
-              if (msgs.length === 0) break;
-              // Dedup: drop any message already in allHistory (race: server may return
-              // the same page twice, or messages may overlap across pages).
-              const existingIds = new Set(allHistory.map((m) => m.id));
-              const newMsgs = msgs.filter((m) => !existingIds.has(m.id));
-              if (newMsgs.length === 0) break;
-              allHistory = [...newMsgs, ...allHistory];
-              // Trim to WINDOW_MAX — prepending older messages may push past the limit.
-              // Drop from the OLDEST end (start) to keep the newest messages visible.
-              let trimmed = false;
-              if (allHistory.length > WINDOW_MAX) {
-                const drop = allHistory.length - WINDOW_MAX;
-                allHistory = allHistory.slice(drop);
-                trimmed = true;
-              }
-              // hasMore: false when the server says no more older pages, true
-              // otherwise. When we trimmed we know there's more regardless.
-              hasMore = trimmed || Boolean(page.hasMore);
-              beforeId = msgs[0].id;
-              exhausted = !hasMore;
-            }
+            // Render the FIRST (most recent) page immediately, then continue
+            // fetching older pages in the BACKGROUND while the UI is already
+            // interactive. The old code looped up to WINDOW_MAX (≈13 sequential
+            // round-trips for a 500-message session) before flipping the loading
+            // flag off — which is exactly the "stuck loading session" a v0.1.124
+            // feedback report flagged. The user only needs recent history to
+            // resume; older messages prepend as they arrive (same projection
+            // loadOlderMessages uses on scroll).
+            const firstPage = (await agentApi(backend.chatListMessages, {
+              sessionId: newId,
+              limit: PAGE_SIZE,
+            })) as { messages?: WireMessage[]; hasMore?: boolean };
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
-            if (cancelled || allHistory.length === 0) return;
-            setHasMoreOlder(exhausted ? false : hasMore);
+            if (cancelled) return;
+            const firstMsgs = firstPage.messages ?? [];
+            const firstHasMore = Boolean(firstPage.hasMore);
+            if (firstMsgs.length === 0) {
+              setIsLoadingHistory(false);
+              return;
+            }
             setHasMoreNewer(false);
-            console.log(
-              '[session-origin] resume backfill: loaded=%d hasMoreOlder=%s',
-              allHistory.length, !exhausted,
-            );
-            // Replay history through the same handlers used for live
-            // streaming events. Skip messages already known (race dedup).
-            // We don't preserve a `firstTurnSent` flag here — the server
-            // already tracks it.
-            const replayedIds = new Set<string>();
-            for (const m of allHistory) {
-              if (replayedIds.has(m.id)) continue;
-              replayedIds.add(m.id);
-              if (m.role === 'assistant') processAssistantMessage(m, 'created');
-              else if (m.role === 'tool') processToolMessage(m);
-              else if (m.role === 'judge') processJudgeMessage(m);
-              else if (m.role === 'status') processStatusMessage(m);
-              else if (m.role === 'user') {
-                const text = extractUserText(m);
-                if (text) {
-                  setMessages((prev) => [
-                    ...prev,
-                    {
-                      id: m.id,
-                      role: 'user',
-                      content: text,
-                      toolUses: [],
-                      isStreaming: false,
-                    },
-                  ]);
+            const replay = (ms: WireMessage[]): void => {
+              const seen = new Set<string>();
+              for (const m of ms) {
+                if (seen.has(m.id)) continue;
+                seen.add(m.id);
+                if (m.role === 'assistant') processAssistantMessage(m, 'created');
+                else if (m.role === 'tool') processToolMessage(m);
+                else if (m.role === 'judge') processJudgeMessage(m);
+                else if (m.role === 'status') processStatusMessage(m);
+                else if (m.role === 'user') {
+                  const text = extractUserText(m);
+                  if (text) {
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: m.id,
+                        role: 'user',
+                        content: text,
+                        toolUses: [],
+                        isStreaming: false,
+                      },
+                    ]);
+                  }
                 }
               }
-            }
-            // Any tool_use still 'running'/'executing' after a full replay was
+            };
+            // ① Replay the newest page through the same handlers used for live
+            // streaming events (full fidelity: model attribution, thinking,
+            // tool cards). Skip messages already known (race dedup).
+            replay(firstMsgs);
+            // Any tool_use still 'running'/'executing' after a replay was
             // INTERRUPTED — the session stopped before the tool finished (or its
             // result was never persisted). Mark it terminal so the card doesn't
             // spin forever ("stuck"). This is display-only: a real resume
             // re-derives the pending tool from the persisted content and runs it.
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.role === 'assistant' &&
-                m.toolUses.some((t) => t.status === 'running' || t.status === 'executing')
-                  ? {
-                      ...m,
-                      toolUses: m.toolUses.map((t) =>
-                        t.status === 'running' || t.status === 'executing'
-                          ? { ...t, status: 'error' as const }
-                          : t,
-                      ),
-                    }
-                  : m,
-              ),
-            );
+            const markInterruptedTools = (): void => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.role === 'assistant' &&
+                  m.toolUses.some((t) => t.status === 'running' || t.status === 'executing')
+                    ? {
+                        ...m,
+                        toolUses: m.toolUses.map((t) =>
+                          t.status === 'running' || t.status === 'executing'
+                            ? { ...t, status: 'error' as const }
+                            : t,
+                        ),
+                      }
+                    : m,
+                ),
+              );
+            };
+            markInterruptedTools();
             setIsStreaming(false);
+            // The newest page is rendered — drop the loading veil NOW so the
+            // transcript is visible + the composer is usable while older pages
+            // keep loading. Assume there's more until the background loop
+            // proves otherwise.
+            setHasMoreOlder(firstHasMore);
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
+            if (cancelled) return;
+            console.log(
+              '[session-origin] resume backfill: firstPage=%d hasMoreOlder=%s (background)',
+              firstMsgs.length, firstHasMore,
+            );
+            // ② Background: keep fetching older pages up to WINDOW_MAX and
+            // PREPEND each batch (oldest first) via the same projection
+            // loadOlderMessages uses, so the on-scroll path and the initial
+            // backfill stay consistent. Runs without holding the loading veil.
+            if (firstHasMore) {
+              let beforeId = firstMsgs[0].id;
+              let total = firstMsgs.length;
+              let exhaustedBg = false;
+              while (!exhaustedBg && total < WINDOW_MAX) {
+                const page = (await agentApi(backend.chatListMessages, {
+                  sessionId: newId,
+                  limit: PAGE_SIZE,
+                  beforeId,
+                })) as { messages?: WireMessage[]; hasMore?: boolean };
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
+                if (cancelled) break;
+                const msgs = page.messages ?? [];
+                if (msgs.length === 0) { exhaustedBg = true; break; }
+                let nextHasMore = Boolean(page.hasMore);
+                setMessages((prev) => {
+                  const seen = new Set(prev.map((m) => m.id));
+                  const fresh = projectAgentMessagesToChat(msgs.filter((m) => !seen.has(m.id)));
+                  if (fresh.length === 0) return prev;
+                  let next = [...fresh, ...prev];
+                  // Trim to WINDOW_MAX from the OLDEST end to keep the newest
+                  // messages visible. If we trimmed, there's definitely more.
+                  if (next.length > WINDOW_MAX) {
+                    const drop = next.length - WINDOW_MAX;
+                    next = next.slice(0, next.length - drop);
+                    nextHasMore = true;
+                    setHasMoreNewer(true);
+                  }
+                  knownMessageIds.current = new Set(next.map((m) => m.id));
+                  return next;
+                });
+                total += msgs.length;
+                beforeId = msgs[0].id;
+                setHasMoreOlder(nextHasMore);
+                exhaustedBg = !nextHasMore;
+              }
+              console.log(
+                '[session-origin] resume backfill: background done total=%d hasMoreOlder=%s',
+                total, !exhaustedBg,
+              );
+            }
           } catch (err) {
             console.error('[useCodingAgentChat:historyBackfill]', JSON.stringify({ sessionId: newId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
             console.debug(
