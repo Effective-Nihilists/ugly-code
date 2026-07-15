@@ -17,7 +17,7 @@ import { enableCollab } from 'ugly-app/collab/server';
 import type { WorkerHandlers } from 'ugly-app/shared';
 import { dbDefaults } from 'ugly-app/shared';
 import { messages, requests } from '../shared/api';
-import { AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
+import { type AgentMessage } from '../shared/agent';
 import { agentTurnHandler } from 'ugly-app/agent/server';
 import { agentStepHandler } from './agentStepHandler';
 import { makeResolveApiKey } from './byoKey';
@@ -67,8 +67,11 @@ const app = createApp(
   {
     // Standardized client-driven agent turn (ugly-app/agent) — the studio path.
     agentTurn: agentTurnHandler({
-      tools: AGENT_TOOLS,
-      systemPrompt: AGENT_SYSTEM_PROMPT,
+      // No `tools` / `systemPrompt` here — the client is authoritative for both.
+      // streamAgentTurn resolves `deps.tools ?? req.tools`, so pinning the 6-tool
+      // AGENT_TOOLS or the raw AGENT_SYSTEM_PROMPT template would override the
+      // studio client's per-session gated tools + rendered prompt. See the Worker
+      // entry (server/workers.ts) for the full rationale.
       // Same BYO-key resolution as the Worker entry, so dev matches prod.
       // `getDb` (late-bound, set in setOnAfterStart) rather than `app.db`:
       // reading `app` here cycles back through its own initializer (TS7022).

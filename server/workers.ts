@@ -31,7 +31,6 @@ import { collections } from '../shared/collections';
 import type { RecentProject } from '../shared/collections';
 import { cronTasks } from '../shared/cron';
 import { agentTurnHandler } from 'ugly-app/agent/server';
-import { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } from '../shared/agent';
 import { makeCodingSessionHandlers } from './codingSessionHandlers';
 import {
   DEFAULT_USER_SETTINGS,
@@ -54,8 +53,14 @@ const workersDb = (): TypedDB => {
 // reload) is the codingSession* set, shared with the Node entry (server/index.ts).
 const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
   agentTurn: agentTurnHandler({
-    tools: AGENT_TOOLS,
-    systemPrompt: AGENT_SYSTEM_PROMPT,
+    // Tools + system prompt are the CLIENT's authority here — the studio loop
+    // (client/studio/agent/clientAgent.ts) sends the per-session gated tool set
+    // (sessionToolSpecs: COMMON + mode + project + feature gates) and the fully
+    // rendered prompt (env + skills + memory injected) as req.tools/req.systemPrompt.
+    // Do NOT pin them here: streamAgentTurn resolves `deps.tools ?? req.tools`
+    // (and likewise systemPrompt), so a static config here would OVERRIDE the
+    // client — starving the model to the 6 legacy AGENT_TOOLS and shipping the
+    // raw prompt template with literal {{MEMORY}}/{{AVAILABLE_SKILLS}} placeholders.
     // BYO-subscription models (glm_coding_plan) run on the user's own provider
     // key, read server-side. This is the PROD path: agentStep isn't registered
     // here (see the note below), so without this the main turn would reach
