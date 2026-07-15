@@ -290,8 +290,8 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
     return () => { cancelled = true; };
   }, []);
   // Collapsed ugly.bot section shows only the auto-pool (pinned) models +
-  // Step 3.5 Flash + any currently-selected catalog row. Expanding reveals
-  // the full ugly.bot framework catalog.
+  // any currently-selected catalog row. Expanding reveals the full ugly.bot
+  // framework catalog.
   const [uglyBotExpanded, setUglyBotExpanded] = useState(false);
 
   // ── Group all available models by subscription, applying family filter.
@@ -531,8 +531,9 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
   const renderPopupContent = (close: () => void): React.ReactNode => {
     // Auto rows belong to the ugly.bot subscription — the auto-mode
     // router only routes through ugly.bot's framework catalog, never
-    // BYO providers or the Claude CLI runner. Render them as a
-    // prefix to the ugly.bot section, never as their own group.
+    // BYO providers or the Claude CLI runner. They render pinned to the
+    // very top of the list (above every section) whenever the ugly.bot
+    // section is present, so the default routing strategy always leads.
     // Drop the deprecated 'auto:cheap' from the offered list —
     // the picker no longer surfaces it as a selectable option,
     // though we still render the label correctly when a session
@@ -569,7 +570,11 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
       );
     }
 
-    return sections.map((key) => {
+    // Auto rows lead the whole list (see the note above) — only when the
+    // ugly.bot section is actually present, since Auto routes through it.
+    const showAutoRows = sections.includes('ugly.bot') && autoModes.length > 0;
+
+    const sectionEls = sections.map((key) => {
       const bucket = groups.get(key)!;
       if (key !== 'ugly.bot') {
         return (
@@ -579,19 +584,16 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
           </div>
         );
       }
-      // ugly.bot section: render auto rows, then the default-pool
-      // pinned rows (in the exact order declared in
-      // `DEFAULT_POOL_PINNED_IDS`), then the remainder of the
-      // ugly.bot catalog sorted by SWE-bench + cost. The pinned
-      // list mirrors the server's DEFAULT_MAX_POOL so the picker's
-      // top entries match what max-mode actually runs.
+      // ugly.bot section: the default-pool pinned rows (in the exact
+      // order declared in `DEFAULT_POOL_PINNED_IDS`), then the remainder
+      // of the ugly.bot catalog sorted by SWE-bench + cost. The pinned
+      // list mirrors the server's DEFAULT_MAX_POOL so the picker's top
+      // entries match what max-mode actually runs. (Auto rows lead the
+      // whole list from above, not this section.)
       //
-      // The "rest" tail collapses behind a Show more toggle by
-      // default — only Step 3.5 Flash (called out as a featured
-      // strong-tier model) plus any currently-selected catalog row
-      // stay visible while collapsed, so the user never loses sight
-      // of what they have picked.
-      const STEPFUN_ID = 'step_3_5_flash';
+      // The "rest" tail collapses behind a Show more toggle by default —
+      // only currently-selected catalog rows stay visible while collapsed,
+      // so the user never loses sight of what they have picked.
       const pinnedSet = new Set(DEFAULT_POOL_PINNED_IDS);
       const byId = new Map(bucket.map((m) => [m.id, m]));
       const pinnedRows = DEFAULT_POOL_PINNED_IDS.map((id) =>
@@ -599,7 +601,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
       ).filter((m): m is CodingAgentModel => m !== undefined);
       const restRows = bucket.filter((m) => !pinnedSet.has(m.id));
 
-      const featuredIds = new Set<string>([STEPFUN_ID]);
+      const featuredIds = new Set<string>();
       for (const m of restRows) {
         if (isModelSelected(m)) featuredIds.add(m.id);
       }
@@ -610,7 +612,6 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
       return (
         <div key={key}>
           <div style={popupGroupHeader}>{subscriptionLabel(key)}</div>
-          {autoModes.map((m) => renderAutoRow(m, close))}
           {pinnedRows.map((m) => renderModelRow(m, close))}
           {featuredRows.map((m) => renderModelRow(m, close))}
           {uglyBotExpanded &&
@@ -641,6 +642,13 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
         </div>
       );
     });
+
+    return (
+      <>
+        {showAutoRows && autoModes.map((m) => renderAutoRow(m, close))}
+        {sectionEls}
+      </>
+    );
   };
 
   // `<Popover>` portals the dropdown into PopoverHost (which sits AFTER

@@ -57,3 +57,34 @@ describe('glmCodingKey merge semantics', () => {
     expect(parseStoredUserSettings(legacy).codingAgent.glmCodingKey).toBeUndefined();
   });
 });
+
+// Regression: a single invalid/missing field in the stored blob must NOT erase the
+// user's provider credential. parseStoredUserSettings feeds updateUserSettings'
+// read-modify-write; if a read discards the whole doc, the next settings write
+// (e.g. sessionDefaults on a model pick) persists that loss and the key is gone.
+describe('parseStoredUserSettings salvages the key past a bad neighbor field', () => {
+  it('keeps the key when the codingAgent block is missing required toggles', () => {
+    // An old/partial blob: key present, but the required feature toggles absent.
+    const partial = JSON.stringify({ codingAgent: { glmCodingKey: 'zai-secret' } });
+    expect(parseStoredUserSettings(partial).codingAgent.glmCodingKey).toBe('zai-secret');
+  });
+
+  it('keeps the key when a NEIGHBOR field has a bad type (stale enum)', () => {
+    // The real trigger: a sessionDefaults written by an older client carries a
+    // value no longer in the schema. That must cost only sessionDefaults, not the key.
+    const poisoned = JSON.stringify({
+      ...DEFAULT_USER_SETTINGS,
+      codingAgent: {
+        ...DEFAULT_USER_SETTINGS.codingAgent,
+        glmCodingKey: 'zai-secret',
+        sessionDefaults: { pattern: 'not-a-real-pattern' },
+      },
+    });
+    expect(parseStoredUserSettings(poisoned).codingAgent.glmCodingKey).toBe('zai-secret');
+  });
+
+  it('still returns defaults (no key) for a truly empty blob', () => {
+    expect(parseStoredUserSettings('{}').codingAgent.glmCodingKey).toBeUndefined();
+    expect(parseStoredUserSettings('not json').codingAgent.glmCodingKey).toBeUndefined();
+  });
+});

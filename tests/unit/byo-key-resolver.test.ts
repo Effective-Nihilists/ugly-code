@@ -1,7 +1,10 @@
 // `makeResolveApiKey` is the ONLY thing that puts the user's GLM key on the
 // main agent turn (agentTurn -> streamAgentTurn -> streamUglyBotTurn). Two
 // guarantees matter: an ordinary metered turn must never pay for a Neon read,
-// and a settings-read failure must not take the turn down.
+// and — for a BYO model — a *transient* settings-read failure must NOT be
+// downgraded to "no key" (that sends the turn keyless and ugly.bot refuses with
+// a misleading "supply your own key", even though the key IS stored). It retries
+// the read, then surfaces an honest, distinct error the turn can show.
 import { describe, expect, it, vi } from 'vitest';
 import { makeResolveApiKey } from '../../server/byoKey';
 import { DEFAULT_USER_SETTINGS } from '../../shared/userSettings';
@@ -39,10 +42,33 @@ describe('makeResolveApiKey', () => {
     await expect(resolve('u1', 'glm_coding_plan')).resolves.toBeUndefined();
   });
 
-  it('swallows a settings-read failure rather than failing the turn', async () => {
-    const getDoc = vi.fn().mockRejectedValue(new Error('neon down'));
+  it('retries a transient read failure, then succeeds (worked-then-randomly-failed)', async () => {
+    // The real incident: the key IS stored (earlier turns worked), but one turn's
+    // D1 read blipped. A single flake must not fail the turn.
+    const getDoc = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('D1_ERROR: network'))
+      .mockResolvedValue(settingsDoc('zai-secret'));
     const resolve = makeResolveApiKey(() => ({ getDoc }));
-    await expect(resolve('u1', 'glm_coding_plan')).resolves.toBeUndefined();
+    await expect(resolve('u1', 'glm_coding_plan')).resolves.toBe('zai-secret');
+    expect(getDoc.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('throws an honest, distinct error when the read keeps failing for a BYO model', async () => {
+    // NOT undefined: undefined would go keyless -> ugly.bot returns the confusing
+    // "supply your own Z.ai key" even though the key is stored. A thrown error
+    // propagates through streamAgentTurn and shows the user the REAL reason.
+    const getDoc = vi.fn().mockRejectedValue(new Error('D1_ERROR: overloaded'));
+    const resolve = makeResolveApiKey(() => ({ getDoc }));
+    await expect(resolve('u1', 'glm_coding_plan')).rejects.toThrow(/z\.?ai|coding plan|load/i);
+  });
+
+  it('never throws for a metered model even if the DB handle is unavailable', async () => {
+    // The read is BYO-only, so a metered turn is never exposed to a read failure.
+    const resolve = makeResolveApiKey(() => {
+      throw new Error('TypedDB not initialized for this request');
+    });
+    await expect(resolve('u1', 'deepseek_v4_pro')).resolves.toBeUndefined();
   });
 
   it('handles a user with no settings doc at all', async () => {

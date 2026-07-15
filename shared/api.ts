@@ -154,6 +154,9 @@ export const requests = defineRequests({
       config: sessionConfigSchema.optional(),
       // The git branch the session operates on (server-persisted, cross-browser).
       branch: z.string().optional(),
+      // Last-turn failure text. Present-and-non-empty sets it; present-and-empty
+      // ('') clears it (a recovered turn); omitted preserves the stored value.
+      lastError: z.string().max(2000).optional(),
     }),
     output: z.object({ ok: z.boolean() }),
     rateLimit: { max: 240, window: 60 },
@@ -225,6 +228,8 @@ export const requests = defineRequests({
           config: sessionConfigSchema.optional(),
           // The git branch (or 'main') this session operates on.
           branch: z.string().optional(),
+          // Last-turn failure text, when the session ended in error (diagnostics).
+          lastError: z.string().optional(),
         }),
       ),
     }),

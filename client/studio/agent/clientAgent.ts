@@ -680,7 +680,12 @@ function persistCompaction(s: SessionAgentState, sessionId: string, droppedCount
 }
 
 /** Upsert the session metadata row (title/status/tokens/cost). */
-function persistMeta(s: SessionAgentState, sessionId: string, status: 'running' | 'idle' | 'done' | 'error'): void {
+function persistMeta(
+  s: SessionAgentState,
+  sessionId: string,
+  status: 'running' | 'idle' | 'done' | 'error',
+  errorMessage?: string,
+): void {
   if (!s.projectId) return;
   // Persist the session's run config (model + modes) from the applied selection so a
   // session created here gets its config on its first turn — and any browser that
@@ -706,6 +711,10 @@ function persistMeta(s: SessionAgentState, sessionId: string, status: 'running' 
     cacheReadTokens: s.cacheReadTokens,
     cacheCreationTokens: s.cacheCreationTokens,
     config,
+    // Record the failure text on the session (queryable by id) when the turn
+    // errored; clear it ('') on any non-error status so a recovered session
+    // stops reporting a stale error. The `⚠` chat bubble is renderer-only.
+    lastError: status === 'error' ? (errorMessage ?? 'Turn failed').slice(0, 2000) : '',
   });
 }
 
@@ -1106,7 +1115,12 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         const tick = debugTick(sessionId);
         if (e.type !== 'error') debugLog(sessionId, 'finish', { reason: e.type, ...tick });
         state.log.append({ ts: Date.now(), type: 'finish', reason: e.type });
-        persistMeta(state, sessionId, e.type === 'error' ? 'error' : 'idle');
+        persistMeta(
+          state,
+          sessionId,
+          e.type === 'error' ? 'error' : 'idle',
+          e.type === 'error' && 'message' in e ? String((e as { message: unknown }).message) : undefined,
+        );
         safeEmit(emitRef.current, {
           type: 'codingAgent:event',
           sessionId,

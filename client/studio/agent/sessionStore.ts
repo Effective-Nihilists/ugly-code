@@ -18,6 +18,8 @@ export interface SessionStore {
     config?: SessionConfig;
     /** The git branch this session operates on (server-persisted for cross-browser visibility). */
     branch?: string;
+    /** Last-turn failure text: non-empty sets it, '' clears it, omitted preserves. Diagnosable by session id. */
+    lastError?: string;
     // Cumulative token usage, persisted so analyzeRun/scorecards can report
     // cache-hit rate + tokens (the CLI fs store keeps these; the server store
     // may ignore them). Optional — not every agent path tracks tokens.

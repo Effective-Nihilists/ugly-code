@@ -17,7 +17,7 @@
  *      Opus 4.7 (87.6%) land in green.
  */
 
-import type { CodingAgentModel } from 'ugly-app/shared';
+import { type CodingAgentModel, isByoKeyTextGenModel } from 'ugly-app/shared';
 import { STANDARD_MODEL_RATES } from './model-rates.js';
 
 // ──────────────────────────────────────────────────────────────────
@@ -25,19 +25,25 @@ import { STANDARD_MODEL_RATES } from './model-rates.js';
 // ──────────────────────────────────────────────────────────────────
 
 export type SubscriptionKey =
-  | 'ugly.bot' // Anthropic / OpenAI / Google / open-weight / DeepSeek — billed via ugly.bot prepaid credits
+  | 'z-ai' // BYO Z.ai GLM Coding Plan — billed to the user's own subscription key
   | 'claude-cli' // Claude Pro / Max plan, invoked via the local `claude` CLI
+  | 'ugly.bot' // Anthropic / OpenAI / Google / open-weight / DeepSeek — billed via ugly.bot prepaid credits
   | 'anthropic'; // Generic Anthropic endpoint (ANTHROPIC_BASE_URL / settings)
 
+// Order = top-to-bottom in the picker. The BYO Z.ai and Claude CLI sections
+// lead so the user's own subscriptions stay above the fold, ahead of the big
+// collapsible ugly.bot catalog.
 export const SUBSCRIPTION_ORDER: readonly SubscriptionKey[] = [
-  'ugly.bot',
+  'z-ai',
   'claude-cli',
+  'ugly.bot',
   'anthropic',
 ] as const;
 
 const SUBSCRIPTION_LABEL: Record<SubscriptionKey, string> = {
-  'ugly.bot': 'ugly.bot',
+  'z-ai': 'Z.ai',
   'claude-cli': 'Claude CLI',
+  'ugly.bot': 'ugly.bot',
   'anthropic': 'Anthropic',
 };
 
@@ -53,6 +59,9 @@ export function subscriptionLabel(key: SubscriptionKey): string {
  * CLI rows (provider === 'claude-cli') get their own keys.
  */
 export function subscriptionOf(model: CodingAgentModel): SubscriptionKey {
+  // BYO subscriptions (currently only the Z.ai GLM Coding Plan) bill against
+  // the user's own provider key, never ugly.bot credits — their own section.
+  if (isByoKeyTextGenModel(model.id)) return 'z-ai';
   if (model.provider === 'claude-cli') return 'claude-cli';
   if (model.id.startsWith('anthropic:')) return 'anthropic';
   return 'ugly.bot';
@@ -70,6 +79,7 @@ export function isUglyBotModel(model: CodingAgentModel): boolean {
 
 /** Same predicate keyed by id only. Returns false for the generic Anthropic endpoint or claude-code tiers. */
 export function isUglyBotModelId(id: string): boolean {
+  if (isByoKeyTextGenModel(id)) return false;
   if (id.startsWith('anthropic:')) return false;
   if (id === 'claude-code' || id.startsWith('claude-code:')) return false;
   return true;

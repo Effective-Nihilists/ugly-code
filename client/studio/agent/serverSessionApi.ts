@@ -135,6 +135,8 @@ export interface SessionListRow {
   config?: SessionConfig;
   /** The git branch (or 'main') this session operates on. Server-persisted. */
   branch?: string;
+  /** Last-turn failure text when the session ended in error (diagnostics). */
+  lastError?: string;
 }
 
 // The server-backed store (the default). `sessionApi` below delegates to whichever

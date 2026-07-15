@@ -206,16 +206,45 @@ function mergeOptional(
   return out;
 }
 
-/** Parse a persisted JSON blob and merge over defaults. Bad/absent blob → defaults. */
+/**
+ * Parse a persisted JSON blob and merge over defaults.
+ *
+ * TOLERANT BY DESIGN. This read feeds `updateUserSettings`' read-modify-write
+ * (server reads current → merges patch → writes back). An all-or-nothing parse
+ * is therefore a data-loss trap: if ONE stale/invalid field made the read return
+ * defaults, the very next settings write (e.g. `sessionDefaults` on a model pick)
+ * would persist those defaults and silently erase the user's `glmCodingKey`
+ * credential. So we degrade field-by-field rather than discarding the whole doc:
+ *
+ *   1. Validate against the DEEP-optional patch schema (not
+ *      `userSettingsSchema.partial()`, which only makes the TOP level optional and
+ *      so rejects any blob whose nested codingAgent is missing a field). This
+ *      alone rescues older/partial blobs.
+ *   2. If a PRESENT field has a bad type (e.g. a sessionDefaults enum from an old
+ *      client), the patch parse still fails — so salvage the one field that must
+ *      never be lost, the provider credential, before falling back to defaults.
+ */
 export function parseStoredUserSettings(raw: string | null | undefined): UserSettings {
   if (!raw) return DEFAULT_USER_SETTINGS;
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    const result = userSettingsSchema.partial().safeParse(parsed);
-    if (!result.success) return DEFAULT_USER_SETTINGS;
-    // A partial stored blob (older schema) merges over defaults via the patch merge.
-    return mergeUserSettings(DEFAULT_USER_SETTINGS, result.data);
+    parsed = JSON.parse(raw);
   } catch {
     return DEFAULT_USER_SETTINGS;
   }
+  const lenient = userSettingsPatchSchema.safeParse(parsed);
+  if (lenient.success) return mergeUserSettings(DEFAULT_USER_SETTINGS, lenient.data);
+  const key = extractGlmCodingKey(parsed);
+  return key === undefined
+    ? DEFAULT_USER_SETTINGS
+    : mergeUserSettings(DEFAULT_USER_SETTINGS, { codingAgent: { glmCodingKey: key } });
+}
+
+/** Pull a well-typed, non-empty glmCodingKey straight out of a raw parsed blob. */
+function extractGlmCodingKey(parsed: unknown): string | undefined {
+  if (parsed === null || typeof parsed !== 'object') return undefined;
+  const ca = (parsed as { codingAgent?: unknown }).codingAgent;
+  if (ca === null || typeof ca !== 'object') return undefined;
+  const key = (ca as { glmCodingKey?: unknown }).glmCodingKey;
+  return typeof key === 'string' && key.length > 0 ? key : undefined;
 }

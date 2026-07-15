@@ -38,6 +38,11 @@ export const CodingSessionSchema = z.object({
   // every browser sees the correct branch pill. Only set for worktree sessions;
   // main-branch sessions omit it (the sidebar resolves to 'main').
   branch: z.string().optional(),
+  // The last turn's failure text, when a turn ended in `status:'error'`. Persisted
+  // so a failed session is diagnosable from its id alone (the `⚠` chat bubble is
+  // renderer-only and never hit the transcript). Cleared on the next successful
+  // turn. See clientAgent.persistMeta.
+  lastError: z.string().optional(),
 });
 export type CodingSessionKind = 'main' | 'session';
 export type CodingSessionStatus = 'running' | 'idle' | 'done' | 'error';

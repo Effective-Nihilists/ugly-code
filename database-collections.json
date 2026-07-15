@@ -1,44 +1,7 @@
 {
-  "generatedAt": "2026-07-09T05:41:17.846Z",
+  "generatedAt": "2026-07-15T22:23:16.423Z",
   "source": "shared/collections.ts",
   "collections": {
-    "perfLog": {
-      "name": "perfLog",
-      "schema": {
-        "fields": {
-          "durationMs": {
-            "type": "number",
-            "required": true
-          },
-          "operation": {
-            "type": "string",
-            "required": true
-          },
-          "userId": {
-            "type": "string",
-            "required": true
-          }
-        },
-        "indexes": [
-          {
-            "fields": {
-              "operation": 1
-            }
-          },
-          {
-            "fields": {
-              "userId": 1
-            }
-          }
-        ]
-      },
-      "meta": {
-        "cache": false,
-        "trackable": false,
-        "public": false,
-        "cascadeFrom": null
-      }
-    },
     "authMagicLink": {
       "name": "authMagicLink",
       "schema": {
@@ -88,7 +51,10 @@
         "cache": false,
         "trackable": false,
         "public": false,
-        "cascadeFrom": null
+        "cascadeFrom": null,
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "authIdentity": {
@@ -148,7 +114,10 @@
         "cache": false,
         "trackable": false,
         "public": false,
-        "cascadeFrom": null
+        "cascadeFrom": null,
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "debugLogSession": {
@@ -240,7 +209,10 @@
         "cascadeFrom": null,
         "trackKeys": [
           "userId"
-        ]
+        ],
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "debugLogStream": {
@@ -267,7 +239,10 @@
         "cascadeFrom": null,
         "trackKeys": [
           "userId"
-        ]
+        ],
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "todo": {
@@ -286,7 +261,14 @@
             "type": "string",
             "required": true
           }
-        }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "done": 1
+            }
+          }
+        ]
       },
       "meta": {
         "cache": false,
@@ -295,7 +277,10 @@
         "cascadeFrom": null,
         "trackKeys": [
           "userId"
-        ]
+        ],
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "conversation": {
@@ -318,7 +303,10 @@
         "cache": false,
         "trackable": false,
         "public": false,
-        "cascadeFrom": null
+        "cascadeFrom": null,
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "message": {
@@ -346,7 +334,10 @@
         "cascadeFrom": "conversation",
         "trackKeys": [
           "conversationId"
-        ]
+        ],
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "collabDoc": {
@@ -372,7 +363,10 @@
         "cache": false,
         "trackable": false,
         "public": false,
-        "cascadeFrom": null
+        "cascadeFrom": null,
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "recentProject": {
@@ -419,7 +413,10 @@
         "cascadeFrom": null,
         "trackKeys": [
           "userId"
-        ]
+        ],
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "userSettings": {
@@ -443,7 +440,10 @@
         "cascadeFrom": null,
         "trackKeys": [
           "userId"
-        ]
+        ],
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "codingSession": {
@@ -589,6 +589,10 @@
             "type": "string",
             "required": true
           },
+          "lastError": {
+            "type": "string",
+            "required": false
+          },
           "messageCount": {
             "type": "number",
             "required": true
@@ -639,7 +643,10 @@
         "cache": false,
         "trackable": false,
         "public": false,
-        "cascadeFrom": null
+        "cascadeFrom": null,
+        "db": {
+          "kind": "d1"
+        }
       }
     },
     "codingSessionMessage": {
@@ -697,7 +704,10 @@
         "cache": false,
         "trackable": false,
         "public": false,
-        "cascadeFrom": null
+        "cascadeFrom": null,
+        "db": {
+          "kind": "d1"
+        }
       }
     }
   }

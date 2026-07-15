@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { InferDocType } from 'ugly-app/shared';
+import type { InferDocType, IndexDef } from 'ugly-app/shared';
 import { defineCollections, d1 } from 'ugly-app/shared';
 import { codingCollections } from './codingCollections';
 import type { CodingSession, CodingSessionMessage } from './codingCollections';
@@ -139,18 +139,38 @@ const baseCollections = defineCollections({
 // a base collection (always precisely typed, cheap) and re-parameterize it over
 // an explicit doc type. The runtime values come from `codingCollections`
 // (correct: { schema, meta, indexes, name }); only the static type is asserted.
-type ColDef<T> = Omit<typeof baseCollections.collabDoc, '_type' | 'name' | 'schema' | 'meta'> & {
+// `_idx` is the phantom tuple that ugly-app's compile-time index-safety reads to
+// know which fields a collection may be filtered/sorted on (CollectionIndexedFields).
+// The cast must carry it, or `getDocs` would only allow the top-level columns.
+type ColDef<T, Idx extends readonly IndexDef[] = readonly IndexDef[]> = Omit<
+  typeof baseCollections.collabDoc,
+  '_type' | '_idx' | 'name' | 'schema' | 'meta'
+> & {
   _type?: T;
+  _idx?: Idx;
   name: string;
   schema: z.ZodObject<z.ZodRawShape>;
   meta: (typeof baseCollections.collabDoc)['meta'];
 };
 const cc = codingCollections as Record<'codingSession' | 'codingSessionMessage', unknown>;
 
+// Literal index tuples used ONLY as the `_idx` phantom on the cast below, so the
+// 0.1.843 index-safety check knows the indexed fields. These are types, never fed
+// to `defineCollections`, so they don't tip its inference budget (see the note in
+// codingCollections.ts). MUST mirror codingSession*Indexes in codingCollections.ts.
+type CodingSessionIdx = readonly [
+  { fields: { userId: 1; projectId: 1; kind: 1 } },
+  { fields: { userId: 1; projectId: 1; archived: 1 } },
+];
+type CodingSessionMessageIdx = readonly [
+  { fields: { sessionId: 1; userId: 1; compacted: 1; seq: 1 } },
+  { fields: { sessionId: 1; userId: 1; seq: 1 } },
+];
+
 export const collections = {
   ...baseCollections,
-  codingSession: cc.codingSession as ColDef<CodingSession>,
-  codingSessionMessage: cc.codingSessionMessage as ColDef<CodingSessionMessage>,
+  codingSession: cc.codingSession as ColDef<CodingSession, CodingSessionIdx>,
+  codingSessionMessage: cc.codingSessionMessage as ColDef<CodingSessionMessage, CodingSessionMessageIdx>,
 };
 
 export type AppCollections = typeof collections;

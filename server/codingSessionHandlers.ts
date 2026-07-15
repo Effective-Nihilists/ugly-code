@@ -95,6 +95,12 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         // persistMeta (worker turn) omits it, so preserve the stored value.
         ...((input.config ?? existing?.config) ? { config: input.config ?? existing?.config } : {}),
         ...((input.branch ?? existing?.branch) ? { branch: input.branch ?? existing?.branch } : {}),
+        // lastError: omitted (undefined) preserves; '' clears (recovered turn); a
+        // non-empty string sets the new failure text.
+        ...(() => {
+          const lastError = input.lastError === undefined ? existing?.lastError : input.lastError || undefined;
+          return lastError ? { lastError } : {};
+        })(),
         ...dbDefaults(),
         // Preserve the original creation time across updates.
         ...(existing ? { created: existing.created } : {}),
@@ -177,6 +183,7 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
           updated: new Date(d.updated).getTime(),
           ...(d.config ? { config: d.config } : {}),
           ...(d.branch ? { branch: d.branch } : {}),
+          ...(d.lastError ? { lastError: d.lastError } : {}),
         })),
       };
     },
