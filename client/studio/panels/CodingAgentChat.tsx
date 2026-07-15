@@ -6034,6 +6034,14 @@ export interface CodingAgentChatProps {
    * Host wires this to its `onSelectSession` machinery.
    */
   onOpenSession?: (compositeId: string) => void;
+  /**
+   * Fired whenever this session's live run state flips (the model is
+   * streaming / thinking vs. idle). The host uses it to light the
+   * "thinking" indicator on the session's sidebar row INSTANTLY, without
+   * waiting for the server-status poll (which lags behind by the poll
+   * interval + D1 read-replica latency for the active session).
+   */
+  onRunningChange?: (running: boolean) => void;
 }
 
 function CodingAgentChatInner({
@@ -6047,6 +6055,7 @@ function CodingAgentChatInner({
   onSessionArchived,
   peerSessions,
   onOpenSession,
+  onRunningChange,
 }: // `onOpenUri` is consumed via OpenUriContext (set by the outer
 // wrapper). Not destructured here — the wrapper installs the
 // provider and the inner has no use for the prop directly.
@@ -6124,6 +6133,13 @@ CodingAgentChatProps = {}) {
     onTitleChanged,
     ...(onResumeMissing ? { onResumeMissing } : {}),
   });
+  // Surface this session's live run state to the host so the sidebar row's
+  // "thinking" indicator flips the instant the model starts/stops — the
+  // server-status poll alone lags (poll interval + D1 read-replica latency),
+  // which is exactly what made the ACTIVE session never look like it was thinking.
+  useEffect(() => {
+    onRunningChange?.(isStreaming);
+  }, [isStreaming, onRunningChange]);
   // Contribute the live coding session (messages + model/mode settings) to any
   // Ugly Studio feedback report filed from this page. The bundle is expensive to
   // serialize, so we register a LAZY provider (invoked only at submit time) rather

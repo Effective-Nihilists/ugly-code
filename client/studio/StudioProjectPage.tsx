@@ -122,6 +122,11 @@ export default function StudioProjectPage({
   );
   // Bumped to remount CodingAgentChat when switching sessions / starting fresh.
   const [chatKey, setChatKey] = React.useState(0);
+  // Live run state of the ACTIVE session's chat, reported by CodingAgentChat.
+  // The server-status poll below covers background/peer sessions but lags for the
+  // one the user is watching (poll interval + D1 replica latency), so we drive the
+  // active row's "thinking" indicator off this instant signal too.
+  const [activeRunning, setActiveRunning] = React.useState(false);
 
   // Resizable sidebar. Window-level pointer listeners (not setPointerCapture) — on macOS the
   // window-controls drag region swallows mousemove otherwise (see ugly-studio dock-drag notes).
@@ -262,12 +267,16 @@ export default function StudioProjectPage({
 
   const selectSession = React.useCallback((id: string) => {
     setActiveSessionId(id);
+    // The freshly-mounted chat re-reports its run state; reset so the switched-to
+    // row doesn't inherit the previous session's "thinking" for a frame.
+    setActiveRunning(false);
     setChatKey((k) => k + 1);
     setTab('chat');
   }, []);
 
   const newSession = React.useCallback(() => {
     setActiveSessionId(null);
+    setActiveRunning(false);
     setChatKey((k) => k + 1);
     setTab('chat');
   }, []);
@@ -303,8 +312,10 @@ export default function StudioProjectPage({
     compositeId: s.compositeId,
     title: s.title,
     updated_at: s.updated_at,
-    // Live thinking indicator — server-persisted status, refreshed by the poll.
-    running: s.status === 'running',
+    // Thinking indicator: the ACTIVE session uses the chat's instant live signal;
+    // every session also honors the server-persisted status from the poll (covers
+    // background/peer sessions + the active one once the poll catches up).
+    running: (s.compositeId === activeSessionId && activeRunning) || s.status === 'running',
     model: s.model,
     totalTokens: 0,
     totalCost: 0,
@@ -420,6 +431,7 @@ export default function StudioProjectPage({
               onSessionCreated={recordSession}
               onResumeMissing={archiveSession}
               onOpenUri={openUri}
+              onRunningChange={setActiveRunning}
             />
           </div>
           {/* Session tabs (dev-scoped) */}
