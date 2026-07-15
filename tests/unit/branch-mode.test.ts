@@ -9,7 +9,6 @@ describe('CodingSessionSchema — branch field', () => {
       projectId: 'proj-1',
       userId: 'user-1',
       title: 'Fix login',
-      kind: 'session',
       model: 'claude-sonnet-4-20250514',
       status: 'idle',
       messageCount: 5,
@@ -25,7 +24,6 @@ describe('CodingSessionSchema — branch field', () => {
       projectId: 'proj-1',
       userId: 'user-1',
       title: 'Fix login',
-      kind: 'session',
       model: 'claude-sonnet-4-20250514',
       status: 'idle',
       messageCount: 5,
@@ -41,8 +39,7 @@ describe('CodingSessionSchema — branch field', () => {
       sessionId: 'cs:abc123',
       projectId: 'proj-1',
       userId: 'user-1',
-      title: 'Main session',
-      kind: 'main',
+      title: 'Main-branch session',
       model: 'auto',
       status: 'idle',
       messageCount: 0,
@@ -64,7 +61,7 @@ describe('CodingSessionSchema — branch field', () => {
   it('codingCollections defines codingSession and codingSessionMessage', () => {
     const cs = codingCollections.codingSession;
     expect(cs.schema).toBe(CodingSessionSchema);
-    expect(cs.indexes).toHaveLength(2);
+    expect(cs.indexes).toHaveLength(1);
 
     const csm = codingCollections.codingSessionMessage;
     expect(csm.schema).toBeDefined();
@@ -97,7 +94,6 @@ describe('API schemas — branch field', () => {
       sessions: [{
         sessionId: 'cs:abc',
         title: 'Test',
-        kind: 'session',
         model: 'claude-sonnet-4-20250514',
         status: 'idle',
         messageCount: 0,
@@ -114,7 +110,6 @@ describe('API schemas — branch field', () => {
       sessions: [{
         sessionId: 'cs:abc',
         title: 'Test',
-        kind: 'main',
         model: 'auto',
         status: 'idle',
         messageCount: 0,

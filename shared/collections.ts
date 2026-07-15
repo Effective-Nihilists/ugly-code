@@ -64,7 +64,6 @@ export type UserSettingsDoc = InferDocType<typeof UserSettingsSchema>;
 export type {
   CodingSession,
   CodingSessionMessage,
-  CodingSessionKind,
   CodingSessionStatus,
   CodingSessionMessageRole,
   CodingSessionMessageKind,
@@ -159,7 +158,6 @@ const cc = codingCollections as Record<'codingSession' | 'codingSessionMessage',
 // to `defineCollections`, so they don't tip its inference budget (see the note in
 // codingCollections.ts). MUST mirror codingSession*Indexes in codingCollections.ts.
 type CodingSessionIdx = readonly [
-  { fields: { userId: 1; projectId: 1; kind: 1 } },
   { fields: { userId: 1; projectId: 1; archived: 1 } },
 ];
 type CodingSessionMessageIdx = readonly [

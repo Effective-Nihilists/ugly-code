@@ -68,24 +68,12 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       const db = getDb();
       const existing = await db.getDoc(collections.codingSession, input.sessionId);
       if (existing && existing.userId !== userId) throw new Error('Session not found');
-      // Resolve kind once (on first upsert). The first session in a project with
-      // no `main` yet becomes the main session; this needs no client plumbing.
-      let kind = input.kind ?? existing?.kind;
-      if (!kind) {
-        const mains: CodingSession[] = await db.getDocs(
-          collections.codingSession,
-          { userId, projectId: input.projectId, kind: 'main' },
-          { limit: 1 },
-        );
-        kind = mains.length > 0 ? 'session' : 'main';
-      }
       const doc: CodingSession = {
         _id: input.sessionId,
         sessionId: input.sessionId,
         projectId: input.projectId,
         userId,
         title: input.title ?? existing?.title ?? '',
-        kind,
         model: input.model ?? existing?.model ?? '',
         status: input.status ?? existing?.status ?? 'idle',
         messageCount: input.messageCount ?? existing?.messageCount ?? 0,
@@ -177,7 +165,7 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       );
       return {
         sessions: docs.map((d) => ({
-          sessionId: d.sessionId, title: d.title, kind: d.kind, model: d.model,
+          sessionId: d.sessionId, title: d.title, model: d.model,
           status: d.status, messageCount: d.messageCount, costUsd: d.costUsd,
           created: new Date(d.created).getTime(),
           updated: new Date(d.updated).getTime(),

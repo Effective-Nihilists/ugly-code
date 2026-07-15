@@ -216,13 +216,6 @@ export interface SessionListSidebarSession {
    * peer. Causes the row to render indented under its parent.
    */
   parentSessionId?: string;
-  /**
-   * Discriminator for the always-present "main" session per project.
-   * `'main'` runs on the parent branch with no worktree and is the
-   * canonical surface for git push/pull. Rendered in a separate
-   * "Repository" pane above the regular session list.
-   */
-  kind?: 'main';
 }
 
 /** One button in the sidebar footer nav (the prod-scoped views live here). */
@@ -244,18 +237,6 @@ export interface SessionListSidebarProps {
   onArchiveSession: (compositeId: string) => void;
   timeAgo: (ts: number) => string;
   footerNav?: SidebarNavItem[];
-  /**
-   * Current branch of the project root, displayed in the Repository
-   * row's title (`main · <branch>`). Optional — if absent, the row
-   * just shows "main".
-   */
-  repoBranch?: string;
-  /**
-   * Reset the project's main session — archives the current main
-   * (lazy replacement: a fresh main is provisioned on next access).
-   * Hidden when undefined.
-   */
-  onResetMainSession?: (compositeId: string) => void;
   /**
    * Count of archived sessions for this project. When > 0, an
    * "Archived (N)" pill appears above the footer nav; clicking it
@@ -279,8 +260,6 @@ export function SessionListSidebar({
   onArchiveSession,
   timeAgo,
   footerNav,
-  repoBranch,
-  onResetMainSession,
   archivedCount,
   onShowArchived,
   sessionViews,
@@ -295,11 +274,6 @@ export function SessionListSidebar({
     firstRowLoggedRef.current = true;
     bootMark('sidebar:first-session-data', { count: sessions.length });
   }
-  // Split "main" session into the Repository pane; the regular session
-  // list is everything else. Server enforces at most one active main
-  // session per project; we still take the first defensively.
-  const mainSession = sessions.find((s) => s.kind === 'main') ?? null;
-  const regularSessions = sessions.filter((s) => s.kind !== 'main');
   return (
     <aside
       data-id="session-list-sidebar"
@@ -347,27 +321,8 @@ export function SessionListSidebar({
             {String(sessions.length).padStart(2, '0')}
           </span>
         </div>
-        {mainSession && (
-          // The repo / no-worktree "main" session is always present and
-          // is always the first row, directly under the Sessions header.
-          <React.Fragment>
-            <RepositoryRow
-              data-id="repository-row"
-              session={mainSession}
-              branch={repoBranch}
-              active={mainSession.compositeId === activeCompositeId}
-              onClick={() => { onSelect(mainSession.compositeId); }}
-              {...(onResetMainSession
-                ? { onReset: () => { onResetMainSession(mainSession.compositeId); } }
-                : {})}
-            />
-            {sessionViews && mainSession.compositeId === activeCompositeId && (
-              <SessionSubNav items={sessionViews} />
-            )}
-          </React.Fragment>
-        )}
         <SessionRowList
-          regularSessions={regularSessions}
+          regularSessions={sessions}
           activeCompositeId={activeCompositeId}
           onSelect={onSelect}
           onArchiveSession={onArchiveSession}
@@ -492,208 +447,6 @@ function ArchiveIcon(): React.ReactElement {
   );
 }
 
-function RepositoryRow({
-  session,
-  branch,
-  active,
-  onClick,
-  onReset,
-  'data-id': dataId,
-}: {
-  session: SessionListSidebarSession;
-  branch?: string;
-  active: boolean;
-  onClick: () => void;
-  onReset?: () => void;
-  'data-id'?: string;
-}): React.ReactElement {
-  const [hovered, setHovered] = React.useState(false);
-  // Cyan stays on the REPO badge as a brand identifier (so the row
-  // still reads as a distinct *kind* of session) — but the active
-  // selection bar uses the same orange accent as SessionRow + the
-  // Prod/Git/Terminal nav buttons so "this is the selected surface"
-  // reads consistently across the whole sidebar.
-  const labelAccent = '#22D3EE';
-  return (
-    <div
-      data-id={dataId ?? 'repository-row'}
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onClick();
-      }}
-      onMouseEnter={() => { setHovered(true); }}
-      onMouseLeave={() => { setHovered(false); }}
-      style={{
-        position: 'relative',
-        padding: '12px 14px 12px 16px',
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        background: active
-          ? 'var(--bg-secondary)'
-          : hovered
-          ? 'var(--bg-panel)'
-          : 'transparent',
-        transition: 'background 120ms ease',
-      }}
-    >
-      {active && (
-        <span
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 3,
-            background: 'var(--accent)',
-            boxShadow: '0 0 12px var(--accent)',
-            pointerEvents: 'none',
-          }}
-        />
-      )}
-
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          minWidth: 0,
-        }}
-      >
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontFamily: 'var(--font-heading)',
-            fontSize: 13,
-            fontWeight: 700,
-            color: 'var(--text-primary)',
-            lineHeight: 1.3,
-            letterSpacing: '-0.01em',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 9,
-              fontWeight: 800,
-              letterSpacing: '0.16em',
-              padding: '1px 5px',
-              borderRadius: 3,
-              background: labelAccent,
-              color: '#04161a',
-              flexShrink: 0,
-            }}
-          >
-            REPO
-          </span>
-          <span
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            main{branch ? ` · ${branch}` : ''}
-          </span>
-        </div>
-        {onReset && (
-          <button
-            type="button"
-            data-id="repository-reset"
-            title="Archive this session and start a fresh one. The repository session always exists."
-            aria-label="Reset main session"
-            onClick={(e) => {
-              e.stopPropagation();
-              onReset();
-            }}
-            style={{
-              width: 22,
-              height: 22,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-muted)',
-              background: 'transparent',
-              border: '1px solid transparent',
-              cursor: 'pointer',
-              flexShrink: 0,
-              padding: 0,
-              // Always reserve the slot — only opacity toggles on
-              // hover so the title never reflows when the icon shows.
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? 'auto' : 'none',
-              transition: 'opacity 120ms ease',
-            }}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              width={12}
-              height={12}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15A9 9 0 1 1 18 6.36L23 10" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontFamily: '"JetBrains Mono", monospace',
-          fontSize: 10.5,
-          color: 'var(--text-muted)',
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-        }}
-      >
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            fontWeight: 600,
-          }}
-        >
-          {session.running ? (
-            <>
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: labelAccent,
-                  flexShrink: 0,
-                  boxShadow: `0 0 8px ${labelAccent}`,
-                }}
-              />
-              <span style={{ color: labelAccent }}>thinking</span>
-            </>
-          ) : (
-            <span>push / pull</span>
-          )}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 function SidebarFooterButton({
   label,
   active,
@@ -747,9 +500,9 @@ function SidebarFooterButton({
       }}
     >
       {active && (
-        // Same orange selection bar that SessionRow + RepositoryRow
-        // use — keeps "this is the active surface" reading
-        // consistent across every clickable entry in the sidebar.
+        // Same orange selection bar that SessionRow uses — keeps "this
+        // is the active surface" reading consistent across every
+        // clickable entry in the sidebar.
         <span
           style={{
             position: 'absolute',

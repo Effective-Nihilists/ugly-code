@@ -9,7 +9,6 @@ export interface SessionStore {
     sessionId: string;
     projectId: string;
     title?: string;
-    kind?: 'main' | 'session';
     model?: string;
     status?: 'running' | 'idle' | 'done' | 'error';
     messageCount?: number;

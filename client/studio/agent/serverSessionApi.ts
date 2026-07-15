@@ -124,7 +124,6 @@ export interface StoredMessageRow {
 export interface SessionListRow {
   sessionId: string;
   title: string;
-  kind: 'main' | 'session';
   model: string;
   status: 'running' | 'idle' | 'done' | 'error';
   messageCount: number;

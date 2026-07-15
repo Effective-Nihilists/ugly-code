@@ -28,7 +28,9 @@ describe('runEval', () => {
     const res = await runEval({ taskName: 'demo', origin: 'https://x', token: 'T' });
     expect(execFile).toHaveBeenCalled();                     // fixture clone (node child_process)
     expect(bootDriver).toHaveBeenCalled();
-    expect(runTurn).toHaveBeenCalledWith(expect.any(String), 'do it', expect.any(Function), undefined);
+    // Eval runs force branchMode 'main' so the agent edits the cloned project dir
+    // the grader inspects (not an isolated worktree). See evalRun.ts `selection`.
+    expect(runTurn).toHaveBeenCalledWith(expect.any(String), 'do it', expect.any(Function), { branchMode: 'main' });
     expect(gradeProject).toHaveBeenCalled();
     expect(res).toEqual({ score: 1, scoreMax: 1, costUsd: 0, turns: 0, resolvedPattern: null });
   });

@@ -97,10 +97,10 @@ function writeWorkspaceUrl(tab: WorkspaceTab, session: string | null): void {
   window.history.replaceState({}, '', url.pathname + url.search);
 }
 
-// The project page: session sidebar (list + main + New session) + the workspace
-// (coding-agent chat + the tab rail). Sessions persist per project; the main
-// session is the always-present canonical one.
-const MAIN_PLACEHOLDER = '__new-main__';
+// The project page: session sidebar (list + New session) + the workspace
+// (coding-agent chat + the tab rail). Sessions persist per project; every session
+// is uniform — isolation is a per-session branchMode pick (worktree vs. main), not
+// a distinct "main" kind. An empty project shows the new-session hero directly.
 
 export default function StudioProjectPage({
   projectName,
@@ -118,11 +118,10 @@ export default function StudioProjectPage({
   // compositeId on first turn (onSessionCreated), which we record here.
   const [stored, setStored] = React.useState<StoredSession[]>(() => loadSessions(projectPath));
   const [activeSessionId, setActiveSessionId] = React.useState<string | null>(
-    () => urlInit.session ?? loadSessions(projectPath).find((s) => s.kind === 'main')?.compositeId ?? null,
+    () => urlInit.session ?? null,
   );
   // Bumped to remount CodingAgentChat when switching sessions / starting fresh.
   const [chatKey, setChatKey] = React.useState(0);
-  const nextKindRef = React.useRef<'main' | 'session'>('main');
 
   // Resizable sidebar. Window-level pointer listeners (not setPointerCapture) — on macOS the
   // window-controls drag region swallows mousemove otherwise (see ugly-studio dock-drag notes).
@@ -199,7 +198,7 @@ export default function StudioProjectPage({
     const u = readWorkspaceUrl();
     const s = loadSessions(projectPath);
     setStored(s);
-    setActiveSessionId(u.session ?? s.find((x) => x.kind === 'main')?.compositeId ?? null);
+    setActiveSessionId(u.session ?? null);
     setTab(u.tab ?? 'chat');
   }, [projectPath]);
 
@@ -211,19 +210,23 @@ export default function StudioProjectPage({
   // and MERGE with any just-created, not-yet-persisted local sessions (a session
   // is only persisted server-side on its first turn). The localStorage list above
   // gives an instant first paint; this reconciles it with the authoritative rows.
+  //
+  // Re-polls on an interval so each row's live `status` (→ the sidebar "thinking"
+  // indicator) flips while an agent works and back to idle when it stops. Paused
+  // while the tab is hidden, and re-fired the moment it becomes visible again.
   React.useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    const poll = async (): Promise<void> => {
       const projectId = await resolveProjectId(projectPath ?? null);
       const data = await sessionApi.list({ projectId });
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is mutated by the cleanup closure
       if (cancelled || !data) return;
       const mapped: StoredSession[] = data.sessions.map((s) => ({
         compositeId: s.sessionId,
-        title: s.title || (s.kind === 'main' ? 'Main session' : 'Session'),
-        ...(s.kind === 'main' ? { kind: 'main' as const } : {}),
+        title: s.title || 'Session',
         updated_at: s.updated,
         model: s.model || 'auto',
+        // Live run status → the row's thinking/idle pill.
+        status: s.status,
         // Branch is server-persisted for cross-browser visibility.
         ...(s.branch ? { branch: s.branch } : {}),
       }));
@@ -232,8 +235,16 @@ export default function StudioProjectPage({
         const localOnly = prev.filter((p) => !serverIds.has(p.compositeId));
         return [...mapped, ...localOnly];
       });
-    })();
-    return () => { cancelled = true; };
+    };
+    void poll();
+    const id = window.setInterval(() => { if (!document.hidden) void poll(); }, 3000);
+    const onVisible = (): void => { if (!document.hidden) void poll(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [projectPath]);
 
   // Keep ?tab= / ?session= in sync so a reload restores the workspace.
@@ -241,37 +252,25 @@ export default function StudioProjectPage({
     writeWorkspaceUrl(tab, activeSessionId);
   }, [tab, activeSessionId]);
 
-  const hasRealMain = stored.some((s) => s.kind === 'main');
-
   const recordSession = React.useCallback((id: string) => {
     setStored((prev) => {
       if (prev.some((s) => s.compositeId === id)) return prev;
-      const asMain = nextKindRef.current === 'main' && !prev.some((s) => s.kind === 'main');
-      return [
-        ...prev,
-        { compositeId: id, title: asMain ? 'Main session' : 'Session', updated_at: Date.now(), model: 'auto', ...(asMain ? { kind: 'main' as const } : {}) },
-      ];
+      return [...prev, { compositeId: id, title: 'Session', updated_at: Date.now(), model: 'auto' }];
     });
     setActiveSessionId(id);
   }, []);
 
   const selectSession = React.useCallback((id: string) => {
-    if (id === MAIN_PLACEHOLDER) {
-      nextKindRef.current = 'main';
-      setActiveSessionId(null);
-    } else {
-      setActiveSessionId(id);
-    }
+    setActiveSessionId(id);
     setChatKey((k) => k + 1);
     setTab('chat');
   }, []);
 
   const newSession = React.useCallback(() => {
-    nextKindRef.current = hasRealMain ? 'session' : 'main';
     setActiveSessionId(null);
     setChatKey((k) => k + 1);
     setTab('chat');
-  }, [hasRealMain]);
+  }, []);
 
   // Hand a feedback report to the coding agent: seed the composer with a fix
   // prompt (via the same sessionStorage bridges the eval flow uses) in an existing
@@ -296,41 +295,31 @@ export default function StudioProjectPage({
     // (not activeSessionId), so bump chatKey to force that remount.
     if (id === activeSessionId) setChatKey((k) => k + 1);
     // Persist the archive + tear down the session's worktree (best-effort).
-    if (id !== MAIN_PLACEHOLDER) {
-      void sessionApi.archive({ sessionId: id });
-      void import('./agent/sessionWorkspace').then((m) => m.removeSessionWorkspace(id, projectPath ?? null));
-    }
+    void sessionApi.archive({ sessionId: id });
+    void import('./agent/sessionWorkspace').then((m) => m.removeSessionWorkspace(id, projectPath ?? null));
   }, [projectPath, activeSessionId]);
 
-  // Synthetic "Main session" row when none has been started yet — clicking it
-  // opens the new-session hero, and the first session created becomes main.
-  const sidebarSessions: SessionListSidebarSession[] = [
-    ...(hasRealMain
-      ? []
-      : [{ compositeId: MAIN_PLACEHOLDER, title: 'Main session', kind: 'main' as const, updated_at: Date.now(), running: false, model: 'auto', totalTokens: 0, totalCost: 0 }]),
-    ...stored.map((s) => ({
-      compositeId: s.compositeId,
-      title: s.title,
-      ...(s.kind ? { kind: s.kind } : {}),
-      updated_at: s.updated_at,
-      running: false,
-      model: s.model,
-      totalTokens: 0,
-      totalCost: 0,
-      ...(s.branch ? { branch: s.branch } : {}),
-    })),
-  ];
+  const sidebarSessions: SessionListSidebarSession[] = stored.map((s) => ({
+    compositeId: s.compositeId,
+    title: s.title,
+    updated_at: s.updated_at,
+    // Live thinking indicator — server-persisted status, refreshed by the poll.
+    running: s.status === 'running',
+    model: s.model,
+    totalTokens: 0,
+    totalCost: 0,
+    ...(s.branch ? { branch: s.branch } : {}),
+  }));
 
   // One props object shared by the desktop inline sidebar and the mobile drawer
   // (DRY). On mobile, every selection also closes the drawer; closeDrawer() is a
   // harmless no-op on desktop where the drawer isn't rendered.
   const sidebarProps = {
     sessions: sidebarSessions,
-    activeCompositeId: activeSessionId ?? MAIN_PLACEHOLDER,
+    activeCompositeId: activeSessionId,
     onSelect: (id: string) => { selectSession(id); closeDrawer(); },
     onNewSession: () => { newSession(); closeDrawer(); },
     onArchiveSession: archiveSession,
-    onResetMainSession: archiveSession,
     timeAgo: timeAgoShort,
     archivedCount: 0,
     onShowArchived: () => undefined,

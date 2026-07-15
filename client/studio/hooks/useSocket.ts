@@ -766,8 +766,6 @@ const handlers: Record<string, Handler> = {
       model: s.model || 'auto',
       totalTokens: 0,
       totalCost: s.costUsd,
-      // Surface the main-session flag so the sidebar can pin/label it.
-      kind: s.kind,
     }));
     return { sessions };
   },

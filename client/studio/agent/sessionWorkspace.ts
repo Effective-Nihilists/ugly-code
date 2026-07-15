@@ -17,7 +17,6 @@
  */
 
 import { native } from 'ugly-app/native';
-import { loadSessions } from '../state/projectSessions';
 import { isWindows } from '../utils/platform';
 
 export interface SessionWorkspace {
@@ -226,30 +225,10 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
     }
   } catch { /* ignore */ }
 
-  // Decide isolation: `opts.branchMode` overrides the localStorage `kind`.
-  // When branchMode === 'main', the session runs directly on the project directory
-  // (no worktree). When branchMode === 'worktree' and the session isn't the
-  // canonical 'main' session, provision an isolated worktree. Falls back to the
-  // stored `kind` for backward compatibility (sessions created before this option).
-  let isMain: boolean;
-  if (opts?.branchMode === 'main') {
-    isMain = true;
-  } else if (opts?.branchMode === 'worktree') {
-    // Worktree mode: stay on project dir only if this is the canonical main session.
-    try {
-      const stored = loadSessions(projectPath);
-      const me = stored.find((s) => s.compositeId === sessionId);
-      isMain = me ? me.kind === 'main' : false;
-    } catch { isMain = false; }
-  } else {
-    // Legacy path: no branchMode specified — existing behavior.
-    try {
-      const stored = loadSessions(projectPath);
-      const me = stored.find((s) => s.compositeId === sessionId);
-      const hasMain = stored.some((s) => s.kind === 'main');
-      isMain = me ? me.kind === 'main' : !hasMain;
-    } catch { isMain = true; }
-  }
+  // Isolation is driven purely by branchMode: `'main'` runs directly on the
+  // project dir (no worktree); anything else (`'worktree'` or unset) provisions an
+  // isolated worktree on a per-session branch.
+  const isMain = opts?.branchMode === 'main';
   if (isMain) {
     // The main session runs against the project dir — ensure its deps are installed
     // (only when node_modules is missing) so `pnpm dev` / publish / the DB panel's

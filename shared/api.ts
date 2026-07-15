@@ -145,7 +145,6 @@ export const requests = defineRequests({
       sessionId: z.string(),
       projectId: z.string(),
       title: z.string().max(300).optional(),
-      kind: z.enum(['main', 'session']).optional(),
       model: z.string().optional(),
       status: z.enum(['running', 'idle', 'done', 'error']).optional(),
       messageCount: z.number().int().min(0).optional(),
@@ -217,7 +216,6 @@ export const requests = defineRequests({
         z.object({
           sessionId: z.string(),
           title: z.string(),
-          kind: z.enum(['main', 'session']),
           model: z.string(),
           status: z.enum(['running', 'idle', 'done', 'error']),
           messageCount: z.number(),

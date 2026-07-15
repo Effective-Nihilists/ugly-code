@@ -2979,38 +2979,8 @@ export const requests = defineRequests({
            * their parent rather than showing them as top-level rows.
            */
           parentSessionId: z.string().optional(),
-          /**
-           * Discriminator for the always-present "main" session per
-           * project. `'main'` runs on the parent branch with no
-           * worktree and is the canonical surface for git push/pull.
-           */
-          kind: z.literal('main').optional(),
         }),
       ),
-    }),
-  }),
-
-  /**
-   * Resolve or provision the project's always-present "main" session.
-   * Returns the compositeId of the active main session — looking it up
-   * from memory/disk first, falling back to fresh creation. Disallows
-   * auto on the main model axis (sub-models keep auto).
-   */
-  codingAgentGetOrCreateMain: req({
-    input: z.object({
-      projectPath: z.string().optional(),
-      /**
-       * Explicit model id for fresh main sessions. Auto sentinels
-       * ('auto', 'auto:cheap', 'auto:max', '', 'same-as-coding') are
-       * rejected. Ignored when an existing main session is already on
-       * disk — its persisted model wins.
-       */
-      model: z.string(),
-    }),
-    output: z.object({
-      sessionId: z.string(),
-      model: z.string(),
-      mode: z.enum(['edit', 'yolo', 'claude-plan']),
     }),
   }),
 

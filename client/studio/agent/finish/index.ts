@@ -40,7 +40,7 @@ export async function runFinish(args: {
 }): Promise<FinishResult> {
   const worktree = await resolveWorktree(args.sessionId, args.projectPath);
   if (!worktree) {
-    return { ok: false, message: 'This session has no isolated worktree to finish (main session or un-provisioned).' };
+    return { ok: false, message: 'This session has no isolated worktree to finish (it runs on the main branch, or is un-provisioned).' };
   }
   const handle = startFinishPipeline({
     sessionId: args.sessionId,

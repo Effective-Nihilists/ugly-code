@@ -6,12 +6,16 @@
 export interface StoredSession {
   compositeId: string;
   title: string;
-  /** The always-present canonical session for the project. */
-  kind?: 'main';
   updated_at: number;
   model: string;
   /** Branch name (server-persisted, not saved to localStorage). */
   branch?: string;
+  /**
+   * Live run status (server-persisted, not saved to localStorage). Drives the
+   * "thinking" indicator in the session list — re-fetched by the project page's
+   * session poll, transient so it's stripped before persisting.
+   */
+  status?: 'running' | 'idle' | 'done' | 'error';
 }
 
 const keyFor = (projectPath: string): string => `ugly-studio:sessions:${projectPath}`;
@@ -31,9 +35,10 @@ export function loadSessions(projectPath: string | undefined): StoredSession[] {
 export function saveSessions(projectPath: string | undefined, sessions: StoredSession[]): void {
   if (!projectPath) return;
   try {
-    // Strip branch before persisting to localStorage — branch is server-persisted
-    // for cross-browser visibility, not stored locally.
-    const stripped = sessions.map(({ branch: _, ...rest }) => rest);
+    // Strip branch + status before persisting to localStorage — both are
+    // server-persisted (branch for cross-browser visibility, status is live +
+    // transient), so a stale localStorage copy must never shadow the poll.
+    const stripped = sessions.map(({ branch: _b, status: _s, ...rest }) => rest);
     localStorage.setItem(keyFor(projectPath), JSON.stringify(stripped));
   } catch {
     /* best effort */

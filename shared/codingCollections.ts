@@ -24,7 +24,6 @@ export const CodingSessionSchema = z.object({
   projectId: z.string(),
   userId: z.string(),
   title: z.string(),
-  kind: z.string(),
   model: z.string(),
   status: z.string(),
   messageCount: z.number(),
@@ -44,10 +43,8 @@ export const CodingSessionSchema = z.object({
   // turn. See clientAgent.persistMeta.
   lastError: z.string().optional(),
 });
-export type CodingSessionKind = 'main' | 'session';
 export type CodingSessionStatus = 'running' | 'idle' | 'done' | 'error';
-export type CodingSession = Omit<InferDocType<typeof CodingSessionSchema>, 'kind' | 'status'> & {
-  kind: CodingSessionKind;
+export type CodingSession = Omit<InferDocType<typeof CodingSessionSchema>, 'status'> & {
   status: CodingSessionStatus;
 };
 
@@ -96,13 +93,11 @@ export function compareCodingMessages(
 // and collapses the collection type. Keep each index list in an already-widened
 // `IndexDef[]`-typed module const and reference it (mirrors shared/collections.ts).
 const codingSessionIndexes: { fields: Record<string, 1 | -1> }[] = [
-  // Composite expression indexes matching the handler filter shapes. One per query:
-  //   userId+projectId+kind     → codingSessionUpsert (find existing 'main')
+  // Composite expression index matching the list handler's filter shape:
   //   userId+projectId+archived → codingSessionList (active sessions)
   // (`updated` is a system column, so codingSessionList's sort{updated:-1} is
-  // exempt from the index-coverage check; these buy filter locality and credit
-  // every filtered field.)
-  { fields: { userId: 1, projectId: 1, kind: 1 } },
+  // exempt from the index-coverage check; this buys filter locality and credits
+  // every filtered field.) Upsert is a getDoc by _id, covered by the primary key.
   { fields: { userId: 1, projectId: 1, archived: 1 } },
 ];
 const codingSessionMessageIndexes: { fields: Record<string, 1 | -1> }[] = [
