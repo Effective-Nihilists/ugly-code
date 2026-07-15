@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-15T22:23:16.423Z",
+  "generatedAt": "2026-07-15T22:45:55.987Z",
   "source": "shared/collections.ts",
   "collections": {
     "authMagicLink": {
@@ -585,10 +585,6 @@
             "type": "number",
             "required": true
           },
-          "kind": {
-            "type": "string",
-            "required": true
-          },
           "lastError": {
             "type": "string",
             "required": false
@@ -623,13 +619,6 @@
           }
         },
         "indexes": [
-          {
-            "fields": {
-              "userId": 1,
-              "projectId": 1,
-              "kind": 1
-            }
-          },
           {
             "fields": {
               "userId": 1,
