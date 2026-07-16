@@ -4,7 +4,7 @@
 // The session runs here — outliving the window and reachable from any device over the
 // Ugly Proxy — instead of in the renderer. Drives the SAME agent loop (runClientAgentTurn);
 // its emitCustom-style events become task events (task.event:<id>) via uglyTask.emit.
-import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
+import { defineTask, taskContext, createNodeUglyNative, native } from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
 import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, ensureCodebaseAnalysis, type AgentSelection } from './clientAgent';
 import { killSessionBashProcs } from '../../agent/tools';
@@ -224,11 +224,34 @@ function emitFinish(e: FinishEventPayload): void {
 
 t.setSnapshot({ turn: 'idle', sessionId });
 
+// A project ugly-code opens isn't necessarily a scaffolded ugly-app repo, so its committed
+// `.gitignore` won't list `.ugly-studio/` — the folder ugly-code fills with the codebase index
+// DB (a binary SQLite file), session state, and per-session worktrees. Left un-ignored, the Git
+// panel surfaces them as changes and offers to commit the DB into the user's repo. Add
+// `.ugly-studio/` to `.git/info/exclude` — LOCAL to this clone, so we never touch the user's
+// tracked `.gitignore`. Idempotent + best-effort (never block a turn on it).
+async function ensureUglyStudioExcluded(projectPath: string): Promise<void> {
+  try {
+    if (!(await native.fs.exists(`${projectPath}/.git`))) return; // not a git repo
+    const excludePath = `${projectPath}/.git/info/exclude`;
+    let current = '';
+    try { current = await native.fs.readFile(excludePath); } catch { /* file may not exist yet */ }
+    if (/^\s*\.ugly-studio\/?\s*$/m.test(current)) return; // already excluded
+    await native.fs.mkdir(`${projectPath}/.git/info`, true);
+    const sep = current && !current.endsWith('\n') ? '\n' : '';
+    await native.fs.writeFile(
+      excludePath,
+      `${current}${sep}# ugly-code local IDE state (codebase index, sessions, worktrees)\n.ugly-studio/\n`,
+    );
+  } catch { /* best-effort — never block a turn */ }
+}
+
 // Kick the host's semantic index + architecture analysis at BOOT (not on the first turn) so the
 // chat header's codebase pill tracks indexing the moment the session opens. Without this the pill
 // sat on "Codebase: loading…" until the user sent a message — a deadlock when they were waiting
 // for it to go "ready" before typing. Readiness is written to the session doc (codebaseReadiness)
 // so it fans out via trackDocs (see ensureCodebaseAnalysis); the poll self-stops once settled.
 if (t.params.projectPath) {
+  void ensureUglyStudioExcluded(t.params.projectPath);
   ensureCodebaseAnalysis(sessionId);
 }
