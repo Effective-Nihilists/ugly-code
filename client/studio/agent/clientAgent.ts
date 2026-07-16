@@ -469,6 +469,11 @@ interface SessionAgentState {
   // so the streaming transient writes and the final committed row share
   // `_id = sessionId:streamSeq` and reconcile idempotently. Null between turns.
   streamSeq: number | null;
+  // Coalesce transient streaming writes: a fast token stream would otherwise fan out one
+  // network write + a full transcript re-projection PER TOKEN on every subscriber. We
+  // write the cumulative text at most once per TRANSIENT_FLUSH_MS with a trailing flush.
+  transientTimer: ReturnType<typeof setTimeout> | null;
+  transientLastAt: number;
   // ── Server persistence (survive reload) ──
   // Append-only transcript bookkeeping: `seq` is the next row index; `activeRows`
   // is the ordered set of currently-uncompacted rows ({seq,id}) — it MUST mirror
@@ -725,6 +730,30 @@ function emitMessage(
 
 // ── Server persistence helpers (all best-effort; never break the loop) ───────
 
+// Max cadence for streaming transient writes (ms). ~12 writes/sec is plenty for smooth
+// streaming and coalesces bursty token deltas into far fewer network writes + re-projections.
+const TRANSIENT_FLUSH_MS = 80;
+
+/** Write the cumulative in-flight assistant text as a transient (pending) row, throttled to
+ *  at most one write per TRANSIENT_FLUSH_MS with a trailing flush so the final partial isn't
+ *  lost. The durable onTurn commit (which cancels any pending timer) supersedes it. */
+function scheduleTransientFlush(s: SessionAgentState, sessionId: string): void {
+  if (s.streamSeq === null) return;
+  const write = (): void => {
+    s.transientTimer = null;
+    s.transientLastAt = Date.now();
+    if (s.streamSeq === null) return;
+    void sessionApi.appendMessage({
+      sessionId, seq: s.streamSeq, role: 'assistant',
+      content: JSON.stringify({ content: [{ type: 'text', text: s.streamText }], pending: true }),
+      transient: true,
+    });
+  };
+  const since = Date.now() - s.transientLastAt;
+  if (since >= TRANSIENT_FLUSH_MS) write();
+  else s.transientTimer ??= setTimeout(write, TRANSIENT_FLUSH_MS - since);
+}
+
 /** Append one transcript row + track its seq/id for the compaction window. When
  *  `reservedSeq` is given (an assistant row whose seq was reserved at stream start),
  *  commit at that seq so it supersedes the transient streaming writes at the same
@@ -978,6 +1007,8 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     streamMsgId: null,
     streamText: '',
     streamSeq: null,
+    transientTimer: null,
+    transientLastAt: 0,
     seq: 0,
     activeRows: [],
     projectId: '',
@@ -1099,18 +1130,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         emitMessage(emitRef.current, sessionId, 'assistant', parts, { id: state.streamMsgId, action: 'updated' });
       }
       // Stream the in-progress content to every client via trackDocs({includeTransient})
-      // — a transient (non-persisted) write at the reserved seq. onTurn commits the
+      // — a transient (non-persisted) write at the reserved seq, THROTTLED so a fast token
+      // stream doesn't fan out a write + full re-projection per token. onTurn commits the
       // final content durably at the same seq. Best-effort; never breaks the loop.
-      if (state.streamSeq !== null) {
-        void sessionApi.appendMessage({
-          sessionId, seq: state.streamSeq, role: 'assistant',
-          // `pending: true` marks this as an in-flight streaming row so the doc-driven
-          // transcript renders it as `isStreaming` (no terminal `finish` part); the
-          // durable onTurn commit at the same seq drops it → the row flips finished.
-          content: JSON.stringify({ content: [{ type: 'text', text: state.streamText }], pending: true }),
-          transient: true,
-        });
-      }
+      scheduleTransientFlush(state, sessionId);
     },
     onTurn: (turn, telemetry) => {
       const content = Array.isArray(turn.content)
@@ -1131,6 +1154,9 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content), modelOpt);
       }
       const reservedSeq = state.streamSeq ?? undefined;
+      // Cancel any pending throttled transient flush so it can't land AFTER the durable
+      // commit below and revive the row's `pending`/streaming state.
+      if (state.transientTimer) { clearTimeout(state.transientTimer); state.transientTimer = null; }
       state.streamMsgId = null;
       state.streamText = '';
       state.streamSeq = null;

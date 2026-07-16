@@ -615,6 +615,9 @@ const BACKEND = {
 
 const WINDOW_MAX = 500;
 const PAGE_SIZE = 40;
+// Max transcript rows the doc-driven projection renders (the trackDocs path bypasses the
+// legacy WINDOW_MAX pager). Bounds per-token re-projection + DOM cost on long sessions.
+const DOC_WINDOW = 200;
 
 /**
  * Pure converter from a raw AgentMessage (as returned by
@@ -3666,9 +3669,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // Numeric seq sort (JSONB sorts seq as text) with the summary tiebreak, then
         // the shared row→display→ChatMessage projection used by history replay — so a
         // doc-sourced transcript renders byte-identically to a live-streamed one.
-        const rows: StoredMessageRow[] = [...docs]
+        const sorted: StoredMessageRow[] = [...docs]
           .sort(compareCodingMessages)
           .map((d) => ({ seq: d.seq, role: d.role, kind: d.kind, compacted: d.compacted, content: d.content }));
+        // Bound the projection + render to the most recent DOC_WINDOW rows. The transient
+        // streaming row is always the newest, so it's always in-window; only old history is
+        // dropped from the view (a "load older" affordance is a follow-up). Without this a
+        // long session re-projected + re-rendered its ENTIRE history on every streamed
+        // token — the heaviest cost the throttled writes now also relieve.
+        const rows = sorted.length > DOC_WINDOW ? sorted.slice(-DOC_WINDOW) : sorted;
         const display = rowsToDisplayMessages(sid, rows);
         const chat = projectAgentMessagesToChat(display);
         // Never let an EMPTY server snapshot (the initial one, or the window before the
