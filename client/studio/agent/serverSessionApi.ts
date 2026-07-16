@@ -53,6 +53,13 @@ export async function createRunRequest(input: {
   return api<{ id: string }>('codingRunRequestCreate', { ...input, seq: nextRunSeq() });
 }
 
+/** Read a run-request's status (client watchdog: still `pending` → no host claimed it). */
+export async function getRunRequestStatus(
+  id: string,
+): Promise<{ status: 'pending' | 'claimed' | 'done' | 'error'; host?: string; error?: string } | null> {
+  return api('codingRunRequestGet', { id });
+}
+
 // `.uglyapp` carries a stable projectId that survives folder moves; fall back to
 // the project path (still a stable per-project key) when it isn't published yet.
 const projectIdCache = new Map<string, string>();

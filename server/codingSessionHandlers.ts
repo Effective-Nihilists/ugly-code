@@ -27,6 +27,7 @@ type CodingSessionHandlers = Pick<
   | 'codingRunRequestCreate'
   | 'codingRunRequestClaim'
   | 'codingRunRequestComplete'
+  | 'codingRunRequestGet'
 >;
 
 // A message's `content` is `JSON.stringify(rawContent)`. A single unbounded tool
@@ -267,6 +268,17 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         ...(error ? { error } : {}),
       });
       return { ok: true };
+    },
+    // Client watchdog read: is this request still `pending` (→ no host claimed it)?
+    codingRunRequestGet: async (userId, { id }) => {
+      const db = getDb();
+      const req = await db.getDoc(collections.codingRunRequest, id);
+      if (req?.userId !== userId) return null; // missing or wrong user
+      return {
+        status: req.status,
+        ...(req.host ? { host: req.host } : {}),
+        ...(req.error ? { error: req.error } : {}),
+      };
     },
   };
 }

@@ -62,4 +62,18 @@ describe('codingRunRequest — doc-triggered task lifecycle + CAS claim', () => 
     // Another user can't complete it.
     expect(await H(fake).codingRunRequestComplete('u2', { id: 'run:cs:a:3', status: 'done' })).toEqual({ ok: false });
   });
+
+  it('get reflects lifecycle for the client watchdog (pending → claimed → error); null for others', async () => {
+    const fake = memDb();
+    await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 4, prompt: 'x', buildId: 'b1' });
+    // Still pending → the watchdog treats this as "no host claimed it yet".
+    expect(await H(fake).codingRunRequestGet('u1', { id: 'run:cs:a:4' })).toEqual({ status: 'pending' });
+    await H(fake).codingRunRequestClaim('u1', { id: 'run:cs:a:4', host: 'dev-1' });
+    expect(await H(fake).codingRunRequestGet('u1', { id: 'run:cs:a:4' })).toEqual({ status: 'claimed', host: 'dev-1' });
+    await H(fake).codingRunRequestComplete('u1', { id: 'run:cs:a:4', status: 'error', error: 'boom' });
+    expect(await H(fake).codingRunRequestGet('u1', { id: 'run:cs:a:4' })).toEqual({ status: 'error', host: 'dev-1', error: 'boom' });
+    // Not the caller's / missing → null.
+    expect(await H(fake).codingRunRequestGet('u2', { id: 'run:cs:a:4' })).toBeNull();
+    expect(await H(fake).codingRunRequestGet('u1', { id: 'run:missing:9' })).toBeNull();
+  });
 });

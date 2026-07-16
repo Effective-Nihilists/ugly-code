@@ -22,7 +22,7 @@ import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 import { gradeProject, type GradeDeps } from '../evals/grader';
 import { listRunHistory, deleteRunFromHistory } from '../evals/history';
-import { sessionApi, resolveProjectId, createRunRequest } from '../agent/serverSessionApi';
+import { sessionApi, resolveProjectId, createRunRequest, getRunRequestStatus } from '../agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
 import { docDrivenCoding } from '../agent/docDrivenCoding';
 import { DB_SCRIPT } from '../db/dbScript';
@@ -305,6 +305,24 @@ async function attachCodingTask(sessionId: string): Promise<boolean> {
   sessionTaskIds.set(sessionId, id);
   wireTaskListener(id);
   return true;
+}
+/**
+ * Doc-driven send watchdog: poll the run-request's status; if it never leaves `pending`
+ * within the window, no desktop host claimed it → surface a clear "no host" error instead
+ * of an infinite spinner. Stops early on claim/terminal. A `null` read (request vanished)
+ * is treated as still-waiting. Best-effort — a poll error just retries next tick.
+ */
+async function watchRunRequest(sessionId: string, id: string): Promise<void> {
+  const deadline = Date.now() + 12_000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2500));
+    const st = await getRunRequestStatus(id).catch(() => null);
+    if (st && st.status !== 'pending') return; // a host picked it up (or it already ran)
+  }
+  const st = await getRunRequestStatus(id).catch(() => null);
+  if (!st || st.status === 'pending') {
+    emitAgentError(sessionId, new Error('No desktop host picked up this session. Open Ugly Studio on your computer (with this project) and send again.'));
+  }
 }
 function emitAgentError(sessionId: string, e: unknown): void {
   console.error('[codingAgentChatSend] turn failed', e);
@@ -1012,9 +1030,17 @@ const handlers: Record<string, Handler> = {
           sessionId, projectId, prompt: message, buildId,
           ...(Object.keys(sel).length > 0 ? { selection: JSON.stringify(sel) } : {}),
         });
-        // A null result is a real failure to enqueue the turn (not the benign long-turn
-        // timeout the legacy path swallows) — surface it.
-        if (!res) emitAgentError(sessionId, new Error('Could not start the turn — the run-request failed to enqueue. Is the desktop host connected?'));
+        // A null result means the SERVER write failed (network/500) — the turn never
+        // enqueued. Distinct from the host-offline case below.
+        if (!res) {
+          emitAgentError(sessionId, new Error("Couldn't reach the server to queue your message — check your connection and try again."));
+          return;
+        }
+        // Host watchdog: the run-request is written `pending`; the owning desktop host
+        // claims it within moments IF it's running. If it stays `pending` past the
+        // window, no host is connected — surface that instead of an infinite spinner
+        // (the #1 doc-driven failure mode). Cleared as soon as it's claimed/terminal.
+        void watchRunRequest(sessionId, res.id);
       })();
       return Promise.resolve({});
     }

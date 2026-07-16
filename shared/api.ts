@@ -299,6 +299,18 @@ export const requests = defineRequests({
     output: z.object({ ok: z.boolean() }),
     rateLimit: { max: 600, window: 60 },
   }),
+  // Read a run-request's status — the client watchdog polls this after a doc-triggered
+  // send: if it never leaves `pending`, no desktop host is connected to claim it.
+  // Returns null when the request doesn't exist / isn't the caller's.
+  codingRunRequestGet: authReq({
+    input: z.object({ id: z.string() }),
+    output: z.object({
+      status: z.enum(['pending', 'claimed', 'done', 'error']),
+      host: z.string().optional(),
+      error: z.string().optional(),
+    }).nullable(),
+    rateLimit: { max: 1200, window: 60 },
+  }),
 
   // ── Per-user coding-agent settings (survive reload, sync across devices) ────
   // Formerly a host-local file served by the removed studio sidecar; now a
