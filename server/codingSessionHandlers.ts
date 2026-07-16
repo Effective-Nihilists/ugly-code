@@ -233,12 +233,12 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
     // ── Doc-triggered background task (E) ────────────────────────────────────
     // The UI writes a run-request instead of poking native.task; the owning desktop
     // host reacts over trackDocs, CAS-claims it, drives the turn, then completes it.
-    codingRunRequestCreate: async (userId, { sessionId, projectId, seq, prompt, selection }) => {
+    codingRunRequestCreate: async (userId, { sessionId, projectId, seq, prompt, selection, buildId }) => {
       const db = getDb();
       const id = `run:${sessionId}:${seq}`;
       const doc: CodingRunRequest = {
         _id: id,
-        sessionId, projectId, userId, seq, prompt,
+        sessionId, projectId, userId, seq, prompt, buildId,
         ...(selection ? { selection } : {}),
         status: 'pending',
         createdAt: Date.now(),

@@ -51,7 +51,9 @@ const SPEC: TextGenTool = {
   name: 'glob',
   description:
     'Find files by name pattern (glob), e.g. "**/*.test.ts" or "src/**/*.tsx". ' +
-    'Returns matching file paths, one per line.',
+    'Returns matching file paths, one per line. Issue this alongside other ' +
+    'independent `grep`/`read` calls in the same message when you need several ' +
+    'lookups — don\'t serialize independent searches across turns.',
   parameters: {
     type: 'object',
     properties: {

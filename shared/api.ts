@@ -278,6 +278,7 @@ export const requests = defineRequests({
       seq: z.number().int().min(0),
       prompt: z.string(),
       selection: z.string().optional(),
+      buildId: z.string(),
     }),
     output: z.object({ id: z.string() }),
     rateLimit: { max: 240, window: 60 },

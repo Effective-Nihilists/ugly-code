@@ -95,6 +95,9 @@ export const CodingRunRequestSchema = z.object({
   prompt: z.string(),
   /** JSON-stringified editor selection carried to the agent turn, when present. */
   selection: z.string().optional(),
+  /** The SPA buildId that issued this request — the host forks the MATCHING
+   *  `coding.js` bundle (`taskEntryUrl('coding', buildId)`), never a stale one. */
+  buildId: z.string(),
   status: z.string(), // 'pending' | 'claimed' | 'done' | 'error'
   /** deviceId of the host that claimed it (set on claim). */
   host: z.string().optional(),

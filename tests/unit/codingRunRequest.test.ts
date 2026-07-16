@@ -32,14 +32,14 @@ const H = (fake: ReturnType<typeof memDb>) => makeCodingSessionHandlers(() => fa
 describe('codingRunRequest — doc-triggered task lifecycle + CAS claim', () => {
   it('create → pending, with idempotent _id = run:<sessionId>:<seq>', async () => {
     const fake = memDb();
-    const { id } = await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 0, prompt: 'hi' });
+    const { id } = await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 0, prompt: 'hi', buildId: 'b1' });
     expect(id).toBe('run:cs:a:0');
-    expect(fake.store.get('run:cs:a:0')).toMatchObject({ status: 'pending', userId: 'u1', projectId: 'p1', prompt: 'hi' });
+    expect(fake.store.get('run:cs:a:0')).toMatchObject({ status: 'pending', userId: 'u1', projectId: 'p1', prompt: 'hi', buildId: 'b1' });
   });
 
   it('claim succeeds once (pending→claimed); a second claim is rejected', async () => {
     const fake = memDb();
-    await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 1, prompt: 'go' });
+    await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 1, prompt: 'go', buildId: 'b1' });
     expect(await H(fake).codingRunRequestClaim('u1', { id: 'run:cs:a:1', host: 'dev-1' })).toEqual({ claimed: true });
     expect(fake.store.get('run:cs:a:1')).toMatchObject({ status: 'claimed', host: 'dev-1' });
     expect(await H(fake).codingRunRequestClaim('u1', { id: 'run:cs:a:1', host: 'dev-2' })).toEqual({ claimed: false });
@@ -48,14 +48,14 @@ describe('codingRunRequest — doc-triggered task lifecycle + CAS claim', () => 
 
   it("refuses to claim another user's request, or a missing one", async () => {
     const fake = memDb();
-    await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 2, prompt: 'x' });
+    await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 2, prompt: 'x', buildId: 'b1' });
     expect(await H(fake).codingRunRequestClaim('u2', { id: 'run:cs:a:2', host: 'h' })).toEqual({ claimed: false });
     expect(await H(fake).codingRunRequestClaim('u1', { id: 'run:missing:9', host: 'h' })).toEqual({ claimed: false });
   });
 
   it('complete sets a terminal status + error text', async () => {
     const fake = memDb();
-    await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 3, prompt: 'x' });
+    await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 3, prompt: 'x', buildId: 'b1' });
     await H(fake).codingRunRequestClaim('u1', { id: 'run:cs:a:3', host: 'h' });
     expect(await H(fake).codingRunRequestComplete('u1', { id: 'run:cs:a:3', status: 'error', error: 'boom' })).toEqual({ ok: true });
     expect(fake.store.get('run:cs:a:3')).toMatchObject({ status: 'error', error: 'boom' });

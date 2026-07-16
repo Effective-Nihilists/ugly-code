@@ -300,7 +300,10 @@ const SPEC: TextGenTool = {
     'language server. mode "lsp-diagnostics" returns TypeScript errors/warnings ' +
     '(authoritative for "does this compile" — prefer over running tsc): pass a ' +
     'file via `path` for one file, or omit for a project-wide summary. Plain ' +
-    'identifier searches in auto mode also get an appended LSP DEFINITIONS section.',
+    'identifier searches in auto mode also get an appended LSP DEFINITIONS section. ' +
+    'Independent searches do not depend on each other — issue several `grep` calls ' +
+    '(and any independent `read`/`glob`) together in a SINGLE message instead of ' +
+    'serializing them across turns.',
   parameters: {
     type: 'object',
     properties: {
