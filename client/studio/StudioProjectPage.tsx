@@ -1,13 +1,14 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
-import { useSafeAreaInsets } from 'ugly-app/client';
+import { useSafeAreaInsets, useAppOptional } from 'ugly-app/client';
+import type { CodingSession } from '../../shared/codingCollections';
 import { ChatOpenUriProvider } from './components/LinkifiedText';
 import {
   SessionListSidebar,
   type SessionListSidebarSession,
 } from './panels/SessionListSidebar';
 import { setActiveProjectPath } from './hooks/useSocket';
-import { loadSessions, saveSessions, type StoredSession } from './state/projectSessions';
+import { type StoredSession } from './state/projectSessions';
 import { sessionApi, resolveProjectId } from './agent/serverSessionApi';
 import { timeAgoShort } from './utils/timeAgo';
 import { ThemeProvider } from './theme/ThemeProvider';
@@ -97,6 +98,33 @@ function writeWorkspaceUrl(tab: WorkspaceTab, session: string | null): void {
   window.history.replaceState({}, '', url.pathname + url.search);
 }
 
+// Narrow structural view of the app socket: trackDocs is a runtime method not on the
+// registry-typed context socket (same pattern as recentProjects.ts).
+interface SessionSocket {
+  trackDocs(
+    collection: string,
+    params: { keys?: Record<string, string>; sort?: Record<string, 1 | -1> },
+    cb: (docs: unknown[]) => void,
+  ): () => void;
+}
+
+// Map a synced `codingSession` doc → the sidebar's StoredSession row. Tokens+cost come
+// straight off the doc now (previously hardcoded to 0 in the sidebar).
+function sessionDocToStored(s: CodingSession): StoredSession {
+  return {
+    compositeId: s.sessionId,
+    title: s.title || 'Session',
+    updated_at: new Date(s.updated).getTime(),
+    created_at: new Date(s.created).getTime(),
+    model: s.model || 'auto',
+    status: s.status,
+    totalTokens: (s.promptTokens ?? 0) + (s.completionTokens ?? 0),
+    totalCost: s.costUsd,
+    ...(s.lastError ? { lastError: s.lastError } : {}),
+    ...(s.branch ? { branch: s.branch } : {}),
+  };
+}
+
 // The project page: session sidebar (list + New session) + the workspace
 // (coding-agent chat + the tab rail). Sessions persist per project; every session
 // is uniform — isolation is a per-session branchMode pick (worktree vs. main), not
@@ -112,11 +140,14 @@ export default function StudioProjectPage({
   onBack: () => void;
 }): React.ReactElement {
   const insets = useSafeAreaInsets();
+  const app = useAppOptional();
   const urlInit = React.useMemo(() => readWorkspaceUrl(), []);
   const [tab, setTab] = React.useState<WorkspaceTab>(urlInit.tab ?? 'chat');
   // Sessions are persisted per project; CodingAgentChat assigns the real
   // compositeId on first turn (onSessionCreated), which we record here.
-  const [stored, setStored] = React.useState<StoredSession[]>(() => loadSessions(projectPath));
+  // Sessions are sourced live from the server via trackDocs (below) — no localStorage
+  // cache, no poll. Starts empty; the trackDocs snapshot lands on connect.
+  const [stored, setStored] = React.useState<StoredSession[]>([]);
   const [activeSessionId, setActiveSessionId] = React.useState<string | null>(
     () => urlInit.session ?? null,
   );
@@ -194,63 +225,52 @@ export default function StudioProjectPage({
 
   const clearPendingFile = React.useCallback(() => { setPendingFile(null); }, []);
 
-  // Reload the session list when the project actually changes (not on first
-  // mount — initial state already came from the URL + store).
+  // Reset the (live-synced) session list when the project actually changes — the
+  // trackDocs effect below re-subscribes for the new projectId and re-seeds it.
   const prevPathRef = React.useRef(projectPath);
   React.useEffect(() => {
     if (prevPathRef.current === projectPath) return;
     prevPathRef.current = projectPath;
     const u = readWorkspaceUrl();
-    const s = loadSessions(projectPath);
-    setStored(s);
+    setStored([]);
     setActiveSessionId(u.session ?? null);
     setTab(u.tab ?? 'chat');
   }, [projectPath]);
 
+  // Source the session list LIVE from the server via trackDocs (single source of
+  // truth; survives reload + cross-device, and a row's status/tokens/cost update the
+  // instant a turn writes the doc — no 3s poll, no localStorage). MERGE with any
+  // just-created, not-yet-persisted local stub (a session is persisted server-side on
+  // its first turn); the stub is the newest → it sits on top until the doc arrives.
   React.useEffect(() => {
-    saveSessions(projectPath, stored);
-  }, [projectPath, stored]);
-
-  // Source the session list from the server (survives cache-clear + cross-device)
-  // and MERGE with any just-created, not-yet-persisted local sessions (a session
-  // is only persisted server-side on its first turn). The localStorage list above
-  // gives an instant first paint; this reconciles it with the authoritative rows.
-  //
-  // Re-polls on an interval so each row's live `status` (→ the sidebar "thinking"
-  // indicator) flips while an agent works and back to idle when it stops. Paused
-  // while the tab is hidden, and re-fired the moment it becomes visible again.
-  React.useEffect(() => {
+    if (!app) return;
     let cancelled = false;
-    const poll = async (): Promise<void> => {
+    let unsub: (() => void) | undefined;
+    void (async () => {
       const projectId = await resolveProjectId(projectPath ?? null);
-      const data = await sessionApi.list({ projectId });
-      if (cancelled || !data) return;
-      const mapped: StoredSession[] = data.sessions.map((s) => ({
-        compositeId: s.sessionId,
-        title: s.title || 'Session',
-        updated_at: s.updated,
-        model: s.model || 'auto',
-        // Live run status → the row's thinking/idle pill.
-        status: s.status,
-        // Branch is server-persisted for cross-browser visibility.
-        ...(s.branch ? { branch: s.branch } : {}),
-      }));
-      setStored((prev) => {
-        const serverIds = new Set(mapped.map((m) => m.compositeId));
-        const localOnly = prev.filter((p) => !serverIds.has(p.compositeId));
-        return [...mapped, ...localOnly];
-      });
-    };
-    void poll();
-    const id = window.setInterval(() => { if (!document.hidden) void poll(); }, 3000);
-    const onVisible = (): void => { if (!document.hidden) void poll(); };
-    document.addEventListener('visibilitychange', onVisible);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
+      if (cancelled || !projectId) return;
+      unsub = (app.socket as unknown as SessionSocket).trackDocs(
+        'codingSession',
+        { keys: { projectId } },
+        (docs) => {
+          const mapped = (docs as CodingSession[])
+            .filter((s) => !s.archived)
+            .map(sessionDocToStored)
+            .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+          setStored((prev) => {
+            const serverIds = new Set(mapped.map((m) => m.compositeId));
+            const localOnly = prev.filter((p) => !serverIds.has(p.compositeId));
+            return [...localOnly, ...mapped];
+          });
+        },
+      );
+    })();
     return () => {
       cancelled = true;
-      window.clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisible);
+      unsub?.();
     };
-  }, [projectPath]);
+  }, [projectPath, app]);
 
   // Keep ?tab= / ?session= in sync so a reload restores the workspace.
   React.useEffect(() => {
@@ -260,7 +280,10 @@ export default function StudioProjectPage({
   const recordSession = React.useCallback((id: string) => {
     setStored((prev) => {
       if (prev.some((s) => s.compositeId === id)) return prev;
-      return [...prev, { compositeId: id, title: 'Session', updated_at: Date.now(), model: 'auto' }];
+      // Prepend: a brand-new session is the newest-created, so it sits at the
+      // top of the sidebar (created-desc order) until the server poll picks
+      // it up.
+      return [{ compositeId: id, title: 'Session', updated_at: Date.now(), created_at: Date.now(), model: 'auto' }, ...prev];
     });
     setActiveSessionId(id);
   }, []);
@@ -308,6 +331,27 @@ export default function StudioProjectPage({
     void import('./agent/sessionWorkspace').then((m) => m.removeSessionWorkspace(id, projectPath ?? null));
   }, [projectPath, activeSessionId]);
 
+  // Rename a session: optimistic local update + persist via upsert. The chat's
+  // in-memory agent state is the live source of truth while a turn runs, so we
+  // also poke the clientAgent's title so the next persistMeta doesn't clobber
+  // the user's edit with a stale value. Click-to-rename lives on the session row.
+  const renameSession = React.useCallback((id: string, title: string) => {
+    const trimmed = title.trim().slice(0, 120);
+    if (!trimmed) return;
+    setStored((prev) => prev.map((s) => (s.compositeId === id ? { ...s, title: trimmed } : s)));
+    void (async () => {
+      const projectId = await resolveProjectId(projectPath ?? null);
+      void sessionApi.upsert({ sessionId: id, projectId, title: trimmed });
+      // Keep the live agent state in sync so a subsequent persistMeta (fired on
+      // the next turn boundary) writes the user's title, not the old one.
+      try {
+        const { setSessionTitle } = await import('./agent/clientAgent');
+        setSessionTitle(id, trimmed);
+      } catch { /* agent module optional */ }
+    })();
+  }, [projectPath]);
+
+
   const sidebarSessions: SessionListSidebarSession[] = stored.map((s) => ({
     compositeId: s.compositeId,
     title: s.title,
@@ -316,9 +360,13 @@ export default function StudioProjectPage({
     // every session also honors the server-persisted status from the poll (covers
     // background/peer sessions + the active one once the poll catches up).
     running: (s.compositeId === activeSessionId && activeRunning) || s.status === 'running',
+    // Failed sessions (crashed background task or a failed turn → server
+    // `status:'error'`) show an ERROR pill — unless the session is actively
+    // re-running, in which case "thinking" wins (a new turn is recovering it).
+    errored: s.status === 'error' && !(s.compositeId === activeSessionId && activeRunning),
     model: s.model,
-    totalTokens: 0,
-    totalCost: 0,
+    totalTokens: s.totalTokens ?? 0,
+    totalCost: s.totalCost ?? 0,
     ...(s.branch ? { branch: s.branch } : {}),
   }));
 
@@ -331,6 +379,7 @@ export default function StudioProjectPage({
     onSelect: (id: string) => { selectSession(id); closeDrawer(); },
     onNewSession: () => { newSession(); closeDrawer(); },
     onArchiveSession: archiveSession,
+    onRenameSession: renameSession,
     timeAgo: timeAgoShort,
     archivedCount: 0,
     onShowArchived: () => undefined,
@@ -422,6 +471,15 @@ export default function StudioProjectPage({
               // archive-active) bump chatKey to force the remount they need.
               key={`chat-${chatKey}`}
               {...(activeSessionId ? { initialSessionId: activeSessionId } : {})}
+              {...(() => {
+                // Reopening a FAILED session: surface its persisted failure text as a
+                // durable error bubble in the transcript (the live crash bubble was
+                // lost on reload/switch). Cleared server-side once a new turn recovers.
+                const err = activeSessionId
+                  ? stored.find((s) => s.compositeId === activeSessionId)?.lastError
+                  : undefined;
+                return err ? { initialLastError: err } : {};
+              })()}
               onSessionCreated={recordSession}
               onResumeMissing={archiveSession}
               onOpenUri={openUri}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StatusDot } from './SessionCard';
 
 /**
@@ -33,6 +33,13 @@ export interface SessionRowData {
    */
   blockedReason?: string;
   /**
+   * True when the session's last run FAILED — a crashed background task or a
+   * failed turn (server `status:'error'`). Renders a red ERROR pill in place of
+   * the idle indicator, unless the session is currently re-running (a new turn
+   * clears it).
+   */
+  errored?: boolean;
+  /**
    * True when the row represents an in-flight session creation. Shows
    * a CREATING pill with a spinner ring in place of the
    * thinking/idle/blocked status.
@@ -56,6 +63,9 @@ export interface SessionRowProps {
   onClick: () => void;
   /** Optional — when set, hover shows an archive button. */
   onArchive?: () => void;
+  /** Optional rename handler — when set, double-clicking the title turns it
+   *  into an inline editable input (commits on Enter/blur, cancels on Esc). */
+  onRename?: (title: string) => void;
   /**
    * When true, render a slim single-line variant (no `thinking/idle`
    * + token/cost meta rows). Used for max-mode peer rows under their
@@ -77,6 +87,7 @@ export function SessionRow({
   active,
   onClick,
   onArchive,
+  onRename,
   compact,
   deleting = false,
 }: SessionRowProps): React.ReactElement {
@@ -86,6 +97,25 @@ export function SessionRow({
   // was archived, the row that slid under the cursor never received a
   // synthetic `mouseenter`, so it rendered un-hovered (no archive
   // button, no highlight) until the user moved the mouse.
+  // Inline rename: double-click the title to edit it in place. Enter/blur
+  // commits (calls onRename), Esc cancels. Disabled while deleting. Only
+  // mounted when onRename is set (the parent gates it for non-peer rows).
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(session.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+  useEffect(() => { if (!editing) setDraft(session.title); }, [session.title, editing]);
+  const commitRename = (): void => {
+    const next = draft.trim();
+    setEditing(false);
+    if (onRename && next && next !== session.title) onRename(next);
+  };
+
   return (
     <div
       role="button"
@@ -167,28 +197,77 @@ export function SessionRow({
           }}
         >
           {compact && <StatusDot running={session.running} />}
-          {session.title}
-          {session.branch && (
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9.5,
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-                color: session.branch === 'main' ? 'var(--text-muted)' : 'var(--text-secondary)',
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: 3,
-                padding: '1px 5px',
-                flexShrink: 0,
-                marginLeft: 4,
-                whiteSpace: 'nowrap',
+          {editing ? (
+            <input
+              ref={inputRef}
+              data-id="session-row-rename"
+              value={draft}
+              onChange={(e) => { setDraft(e.target.value); }}
+              onClick={(e) => { e.stopPropagation(); }}
+              onDoubleClick={(e) => { e.stopPropagation(); }}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') { commitRename(); }
+                else if (e.key === 'Escape') { setEditing(false); }
               }}
+              style={{
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                fontWeight: 'inherit',
+                color: 'inherit',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--accent)',
+                borderRadius: 4,
+                padding: '0 4px',
+                margin: 0,
+                width: '100%',
+                minWidth: 0,
+                outline: 'none',
+              }}
+            />
+          ) : (
+            <span
+              onDoubleClick={(e) => {
+                if (deleting || !onRename) return;
+                e.stopPropagation();
+                setDraft(session.title);
+                setEditing(true);
+              }}
+              title={onRename ? 'Double-click to rename' : undefined}
+              style={onRename ? { cursor: 'text' } : undefined}
             >
-              {session.branch}
+              {session.title}
             </span>
           )}
         </div>
+        {/* Branch pill lives on the TOP row, right-aligned (per feedback):
+            previously it sat inline after the title text inside the clamped
+            title div, which wrapped it onto a second line for long titles and
+            made it look unanchored. On the top row it reads as metadata next
+            to the archive action. Hidden on compact peer rows (those show the
+            model id as the title and don't carry a branch). */}
+        {!compact && session.branch && (
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9.5,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              color: session.branch === 'main' ? 'var(--text-muted)' : 'var(--text-secondary)',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: 3,
+              padding: '1px 5px',
+              flexShrink: 0,
+              marginLeft: 6,
+              whiteSpace: 'nowrap',
+              alignSelf: 'center',
+            }}
+          >
+            {session.branch}
+          </span>
+        )}
         {deleting ? (
           <span
             className="us-pulse-soft"
@@ -304,6 +383,19 @@ export function SessionRow({
                     blocked
                   </span>
                 </span>
+              ) : session.errored && !session.running ? (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    minWidth: 0,
+                  }}
+                  title="The session failed — its background task crashed or a turn errored. Send a message to restart it."
+                >
+                  <ErrorDot />
+                  <span style={{ color: 'var(--error, #e5484d)' }}>error</span>
+                </span>
               ) : (
                 <>
                   <StatusDot running={session.running} />
@@ -406,6 +498,24 @@ function BlockedDot(): React.ReactElement {
         }}
       />
     </span>
+  );
+}
+
+/** Error-state indicator: a solid red dot (static — a failed session isn't
+ *  working, so no pulse), matching BlockedDot's footprint. */
+function ErrorDot(): React.ReactElement {
+  return (
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        background: 'var(--error, #e5484d)',
+        flexShrink: 0,
+        boxShadow: '0 0 8px var(--error, #e5484d)',
+        borderRadius: '50%',
+      }}
+      aria-label="Session failed"
+    />
   );
 }
 

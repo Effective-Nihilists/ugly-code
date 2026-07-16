@@ -11,7 +11,7 @@
 import type { TypedDB } from 'ugly-app/server';
 import type { RequestHandlers } from 'ugly-app';
 import { dbDefaults } from 'ugly-app/shared';
-import { collections, type CodingSession, type CodingSessionMessage } from '../shared/collections';
+import { collections, type CodingSession, type CodingSessionMessage, type CodingRunRequest } from '../shared/collections';
 import { compareCodingMessages } from '../shared/codingCollections';
 import type { requests } from '../shared/api';
 
@@ -24,6 +24,9 @@ type CodingSessionHandlers = Pick<
   | 'codingSessionList'
   | 'codingSessionArchive'
   | 'codingSessionClearMessages'
+  | 'codingRunRequestCreate'
+  | 'codingRunRequestClaim'
+  | 'codingRunRequestComplete'
 >;
 
 // A message's `content` is `JSON.stringify(rawContent)`. A single unbounded tool
@@ -78,6 +81,17 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         status: input.status ?? existing?.status ?? 'idle',
         messageCount: input.messageCount ?? existing?.messageCount ?? 0,
         costUsd: input.costUsd ?? existing?.costUsd ?? 0,
+        // Token usage: preserve the stored value when a given upsert omits it (e.g. a
+        // branch-only or chatCreate upsert), like costUsd. persistMeta sends all four
+        // every turn.
+        ...(() => {
+          const t: Partial<Pick<CodingSession, 'promptTokens' | 'completionTokens' | 'cacheReadTokens' | 'cacheCreationTokens'>> = {};
+          for (const k of ['promptTokens', 'completionTokens', 'cacheReadTokens', 'cacheCreationTokens'] as const) {
+            const v = input[k] ?? existing?.[k];
+            if (v !== undefined) t[k] = v;
+          }
+          return t;
+        })(),
         archived: existing?.archived ?? false,
         // The session config is written by chatCreate + the axis set* RPCs; a plain
         // persistMeta (worker turn) omits it, so preserve the stored value.
@@ -97,7 +111,7 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       return { ok: true };
     },
 
-    codingSessionAppendMessage: async (userId, { sessionId, seq, role, content }) => {
+    codingSessionAppendMessage: async (userId, { sessionId, seq, role, content, transient }) => {
       const db = getDb();
       const sess = await db.getDoc(collections.codingSession, sessionId);
       if (sess && sess.userId !== userId) throw new Error('Session not found');
@@ -107,7 +121,10 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         content: capMessageContent(content),
         ...dbDefaults(),
       };
-      await db.setDoc(collections.codingSessionMessage, doc);
+      // Streaming write: relay the in-progress row to trackDocs({includeTransient})
+      // subscribers WITHOUT persisting (setDoc({transient}), ugly-app>=0.1.857). A later
+      // non-transient append at the same seq commits the final content durably.
+      await db.setDoc(collections.codingSessionMessage, doc, transient ? { transient: true } : {});
       return { ok: true };
     },
 
@@ -161,12 +178,20 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       const docs: CodingSession[] = await db.getDocs(
         collections.codingSession,
         { userId, projectId, archived: false },
-        { sort: { updated: -1 } },
+        // Sort newest-CREATED first (stable order: a session stays put as it
+        // gains activity, instead of jumping to the top on every turn under the
+        // old `updated: -1`). A v0.1.124 feedback report asked for exactly this
+        // — created-time order so the list doesn't reshuffle while you work.
+        { sort: { created: -1 } },
       );
       return {
         sessions: docs.map((d) => ({
           sessionId: d.sessionId, title: d.title, model: d.model,
           status: d.status, messageCount: d.messageCount, costUsd: d.costUsd,
+          ...(d.promptTokens !== undefined ? { promptTokens: d.promptTokens } : {}),
+          ...(d.completionTokens !== undefined ? { completionTokens: d.completionTokens } : {}),
+          ...(d.cacheReadTokens !== undefined ? { cacheReadTokens: d.cacheReadTokens } : {}),
+          ...(d.cacheCreationTokens !== undefined ? { cacheCreationTokens: d.cacheCreationTokens } : {}),
           created: new Date(d.created).getTime(),
           updated: new Date(d.updated).getTime(),
           ...(d.config ? { config: d.config } : {}),
@@ -203,6 +228,45 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         await db.setDocFields(collections.codingSession, sessionId, { messageCount: 0, costUsd: 0 });
       }
       return { ok: true, deleted: docs.length };
+    },
+
+    // ── Doc-triggered background task (E) ────────────────────────────────────
+    // The UI writes a run-request instead of poking native.task; the owning desktop
+    // host reacts over trackDocs, CAS-claims it, drives the turn, then completes it.
+    codingRunRequestCreate: async (userId, { sessionId, projectId, seq, prompt, selection }) => {
+      const db = getDb();
+      const id = `run:${sessionId}:${seq}`;
+      const doc: CodingRunRequest = {
+        _id: id,
+        sessionId, projectId, userId, seq, prompt,
+        ...(selection ? { selection } : {}),
+        status: 'pending',
+        createdAt: Date.now(),
+        ...dbDefaults(),
+      };
+      await db.setDoc(collections.codingRunRequest, doc);
+      return { id };
+    },
+    // CAS claim: succeeds only if still `pending`. The task the host then drives is
+    // keyed by `coding:<sessionId>` (native.task.ensure dedups), so a double-claim on
+    // ONE machine can't double-run; this guards the (rare) multi-host-same-project case.
+    codingRunRequestClaim: async (userId, { id, host }) => {
+      const db = getDb();
+      const req = await db.getDoc(collections.codingRunRequest, id);
+      if (req?.userId !== userId) return { claimed: false }; // missing or wrong user
+      if (req.status !== 'pending') return { claimed: false }; // already claimed/terminal
+      await db.setDocFields(collections.codingRunRequest, id, { status: 'claimed', host });
+      return { claimed: true };
+    },
+    codingRunRequestComplete: async (userId, { id, status, error }) => {
+      const db = getDb();
+      const req = await db.getDoc(collections.codingRunRequest, id);
+      if (req?.userId !== userId) return { ok: false }; // missing or wrong user
+      await db.setDocFields(collections.codingRunRequest, id, {
+        status,
+        ...(error ? { error } : {}),
+      });
+      return { ok: true };
     },
   };
 }

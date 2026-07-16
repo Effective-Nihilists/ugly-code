@@ -82,6 +82,22 @@ export function setSessionEval(sessionId: string, isEval: boolean): void {
   if (isEval) evalSessions.add(sessionId); else evalSessions.delete(sessionId);
 }
 
+/**
+ * Override a live session's title from outside the agent loop (user rename via
+ * the sidebar). Sets title + titleSet + titleGenerated so the next persistMeta
+ * writes the user's title and the LLM title-deriver never re-runs to overwrite
+ * it. No-op if the session isn't loaded (it'll pick the title up from the
+ * server-side upsert on its next resume).
+ */
+export function setSessionTitle(sessionId: string, title: string): void {
+  const s = sessions.get(sessionId);
+  if (!s) return;
+  s.title = title;
+  s.titleSet = true;
+  s.titleGenerated = true;
+}
+
+
 // Per-session agent-step budget override. The interactive default is 12 (a
 // per-message cap so a chat turn can't run away), but an eval must honor the
 // TASK's declared budget.maxTurns — a long-horizon task (e.g. the 80-turn ORM
@@ -138,14 +154,30 @@ async function verifyOnSettle(sessionId: string): Promise<string | null> {
 
 /** No-tools LLM completion for the criteria grader — the same governed,
  *  metered /api/agentStep endpoint the main loop + delegate use. */
-const agentStepJudge: Judge = async (system, user, maxTokens = 512) => {
+const agentStepJudge = async (
+  system: string,
+  user: string,
+  maxTokens = 512,
+  opts?: { model?: string; reasoning?: ReasoningEffort },
+): Promise<string> => {
   const res = await fetch('/api/agentStep', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     // noTools → clean completion (no injected agent system prompt, no tools) so the
     // judge/classifier get exactly the JSON/prose their own prompt asks for.
-    body: JSON.stringify({ input: { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], noTools: true, maxTokens } }),
+    // `opts.model` / `opts.reasoning` (optional) pin a specific model and thinking
+    // level for cheap aux calls — e.g. the title deriver forces deepseek_v4_flash
+    // with reasoning 'off' instead of the reasoning-heavy default.
+    body: JSON.stringify({
+      input: {
+        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+        noTools: true,
+        maxTokens,
+        ...(opts?.model ? { model: opts.model } : {}),
+        ...(opts?.reasoning ? { reasoning: opts.reasoning } : {}),
+      },
+    }),
   });
   const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
   if (json.error) throw new Error(json.error);
@@ -154,6 +186,39 @@ const agentStepJudge: Judge = async (system, user, maxTokens = 512) => {
   if (Array.isArray(content)) return content.map((b) => (b as { text?: string }).text ?? '').join('');
   return '';
 };
+
+/**
+ * Derive a short, human-readable session title from the first user prompt +
+ * first assistant reply via a no-tools completion. Returns null on any failure
+ * (the caller keeps the truncated-prompt fallback). Reuses the same governed,
+ * metered /api/agentStep endpoint the judge/compaction paths use, so there's no
+ * new auth/billing surface — just one cheap model call per new session.
+ *
+ * Pinned to `deepseek_v4_flash` (the non-reasoning fast variant) rather than the
+ * reasoning-heavy AGENT_DEFAULT_MODEL: a 3-6 word title never needs a reasoning
+ * pass, so this keeps it fast and cheap.
+ *
+ * Fires AFTER the first assistant turn so the title reflects what the session
+ * is actually about, not just the raw (often command-prefixed) prompt. The
+ * result overwrites the truncated-prompt placeholder set on send.
+ */
+async function deriveSessionTitle(userText: string, assistantText: string): Promise<string | null> {
+  const system =
+    'You write a 3-6 word title summarizing what the user asked the coding agent to do. ' +
+    'Reply with ONLY the title — no quotes, no punctuation at the end, no prefix like "Title:", no markdown. ' +
+    'Lowercase unless it is a proper noun. Imperative or noun-phrase, not a full sentence. Max 40 chars.';
+  const user =
+    `User asked:\n${userText.slice(0, 1500)}\n\n` +
+    `Agent replied (first turn):\n${assistantText.slice(0, 1500)}\n\nTitle:`;
+  try {
+    const raw = await agentStepJudge(system, user, 32, { model: 'deepseek_v4_flash', reasoning: 'off' });
+    const cleaned = raw.trim().split('\n')[0].trim().replace(/^["'`]|["'`.]$/g, '').slice(0, 60);
+    return cleaned.length >= 2 ? cleaned : null;
+  } catch {
+    return null;
+  }
+}
+
 
 // ── Always-on agent-loop debug telemetry ────────────────────────────────────
 // Every session streams a structured event log to
@@ -409,6 +474,12 @@ interface SessionAgentState {
   projectId: string;
   title: string;
   titleSet: boolean;
+  /**
+   * True once the LLM-derived title has been generated (or attempted). Guards
+   * against firing more than one title-completion call per session — the first
+   * assistant turn triggers it, and it never re-runs even if titleSet flips.
+   */
+  titleGenerated: boolean;
   resumed: boolean;
   /** The first user message (the task), pinned verbatim into every compaction
    *  summary so the original instruction is never lost to the context window. */
@@ -747,6 +818,7 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
   s.activeRows = activeRows;
   s.seq = nextSeq;
   s.titleSet = true; // a resumed session already has its title
+  s.titleGenerated = true; // don't re-derive an LLM title on a resumed session
   // Restore the pinned task so post-reload compaction still preserves it: the
   // first user row, or (if already compacted) parsed back out of the summary.
   if (!s.taskText) {
@@ -903,6 +975,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     projectId: '',
     title: '',
     titleSet: false,
+    titleGenerated: false,
     resumed: false,
     taskText: '',
     // Selection defaults — overwritten by `selection` (and any subsequent
@@ -1059,6 +1132,37 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         emitTelemetry(state, sessionId);
       }
       persistMeta(state, sessionId, 'running');
+      // After the FIRST assistant turn, derive a proper title from the prompt +
+      // reply (replaces the truncated-prompt placeholder set on send). Fire-and-
+      // forget — it never blocks the loop, and on failure the placeholder stays.
+      // Guards on titleGenerated so it runs exactly once per session.
+      if (!state.titleGenerated) {
+        state.titleGenerated = true;
+        const assistantText = content
+          .filter((b) => b.type === 'text')
+          .map((b) => (b as { text?: string }).text ?? '')
+          .join('\n')
+          .trim();
+        if (state.taskText && assistantText) {
+          void deriveSessionTitle(state.taskText, assistantText).then((title) => {
+            if (!title) return;
+            // The session may have been torn down while the completion was in
+            // flight; re-fetch live state rather than capturing a stale ref.
+            const live = sessions.get(sessionId);
+            if (!live) return; // session torn down while the completion was in flight
+            live.title = title;
+            live.titleSet = true;
+            persistMeta(live, sessionId, 'running');
+            safeEmit(emitRef.current, {
+              type: 'codingAgent:event',
+              sessionId,
+              title,
+              action: 'title',
+            });
+          });
+        }
+      }
+
       const clk = debugTick(sessionId);
       debugLog(sessionId, 'turn', {
         turnMs: clk.sinceLastMs, // wall-time of this model turn (since prior activity)
@@ -1115,6 +1219,24 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         const tick = debugTick(sessionId);
         if (e.type !== 'error') debugLog(sessionId, 'finish', { reason: e.type, ...tick });
         state.log.append({ ts: Date.now(), type: 'finish', reason: e.type });
+        // Surface a visible note when the turn ended for a NON-error reason the
+        // user would otherwise have NO way to see (the spinner just stops). A
+        // v0.1.124 feedback report flagged this as "stopped thinking with no
+        // reason" — `aborted` is a stream/abort cut-off mid-turn and
+        // `budget_exceeded` is the context-size cap; both warrant an
+        // explanation. `done` (normal completion) and `error` (already shows ⚠)
+        // stay silent.
+        if (e.type === 'aborted' || e.type === 'budget_exceeded') {
+          const note =
+            e.type === 'aborted'
+              ? 'ⓘ Turn was interrupted (stream aborted). Send again to resume.'
+              : 'ⓘ Turn stopped — context window is full. Run /compact to free space, then continue.';
+          emitMessage(emitRef.current, sessionId, 'assistant', [
+            { type: 'text', data: { text: note } },
+            { type: 'finish' },
+          ]);
+        }
+
         persistMeta(
           state,
           sessionId,

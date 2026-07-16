@@ -1,4 +1,4 @@
-import { authReq, defineMessages, defineRequests, frameworkMessages, frameworkRequests, z } from 'ugly-app/shared';
+import { authReq, defineMessages, defineRequests, frameworkMessages, frameworkRequests, reasoningEffortSchema, z } from 'ugly-app/shared';
 import { agentMessageSchema } from './agent';
 import { agentTurnRequestSchema, agentTurnResponseSchema } from 'ugly-app/agent/shared';
 import { userSettingsSchema, userSettingsPatchSchema } from './userSettings';
@@ -28,6 +28,9 @@ export const requests = defineRequests({
       // pattern engine's aux calls (classifier / judge / synthesis / picker).
       noTools: z.boolean().optional(),
       maxTokens: z.number().optional(),
+      // Coarse thinking knob forwarded to the provider; `'off'` disables reasoning
+      // for cheap aux calls (e.g. the title deriver) that never need a thinking pass.
+      reasoning: reasoningEffortSchema.optional(),
     }),
     output: z.object({ message: agentMessageSchema }),
     rateLimit: { max: 60, window: 60 },
@@ -149,6 +152,13 @@ export const requests = defineRequests({
       status: z.enum(['running', 'idle', 'done', 'error']).optional(),
       messageCount: z.number().int().min(0).optional(),
       costUsd: z.number().min(0).optional(),
+      // Cumulative token usage. persistMeta already sends these; they were being
+      // DROPPED here (zod strips unknown keys) so tokens never persisted — declare
+      // them so they reach the DB + the session list.
+      promptTokens: z.number().int().min(0).optional(),
+      completionTokens: z.number().int().min(0).optional(),
+      cacheReadTokens: z.number().int().min(0).optional(),
+      cacheCreationTokens: z.number().int().min(0).optional(),
       // The session's strictly-typed run config (see shared/sessionConfig.ts).
       config: sessionConfigSchema.optional(),
       // The git branch the session operates on (server-persisted, cross-browser).
@@ -168,9 +178,15 @@ export const requests = defineRequests({
       seq: z.number().int().min(0),
       role: z.enum(['user', 'assistant', 'tool']),
       content: z.string(),
+      // When true, this is a STREAMING/transient write: relay the row to
+      // trackDocs({includeTransient}) subscribers as an ephemeral frame WITHOUT
+      // persisting it (see setDoc({transient})). The final content is committed by a
+      // later non-transient append at the same seq. Higher rate limit — streaming
+      // fires many per turn (throttled client-side).
+      transient: z.boolean().optional(),
     }),
     output: z.object({ ok: z.boolean() }),
-    rateLimit: { max: 600, window: 60 },
+    rateLimit: { max: 6000, window: 60 },
   }),
 
   // Persist a compaction: flag the dropped rows (by _id, since summary rows use a
@@ -220,6 +236,11 @@ export const requests = defineRequests({
           status: z.enum(['running', 'idle', 'done', 'error']),
           messageCount: z.number(),
           costUsd: z.number(),
+          // Cumulative token usage (absent on rows written before these columns).
+          promptTokens: z.number().optional(),
+          completionTokens: z.number().optional(),
+          cacheReadTokens: z.number().optional(),
+          cacheCreationTokens: z.number().optional(),
           created: z.number(),
           updated: z.number(),
           // The session's strictly-typed run config; absent on old rows.
@@ -244,6 +265,38 @@ export const requests = defineRequests({
   codingSessionClearMessages: authReq({
     input: z.object({ sessionId: z.string() }),
     output: z.object({ ok: z.boolean(), deleted: z.number() }),
+  }),
+
+  // ── Doc-triggered background task (E) ───────────────────────────────────────
+  // The UI writes a run-request (create) instead of poking native.task; the owning
+  // desktop host reacts via trackDocs, CAS-claims it, drives the turn, then marks it
+  // done/error. `_id` = `run:<sessionId>:<seq>` (idempotent per turn).
+  codingRunRequestCreate: authReq({
+    input: z.object({
+      sessionId: z.string(),
+      projectId: z.string(),
+      seq: z.number().int().min(0),
+      prompt: z.string(),
+      selection: z.string().optional(),
+    }),
+    output: z.object({ id: z.string() }),
+    rateLimit: { max: 240, window: 60 },
+  }),
+  // CAS claim: succeeds (claimed:true) only if the request is still `pending`.
+  codingRunRequestClaim: authReq({
+    input: z.object({ id: z.string(), host: z.string() }),
+    output: z.object({ claimed: z.boolean() }),
+    rateLimit: { max: 600, window: 60 },
+  }),
+  // Terminal status after the host finishes (or fails) driving the turn.
+  codingRunRequestComplete: authReq({
+    input: z.object({
+      id: z.string(),
+      status: z.enum(['done', 'error']),
+      error: z.string().max(2000).optional(),
+    }),
+    output: z.object({ ok: z.boolean() }),
+    rateLimit: { max: 600, window: 60 },
   }),
 
   // ── Per-user coding-agent settings (survive reload, sync across devices) ────

@@ -188,6 +188,10 @@ export interface SessionListSidebarSession {
   title: string;
   updated_at: number;
   running: boolean;
+  /** True when the session's last run ended in a FAILURE (a crashed background task
+   *  or a failed turn — server `status:'error'`). Renders an ERROR pill when the
+   *  session isn't currently re-running. */
+  errored?: boolean;
   /** True when the session is stuck on a pending user answer. */
   blocked?: boolean;
   /** Tooltip explaining what the session is blocked on. */
@@ -235,6 +239,9 @@ export interface SessionListSidebarProps {
   onSelect: (compositeId: string) => void;
   onNewSession: () => void;
   onArchiveSession: (compositeId: string) => void;
+  /** Optional rename handler — when set, double-clicking a row's title turns it
+   *  into an inline editable input that commits here on Enter/blur. */
+  onRenameSession?: (compositeId: string, title: string) => void;
   timeAgo: (ts: number) => string;
   footerNav?: SidebarNavItem[];
   /**
@@ -265,6 +272,7 @@ export function SessionListSidebar({
   onSelect,
   onNewSession,
   onArchiveSession,
+  onRenameSession,
   timeAgo,
   footerNav,
   archivedCount,
@@ -375,6 +383,7 @@ export function SessionListSidebar({
           activeCompositeId={activeCompositeId}
           onSelect={onSelect}
           onArchiveSession={onArchiveSession}
+          {...(onRenameSession ? { onRenameSession } : {})}
           timeAgo={timeAgo}
           {...(sessionViews ? { sessionViews } : {})}
         />
@@ -710,6 +719,7 @@ function SessionRowList({
   activeCompositeId,
   onSelect,
   onArchiveSession,
+  onRenameSession,
   timeAgo,
   sessionViews,
 }: {
@@ -717,6 +727,7 @@ function SessionRowList({
   activeCompositeId: string | null;
   onSelect: (compositeId: string) => void;
   onArchiveSession: (compositeId: string) => void;
+  onRenameSession?: (compositeId: string, title: string) => void;
   timeAgo: (ts: number) => string;
   sessionViews?: SidebarNavItem[];
 }): React.ReactElement {
@@ -808,6 +819,7 @@ function SessionRowList({
                 title: isChild ? s.model : s.title,
                 time: timeAgo(s.updated_at),
                 running: s.running,
+                ...(s.errored ? { errored: true } : {}),
                 blocked: s.blocked ?? false,
                 ...(s.blockedReason ? { blockedReason: s.blockedReason } : {}),
                 ...(s.creating ? { creating: true } : {}),
@@ -829,6 +841,7 @@ function SessionRowList({
                 ? {}
                 : { onArchive: () => { onArchiveSession(s.compositeId); } })}
               compact={isChild}
+              {...(onRenameSession && !isChild ? { onRename: (title: string) => { onRenameSession(s.compositeId, title); } } : {})}
               deleting={deleting} data-id="session-row"
             />
           </AnimatedRow>

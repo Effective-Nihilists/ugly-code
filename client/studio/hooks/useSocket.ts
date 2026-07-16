@@ -151,6 +151,19 @@ function readAuthTokenCookie(): string {
 /** Start (or re-attach to) the session's coding task + wire its events to emitCustom. */
 async function ensureCodingTask(sessionId: string): Promise<string> {
   const id = 'coding:' + sessionId;
+  const entry = taskEntryUrl('coding', buildId);
+  // Diagnostic (answers "why did my session restart, and did a send kill another
+  // session's task?"): capture the task's status BEFORE ensure so we can tell a fresh
+  // start from a REPLACE that stops a live child (which kills its in-flight turn).
+  // `ensure` only ever touches THIS `id` — a distinct per-session `coding:<sessionId>`
+  // — never a sibling; the log makes that auditable from the feedback logs. A replace
+  // must only ever happen on a real build change, NEVER on a mere view/session switch.
+  let priorStatus: string | null = null;
+  try {
+    const existing = (await native.task.enum()).find((t) => t.id === id);
+    priorStatus = existing ? existing.status : null;
+  } catch { /* enum unreachable — proceed to ensure anyway */ }
+  const priorLive = priorStatus === 'running' || priorStatus === 'starting';
   // Upsert via the framework's generic, race-safe task.ensure: reuse the running
   // task when its bundle (`entry`, which pins the buildId) matches, else replace it
   // (stop stale/dead → start fresh → wait ready), returning the id. This supersedes
@@ -162,7 +175,7 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
   //    the fresh task to 'exited') is absorbed internally.
   const { reused } = await native.task.ensure({
     id,
-    entry: taskEntryUrl('coding', buildId),
+    entry,
     kind: 'coding',
     params: {
       projectPath: getActiveProjectPath(),
@@ -171,6 +184,19 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
       authToken: readAuthTokenCookie(),
     },
   });
+  // A fresh turn recovers a previously-crashed session — allow its next crash to
+  // surface again, and let the agent's persistMeta('running') clear the stored error.
+  crashedSessions.delete(sessionId);
+  // Rolling context for every send (visible in errorLog's recentLogs on any capture).
+  console.log('[coding-task] ensure id=%s session=%s reused=%s prior=%s', id, sessionId, reused, priorStatus ?? 'none');
+  // Replacing a LIVE task means its build no longer matches the SPA (a version
+  // mismatch) — the ONLY legitimate reason to restart a running session. This is
+  // EXPECTED, not a fault: log it (so an unexpected restart is still traceable in the
+  // rolling context) but never as an error/warn row. A crash, by contrast, arrives as
+  // a task `error`/abnormal-`exit` event (see wireTaskListener) and IS surfaced.
+  if (!reused && priorLive) {
+    console.log('[coding-task] restarted session %s on a new build (prior task %s was replaced; entry=%s)', sessionId, priorStatus, entry);
+  }
   sessionTaskIds.set(sessionId, id);
   // A freshly started task dropped the old host listener (stop's cleanup), so force a
   // re-subscribe; a reused task keeps its listener (wireTaskListener dedups).
@@ -178,13 +204,81 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
   wireTaskListener(id);
   return id;
 }
-/** Wire a task's emitCustom-shaped frames back onto the local bus, once per task id. */
+/** Wire a task's emitCustom-shaped frames back onto the local bus, once per task id.
+ *  Chat frames arrive as the `msg` event; the host's own `error` / `exit` events are
+ *  classified here into a session-level failure (a crash) vs an expected teardown. */
 function wireTaskListener(id: string): void {
   if (listenedTaskIds.has(id)) return;
   listenedTaskIds.add(id);
-  native.task.listen(id, (_event, data) =>
-    { emitCustom(data as { type: string; [k: string]: unknown }); },
-  );
+  native.task.listen(id, (event, data) => {
+    // Case 1 — the task child threw (uncaught exception / unhandled rejection / bundle
+    // load failure): taskRunner emits an `error` event. Always a real failure.
+    if (event === 'error') {
+      const d = (data ?? {}) as { message?: string };
+      reportCodingSessionError(sessionIdOf(id), `The coding session crashed: ${d.message ?? 'unknown error'}. Send a message to restart it.`);
+      return;
+    }
+    // The child process exited. Distinguish a CRASH (surface it) from an EXPECTED kill
+    // (a user Stop, or an ensure-replace on a build/version mismatch) — the host tags
+    // deliberate kills `intentional`, and a clean code:0 is normal completion.
+    if (event === 'exit') {
+      const text = codingExitCrashText(data ?? {});
+      if (text) reportCodingSessionError(sessionIdOf(id), text);
+      return;
+    }
+    emitCustom(data as { type: string; [k: string]: unknown });
+  });
+}
+
+/** Recover the session id from a `coding:<sessionId>` task id. */
+function sessionIdOf(taskId: string): string {
+  return taskId.startsWith('coding:') ? taskId.slice('coding:'.length) : taskId;
+}
+
+/** Host `exit` task-event payload (see ugly-studio TaskManager). */
+export interface CodingTaskExit {
+  code?: number | null;
+  signal?: string | null;
+  /** True when the host killed it deliberately (user Stop / ensure-replace on a
+   *  build mismatch) — an EXPECTED teardown, never surfaced as an error. */
+  intentional?: boolean;
+}
+
+/**
+ * Classify a coding task's `exit` event: return the user-facing crash text, or
+ * `null` when the exit is EXPECTED (deliberate kill) or clean. A `code:0`, or a
+ * `code:null` with no signal, is a normal exit; a non-zero code or a kill signal
+ * we did NOT initiate is a crash. Pure + exported so the taxonomy is unit-tested.
+ */
+export function codingExitCrashText(d: CodingTaskExit): string | null {
+  const clean = d.code === 0 || (d.code == null && !d.signal);
+  if (d.intentional || clean) return null;
+  return `The coding session process exited unexpectedly (code=${d.code ?? 'null'}${d.signal ? `, signal=${d.signal}` : ''}). Send a message to restart it.`;
+}
+
+// A crashed session fires BOTH an `error` and an `exit` — dedupe so it surfaces once.
+// Cleared in ensureCodingTask when a new turn restarts the session.
+const crashedSessions = new Set<string>();
+
+/**
+ * Surface a background-task FAILURE (a crash — NOT an expected version-mismatch
+ * restart) to the UI: (1) a live error bubble in the open transcript, matching how a
+ * caught turn error shows (renderer-only, never persisted into the agent's context),
+ * and (2) a durable `status:'error'` + `lastError` on the session doc so the session
+ * list flips to ERROR and the reason survives a reload / is queryable by id.
+ */
+function reportCodingSessionError(sessionId: string, text: string): void {
+  if (!sessionId || crashedSessions.has(sessionId)) return;
+  crashedSessions.add(sessionId);
+  console.error('[coding-task] session %s failed: %s', sessionId, text);
+  emitAgentError(sessionId, new Error(text));
+  void (async () => {
+    try {
+      const projectId = await resolveProjectId(getActiveProjectPath());
+      if (!projectId) return;
+      await sessionApi.upsert({ sessionId, projectId, status: 'error', lastError: text.slice(0, 2000) });
+    } catch { /* best-effort — telemetry/state persistence must never throw */ }
+  })();
 }
 /**
  * Attach (listen-only) to an ALREADY-RUNNING session task without ever starting

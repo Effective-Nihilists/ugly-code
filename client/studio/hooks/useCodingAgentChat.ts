@@ -1035,6 +1035,14 @@ export interface UseCodingAgentChatOptions {
   initialSessionId?: string;
   initialModel?: string;
   /**
+   * Persisted failure text (`lastError`) for a session being REOPENED after a
+   * failure. When set, the hook appends a one-off, renderer-only error bubble at
+   * the end of the transcript once history has loaded — so a crash the user missed
+   * (it happened while the session was closed / on another device) is still visible
+   * on reopen. Never persisted, so it can't pollute the agent's LLM context.
+   */
+  initialLastError?: string;
+  /**
    * When set, creates (or resumes) this session as bound to the given
    * spec. The server injects a spec-context block in the system prompt
    * every turn and removes `spec_create` from the tool catalog.
@@ -1074,6 +1082,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const {
     initialSessionId,
     initialModel,
+    initialLastError,
     specId,
     onSessionCreated,
     onModelChanged,
@@ -3225,6 +3234,27 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     // Intentionally mount-only — we don't want to re-create the session on
     // every prop change.
   }, []);
+
+  // Reopening a FAILED session: append the persisted `lastError` as a one-off,
+  // renderer-only error bubble once the transcript has loaded. The live crash bubble
+  // is renderer-only and is lost on reload/switch, so without this a session that
+  // died while closed (or on another device) would reopen looking merely idle. Never
+  // persisted → stays out of the agent's LLM context (matches the caught-turn-error
+  // convention). The ref makes it fire once per mount; a session switch remounts the
+  // hook, so the next session gets its own evaluation.
+  const lastErrorShownRef = useRef(false);
+  useEffect(() => {
+    if (lastErrorShownRef.current) return;
+    if (!initialLastError || !initialSessionId) return;
+    if (isLoadingHistory) return; // wait until the loaded transcript is in place
+    lastErrorShownRef.current = true;
+    const id = `lasterror:${initialSessionId}`;
+    setMessages((prev) =>
+      prev.some((m) => m.id === id)
+        ? prev
+        : [...prev, { id, role: 'assistant', content: `⚠ ${initialLastError}`, toolUses: [], isStreaming: false }],
+    );
+  }, [isLoadingHistory, initialLastError, initialSessionId]);
 
   const loadOlderMessages = useCallback(async () => {
     if (!sessionId) return;

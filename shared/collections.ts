@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { InferDocType, IndexDef } from 'ugly-app/shared';
 import { defineCollections, d1 } from 'ugly-app/shared';
 import { codingCollections } from './codingCollections';
-import type { CodingSession, CodingSessionMessage } from './codingCollections';
+import type { CodingSession, CodingSessionMessage, CodingRunRequest } from './codingCollections';
 
 // ─── Schemas & Types ─────────────────────────────────────────────────────────
 
@@ -67,6 +67,8 @@ export type {
   CodingSessionStatus,
   CodingSessionMessageRole,
   CodingSessionMessageKind,
+  CodingRunRequest,
+  CodingRunRequestStatus,
 } from './codingCollections';
 
 // --- Collections ---
@@ -151,7 +153,7 @@ type ColDef<T, Idx extends readonly IndexDef[] = readonly IndexDef[]> = Omit<
   schema: z.ZodObject<z.ZodRawShape>;
   meta: (typeof baseCollections.collabDoc)['meta'];
 };
-const cc = codingCollections as Record<'codingSession' | 'codingSessionMessage', unknown>;
+const cc = codingCollections as Record<'codingSession' | 'codingSessionMessage' | 'codingRunRequest', unknown>;
 
 // Literal index tuples used ONLY as the `_idx` phantom on the cast below, so the
 // 0.1.843 index-safety check knows the indexed fields. These are types, never fed
@@ -164,11 +166,15 @@ type CodingSessionMessageIdx = readonly [
   { fields: { sessionId: 1; userId: 1; compacted: 1; seq: 1 } },
   { fields: { sessionId: 1; userId: 1; seq: 1 } },
 ];
+type CodingRunRequestIdx = readonly [
+  { fields: { userId: 1; status: 1 } },
+];
 
 export const collections = {
   ...baseCollections,
   codingSession: cc.codingSession as ColDef<CodingSession, CodingSessionIdx>,
   codingSessionMessage: cc.codingSessionMessage as ColDef<CodingSessionMessage, CodingSessionMessageIdx>,
+  codingRunRequest: cc.codingRunRequest as ColDef<CodingRunRequest, CodingRunRequestIdx>,
 };
 
 export type AppCollections = typeof collections;

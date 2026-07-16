@@ -961,7 +961,11 @@ function TodoList({
     <div
       data-id="todo-list"
       style={{
-        padding: '6px 10px',
+        // Balanced padding: the first todo row was flush against the card's
+        // top edge (6px vs 10px on the sides), which read as cramped — a
+        // v0.1.124 feedback report flagged "missing padding on top." Give the
+        // top more room than the sides/bottom so the list breathes.
+        padding: '11px 12px 9px',
         display: 'flex',
         flexDirection: 'column',
         gap: 3,
@@ -5985,6 +5989,14 @@ export interface CodingAgentChatProps {
   initialSessionId?: string;
   initialModel?: string;
   /**
+   * Persisted failure text (`lastError`) for a session being REOPENED after it
+   * failed (a crashed background task or a failed turn). Rendered once as a durable
+   * trailing error bubble in the transcript so the error survives a reload/switch —
+   * the live crash bubble is renderer-only. Cleared server-side when a new turn
+   * recovers the session.
+   */
+  initialLastError?: string;
+  /**
    * When set, this tab is bound to the given spec. Passed through to
    * the session on create so the server injects a spec-context block
    * in the system prompt and gates `spec_create` out of the tool catalog.
@@ -6047,6 +6059,7 @@ export interface CodingAgentChatProps {
 function CodingAgentChatInner({
   initialSessionId,
   initialModel,
+  initialLastError,
   specId,
   onSessionCreated,
   onModelChanged,
@@ -6127,6 +6140,7 @@ CodingAgentChatProps = {}) {
   } = useCodingAgentChat({
     initialSessionId,
     initialModel,
+    ...(initialLastError ? { initialLastError } : {}),
     specId,
     onSessionCreated,
     onModelChanged,

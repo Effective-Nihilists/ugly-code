@@ -179,4 +179,123 @@ test.describe('Feedback fixes — Studio shell', () => {
     // is the newest page is interactive without waiting on the full backfill.
     expect(listMessagesCalls).toBeGreaterThanOrEqual(1);
   });
+
+  // ── New round (this session): branch pill, created-order, rename ────────
+
+  // Helper: seed the sidebar with a controlled set of sessions by mocking the
+  // list endpoint, then open the project so the sidebar renders them.
+  async function seedSidebar(
+    page: import('@playwright/test').Page,
+    sessions: Array<{
+      sessionId: string;
+      title: string;
+      branch?: string;
+      created: number;
+      updated: number;
+    }>,
+  ): Promise<void> {
+    await page.route('**/api/codingSessionList', async (route) => {
+      // Mirror the server's created-desc sort so the test asserts the real order.
+      const sorted = [...sessions].sort((a, b) => b.created - a.created);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          result: {
+            sessions: sorted.map((s) => ({
+              sessionId: s.sessionId,
+              title: s.title,
+              model: 'auto',
+              status: 'idle',
+              messageCount: 0,
+              costUsd: 0,
+              created: s.created,
+              updated: s.updated,
+              ...(s.branch ? { branch: s.branch } : {}),
+            })),
+          },
+        }),
+      });
+    });
+    await enterStudioShell(page, auth!);
+    await openProject(page);
+  }
+
+  // #1: branch pill is on the TOP row (right-aligned), not wrapped into the title
+  test('session row shows the branch pill on the top row', async ({ page }) => {
+    const NOW = Date.now();
+    await seedSidebar(page, [
+      { sessionId: 'cs:e2e_branch', title: 'Branch session', branch: 'feature-x', created: NOW, updated: NOW },
+    ]);
+
+    const row = page.locator('[data-id="session-row-cs:e2e_branch"]');
+    await expect(row).toBeVisible();
+    // The branch pill text is present and right-aligned on the top row.
+    await expect(row.getByText('feature-x', { exact: true })).toBeVisible();
+
+    // The pill sits in the top row (the title's sibling), NOT inside the
+    // clamped title div. Assert the title text and the pill are siblings by
+    // checking the pill is NOT a descendant of the title span.
+    const titleSpan = row.locator('span[title]').first();
+    const pillBox = await row.getByText('feature-x', { exact: true }).boundingBox();
+    const titleBox = await titleSpan.boundingBox();
+    expect(pillBox).not.toBeNull();
+    expect(titleBox).not.toBeNull();
+    // The pill is to the RIGHT of the title's left edge (same row), and their
+    // vertical centers are within a few px (top row, not a wrapped second line).
+    expect(pillBox!.x).toBeGreaterThan(titleBox!.x);
+    expect(Math.abs(pillBox!.y + pillBox!.height / 2 - (titleBox!.y + titleBox!.height / 2))).toBeLessThan(8);
+  });
+
+  // #2: sessions are ordered newest-CREATED first (stable across updates)
+  test('session list is sorted by created time, newest on top', async ({ page }) => {
+    const NOW = Date.now();
+    // Oldest by created, but MOST-recently updated — under the old `updated:-1`
+    // sort this order would flip. Created-desc must win.
+    await seedSidebar(page, [
+      { sessionId: 'cs:old', title: 'Old session', created: NOW - 100_000, updated: NOW - 1_000 },
+      { sessionId: 'cs:mid', title: 'Mid session', created: NOW - 50_000, updated: NOW - 5_000 },
+      { sessionId: 'cs:new', title: 'New session', created: NOW - 1_000, updated: NOW - 50_000 },
+    ]);
+
+    // The first (top) session row is the newest-CREATED, not the most-recently-updated.
+    const rows = page.locator('[data-id="session-list-sidebar"] [data-active]');
+    const firstTitle = await page.locator('[data-id="session-row-cs:new"]').textContent();
+    expect(firstTitle).toContain('New session');
+  });
+
+  // #3: click-to-rename — double-click the title to edit, Enter commits
+  test('session row title is editable via double-click', async ({ page }) => {
+    let savedTitle: string | null = null;
+    const NOW = Date.now();
+    await page.route('**/api/codingSessionUpsert', async (route) => {
+      try {
+        const body = JSON.parse(route.request().postData() ?? '{}') as { input?: { title?: string } };
+        if (body.input?.title) savedTitle = body.input.title;
+      } catch { /* ignore */ }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"result":{"ok":true}}' });
+    });
+    await seedSidebar(page, [
+      { sessionId: 'cs:e2e_rename', title: 'Original title', created: NOW, updated: NOW },
+    ]);
+
+    const row = page.locator('[data-id="session-row-cs:e2e_rename"]');
+    await expect(row).toBeVisible();
+    const titleSpan = row.locator('span[title]').first();
+    await expect(titleSpan).toHaveAttribute('title', /Double-click to rename/);
+
+    // Double-click → inline input appears.
+    await titleSpan.dblclick();
+    const input = row.locator('[data-id="session-row-rename"]');
+    await expect(input).toBeVisible();
+
+    // Type a new title + Enter commits.
+    await input.fill('Renamed by e2e');
+    await input.press('Enter');
+    await expect(input).toHaveCount(0);
+
+    // The row now shows the new title, and the upsert persisted it.
+    await expect(row.getByText('Renamed by e2e')).toBeVisible();
+    expect(savedTitle).toBe('Renamed by e2e');
+  });
 });

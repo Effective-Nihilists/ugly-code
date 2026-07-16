@@ -28,6 +28,15 @@ export const CodingSessionSchema = z.object({
   status: z.string(),
   messageCount: z.number(),
   costUsd: z.number(),
+  // Cumulative token usage (server-persisted so the session list can show it and it
+  // survives reload). Optional for backward-compat with rows written before these
+  // columns existed. Accrued per turn in clientAgent (see persistMeta). NOTE: these
+  // were previously sent by persistMeta but SILENTLY DROPPED at the codingSessionUpsert
+  // zod boundary (shared/api.ts) — so tokens never persisted and reset to 0 on reload.
+  promptTokens: z.number().optional(),
+  completionTokens: z.number().optional(),
+  cacheReadTokens: z.number().optional(),
+  cacheCreationTokens: z.number().optional(),
   archived: z.boolean(),
   // The session's run configuration (model + run modes) — strictly typed and
   // server-persisted so every browser opening the session sees the same picks. See
@@ -71,6 +80,33 @@ export type CodingSessionMessage = Omit<InferDocType<typeof CodingSessionMessage
   kind: CodingSessionMessageKind;
 };
 
+// ─── Doc-triggered background task (E) ───────────────────────────────────────
+// A run-request is the DECOUPLED trigger: the UI writes one (setDoc via
+// codingRunRequestCreate) instead of poking native.task directly; the desktop host
+// that OWNS the project reacts to it over trackDocs and drives the turn. Keyed by
+// userId (the host subscribes by user, then filters to projects it hosts). `_id` is
+// `run:<sessionId>:<seq>` so re-issuing the same turn is idempotent. A host CAS-claims
+// a pending request (status pending→claimed) so exactly one host runs it.
+export const CodingRunRequestSchema = z.object({
+  sessionId: z.string(),
+  projectId: z.string(),
+  userId: z.string(),
+  seq: z.number(),
+  prompt: z.string(),
+  /** JSON-stringified editor selection carried to the agent turn, when present. */
+  selection: z.string().optional(),
+  status: z.string(), // 'pending' | 'claimed' | 'done' | 'error'
+  /** deviceId of the host that claimed it (set on claim). */
+  host: z.string().optional(),
+  /** Failure text when status === 'error'. */
+  error: z.string().optional(),
+  createdAt: z.number(),
+});
+export type CodingRunRequestStatus = 'pending' | 'claimed' | 'done' | 'error';
+export type CodingRunRequest = Omit<InferDocType<typeof CodingRunRequestSchema>, 'status'> & {
+  status: CodingRunRequestStatus;
+};
+
 /**
  * Stable transcript ordering. The DB sorts `seq` as JSONB TEXT
  * (1,10,11,…,2,20), so every transcript read MUST re-sort with this:
@@ -107,19 +143,36 @@ const codingSessionMessageIndexes: { fields: Record<string, 1 | -1> }[] = [
   { fields: { sessionId: 1, userId: 1, compacted: 1, seq: 1 } },
   { fields: { sessionId: 1, userId: 1, seq: 1 } },
 ];
+const codingRunRequestIndexes: { fields: Record<string, 1 | -1> }[] = [
+  // Host subscribes trackDocs by userId; also scans pending by userId on connect.
+  { fields: { userId: 1, status: 1 } },
+];
 
 export const codingCollections = defineCollections({
   codingSession: {
     schema: CodingSessionSchema,
-    meta: { cache: false, trackable: false, public: false, cascadeFrom: null, db: d1 },
+    // Live-synced to the session list (StudioProjectPage) via trackDocs. `userId`
+    // MUST be a trackKey so the Workers path owner-scopes the subscription (it injects
+    // the authenticated userId for owner-scoped collections); `projectId` is the list
+    // routing key the client subscribes on. Query filter {userId,projectId,archived}
+    // stays covered by codingSessionIndexes.
+    meta: { cache: false, trackable: true, trackKeys: ['userId', 'projectId'], public: false, cascadeFrom: null, db: d1 },
     indexes: codingSessionIndexes,
   },
   codingSessionMessage: {
     schema: CodingSessionMessageSchema,
     // No cascade — sessions are soft-archived (archived:true), never hard-deleted,
     // so the transcript is preserved. (Cascade would key on `codingSessionId`; we
-    // use `sessionId`.)
-    meta: { cache: false, trackable: false, public: false, cascadeFrom: null, db: d1 },
+    // use `sessionId`.) Live-synced to the transcript via trackDocs keyed by
+    // `sessionId`; `userId` owner-scopes it (Workers injects the authed userId).
+    meta: { cache: false, trackable: true, trackKeys: ['userId', 'sessionId'], public: false, cascadeFrom: null, db: d1 },
     indexes: codingSessionMessageIndexes,
+  },
+  codingRunRequest: {
+    schema: CodingRunRequestSchema,
+    // Live-synced to the OWNING desktop host via trackDocs keyed by userId (the host
+    // filters to projects it hosts). No cascade — short-lived control docs.
+    meta: { cache: false, trackable: true, trackKeys: ['userId'], public: false, cascadeFrom: null, db: d1 },
+    indexes: codingRunRequestIndexes,
   },
 });
