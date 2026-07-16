@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-15T22:45:55.987Z",
+  "generatedAt": "2026-07-16T03:26:42.741Z",
   "source": "shared/collections.ts",
   "collections": {
     "authMagicLink": {
@@ -458,6 +458,18 @@
             "type": "string",
             "required": false
           },
+          "cacheCreationTokens": {
+            "type": "number",
+            "required": false
+          },
+          "cacheReadTokens": {
+            "type": "number",
+            "required": false
+          },
+          "completionTokens": {
+            "type": "number",
+            "required": false
+          },
           "config": {
             "type": "object",
             "fields": {
@@ -601,6 +613,10 @@
             "type": "string",
             "required": true
           },
+          "promptTokens": {
+            "type": "number",
+            "required": false
+          },
           "sessionId": {
             "type": "string",
             "required": true
@@ -630,7 +646,11 @@
       },
       "meta": {
         "cache": false,
-        "trackable": false,
+        "trackable": true,
+        "trackKeys": [
+          "userId",
+          "projectId"
+        ],
         "public": false,
         "cascadeFrom": null,
         "db": {
@@ -691,7 +711,78 @@
       },
       "meta": {
         "cache": false,
-        "trackable": false,
+        "trackable": true,
+        "trackKeys": [
+          "userId",
+          "sessionId"
+        ],
+        "public": false,
+        "cascadeFrom": null,
+        "db": {
+          "kind": "d1"
+        }
+      }
+    },
+    "codingRunRequest": {
+      "name": "codingRunRequest",
+      "schema": {
+        "fields": {
+          "createdAt": {
+            "type": "number",
+            "required": true
+          },
+          "error": {
+            "type": "string",
+            "required": false
+          },
+          "host": {
+            "type": "string",
+            "required": false
+          },
+          "projectId": {
+            "type": "string",
+            "required": true
+          },
+          "prompt": {
+            "type": "string",
+            "required": true
+          },
+          "selection": {
+            "type": "string",
+            "required": false
+          },
+          "seq": {
+            "type": "number",
+            "required": true
+          },
+          "sessionId": {
+            "type": "string",
+            "required": true
+          },
+          "status": {
+            "type": "string",
+            "required": true
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "userId": 1,
+              "status": 1
+            }
+          }
+        ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": true,
+        "trackKeys": [
+          "userId"
+        ],
         "public": false,
         "cascadeFrom": null,
         "db": {
