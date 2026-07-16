@@ -27,7 +27,13 @@ export interface SessionStore {
     cacheReadTokens?: number;
     cacheCreationTokens?: number;
   }): Promise<{ ok: boolean } | null>;
-  appendMessage(i: { sessionId: string; seq: number; role: StoredRole; content: string }): Promise<{ ok: boolean } | null>;
+  appendMessage(i: {
+    sessionId: string; seq: number; role: StoredRole; content: string;
+    /** Streaming write: relay the in-progress row to trackDocs({includeTransient})
+     *  subscribers WITHOUT persisting. A later non-transient append at the same seq
+     *  commits it durably. The CLI fs store ignores this (it commits every write). */
+    transient?: boolean;
+  }): Promise<{ ok: boolean } | null>;
   compact(i: { sessionId: string; droppedIds: string[]; summaryId: string; summarySeq: number; summaryText: string }): Promise<{ ok: boolean } | null>;
   listMessages(i: { sessionId: string; limit?: number; includeCompacted?: boolean }): Promise<{ messages: StoredMessageRow[] } | null>;
   list(i: { projectId: string }): Promise<{ sessions: SessionListRow[] } | null>;

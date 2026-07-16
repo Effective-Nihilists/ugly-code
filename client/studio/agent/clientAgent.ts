@@ -465,6 +465,10 @@ interface SessionAgentState {
   // message in place and onTurn finalizes it.
   streamMsgId: string | null;
   streamText: string;
+  // The transcript seq reserved for the in-flight assistant row at the first token,
+  // so the streaming transient writes and the final committed row share
+  // `_id = sessionId:streamSeq` and reconcile idempotently. Null between turns.
+  streamSeq: number | null;
   // ── Server persistence (survive reload) ──
   // Append-only transcript bookkeeping: `seq` is the next row index; `activeRows`
   // is the ordered set of currently-uncompacted rows ({seq,id}) — it MUST mirror
@@ -721,9 +725,12 @@ function emitMessage(
 
 // ── Server persistence helpers (all best-effort; never break the loop) ───────
 
-/** Append one transcript row + track its seq/id for the compaction window. */
-function persistRow(s: SessionAgentState, sessionId: string, role: StoredRole, payload: unknown): string {
-  const seq = s.seq++;
+/** Append one transcript row + track its seq/id for the compaction window. When
+ *  `reservedSeq` is given (an assistant row whose seq was reserved at stream start),
+ *  commit at that seq so it supersedes the transient streaming writes at the same
+ *  `_id`; otherwise allocate the next seq. */
+function persistRow(s: SessionAgentState, sessionId: string, role: StoredRole, payload: unknown, reservedSeq?: number): string {
+  const seq = reservedSeq ?? s.seq++;
   const id = `${sessionId}:${seq}`;
   s.activeRows.push({ seq, id });
   void sessionApi.appendMessage({ sessionId, seq, role, content: JSON.stringify(payload) });
@@ -970,6 +977,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     createdAt: Date.now(),
     streamMsgId: null,
     streamText: '',
+    streamSeq: null,
     seq: 0,
     activeRows: [],
     projectId: '',
@@ -1083,9 +1091,22 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       const parts: Part[] = [{ type: 'text', data: { text: state.streamText } }];
       if (!state.streamMsgId) {
         state.streamMsgId = rid();
+        // Reserve this row's transcript seq NOW so the transient streaming writes and
+        // the final committed row (onTurn) share `_id = sessionId:streamSeq`.
+        state.streamSeq = state.seq++;
         emitMessage(emitRef.current, sessionId, 'assistant', parts, { id: state.streamMsgId, action: 'created' });
       } else {
         emitMessage(emitRef.current, sessionId, 'assistant', parts, { id: state.streamMsgId, action: 'updated' });
+      }
+      // Stream the in-progress content to every client via trackDocs({includeTransient})
+      // — a transient (non-persisted) write at the reserved seq. onTurn commits the
+      // final content durably at the same seq. Best-effort; never breaks the loop.
+      if (state.streamSeq !== null) {
+        void sessionApi.appendMessage({
+          sessionId, seq: state.streamSeq, role: 'assistant',
+          content: JSON.stringify({ content: [{ type: 'text', text: state.streamText }] }),
+          transient: true,
+        });
       }
     },
     onTurn: (turn, telemetry) => {
@@ -1106,8 +1127,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       } else {
         emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content), modelOpt);
       }
+      const reservedSeq = state.streamSeq ?? undefined;
       state.streamMsgId = null;
       state.streamText = '';
+      state.streamSeq = null;
       state.messageCount += 1;
       state.log.append({ ts: Date.now(), type: 'assistant', content, ...(telemetry ? { telemetry } : {}) });
       // Persist the assistant turn verbatim (one row, matches one working-context
@@ -1125,7 +1148,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         content,
         ...modelOpt,
         ...(Object.keys(toolStartedAt).length > 0 ? { toolStartedAt } : {}),
-      });
+      }, reservedSeq);
       if (telemetry) {
         accrue(state, telemetry);
         state.log.append({ ts: Date.now(), type: 'telemetry', telemetry });
