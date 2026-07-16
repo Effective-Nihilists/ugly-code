@@ -89,8 +89,9 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         // branch-only or chatCreate upsert), like costUsd. persistMeta sends all four
         // every turn.
         ...(() => {
-          const t: Partial<Pick<CodingSession, 'promptTokens' | 'completionTokens' | 'cacheReadTokens' | 'cacheCreationTokens'>> = {};
-          for (const k of ['promptTokens', 'completionTokens', 'cacheReadTokens', 'cacheCreationTokens'] as const) {
+          const keys = ['promptTokens', 'completionTokens', 'cacheReadTokens', 'cacheCreationTokens', 'contextTokens', 'contextWindow', 'contextBudget'] as const;
+          const t: Partial<Pick<CodingSession, typeof keys[number]>> = {};
+          for (const k of keys) {
             const v = input[k] ?? existing?.[k];
             if (v !== undefined) t[k] = v;
           }
@@ -196,6 +197,9 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
           ...(d.completionTokens !== undefined ? { completionTokens: d.completionTokens } : {}),
           ...(d.cacheReadTokens !== undefined ? { cacheReadTokens: d.cacheReadTokens } : {}),
           ...(d.cacheCreationTokens !== undefined ? { cacheCreationTokens: d.cacheCreationTokens } : {}),
+          ...(d.contextTokens !== undefined ? { contextTokens: d.contextTokens } : {}),
+          ...(d.contextWindow !== undefined ? { contextWindow: d.contextWindow } : {}),
+          ...(d.contextBudget !== undefined ? { contextBudget: d.contextBudget } : {}),
           created: new Date(d.created).getTime(),
           updated: new Date(d.updated).getTime(),
           ...(d.config ? { config: d.config } : {}),

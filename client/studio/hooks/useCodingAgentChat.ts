@@ -36,6 +36,17 @@ interface CodingMsgDoc {
   content: string;
 }
 
+/** The subset of a `codingSession` doc the in-chat context meter reads (doc-driven). */
+interface CodingSessionMetaDoc {
+  _id: string;
+  version: number;
+  created: Date;
+  updated: Date;
+  contextTokens?: number;
+  contextWindow?: number;
+  contextBudget?: number;
+}
+
 /** A `codingInteraction` doc (doc-driven ask_user/step_review cards). */
 interface CodingInteractionDoc {
   _id: string;
@@ -3743,6 +3754,31 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             patternId: q.patternId ?? '', ...(q.specId ? { specId: q.specId } : {}), createdAt: q.createdAt ?? 0,
           };
         }));
+      },
+    );
+    return () => { unsub(); };
+  }, [sessionId, initialSessionId, app]);
+
+  // Doc-driven context-pressure meter: read the session's contextTokens/window/budget from
+  // its `codingSession` doc (persistMeta writes them per-turn) so the meter renders for ANY
+  // session — not just the one this device is attached to (the finding: background/just-
+  // opened sessions showed 0 until session_state via attach).
+  useEffect(() => {
+    if (!docDrivenCoding()) return;
+    const sid = sessionId ?? initialSessionId;
+    if (!sid || !app?.socket || !app.userId) return;
+    const unsub = app.socket.trackDocs<CodingSessionMetaDoc>(
+      'codingSession',
+      { keys: { userId: app.userId } },
+      (docs) => {
+        const d = docs.find((x) => x._id === sid);
+        if (!d || (d.contextTokens === undefined && d.contextWindow === undefined)) return;
+        setSessionInfo((prev) => ({
+          ...(prev ?? { cwd: '' }),
+          ...(d.contextTokens !== undefined ? { contextTokens: d.contextTokens } : {}),
+          ...(d.contextWindow !== undefined ? { contextWindow: d.contextWindow } : {}),
+          ...(d.contextBudget !== undefined ? { contextBudget: d.contextBudget } : {}),
+        } as CodingAgentSessionInfo));
       },
     );
     return () => { unsub(); };

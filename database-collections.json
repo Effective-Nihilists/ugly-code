@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-16T07:13:09.884Z",
+  "generatedAt": "2026-07-16T15:28:05.117Z",
   "source": "shared/collections.ts",
   "collections": {
     "authMagicLink": {
@@ -591,6 +591,18 @@
                 "required": true
               }
             },
+            "required": false
+          },
+          "contextBudget": {
+            "type": "number",
+            "required": false
+          },
+          "contextTokens": {
+            "type": "number",
+            "required": false
+          },
+          "contextWindow": {
+            "type": "number",
             "required": false
           },
           "costUsd": {

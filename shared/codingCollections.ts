@@ -37,6 +37,12 @@ export const CodingSessionSchema = z.object({
   completionTokens: z.number().optional(),
   cacheReadTokens: z.number().optional(),
   cacheCreationTokens: z.number().optional(),
+  // Context-pressure meter (doc-driven so it renders for any session, not just the
+  // attached one): current fill (last turn's total prompt), raw model window, and the
+  // pre-compaction budget. Written per-turn by persistMeta.
+  contextTokens: z.number().optional(),
+  contextWindow: z.number().optional(),
+  contextBudget: z.number().optional(),
   archived: z.boolean(),
   // The session's run configuration (model + run modes) — strictly typed and
   // server-persisted so every browser opening the session sees the same picks. See

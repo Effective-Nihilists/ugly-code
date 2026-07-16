@@ -159,6 +159,10 @@ export const requests = defineRequests({
       completionTokens: z.number().int().min(0).optional(),
       cacheReadTokens: z.number().int().min(0).optional(),
       cacheCreationTokens: z.number().int().min(0).optional(),
+      // Context-pressure meter (doc-driven so it renders for any session).
+      contextTokens: z.number().int().min(0).optional(),
+      contextWindow: z.number().int().min(0).optional(),
+      contextBudget: z.number().int().min(0).optional(),
       // The session's strictly-typed run config (see shared/sessionConfig.ts).
       config: sessionConfigSchema.optional(),
       // The git branch the session operates on (server-persisted, cross-browser).
@@ -241,6 +245,9 @@ export const requests = defineRequests({
           completionTokens: z.number().optional(),
           cacheReadTokens: z.number().optional(),
           cacheCreationTokens: z.number().optional(),
+          contextTokens: z.number().optional(),
+          contextWindow: z.number().optional(),
+          contextBudget: z.number().optional(),
           created: z.number(),
           updated: z.number(),
           // The session's strictly-typed run config; absent on old rows.

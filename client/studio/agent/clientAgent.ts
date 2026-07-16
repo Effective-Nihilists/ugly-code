@@ -467,6 +467,10 @@ interface SessionAgentState {
   completionTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
+  // The LAST turn's total prompt size (input + cache) — i.e. how full the context window
+  // currently is. NOT cumulative; overwritten each turn. Persisted so the context-pressure
+  // meter is doc-driven (works for any session, not just the attached one).
+  contextTokens: number;
   messageCount: number;
   perModel: Map<string, PerModelAcc>;
   createdAt: number;
@@ -827,6 +831,12 @@ function persistMeta(
     completionTokens: s.completionTokens,
     cacheReadTokens: s.cacheReadTokens,
     cacheCreationTokens: s.cacheCreationTokens,
+    // Context-pressure meter, doc-driven so it renders for ANY session (not just the one
+    // this device is attached to): current fill, the raw window, and the pre-compaction
+    // budget. Only meaningful once a turn has run (contextTokens 0 before that).
+    contextTokens: s.contextTokens,
+    contextWindow: contextWindowFor(s.model),
+    contextBudget: compactionThreshold(s.model),
     config,
     // Record the failure text on the session (queryable by id) when the turn
     // errored; clear it ('') on any non-error status so a recovered session
@@ -913,6 +923,9 @@ function accrue(s: SessionAgentState, t: MsgTelemetry): void {
   s.completionTokens += output;
   s.cacheReadTokens += cacheRead;
   s.cacheCreationTokens += cacheCreation;
+  // Current context-window fill = this turn's TOTAL prompt (fresh input + cached), not
+  // cumulative. Overwritten each turn so the doc always carries the latest pressure.
+  s.contextTokens = input + cacheRead + cacheCreation;
   const pm = s.perModel.get(model) ?? {
     model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, cost: 0, turnCount: 0,
   };
@@ -1011,6 +1024,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     completionTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
+    contextTokens: 0,
     messageCount: 0,
     perModel: new Map(),
     createdAt: Date.now(),

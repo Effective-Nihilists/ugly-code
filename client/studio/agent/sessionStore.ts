@@ -26,6 +26,10 @@ export interface SessionStore {
     completionTokens?: number;
     cacheReadTokens?: number;
     cacheCreationTokens?: number;
+    /** Context-pressure meter (doc-driven). */
+    contextTokens?: number;
+    contextWindow?: number;
+    contextBudget?: number;
   }): Promise<{ ok: boolean } | null>;
   appendMessage(i: {
     sessionId: string; seq: number; role: StoredRole; content: string;
