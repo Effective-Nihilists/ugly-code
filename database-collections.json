@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-16T03:26:42.741Z",
+  "generatedAt": "2026-07-16T04:06:04.790Z",
   "source": "shared/collections.ts",
   "collections": {
     "authMagicLink": {
@@ -727,6 +727,10 @@
       "name": "codingRunRequest",
       "schema": {
         "fields": {
+          "buildId": {
+            "type": "string",
+            "required": true
+          },
           "createdAt": {
             "type": "number",
             "required": true
