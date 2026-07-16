@@ -19,7 +19,6 @@ import { subscribeEditorLspStatus } from '../agent/lsp/registry';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
 import type { StoredMessageRow, StoredRole, StoredKind } from '../agent/serverSessionApi';
 import { compareCodingMessages } from '../../../shared/codingCollections';
-import { docDrivenCoding } from '../agent/docDrivenCoding';
 
 /** A `codingSessionMessage` doc as delivered by trackDocs (for the projection).
  *  Extends the DBObject system fields (`version`/`created`/`updated`) so it satisfies
@@ -688,15 +687,6 @@ interface MessagePartData {
   content?: string;
   is_error?: boolean;
   metadata?: unknown;
-}
-
-/** A raw wire message with typed parts (parts carry `MessagePartData`). */
-interface WireMessage {
-  id: string;
-  role: string;
-  model?: string;
-  parts?: { type: string; data?: MessagePartData }[];
-  created_at?: number;
 }
 
 /**
@@ -1806,91 +1796,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
 
       console.debug('[CodingAgentChat] Event: type=%s', eventType);
 
-      // Handle message events (created/updated)
-      if (eventType === 'message') {
-        // C-transcript flag: the trackDocs({includeTransient}) subscription owns the
-        // transcript (committed rows + live transient streaming), so ignore the local
-        // task.listen message stream entirely. Control events (below) still flow.
-        if (docDrivenCoding()) return;
-        // When the visible window doesn't cover the live tail, ignore
-        // streaming message events. The server has them durably in
-        // messages.jsonl; jumpToTail re-fetches when the user returns
-        // to the bottom.
-        if (!tailFollowingRef.current) return;
-        const subType = payload?.type ?? ''; // 'created' | 'updated' | 'deleted'
-        const message = payload?.payload as WireMessage | undefined;
-        if (!message) return;
-
-        console.debug(
-          '[CodingAgentChat] Message event: sub=%s role=%s id=%s',
-          subType,
-          message.role,
-          message.id.slice(0, 8),
-        );
-
-        // Only process assistant and tool messages
-        if (message.role === 'assistant') {
-          processAssistantMessage(message, subType);
-        } else if (message.role === 'tool') {
-          processToolMessage(message);
-        } else if (message.role === 'judge') {
-          processJudgeMessage(message);
-        } else if (message.role === 'status') {
-          processStatusMessage(message);
-        } else if (message.role === 'user') {
-          // User-message echoes from the server arrive when the prompt
-          // was fired BEFORE the chat panel mounted (e.g. ProjectHome's
-          // flow: chatCreate → chatSend → onOpenSession), so the
-          // backfill that ran on mount returned []. Without this branch
-          // the message is dropped on the floor and the chat shows
-          // empty even though messages.json on disk has the prompt.
-          // Dedupe rules (was id-only — id-only let the in-panel send
-          // path render twice, since `sendMessage` stamps a client
-          // UUID and the server stamps `msg_xxx`, so the two never
-          // collide; bug observed in ws_5v3j8c2smou5y3qb):
-          //
-          //   1. Same id already present → no-op.
-          //   2. The most recent user entry has matching content AND
-          //      a non-server-format id (i.e. the optimistic UUID we
-          //      added in `sendMessage`) → adopt the server's id so
-          //      future `updated`/`deleted` events for this message
-          //      land on the right row, but don't append a duplicate.
-          //   3. Otherwise (panel mounted after the prompt fired, e.g.
-          //      ProjectHome flow) → append.
-          if (subType === 'deleted') {
-            setMessages((prev) => prev.filter((m) => m.id !== message.id));
-            return;
-          }
-          const text = extractUserText(message);
-          if (!text) return;
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === message.id)) return prev;
-            for (let i = prev.length - 1; i >= 0; i--) {
-              const m = prev[i];
-              if (m.role !== 'user') continue;
-              const isServerId =
-                typeof m.id === 'string' && m.id.startsWith('msg_');
-              if (!isServerId && m.content === text) {
-                const next = prev.slice();
-                next[i] = { ...m, id: message.id };
-                return next;
-              }
-              break;
-            }
-            return [
-              ...prev,
-              {
-                id: message.id,
-                role: 'user',
-                content: text,
-                toolUses: [],
-                isStreaming: false,
-              },
-            ];
-          });
-        }
-        return;
-      }
+      // The transcript is owned by the trackDocs({includeTransient}) subscription
+      // (committed rows + live transient streaming), so the local task.listen message
+      // stream is ignored. Control events (below) still flow.
+      if (eventType === 'message') return;
 
       // Snapshot is the single source of truth for mode, model,
       // reasoning, tokens, worktree, worktreeStatus, finishPipeline
@@ -2326,137 +2235,6 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     return unsub;
   }, [sessionId, initialSessionId, backend.eventType, backend.exitType]);
 
-  /** Pull a plain-text body out of a user message's parts array. */
-  function extractUserText(message: WireMessage): string {
-    const parts = message.parts;
-    if (!parts) return '';
-    let text = '';
-    for (const p of parts) {
-      if (p.type === 'text') text += p.data?.text ?? '';
-    }
-    return text;
-  }
-
-  /**
-   * Process an assistant message from the agent.
-   * Messages have typed parts: text, reasoning, tool_call, tool_result, finish.
-   */
-  function processAssistantMessage(message: WireMessage, _subType: string) {
-    const parts = message.parts;
-    if (!parts) return;
-
-    const isNew = !knownMessageIds.current.has(message.id);
-
-    // Extract content from parts
-    let textContent = '';
-    let thinkingContent = '';
-    const toolUses: ToolUse[] = [];
-    let isFinished = false;
-
-    for (const part of parts) {
-      switch (part.type) {
-        case 'text':
-          textContent += part.data?.text ?? '';
-          break;
-        case 'reasoning':
-          thinkingContent += part.data?.thinking ?? '';
-          break;
-        case 'tool_call':
-          // 'running' while the LLM is still streaming args (finished=false).
-          // Once finished=true the args are complete but the tool hasn't
-          // executed yet — the tool_result arrives as a separate message. That
-          // gap is 'executing'. processToolMessage overwrites to 'done'/'error'
-          // when the tool_result lands.
-          toolUses.push({
-            id: part.data?.id ?? crypto.randomUUID(),
-            name: part.data?.name ?? 'tool',
-            input: part.data?.input ?? '',
-            status: part.data?.finished ? 'executing' : 'running',
-            // Persisted start time (see clientAgent onTurn) so a running tool's
-            // duration timer survives reload instead of resetting to zero.
-            ...(typeof part.data?.started_at === 'number' ? { startedAt: part.data.started_at } : {}),
-          });
-          break;
-        case 'tool_result':
-          // Tool results come as separate messages, handled in processToolMessage
-          break;
-        case 'finish':
-          isFinished = true;
-          break;
-      }
-    }
-
-    if (isNew) {
-      // New assistant message
-      knownMessageIds.current.add(message.id);
-      console.debug(
-        '[CodingAgentChat] New assistant message: id=%s text=%d chars, tools=%d',
-        message.id.slice(0, 8),
-        textContent.length,
-        toolUses.length,
-      );
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: message.id,
-          role: 'assistant',
-          content: textContent,
-          toolUses,
-          thinking: thinkingContent || undefined,
-          isStreaming: !isFinished,
-          ...(message.model ? { model: message.model } : {}),
-        },
-      ]);
-      // Don't flip isStreaming off when an assistant message finishes —
-      // multi-iteration turns emit a `finish` part between iterations
-      // (tool_calls → execute → next iteration). `agent_finished` is
-      // the authoritative turn-end signal; only it turns the spinner off.
-      if (!isFinished) setIsStreaming(true);
-    } else {
-      // Update existing message
-      console.debug(
-        '[CodingAgentChat] Updating assistant message: id=%s text=%d chars, tools=%d, finished=%s',
-        message.id.slice(0, 8),
-        textContent.length,
-        toolUses.length,
-        isFinished,
-      );
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (m.id !== message.id) return m;
-          // Merge tool uses: preserve results from existing, update status from new.
-          // If the existing entry already has a result (tool_result landed), it
-          // owns the terminal 'done'/'error' status. Otherwise take the new
-          // status — which is now 'running' (args streaming) or 'executing'
-          // (args done, waiting on tool_result).
-          const mergedTools = toolUses.map((tu) => {
-            const existing = m.toolUses.find((e) => e.id === tu.id);
-            if (!existing) return tu;
-            const keepTerminal =
-              existing.result != null ||
-              existing.status === 'done' ||
-              existing.status === 'error';
-            return {
-              ...tu,
-              result: existing.result,
-              metadata: existing.metadata,
-              liveOutput: existing.liveOutput,
-              status: keepTerminal ? existing.status : tu.status,
-            };
-          });
-          return {
-            ...m,
-            content: textContent,
-            toolUses: mergedTools,
-            thinking: thinkingContent || m.thinking,
-            isStreaming: !isFinished,
-            ...(message.model ? { model: message.model } : {}),
-          };
-        }),
-      );
-    }
-  }
-
   /**
    * Fold one `subagent_event` envelope into the parent delegate's
    * `children` tree. The first time we see a given child session id
@@ -2622,146 +2400,6 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `touched` is mutated inside the .map callback above; TS control-flow can't see the closure write.
         return touched ? { ...m, toolUses: nextTools } : m;
       });
-    });
-  }
-
-  /**
-   * Process tool result messages — update the matching tool use in the last assistant message.
-   */
-  function processToolMessage(message: WireMessage) {
-    const parts = message.parts;
-    if (!parts) return;
-
-    for (const part of parts) {
-      if (part.type !== 'tool_result') continue;
-
-      const toolCallId = part.data?.tool_call_id;
-      const content = part.data?.content ?? '';
-      const isError = part.data?.is_error ?? false;
-      const metadataRaw = part.data?.metadata;
-
-      if (!toolCallId) continue;
-
-      console.debug(
-        '[CodingAgentChat] Tool result: callId=%s isError=%s content=%d chars',
-        toolCallId.slice(0, 8),
-        isError,
-        content.length,
-      );
-
-      // The agent ships tool metadata as a JSON-encoded string. Parse
-      // eagerly so renderers don't all have to re-parse.
-      let metadata: Record<string, unknown> | null = null;
-      if (typeof metadataRaw === 'string' && metadataRaw.length > 0) {
-        try {
-          metadata = JSON.parse(metadataRaw) as Record<string, unknown>;
-        } catch {
-          /* ignore */
-        }
-      } else if (metadataRaw && typeof metadataRaw === 'object') {
-        metadata = metadataRaw as Record<string, unknown>;
-      }
-
-      // Truncate very long results for display
-      const displayContent =
-        content.length > 4000
-          ? content.slice(0, 4000) + '\n... (truncated)'
-          : content;
-
-      setMessages((prev) => {
-        const updated = [...prev];
-        for (let i = updated.length - 1; i >= 0; i--) {
-          const m = updated[i];
-          if (m.role !== 'assistant') continue;
-          const idx = m.toolUses.findIndex((tu) => tu.id === toolCallId);
-          if (idx !== -1) {
-            const toolUses = [...m.toolUses];
-            toolUses[idx] = {
-              ...toolUses[idx],
-              result: displayContent,
-              metadata,
-              status: isError ? 'error' : 'done',
-            };
-            updated[i] = { ...m, toolUses };
-            break;
-          }
-        }
-        return updated;
-      });
-    }
-  }
-
-  /**
-   * Append a server-emitted judge message to the chat stream so the
-   * UI can render it inline. Idempotent — repeated calls with the same
-   * message id are no-ops (replay during history backfill is safe).
-   */
-  function processJudgeMessage(message: WireMessage) {
-    const parts = message.parts;
-    if (!parts) return;
-    const judgePart = parts.find((p) => p.type === 'judge_call');
-    if (!judgePart?.data) return;
-    const snap = judgePart.data as unknown as JudgeCallSnapshot;
-    setMessages((prev) => {
-      if (prev.some((m) => m.id === message.id)) return prev;
-      const summaryLine = `${snap.kind} · ${snap.model} · ${
-        snap.output.verdict
-      }${snap.output.intervention ? `/${snap.output.intervention.kind}` : ''}`;
-      return [
-        ...prev,
-        {
-          id: message.id,
-          role: 'judge',
-          content: summaryLine,
-          toolUses: [],
-          isStreaming: false,
-          judge: snap,
-        },
-      ];
-    });
-  }
-
-  /**
-   * Append (or update) a server-emitted status message — currently the
-   * "Done entry" snapshot summarising worktree changes after a turn.
-   * Insert is idempotent on first sight; an `updated` event for the
-   * same id (sent when the finish pipeline completes and patches
-   * `finishOutcome`) replaces the existing entry in place so the chat
-   * panel re-renders the persisted outcome line without scrolling.
-   */
-  function processStatusMessage(message: WireMessage) {
-    const parts = message.parts;
-    if (!parts) return;
-    const donePart = parts.find((p) => p.type === 'done_state');
-    if (!donePart?.data) return;
-    const snap = donePart.data as unknown as DoneStateSnapshot;
-    const wt = snap.worktree;
-    const summary =
-      `${wt.changedCount} file${wt.changedCount === 1 ? '' : 's'} changed` +
-      (wt.aheadCount && wt.aheadCount > 0
-        ? ` · ${wt.aheadCount} commit${
-            wt.aheadCount === 1 ? '' : 's'
-          } ahead of ${wt.parentBranch}`
-        : '');
-    const ts =
-      typeof message.created_at === 'number' && message.created_at > 0
-        ? { created_at: message.created_at }
-        : {};
-    const next: ChatMessage = {
-      id: message.id,
-      role: 'status',
-      content: summary,
-      toolUses: [],
-      isStreaming: false,
-      done: snap,
-      ...ts,
-    };
-    setMessages((prev) => {
-      const idx = prev.findIndex((m) => m.id === message.id);
-      if (idx === -1) return [...prev, next];
-      const updated = prev.slice();
-      updated[idx] = next;
-      return updated;
     });
   }
 
@@ -3099,154 +2737,6 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           skip: true,
         }).catch(() => {/* noop */});
 
-        // When the C-transcript flag is on, the trackDocs subscription hydrates +
-        // live-syncs the transcript (below), so skip the listMessages page-fetch/replay
-        // path entirely. The trackDocs effect flips isLoadingHistory off on its first
-        // snapshot (even an empty one).
-        if (initialSessionId && !docDrivenCoding()) {
-          try {
-            // Render the FIRST (most recent) page immediately, then continue
-            // fetching older pages in the BACKGROUND while the UI is already
-            // interactive. The old code looped up to WINDOW_MAX (≈13 sequential
-            // round-trips for a 500-message session) before flipping the loading
-            // flag off — which is exactly the "stuck loading session" a v0.1.124
-            // feedback report flagged. The user only needs recent history to
-            // resume; older messages prepend as they arrive (same projection
-            // loadOlderMessages uses on scroll).
-            const firstPage = (await agentApi(backend.chatListMessages, {
-              sessionId: newId,
-              limit: PAGE_SIZE,
-            })) as { messages?: WireMessage[]; hasMore?: boolean };
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
-            if (cancelled) return;
-            const firstMsgs = firstPage.messages ?? [];
-            const firstHasMore = Boolean(firstPage.hasMore);
-            if (firstMsgs.length === 0) {
-              setIsLoadingHistory(false);
-              return;
-            }
-            setHasMoreNewer(false);
-            const replay = (ms: WireMessage[]): void => {
-              const seen = new Set<string>();
-              for (const m of ms) {
-                if (seen.has(m.id)) continue;
-                seen.add(m.id);
-                if (m.role === 'assistant') processAssistantMessage(m, 'created');
-                else if (m.role === 'tool') processToolMessage(m);
-                else if (m.role === 'judge') processJudgeMessage(m);
-                else if (m.role === 'status') processStatusMessage(m);
-                else if (m.role === 'user') {
-                  const text = extractUserText(m);
-                  if (text) {
-                    setMessages((prev) => [
-                      ...prev,
-                      {
-                        id: m.id,
-                        role: 'user',
-                        content: text,
-                        toolUses: [],
-                        isStreaming: false,
-                      },
-                    ]);
-                  }
-                }
-              }
-            };
-            // ① Replay the newest page through the same handlers used for live
-            // streaming events (full fidelity: model attribution, thinking,
-            // tool cards). Skip messages already known (race dedup).
-            replay(firstMsgs);
-            // Any tool_use still 'running'/'executing' after a replay was
-            // INTERRUPTED — the session stopped before the tool finished (or its
-            // result was never persisted). Mark it terminal so the card doesn't
-            // spin forever ("stuck"). This is display-only: a real resume
-            // re-derives the pending tool from the persisted content and runs it.
-            const markInterruptedTools = (): void => {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.role === 'assistant' &&
-                  m.toolUses.some((t) => t.status === 'running' || t.status === 'executing')
-                    ? {
-                        ...m,
-                        toolUses: m.toolUses.map((t) =>
-                          t.status === 'running' || t.status === 'executing'
-                            ? { ...t, status: 'error' as const }
-                            : t,
-                        ),
-                      }
-                    : m,
-                ),
-              );
-            };
-            markInterruptedTools();
-            setIsStreaming(false);
-            // The newest page is rendered — drop the loading veil NOW so the
-            // transcript is visible + the composer is usable while older pages
-            // keep loading. Assume there's more until the background loop
-            // proves otherwise.
-            setHasMoreOlder(firstHasMore);
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
-            if (cancelled) return;
-            console.log(
-              '[session-origin] resume backfill: firstPage=%d hasMoreOlder=%s (background)',
-              firstMsgs.length, firstHasMore,
-            );
-            // ② Background: keep fetching older pages up to WINDOW_MAX and
-            // PREPEND each batch (oldest first) via the same projection
-            // loadOlderMessages uses, so the on-scroll path and the initial
-            // backfill stay consistent. Runs without holding the loading veil.
-            if (firstHasMore) {
-              let beforeId = firstMsgs[0].id;
-              let total = firstMsgs.length;
-              let exhaustedBg = false;
-              while (!exhaustedBg && total < WINDOW_MAX) {
-                const page = (await agentApi(backend.chatListMessages, {
-                  sessionId: newId,
-                  limit: PAGE_SIZE,
-                  beforeId,
-                })) as { messages?: WireMessage[]; hasMore?: boolean };
-                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
-                if (cancelled) break;
-                const msgs = page.messages ?? [];
-                if (msgs.length === 0) { exhaustedBg = true; break; }
-                let nextHasMore = Boolean(page.hasMore);
-                setMessages((prev) => {
-                  const seen = new Set(prev.map((m) => m.id));
-                  const fresh = projectAgentMessagesToChat(msgs.filter((m) => !seen.has(m.id)));
-                  if (fresh.length === 0) return prev;
-                  let next = [...fresh, ...prev];
-                  // Trim to WINDOW_MAX from the OLDEST end to keep the newest
-                  // messages visible. If we trimmed, there's definitely more.
-                  if (next.length > WINDOW_MAX) {
-                    const drop = next.length - WINDOW_MAX;
-                    next = next.slice(0, next.length - drop);
-                    nextHasMore = true;
-                    setHasMoreNewer(true);
-                  }
-                  knownMessageIds.current = new Set(next.map((m) => m.id));
-                  return next;
-                });
-                total += msgs.length;
-                beforeId = msgs[0].id;
-                setHasMoreOlder(nextHasMore);
-                exhaustedBg = !nextHasMore;
-              }
-              console.log(
-                '[session-origin] resume backfill: background done total=%d hasMoreOlder=%s',
-                total, !exhaustedBg,
-              );
-            }
-          } catch (err) {
-            console.error('[useCodingAgentChat:historyBackfill]', JSON.stringify({ sessionId: newId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
-            console.debug(
-              '[CodingAgentChat] History backfill failed: %s',
-              (err as Error).message,
-            );
-          } finally {
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
-            if (!cancelled) setIsLoadingHistory(false);
-          }
-        }
       } catch (err) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
         if (!cancelled) {
@@ -3677,15 +3167,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // the app-specific request through a narrow structural interface.
   const app = useAppOptional();
 
-  // C-transcript cutover (flag-gated): make the transcript a pure projection of the
-  // `codingSessionMessage` docs, live-synced via trackDocs({ includeTransient }). The
-  // in-flight assistant turn streams through the transient writes the task child emits
-  // (D-child); committed rows arrive as deltas. Cross-device + reload-surviving, with
-  // no dependency on the local task.listen event stream. Default OFF (see
-  // transcriptViaTrackDocs); the message-event branch + listMessages hydration are
-  // gated off when this is on so the two paths never fight over `messages`.
+  // The transcript is a pure projection of the `codingSessionMessage` docs, live-synced
+  // via trackDocs({ includeTransient }). The in-flight assistant turn streams through the
+  // transient writes the task child emits (D-child); committed rows arrive as deltas.
+  // Cross-device + reload-surviving, with no dependency on the local task.listen stream.
   useEffect(() => {
-    if (!docDrivenCoding()) return;
     const sid = sessionId ?? initialSessionId;
     if (!sid || !app?.socket) return;
     const unsub = app.socket.trackDocs<CodingMsgDoc>(
@@ -3728,7 +3214,6 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // → respondInteraction → the host forwards it to the task. A `pending` ask_user doc is a
   // live gate; anything else (answered/done) has been picked up, so it drops off.
   useEffect(() => {
-    if (!docDrivenCoding()) return;
     const sid = sessionId ?? initialSessionId;
     if (!sid || !app?.socket) return;
     const unsub = app.socket.trackDocs<CodingInteractionDoc>(
@@ -3764,7 +3249,6 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // session — not just the one this device is attached to (the finding: background/just-
   // opened sessions showed 0 until session_state via attach).
   useEffect(() => {
-    if (!docDrivenCoding()) return;
     const sid = sessionId ?? initialSessionId;
     if (!sid || !app?.socket || !app.userId) return;
     const unsub = app.socket.trackDocs<CodingSessionMetaDoc>(

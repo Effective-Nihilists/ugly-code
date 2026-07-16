@@ -24,7 +24,6 @@ import { gradeProject, type GradeDeps } from '../evals/grader';
 import { listRunHistory, deleteRunFromHistory } from '../evals/history';
 import { sessionApi, resolveProjectId, createRunRequest, getRunRequestStatus, putInteraction, respondInteraction, askInteractionId, stepInteractionId } from '../agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
-import { docDrivenCoding } from '../agent/docDrivenCoding';
 import { DB_SCRIPT } from '../db/dbScript';
 import {
   lspDefinition,
@@ -327,13 +326,11 @@ async function watchRunRequest(sessionId: string, id: string): Promise<void> {
 function emitAgentError(sessionId: string, e: unknown): void {
   console.error('[codingAgentChatSend] turn failed', e);
   const text = e instanceof Error ? e.message : String(e);
-  // Surface via the UNGATED `error` event (useCodingAgentChat handles `type:'error'`
-  // outside the docDrivenCoding-gated `message` branch) so the failure is visible in BOTH
-  // the doc-driven and legacy paths. Without this, a doc-driven send error was dropped on
-  // the floor (the message branch returns early under docDrivenCoding) — a permanent
-  // spinner with no diagnostic.
+  // Surface via the `error` event — useCodingAgentChat handles `type:'error'` directly
+  // (the transcript itself is doc-sourced), so the failure shows as an error banner.
   emitCustom({ type: 'codingAgent:event', sessionId, event: { type: 'error', text } });
-  // Legacy transcript also renders it as an assistant ⚠ bubble (ignored under doc-driven).
+  // Also carry it as an assistant ⚠ event for any consumer that renders message events
+  // (the doc-sourced transcript ignores it).
   emitCustom({
     type: 'codingAgent:event',
     sessionId,
@@ -1017,68 +1014,27 @@ const handlers: Record<string, Handler> = {
         .catch((e: unknown) => { emitAgentError(sessionId, e); });
       return Promise.resolve({});
     }
-    // 2. F (doc-driven, DEFAULT): write a `codingRunRequest` doc — the owning desktop
-    //    host claims + forks + drives the turn (E-host), streaming via transient message
-    //    docs (D-child). No native.task/proxy tunnel from the renderer; the transcript
-    //    renders live from `codingSessionMessage` docs (useCodingAgentChat). The user
-    //    bubble appears when the host commits it (a brief host round-trip).
-    if (docDrivenCoding()) {
-      void (async () => {
-        const projectId = await resolveProjectId(getActiveProjectPath());
-        const sel = buildSelection(sessionId);
-        const res = await createRunRequest({
-          sessionId, projectId, prompt: message, buildId,
-          ...(Object.keys(sel).length > 0 ? { selection: JSON.stringify(sel) } : {}),
-        });
-        // A null result means the SERVER write failed (network/500) — the turn never
-        // enqueued. Distinct from the host-offline case below.
-        if (!res) {
-          emitAgentError(sessionId, new Error("Couldn't reach the server to queue your message — check your connection and try again."));
-          return;
-        }
-        // Host watchdog: the run-request is written `pending`; the owning desktop host
-        // claims it within moments IF it's running. If it stays `pending` past the
-        // window, no host is connected — surface that instead of an infinite spinner
-        // (the #1 doc-driven failure mode). Cleared as soon as it's claimed/terminal.
-        void watchRunRequest(sessionId, res.id);
-      })();
-      return Promise.resolve({});
-    }
-    // 3. Legacy: run the session as a background task (Studio desktop, or mobile via the
-    //    Ugly Proxy); its frames stream back via task.listen. Kept behind the kill-switch.
+    // 2. Doc-driven: write a `codingRunRequest` doc — the owning desktop host claims +
+    //    forks + drives the turn (E-host), streaming via transient message docs (D-child).
+    //    No native.task/proxy tunnel from the renderer; the transcript renders live from
+    //    `codingSessionMessage` docs (useCodingAgentChat). The user bubble appears when the
+    //    host commits it (a brief host round-trip).
     void (async () => {
-      let id: string;
-      try {
-        id = await ensureCodingTask(sessionId);
-      } catch (e) {
-        // The task couldn't be started at all — a real, surfaced failure.
-        emitAgentError(sessionId, e);
+      const projectId = await resolveProjectId(getActiveProjectPath());
+      const sel = buildSelection(sessionId);
+      const res = await createRunRequest({
+        sessionId, projectId, prompt: message, buildId,
+        ...(Object.keys(sel).length > 0 ? { selection: JSON.stringify(sel) } : {}),
+      });
+      // A null result means the SERVER write failed (network/500) — the turn never enqueued.
+      if (!res) {
+        emitAgentError(sessionId, new Error("Couldn't reach the server to queue your message — check your connection and try again."));
         return;
       }
-      // The `send` call stays open for the ENTIRE turn (the host keeps the task
-      // child driving the turn only while this call is pending — see coding-task
-      // `send`). A long turn therefore outruns the host bridge's task.call
-      // timeout, which rejects this promise with "task.call timed out: send".
-      // That is BENIGN: the turn keeps running and streams its frames — and any
-      // real error — via task.listen. So swallow the timeout instead of showing a
-      // spurious "turn failed" bubble (the "timeout in UglyNative" bug report).
-      // Non-timeout rejections are genuine dispatch failures → surface them.
-      const sentAt = Date.now();
-      native.task.call(id, 'send', { text: message, selection: buildSelection(sessionId) })
-        .then(() => {
-          // Diagnostic (browser feedback telemetry): a `send` RPC that resolves
-          // FAST (before a real turn could run) means the task child returned
-          // early — the turn isn't being driven. A slow resolve / timeout is the
-          // expected shape for a real turn. Pairs with the task-side turn_dispatch
-          // + agent_finished diag to localize instant no-op turns.
-          console.debug('[codingAgentChatSend] send RPC resolved after %dms', Date.now() - sentAt);
-        })
-        .catch((e: unknown) => {
-          const msg = e instanceof Error ? e.message : String(e);
-          console.debug('[codingAgentChatSend] send RPC rejected after %dms: %s', Date.now() - sentAt, msg);
-          if (/timed out/i.test(msg)) return; // turn continues streaming independently
-          emitAgentError(sessionId, e);
-        });
+      // Host watchdog: the run-request is written `pending`; the owning desktop host claims
+      // it within moments IF it's running. If it stays `pending` past the window, no host is
+      // connected — surface that instead of an infinite spinner. Cleared once claimed.
+      void watchRunRequest(sessionId, res.id);
     })();
     return Promise.resolve({});
   },
@@ -1089,16 +1045,8 @@ const handlers: Record<string, Handler> = {
       return Promise.resolve({});
     }
     // Doc-driven: write a stop COMMAND the owning host forwards to its local task —
-    // proxy-free, so a phone can stop a turn it started. (Legacy: direct native.task.)
-    if (docDrivenCoding()) {
-      void putInteraction({ id: `int:${sessionId}:stop:${Date.now()}`, sessionId, kind: 'stop' });
-      return Promise.resolve({});
-    }
-    // The task id is deterministic (`coding:<sessionId>`) — under doc-driven send the
-    // renderer never forked it (the host did), so `sessionTaskIds` is empty; fall back to
-    // the deterministic id so stop still reaches the host's task. No-op if none is live.
-    const taskId = sessionTaskIds.get(sessionId) ?? ('coding:' + sessionId);
-    void native.task.call(taskId, 'interrupt').catch(() => {/* noop */});
+    // proxy-free, so a phone can stop a turn it started.
+    void putInteraction({ id: `int:${sessionId}:stop:${Date.now()}`, sessionId, kind: 'stop' });
     return Promise.resolve({});
   },
   // `/clear`: wipe the conversation in place. Reset the running task's in-memory
@@ -1119,43 +1067,23 @@ const handlers: Record<string, Handler> = {
   codingAgentToolStop: (i) => {
     const sessionId = str(i.sessionId ?? '');
     const toolCallId = str(i.toolCallId ?? '');
-    if (docDrivenCoding()) {
-      void putInteraction({ id: `int:${sessionId}:toolstop:${toolCallId}`, sessionId, kind: 'tool_stop', toolCallId });
-      return Promise.resolve({ ok: true });
-    }
-    const taskId = sessionTaskIds.get(sessionId);
-    if (!taskId) return Promise.resolve({ ok: false });
-    return native.task.call(taskId, 'toolStop', { toolCallId });
+    void putInteraction({ id: `int:${sessionId}:toolstop:${toolCallId}`, sessionId, kind: 'tool_stop', toolCallId });
+    return Promise.resolve({ ok: true });
   },
-  // ── Interactive turn controls (C1) — forward to the coding task. The task
-  //    acks safely today (the ask-user / step-review CARDS render from
-  //    session_state snapshots the task loop doesn't emit yet, and the agent
-  //    framework has no manual compaction) — so these keep the names wired
-  //    without rejecting; end-to-end interactivity is a follow-up. No live task
-  //    → benign default (a phantom card / no-op).
+  // ── Interactive turn controls — doc-driven: the client answers via a doc the owning
+  //    host forwards to the task (answerAskUser / answerStepReview), so a proxy-less
+  //    client can steer a parked gate.
   codingAgentAnswerAskUser: (i) => {
     const sessionId = str(i.sessionId ?? '');
     const toolCallId = str(i.toolCallId ?? '');
-    // Doc-driven: answer the parked question via a doc the owning host forwards to the
-    // task's `answerAskUser` — so a proxy-less client can answer an ask_user gate.
-    if (docDrivenCoding()) {
-      void respondInteraction(askInteractionId(sessionId, toolCallId), JSON.stringify({ answer: str(i.value ?? '') }));
-      return Promise.resolve({ ok: true });
-    }
-    const taskId = sessionTaskIds.get(sessionId);
-    if (!taskId) return Promise.resolve({ ok: false });
-    return native.task.call(taskId, 'answerAskUser', { toolCallId, answer: str(i.value ?? '') });
+    void respondInteraction(askInteractionId(sessionId, toolCallId), JSON.stringify({ answer: str(i.value ?? '') }));
+    return Promise.resolve({ ok: true });
   },
   codingAgentAnswerStepReview: (i) => {
     const sessionId = str(i.sessionId ?? '');
     const stepId = str(i.id ?? '');
-    if (docDrivenCoding()) {
-      void respondInteraction(stepInteractionId(sessionId, stepId), JSON.stringify({ action: i.action, feedback: i.feedback }));
-      return Promise.resolve({ ok: true });
-    }
-    const taskId = sessionTaskIds.get(sessionId);
-    if (!taskId) return Promise.resolve({ ok: false });
-    return native.task.call(taskId, 'answerStepReview', { id: i.id, action: i.action, feedback: i.feedback });
+    void respondInteraction(stepInteractionId(sessionId, stepId), JSON.stringify({ action: i.action, feedback: i.feedback }));
+    return Promise.resolve({ ok: true });
   },
   codingAgentCompactNow: (i) => {
     const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
