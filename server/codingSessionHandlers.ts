@@ -11,7 +11,7 @@
 import type { TypedDB } from 'ugly-app/server';
 import type { RequestHandlers } from 'ugly-app';
 import { dbDefaults } from 'ugly-app/shared';
-import { collections, type CodingSession, type CodingSessionMessage, type CodingRunRequest } from '../shared/collections';
+import { collections, type CodingSession, type CodingSessionMessage, type CodingRunRequest, type CodingInteraction } from '../shared/collections';
 import { compareCodingMessages } from '../shared/codingCollections';
 import type { requests } from '../shared/api';
 
@@ -28,6 +28,9 @@ type CodingSessionHandlers = Pick<
   | 'codingRunRequestClaim'
   | 'codingRunRequestComplete'
   | 'codingRunRequestGet'
+  | 'codingInteractionPut'
+  | 'codingInteractionRespond'
+  | 'codingInteractionResolve'
 >;
 
 // A message's `content` is `JSON.stringify(rawContent)`. A single unbounded tool
@@ -279,6 +282,40 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         ...(req.host ? { host: req.host } : {}),
         ...(req.error ? { error: req.error } : {}),
       };
+    },
+
+    // ── Interactive control ────────────────────────────────────────────────────────
+    // Agent posts a question / client posts a command. Idempotent by _id.
+    codingInteractionPut: async (userId, { id, sessionId, kind, toolCallId, stepId, question }) => {
+      const db = getDb();
+      const doc: CodingInteraction = {
+        _id: id,
+        sessionId, userId, kind,
+        ...(toolCallId ? { toolCallId } : {}),
+        ...(stepId ? { stepId } : {}),
+        ...(question ? { question } : {}),
+        status: 'pending',
+        createdAt: Date.now(),
+        ...dbDefaults(),
+      };
+      await db.setDoc(collections.codingInteraction, doc);
+      return { id };
+    },
+    // Client answers a parked question. Preserves the question fields; flips to answered.
+    codingInteractionRespond: async (userId, { id, response }) => {
+      const db = getDb();
+      const it = await db.getDoc(collections.codingInteraction, id);
+      if (it?.userId !== userId) return { ok: false }; // missing or wrong user
+      await db.setDocFields(collections.codingInteraction, id, { status: 'answered', response });
+      return { ok: true };
+    },
+    // Host/agent marks it handled after forwarding to the task.
+    codingInteractionResolve: async (userId, { id }) => {
+      const db = getDb();
+      const it = await db.getDoc(collections.codingInteraction, id);
+      if (it?.userId !== userId) return { ok: false }; // missing or wrong user
+      await db.setDocFields(collections.codingInteraction, id, { status: 'done' });
+      return { ok: true };
     },
   };
 }

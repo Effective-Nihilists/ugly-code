@@ -40,6 +40,9 @@ import {
   resolveProjectId,
   planCompaction,
   reconstructResumeContext,
+  putInteraction,
+  resolveInteraction,
+  askInteractionId,
   type ActiveRow,
   type StoredRole,
   type ToolResultPayload,
@@ -406,6 +409,11 @@ function makeToolHandlers(
               },
             ];
             emitTelemetry(state, sessionId);
+            // Doc-driven: post the question so any client (incl. a proxy-less phone) renders
+            // the card via trackDocs + can answer it; the owning host forwards the answer
+            // back to `awaitAskUser`. Best-effort — the local snapshot path still works.
+            const interactionId = askInteractionId(sessionId, toolCallId);
+            void putInteraction({ id: interactionId, sessionId, kind: 'ask_user', toolCallId, question: JSON.stringify({ question, options: opts }) });
             try {
               const answer = await awaitAskUser(toolCallId);
               return answer;
@@ -414,6 +422,7 @@ function makeToolHandlers(
                 (p) => p.toolCallId !== toolCallId,
               );
               emitTelemetry(state, sessionId);
+              void resolveInteraction(interactionId);
             }
           },
         ];

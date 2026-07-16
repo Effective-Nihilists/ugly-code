@@ -312,6 +312,35 @@ export const requests = defineRequests({
     rateLimit: { max: 1200, window: 60 },
   }),
 
+  // ── Interactive control (doc-driven, proxy-free) ──────────────────────────────────
+  // Write a pending interaction: the AGENT posts a QUESTION (ask_user/step_review) when it
+  // parks a turn; a CLIENT posts a COMMAND (stop/tool_stop). Idempotent by `id`.
+  codingInteractionPut: authReq({
+    input: z.object({
+      id: z.string(),
+      sessionId: z.string(),
+      kind: z.enum(['ask_user', 'step_review', 'stop', 'tool_stop']),
+      toolCallId: z.string().optional(),
+      stepId: z.string().optional(),
+      question: z.string().max(20000).optional(),
+    }),
+    output: z.object({ id: z.string() }),
+    rateLimit: { max: 600, window: 60 },
+  }),
+  // A CLIENT answers a parked question (status pending→answered + response); the owning
+  // host forwards it to the task.
+  codingInteractionRespond: authReq({
+    input: z.object({ id: z.string(), response: z.string().max(20000) }),
+    output: z.object({ ok: z.boolean() }),
+    rateLimit: { max: 600, window: 60 },
+  }),
+  // The host/agent marks an interaction handled (status→done) after forwarding it.
+  codingInteractionResolve: authReq({
+    input: z.object({ id: z.string() }),
+    output: z.object({ ok: z.boolean() }),
+    rateLimit: { max: 600, window: 60 },
+  }),
+
   // ── Per-user coding-agent settings (survive reload, sync across devices) ────
   // Formerly a host-local file served by the removed studio sidecar; now a
   // per-user Neon doc read/written via the framework request path (see

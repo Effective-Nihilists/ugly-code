@@ -36,6 +36,21 @@ interface CodingMsgDoc {
   content: string;
 }
 
+/** A `codingInteraction` doc (doc-driven ask_user/step_review cards). */
+interface CodingInteractionDoc {
+  _id: string;
+  version: number;
+  created: Date;
+  updated: Date;
+  sessionId: string;
+  kind: string;
+  toolCallId?: string;
+  stepId?: string;
+  question?: string;
+  status: string;
+  response?: string;
+}
+
 export interface ToolUse {
   id: string;
   name: string;
@@ -3692,6 +3707,30 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // finished. So the spinner reflects the live turn without the gated event stream.
         setIsStreaming(chat.some((m) => m.role === 'assistant' && m.isStreaming));
         setIsLoadingHistory(false);
+      },
+    );
+    return () => { unsub(); };
+  }, [sessionId, initialSessionId, app]);
+
+  // Doc-driven interactive control: render the ask_user card from `codingInteraction` docs
+  // (so a proxy-less client sees the parked question), answered via `codingAgentAnswerAskUser`
+  // → respondInteraction → the host forwards it to the task. A `pending` ask_user doc is a
+  // live gate; anything else (answered/done) has been picked up, so it drops off.
+  useEffect(() => {
+    if (!docDrivenCoding()) return;
+    const sid = sessionId ?? initialSessionId;
+    if (!sid || !app?.socket) return;
+    const unsub = app.socket.trackDocs<CodingInteractionDoc>(
+      'codingInteraction',
+      { keys: { sessionId: sid } },
+      (docs) => {
+        const asks = docs.filter((d) => d.kind === 'ask_user' && d.status === 'pending');
+        setPendingAskUsers(asks.map((d) => {
+          let q: { question?: string; options?: AskUserOption[] } = {};
+          try { q = JSON.parse(d.question ?? '{}') as typeof q; } catch { /* keep defaults */ }
+          const toolCallId = d.toolCallId ?? d._id;
+          return { id: toolCallId, sessionId: sid, toolCallId, question: q.question ?? '', options: q.options ?? [] };
+        }));
       },
     );
     return () => { unsub(); };

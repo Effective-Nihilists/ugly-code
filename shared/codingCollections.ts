@@ -110,6 +110,35 @@ export type CodingRunRequest = Omit<InferDocType<typeof CodingRunRequestSchema>,
   status: CodingRunRequestStatus;
 };
 
+// ── Interactive control (F, doc-driven) ──────────────────────────────────────────────
+// Proxy-free bridge for the interactive controls a coding turn needs, so a mobile/remote
+// client can steer a turn without the WebRTC task tunnel. Two directions in one collection,
+// forwarded by the owning desktop host to its local task.call:
+//   QUESTIONS  (kind ask_user/step_review): the AGENT writes one when it parks a turn on a
+//     gate (so any client renders the card via trackDocs); the CLIENT answers (status
+//     answered + response); the HOST forwards the answer to the task; the agent resolves it.
+//   COMMANDS   (kind stop/tool_stop): the CLIENT writes one; the HOST forwards it to the
+//     task (interrupt / toolStop) and marks it done.
+export const CodingInteractionSchema = z.object({
+  sessionId: z.string(),
+  userId: z.string(),
+  kind: z.string(), // 'ask_user' | 'step_review' | 'stop' | 'tool_stop'
+  /** ask_user / tool_stop target. */
+  toolCallId: z.string().optional(),
+  /** step_review target. */
+  stepId: z.string().optional(),
+  /** JSON question payload the agent parked (ask_user: {question,options}; step_review: {...}). */
+  question: z.string().optional(),
+  status: z.string(), // 'pending' | 'answered' | 'done'
+  /** JSON client answer ({answer} | {action,feedback}). */
+  response: z.string().optional(),
+  createdAt: z.number(),
+});
+export type CodingInteractionStatus = 'pending' | 'answered' | 'done';
+export type CodingInteraction = Omit<InferDocType<typeof CodingInteractionSchema>, 'status'> & {
+  status: CodingInteractionStatus;
+};
+
 /**
  * Stable transcript ordering. The DB sorts `seq` as JSONB TEXT
  * (1,10,11,…,2,20), so every transcript read MUST re-sort with this:
@@ -150,6 +179,10 @@ const codingRunRequestIndexes: { fields: Record<string, 1 | -1> }[] = [
   // Host subscribes trackDocs by userId; also scans pending by userId on connect.
   { fields: { userId: 1, status: 1 } },
 ];
+const codingInteractionIndexes: { fields: Record<string, 1 | -1> }[] = [
+  // Client tracks by sessionId (cards for the open session); host tracks by userId.
+  { fields: { userId: 1, sessionId: 1, status: 1 } },
+];
 
 export const codingCollections = defineCollections({
   codingSession: {
@@ -177,5 +210,12 @@ export const codingCollections = defineCollections({
     // filters to projects it hosts). No cascade — short-lived control docs.
     meta: { cache: false, trackable: true, trackKeys: ['userId'], public: false, cascadeFrom: null, db: d1 },
     indexes: codingRunRequestIndexes,
+  },
+  codingInteraction: {
+    schema: CodingInteractionSchema,
+    // Client tracks by sessionId (render cards for the open session); host tracks by
+    // userId (forward answers/commands for owned sessions). No cascade — short-lived.
+    meta: { cache: false, trackable: true, trackKeys: ['userId', 'sessionId'], public: false, cascadeFrom: null, db: d1 },
+    indexes: codingInteractionIndexes,
   },
 });

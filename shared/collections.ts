@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { InferDocType, IndexDef } from 'ugly-app/shared';
 import { defineCollections, d1 } from 'ugly-app/shared';
 import { codingCollections } from './codingCollections';
-import type { CodingSession, CodingSessionMessage, CodingRunRequest } from './codingCollections';
+import type { CodingSession, CodingSessionMessage, CodingRunRequest, CodingInteraction } from './codingCollections';
 
 // ─── Schemas & Types ─────────────────────────────────────────────────────────
 
@@ -69,6 +69,8 @@ export type {
   CodingSessionMessageKind,
   CodingRunRequest,
   CodingRunRequestStatus,
+  CodingInteraction,
+  CodingInteractionStatus,
 } from './codingCollections';
 
 // --- Collections ---
@@ -153,7 +155,7 @@ type ColDef<T, Idx extends readonly IndexDef[] = readonly IndexDef[]> = Omit<
   schema: z.ZodObject<z.ZodRawShape>;
   meta: (typeof baseCollections.collabDoc)['meta'];
 };
-const cc = codingCollections as Record<'codingSession' | 'codingSessionMessage' | 'codingRunRequest', unknown>;
+const cc = codingCollections as Record<'codingSession' | 'codingSessionMessage' | 'codingRunRequest' | 'codingInteraction', unknown>;
 
 // Literal index tuples used ONLY as the `_idx` phantom on the cast below, so the
 // 0.1.843 index-safety check knows the indexed fields. These are types, never fed
@@ -169,12 +171,16 @@ type CodingSessionMessageIdx = readonly [
 type CodingRunRequestIdx = readonly [
   { fields: { userId: 1; status: 1 } },
 ];
+type CodingInteractionIdx = readonly [
+  { fields: { userId: 1; sessionId: 1; status: 1 } },
+];
 
 export const collections = {
   ...baseCollections,
   codingSession: cc.codingSession as ColDef<CodingSession, CodingSessionIdx>,
   codingSessionMessage: cc.codingSessionMessage as ColDef<CodingSessionMessage, CodingSessionMessageIdx>,
   codingRunRequest: cc.codingRunRequest as ColDef<CodingRunRequest, CodingRunRequestIdx>,
+  codingInteraction: cc.codingInteraction as ColDef<CodingInteraction, CodingInteractionIdx>,
 };
 
 export type AppCollections = typeof collections;

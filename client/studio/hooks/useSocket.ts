@@ -22,7 +22,7 @@ import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 import { gradeProject, type GradeDeps } from '../evals/grader';
 import { listRunHistory, deleteRunFromHistory } from '../evals/history';
-import { sessionApi, resolveProjectId, createRunRequest, getRunRequestStatus } from '../agent/serverSessionApi';
+import { sessionApi, resolveProjectId, createRunRequest, getRunRequestStatus, putInteraction, respondInteraction, askInteractionId, stepInteractionId } from '../agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
 import { docDrivenCoding } from '../agent/docDrivenCoding';
 import { DB_SCRIPT } from '../db/dbScript';
@@ -1088,6 +1088,12 @@ const handlers: Record<string, Handler> = {
       void import('../agent/claudeCliAgent').then((m) => { m.abortClaudeCli(sessionId); });
       return Promise.resolve({});
     }
+    // Doc-driven: write a stop COMMAND the owning host forwards to its local task —
+    // proxy-free, so a phone can stop a turn it started. (Legacy: direct native.task.)
+    if (docDrivenCoding()) {
+      void putInteraction({ id: `int:${sessionId}:stop:${Date.now()}`, sessionId, kind: 'stop' });
+      return Promise.resolve({});
+    }
     // The task id is deterministic (`coding:<sessionId>`) — under doc-driven send the
     // renderer never forked it (the host did), so `sessionTaskIds` is empty; fall back to
     // the deterministic id so stop still reaches the host's task. No-op if none is live.
@@ -1111,9 +1117,15 @@ const handlers: Record<string, Handler> = {
   // (was a no-op, so "clicked stop, bash still running"). Sessions run as a
   // task; the proc registry lives there, so forward the kill.
   codingAgentToolStop: (i) => {
-    const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
+    const sessionId = str(i.sessionId ?? '');
+    const toolCallId = str(i.toolCallId ?? '');
+    if (docDrivenCoding()) {
+      void putInteraction({ id: `int:${sessionId}:toolstop:${toolCallId}`, sessionId, kind: 'tool_stop', toolCallId });
+      return Promise.resolve({ ok: true });
+    }
+    const taskId = sessionTaskIds.get(sessionId);
     if (!taskId) return Promise.resolve({ ok: false });
-    return native.task.call(taskId, 'toolStop', { toolCallId: str(i.toolCallId ?? '') });
+    return native.task.call(taskId, 'toolStop', { toolCallId });
   },
   // ── Interactive turn controls (C1) — forward to the coding task. The task
   //    acks safely today (the ask-user / step-review CARDS render from
@@ -1122,12 +1134,26 @@ const handlers: Record<string, Handler> = {
   //    without rejecting; end-to-end interactivity is a follow-up. No live task
   //    → benign default (a phantom card / no-op).
   codingAgentAnswerAskUser: (i) => {
-    const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
+    const sessionId = str(i.sessionId ?? '');
+    const toolCallId = str(i.toolCallId ?? '');
+    // Doc-driven: answer the parked question via a doc the owning host forwards to the
+    // task's `answerAskUser` — so a proxy-less client can answer an ask_user gate.
+    if (docDrivenCoding()) {
+      void respondInteraction(askInteractionId(sessionId, toolCallId), JSON.stringify({ answer: str(i.value ?? '') }));
+      return Promise.resolve({ ok: true });
+    }
+    const taskId = sessionTaskIds.get(sessionId);
     if (!taskId) return Promise.resolve({ ok: false });
-    return native.task.call(taskId, 'answerAskUser', { toolCallId: str(i.toolCallId ?? ''), answer: str(i.value ?? '') });
+    return native.task.call(taskId, 'answerAskUser', { toolCallId, answer: str(i.value ?? '') });
   },
   codingAgentAnswerStepReview: (i) => {
-    const taskId = sessionTaskIds.get(str(i.sessionId ?? ''));
+    const sessionId = str(i.sessionId ?? '');
+    const stepId = str(i.id ?? '');
+    if (docDrivenCoding()) {
+      void respondInteraction(stepInteractionId(sessionId, stepId), JSON.stringify({ action: i.action, feedback: i.feedback }));
+      return Promise.resolve({ ok: true });
+    }
+    const taskId = sessionTaskIds.get(sessionId);
     if (!taskId) return Promise.resolve({ ok: false });
     return native.task.call(taskId, 'answerStepReview', { id: i.id, action: i.action, feedback: i.feedback });
   },

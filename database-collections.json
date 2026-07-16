@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-16T04:06:04.790Z",
+  "generatedAt": "2026-07-16T07:13:09.884Z",
   "source": "shared/collections.ts",
   "collections": {
     "authMagicLink": {
@@ -786,6 +786,71 @@
         "trackable": true,
         "trackKeys": [
           "userId"
+        ],
+        "public": false,
+        "cascadeFrom": null,
+        "db": {
+          "kind": "d1"
+        }
+      }
+    },
+    "codingInteraction": {
+      "name": "codingInteraction",
+      "schema": {
+        "fields": {
+          "createdAt": {
+            "type": "number",
+            "required": true
+          },
+          "kind": {
+            "type": "string",
+            "required": true
+          },
+          "question": {
+            "type": "string",
+            "required": false
+          },
+          "response": {
+            "type": "string",
+            "required": false
+          },
+          "sessionId": {
+            "type": "string",
+            "required": true
+          },
+          "status": {
+            "type": "string",
+            "required": true
+          },
+          "stepId": {
+            "type": "string",
+            "required": false
+          },
+          "toolCallId": {
+            "type": "string",
+            "required": false
+          },
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "userId": 1,
+              "sessionId": 1,
+              "status": 1
+            }
+          }
+        ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": true,
+        "trackKeys": [
+          "userId",
+          "sessionId"
         ],
         "public": false,
         "cascadeFrom": null,

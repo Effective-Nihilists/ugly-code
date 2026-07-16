@@ -60,6 +60,26 @@ export async function getRunRequestStatus(
   return api('codingRunRequestGet', { id });
 }
 
+// ── Interactive control (doc-driven) — the id scheme both sides reconstruct ──────────
+export const askInteractionId = (sessionId: string, toolCallId: string): string => `int:${sessionId}:ask:${toolCallId}`;
+export const stepInteractionId = (sessionId: string, stepId: string): string => `int:${sessionId}:step:${stepId}`;
+
+/** Post a pending interaction — a QUESTION (agent) or a COMMAND (client). */
+export async function putInteraction(input: {
+  id: string; sessionId: string; kind: 'ask_user' | 'step_review' | 'stop' | 'tool_stop';
+  toolCallId?: string; stepId?: string; question?: string;
+}): Promise<{ id: string } | null> {
+  return api('codingInteractionPut', input);
+}
+/** Client answers a parked question; the owning host forwards it to the task. */
+export async function respondInteraction(id: string, response: string): Promise<{ ok: boolean } | null> {
+  return api('codingInteractionRespond', { id, response });
+}
+/** Mark an interaction handled (agent, once its awaited answer resolves / the gate clears). */
+export async function resolveInteraction(id: string): Promise<{ ok: boolean } | null> {
+  return api('codingInteractionResolve', { id });
+}
+
 // `.uglyapp` carries a stable projectId that survives folder moves; fall back to
 // the project path (still a stable per-project key) when it isn't published yet.
 const projectIdCache = new Map<string, string>();
