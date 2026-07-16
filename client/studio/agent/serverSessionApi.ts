@@ -30,16 +30,27 @@ async function api<T>(name: string, input: unknown): Promise<T | null> {
   }
 }
 
+// Monotonic, collision-resistant seq source for run-request ids. A bare `Date.now()`
+// collides on same-millisecond double-taps (and can go backwards on an NTP correction),
+// silently overwriting one prompt's request. This is strictly increasing within the
+// process (guards double-taps + clock steps) and mixes in sub-ms entropy (guards two
+// devices firing in the same ms), so `_id = run:<sessionId>:<seq>` stays unique per turn.
+let lastRunSeq = 0;
+function nextRunSeq(): number {
+  const seq = Math.max(Date.now() * 1000 + Math.floor(Math.random() * 1000), lastRunSeq + 1);
+  lastRunSeq = seq;
+  return seq;
+}
+
 /**
  * F (doc-triggered send): write a `codingRunRequest` so the owning desktop host claims +
- * forks the turn — instead of the renderer poking native.task directly. `seq` uses a
- * wall-clock stamp so the idempotent `_id = run:<sessionId>:<seq>` never collides across
- * reloads. Returns the request id (or null on failure — the caller surfaces the error).
+ * forks the turn — instead of the renderer poking native.task directly. Returns the
+ * request id (or null on failure — the caller surfaces the error).
  */
 export async function createRunRequest(input: {
   sessionId: string; projectId: string; prompt: string; buildId: string; selection?: string;
 }): Promise<{ id: string } | null> {
-  return api<{ id: string }>('codingRunRequestCreate', { ...input, seq: Date.now() });
+  return api<{ id: string }>('codingRunRequestCreate', { ...input, seq: nextRunSeq() });
 }
 
 // `.uglyapp` carries a stable projectId that survives folder moves; fall back to

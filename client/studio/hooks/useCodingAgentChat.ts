@@ -3671,6 +3671,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           .map((d) => ({ seq: d.seq, role: d.role, kind: d.kind, compacted: d.compacted, content: d.content }));
         const display = rowsToDisplayMessages(sid, rows);
         const chat = projectAgentMessagesToChat(display);
+        // Never let an EMPTY server snapshot (the initial one, or the window before the
+        // host commits the first row) clobber an optimistic just-sent user bubble +
+        // spinner — that made a fresh session's first message vanish and snap back to the
+        // new-session hero. Only take the projection once the server actually has rows;
+        // an empty snapshot leaves the local optimistic state intact.
+        if (chat.length === 0) { setIsLoadingHistory(false); return; }
         setMessages(chat);
         // Streaming indicator derived purely from docs: a `pending` (transient) assistant
         // row projects to `isStreaming` (no `finish` part); its durable commit flips it

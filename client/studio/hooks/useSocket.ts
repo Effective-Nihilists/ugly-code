@@ -308,6 +308,14 @@ async function attachCodingTask(sessionId: string): Promise<boolean> {
 }
 function emitAgentError(sessionId: string, e: unknown): void {
   console.error('[codingAgentChatSend] turn failed', e);
+  const text = e instanceof Error ? e.message : String(e);
+  // Surface via the UNGATED `error` event (useCodingAgentChat handles `type:'error'`
+  // outside the docDrivenCoding-gated `message` branch) so the failure is visible in BOTH
+  // the doc-driven and legacy paths. Without this, a doc-driven send error was dropped on
+  // the floor (the message branch returns early under docDrivenCoding) — a permanent
+  // spinner with no diagnostic.
+  emitCustom({ type: 'codingAgent:event', sessionId, event: { type: 'error', text } });
+  // Legacy transcript also renders it as an assistant ⚠ bubble (ignored under doc-driven).
   emitCustom({
     type: 'codingAgent:event',
     sessionId,
@@ -319,7 +327,7 @@ function emitAgentError(sessionId: string, e: unknown): void {
           id: 'err_' + Math.random().toString(36).slice(2, 9),
           role: 'assistant',
           parts: [
-            { type: 'text', data: { text: '⚠ ' + (e instanceof Error ? e.message : String(e)) } },
+            { type: 'text', data: { text: '⚠ ' + text } },
             { type: 'finish' },
           ],
           created_at: Date.now(),
