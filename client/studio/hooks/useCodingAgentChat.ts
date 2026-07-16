@@ -16,6 +16,45 @@ import {
 } from '../agent/sessionConfigStore';
 import type { SessionConfig, SessionConfigDefaults } from '../../../shared/sessionConfig';
 import { subscribeEditorLspStatus } from '../agent/lsp/registry';
+import { rowsToDisplayMessages } from '../agent/sessionDisplay';
+import type { StoredMessageRow, StoredRole, StoredKind } from '../agent/serverSessionApi';
+import { compareCodingMessages } from '../../../shared/codingCollections';
+
+/**
+ * C-transcript cutover (flag-gated, DEFAULT OFF): when enabled, the message
+ * transcript is a pure projection of the `codingSessionMessage` docs streamed via
+ * `trackDocs({ includeTransient })` — cross-device + reload-surviving, streaming
+ * the in-flight assistant turn through the SAME transient writes the task child
+ * emits — instead of being reconstructed from local `task.listen` events. Toggle
+ * live in a running Studio devtools (no rebuild):
+ *   localStorage.setItem('uglycode.transcriptViaTrackDocs','1')  // on
+ *   localStorage.removeItem('uglycode.transcriptViaTrackDocs')   // off
+ * Known limitation of the flag path: ephemeral judge/status live cards (not
+ * persisted as rows) are suppressed while on — they need row persistence for the
+ * full cutover.
+ */
+function transcriptViaTrackDocs(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem('uglycode.transcriptViaTrackDocs') === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** A `codingSessionMessage` doc as delivered by trackDocs (for the projection).
+ *  Extends the DBObject system fields (`version`/`created`/`updated`) so it satisfies
+ *  the `trackDocs<T extends DBObject>` constraint. */
+interface CodingMsgDoc {
+  _id: string;
+  version: number;
+  created: Date;
+  updated: Date;
+  seq: number;
+  role: StoredRole;
+  kind: StoredKind;
+  compacted: boolean;
+  content: string;
+}
 
 export interface ToolUse {
   id: string;
@@ -1760,6 +1799,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
 
       // Handle message events (created/updated)
       if (eventType === 'message') {
+        // C-transcript flag: the trackDocs({includeTransient}) subscription owns the
+        // transcript (committed rows + live transient streaming), so ignore the local
+        // task.listen message stream entirely. Control events (below) still flow.
+        if (transcriptViaTrackDocs()) return;
         // When the visible window doesn't cover the live tail, ignore
         // streaming message events. The server has them durably in
         // messages.jsonl; jumpToTail re-fetches when the user returns
@@ -3047,7 +3090,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           skip: true,
         }).catch(() => {/* noop */});
 
-        if (initialSessionId) {
+        // When the C-transcript flag is on, the trackDocs subscription hydrates +
+        // live-syncs the transcript (below), so skip the listMessages page-fetch/replay
+        // path entirely. The trackDocs effect flips isLoadingHistory off on its first
+        // snapshot (even an empty one).
+        if (initialSessionId && !transcriptViaTrackDocs()) {
           try {
             // Render the FIRST (most recent) page immediately, then continue
             // fetching older pages in the BACKGROUND while the UI is already
@@ -3620,6 +3667,36 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // + server/index.ts. The socket is typed to framework requests only, so reach
   // the app-specific request through a narrow structural interface.
   const app = useAppOptional();
+
+  // C-transcript cutover (flag-gated): make the transcript a pure projection of the
+  // `codingSessionMessage` docs, live-synced via trackDocs({ includeTransient }). The
+  // in-flight assistant turn streams through the transient writes the task child emits
+  // (D-child); committed rows arrive as deltas. Cross-device + reload-surviving, with
+  // no dependency on the local task.listen event stream. Default OFF (see
+  // transcriptViaTrackDocs); the message-event branch + listMessages hydration are
+  // gated off when this is on so the two paths never fight over `messages`.
+  useEffect(() => {
+    if (!transcriptViaTrackDocs()) return;
+    const sid = sessionId ?? initialSessionId;
+    if (!sid || !app?.socket) return;
+    const unsub = app.socket.trackDocs<CodingMsgDoc>(
+      'codingSessionMessage',
+      { keys: { sessionId: sid }, includeTransient: true },
+      (docs) => {
+        // Numeric seq sort (JSONB sorts seq as text) with the summary tiebreak, then
+        // the shared row→display→ChatMessage projection used by history replay — so a
+        // doc-sourced transcript renders byte-identically to a live-streamed one.
+        const rows: StoredMessageRow[] = [...docs]
+          .sort(compareCodingMessages)
+          .map((d) => ({ seq: d.seq, role: d.role, kind: d.kind, compacted: d.compacted, content: d.content }));
+        const display = rowsToDisplayMessages(sid, rows);
+        setMessages(projectAgentMessagesToChat(display));
+        setIsLoadingHistory(false);
+      },
+    );
+    return () => { unsub(); };
+  }, [sessionId, initialSessionId, app]);
+
   useEffect(() => {
     if (!app) return;
     let cancelled = false;
