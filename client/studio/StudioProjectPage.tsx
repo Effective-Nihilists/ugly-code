@@ -489,7 +489,7 @@ export default function StudioProjectPage({
           {/* Session tabs (dev-scoped) */}
           {tab === 'preview' && <div style={S.pane}><PreviewPanel sessionId={activeSessionId} /></div>}
           {tab === 'file' && <div style={S.pane}><FilePanel openTarget={pendingFile} onOpened={clearPendingFile} /></div>}
-          {tab === 'git' && <div style={S.pane}><GitPanel /></div>}
+          {tab === 'git' && <div style={S.pane}><GitPanel sessionId={activeSessionId} /></div>}
           {tab === 'tests' && <div style={S.pane}><TestsPanel /></div>}
           {tab === 'database' && <div style={S.paneScroll}><DatabasePanel forceDev /></div>}
           {/* Sidebar prod views */}

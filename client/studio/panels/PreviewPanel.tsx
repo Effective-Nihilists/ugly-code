@@ -1,7 +1,7 @@
 import React from 'react';
 import { native, isNativeAvailable, permissions } from 'ugly-app/native';
 import { NativeHostRequired } from '../common/NativeHostRequired';
-import { sessionPort, getSessionWorkspace } from '../agent/sessionWorkspace';
+import { sessionPort, getSessionWorkspace, sessionWorktreeDir } from '../agent/sessionWorkspace';
 import { devServerSpawn } from './devServerCmd';
 import { persistDevLog, flushDevLog, readDevLog } from './devServerLog';
 import { readDevControl } from './devServerControl';
@@ -194,6 +194,24 @@ function stopDev(key: string): void {
 
 export function PreviewPanel({ sessionId }: { sessionId?: string | null }): React.ReactElement {
   const activeRepo = useActiveRepoPath();
+  // Prefer the active session's WORKTREE (agent's in-flight change) when it exists, so the dev
+  // server runs the worktree checkout — serving the change — instead of `master`. Polled (the
+  // worktree is created by the first turn); falls back to the selected repo / project root.
+  const [resolvedProj, setResolvedProj] = React.useState<string | null>(activeRepo);
+  React.useEffect(() => {
+    let cancelled = false;
+    const resolve = async (): Promise<void> => {
+      let dir = activeRepo;
+      if (sessionId && activeRepo) {
+        const wt = sessionWorktreeDir(activeRepo, sessionId);
+        try { if (await native.fs.exists(wt)) dir = wt; } catch { /* fall back to activeRepo */ }
+      }
+      if (!cancelled) setResolvedProj(dir);
+    };
+    void resolve();
+    const t = setInterval(() => void resolve(), 5000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [activeRepo, sessionId]);
   const port = sessionId ? sessionPort(sessionId) : 4321;
   const defaultUrl = `http://localhost:${port}`;
   const devKey = sessionId ?? 'root';
@@ -256,7 +274,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   // running server itself survives on the host). Skipped on a tab switch, where
   // the in-memory log is still present.
   React.useEffect(() => {
-    const proj = activeRepo;
+    const proj = resolvedProj;
     if (!proj) return;
     const d = getDev(devKey, port);
     if (d.log) return;
@@ -264,7 +282,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
       const dd = getDev(devKey, port);
       if (text && !dd.log) { dd.log = text; notify(dd); }
     });
-  }, [activeRepo, devKey, port]);
+  }, [resolvedProj, devKey, port]);
 
   // Attach the dev-server log to any feedback filed from the preview tab, so a
   // "preview not working" report carries the actual dev-server output.
@@ -305,7 +323,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   // can't call startDev/stopDev directly. Poll ~3s; act on each new nonce once.
   const lastCtlNonce = React.useRef<string | null>(null);
   React.useEffect(() => {
-    const proj = activeRepo;
+    const proj = resolvedProj;
     if (!proj) return;
     let cancelled = false;
     // Seed with the current command so a stale pre-mount request isn't replayed.
@@ -319,7 +337,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
       });
     }, 3000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [activeRepo, devKey, port, sessionId]);
+  }, [resolvedProj, devKey, port, sessionId]);
 
   // Reload the iframe once the dev server is actually READY. `ugly-app dev` runs
   // Vite in MIDDLEWARE mode, so it never prints Vite's "➜ Local:" / "ready in Nms"
@@ -358,7 +376,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
   }, [dev.running, dev.startToken]);
 
   const startOrRestart = React.useCallback(() => {
-    const proj = activeRepo;
+    const proj = resolvedProj;
     if (!proj) { setShowLog(true); return; }
     startDev(devKey, proj, port, sessionId ? getSessionWorkspace(sessionId)?.databaseUrl : undefined);
     setShowLog(true);
@@ -369,7 +387,7 @@ export function PreviewPanel({ sessionId }: { sessionId?: string | null }): Reac
     setUrl(target);
     setCommitted(target);
     try { localStorage.setItem(keyFor(sessionId ?? null), target); } catch { /* ignore */ }
-  }, [activeRepo, devKey, port, sessionId]);
+  }, [resolvedProj, devKey, port, sessionId]);
 
   // Auto-scroll the log to the bottom as new output arrives, while pinned.
   React.useEffect(() => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { native } from 'ugly-app/native';
 import { getActiveProjectPath } from '../hooks/useSocket';
+import { sessionWorktreeDir } from '../agent/sessionWorkspace';
 import { findAndCacheGitRepos, getCachedRepos, type GitRepo } from './findGitRepos';
 import { GitRepoSelector, useQueryParam } from './GitRepoSelector';
 
@@ -68,7 +69,7 @@ function parseLog(out: string): Commit[] {
 
 type View = 'changes' | 'history';
 
-export function GitPanel(): React.ReactElement {
+export function GitPanel({ sessionId }: { sessionId?: string | null }): React.ReactElement {
   const [view, setView] = React.useState<View>('changes');
   const [branch, setBranch] = React.useState('');
   const [files, setFiles] = React.useState<GitFile[]>([]);
@@ -88,8 +89,27 @@ export function GitPanel(): React.ReactElement {
   // "fatal: not a git repository" to the user; show a clean empty state instead.
   const [isRepo, setIsRepo] = React.useState(true);
 
-  // Effective working directory: the selected repo or the active project root.
-  const cwd = activeRepo ?? getActiveProjectPath() ?? '';
+  // Effective working directory. Prefer the active session's WORKTREE (branch
+  // `ugly-studio/session/<id>`) — where the agent's in-flight edits live — so the panel
+  // reviews the actual change instead of `master`. Falls back to the selected repo / project
+  // root when there's no session or its worktree doesn't exist yet. Polled (the worktree is
+  // created by the first turn, after this panel may have mounted).
+  const baseCwd = activeRepo ?? getActiveProjectPath() ?? '';
+  const [cwd, setCwd] = React.useState(baseCwd);
+  React.useEffect(() => {
+    let cancelled = false;
+    const resolve = async (): Promise<void> => {
+      let dir = baseCwd;
+      if (sessionId && baseCwd) {
+        const wt = sessionWorktreeDir(baseCwd, sessionId);
+        try { if (await native.fs.exists(wt)) dir = wt; } catch { /* fall back to baseCwd */ }
+      }
+      if (!cancelled) setCwd(dir);
+    };
+    void resolve();
+    const t = setInterval(() => void resolve(), 5000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [baseCwd, sessionId]);
 
   // Scan for nested .git dirs on mount (deduplicated with GitRepoSelector).
   React.useEffect(() => {

@@ -287,6 +287,15 @@ export function sessionPort(sessionId: string): number {
   return getSessionWorkspace(sessionId)?.port ?? portFor(sessionId);
 }
 
+/** Deterministic worktree dir for a session — the isolated checkout (branch
+ *  `ugly-studio/session/<id>`) where the agent's IN-FLIGHT changes live, NOT `projectPath`
+ *  (master). Computable in the renderer (which can't see the child's `getSessionWorkspace`
+ *  cache); the dir exists only for worktree sessions, so callers verify with `native.fs.exists`
+ *  and fall back to the project root. Lets the Git + Preview panels show the agent's change. */
+export function sessionWorktreeDir(projectPath: string, sessionId: string): string {
+  return `${projectPath}/.ugly-studio/worktrees/${safeId(sessionId)}`;
+}
+
 /** Sync accessor for tool handlers (null until ensureSessionWorkspace resolves). */
 export function getSessionWorkspace(sessionId: string): SessionWorkspace | null {
   if (cache.has(sessionId)) return cache.get(sessionId)!;
