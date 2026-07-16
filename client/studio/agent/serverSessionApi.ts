@@ -30,6 +30,18 @@ async function api<T>(name: string, input: unknown): Promise<T | null> {
   }
 }
 
+/**
+ * F (doc-triggered send): write a `codingRunRequest` so the owning desktop host claims +
+ * forks the turn — instead of the renderer poking native.task directly. `seq` uses a
+ * wall-clock stamp so the idempotent `_id = run:<sessionId>:<seq>` never collides across
+ * reloads. Returns the request id (or null on failure — the caller surfaces the error).
+ */
+export async function createRunRequest(input: {
+  sessionId: string; projectId: string; prompt: string; buildId: string; selection?: string;
+}): Promise<{ id: string } | null> {
+  return api<{ id: string }>('codingRunRequestCreate', { ...input, seq: Date.now() });
+}
+
 // `.uglyapp` carries a stable projectId that survives folder moves; fall back to
 // the project path (still a stable per-project key) when it isn't published yet.
 const projectIdCache = new Map<string, string>();

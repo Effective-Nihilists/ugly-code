@@ -19,27 +19,7 @@ import { subscribeEditorLspStatus } from '../agent/lsp/registry';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
 import type { StoredMessageRow, StoredRole, StoredKind } from '../agent/serverSessionApi';
 import { compareCodingMessages } from '../../../shared/codingCollections';
-
-/**
- * C-transcript cutover (flag-gated, DEFAULT OFF): when enabled, the message
- * transcript is a pure projection of the `codingSessionMessage` docs streamed via
- * `trackDocs({ includeTransient })` — cross-device + reload-surviving, streaming
- * the in-flight assistant turn through the SAME transient writes the task child
- * emits — instead of being reconstructed from local `task.listen` events. Toggle
- * live in a running Studio devtools (no rebuild):
- *   localStorage.setItem('uglycode.transcriptViaTrackDocs','1')  // on
- *   localStorage.removeItem('uglycode.transcriptViaTrackDocs')   // off
- * Known limitation of the flag path: ephemeral judge/status live cards (not
- * persisted as rows) are suppressed while on — they need row persistence for the
- * full cutover.
- */
-function transcriptViaTrackDocs(): boolean {
-  try {
-    return typeof localStorage !== 'undefined' && localStorage.getItem('uglycode.transcriptViaTrackDocs') === '1';
-  } catch {
-    return false;
-  }
-}
+import { docDrivenCoding } from '../agent/docDrivenCoding';
 
 /** A `codingSessionMessage` doc as delivered by trackDocs (for the projection).
  *  Extends the DBObject system fields (`version`/`created`/`updated`) so it satisfies
@@ -1802,7 +1782,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // C-transcript flag: the trackDocs({includeTransient}) subscription owns the
         // transcript (committed rows + live transient streaming), so ignore the local
         // task.listen message stream entirely. Control events (below) still flow.
-        if (transcriptViaTrackDocs()) return;
+        if (docDrivenCoding()) return;
         // When the visible window doesn't cover the live tail, ignore
         // streaming message events. The server has them durably in
         // messages.jsonl; jumpToTail re-fetches when the user returns
@@ -3094,7 +3074,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // live-syncs the transcript (below), so skip the listMessages page-fetch/replay
         // path entirely. The trackDocs effect flips isLoadingHistory off on its first
         // snapshot (even an empty one).
-        if (initialSessionId && !transcriptViaTrackDocs()) {
+        if (initialSessionId && !docDrivenCoding()) {
           try {
             // Render the FIRST (most recent) page immediately, then continue
             // fetching older pages in the BACKGROUND while the UI is already
@@ -3676,7 +3656,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // transcriptViaTrackDocs); the message-event branch + listMessages hydration are
   // gated off when this is on so the two paths never fight over `messages`.
   useEffect(() => {
-    if (!transcriptViaTrackDocs()) return;
+    if (!docDrivenCoding()) return;
     const sid = sessionId ?? initialSessionId;
     if (!sid || !app?.socket) return;
     const unsub = app.socket.trackDocs<CodingMsgDoc>(

@@ -22,8 +22,9 @@ import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 import { gradeProject, type GradeDeps } from '../evals/grader';
 import { listRunHistory, deleteRunFromHistory } from '../evals/history';
-import { sessionApi, resolveProjectId } from '../agent/serverSessionApi';
+import { sessionApi, resolveProjectId, createRunRequest } from '../agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
+import { docDrivenCoding } from '../agent/docDrivenCoding';
 import { DB_SCRIPT } from '../db/dbScript';
 import {
   lspDefinition,
@@ -990,9 +991,27 @@ const handlers: Record<string, Handler> = {
         .catch((e: unknown) => { emitAgentError(sessionId, e); });
       return Promise.resolve({});
     }
-    // 2. Run the session as a background task (Studio desktop, or mobile via the Ugly
-    //    Proxy); its frames stream back via task.listen. The IDE only runs inside Ugly
-    //    Studio, so there's no in-renderer fallback.
+    // 2. F (doc-driven, DEFAULT): write a `codingRunRequest` doc — the owning desktop
+    //    host claims + forks + drives the turn (E-host), streaming via transient message
+    //    docs (D-child). No native.task/proxy tunnel from the renderer; the transcript
+    //    renders live from `codingSessionMessage` docs (useCodingAgentChat). The user
+    //    bubble appears when the host commits it (a brief host round-trip).
+    if (docDrivenCoding()) {
+      void (async () => {
+        const projectId = await resolveProjectId(getActiveProjectPath());
+        const sel = buildSelection(sessionId);
+        const res = await createRunRequest({
+          sessionId, projectId, prompt: message, buildId,
+          ...(Object.keys(sel).length > 0 ? { selection: JSON.stringify(sel) } : {}),
+        });
+        // A null result is a real failure to enqueue the turn (not the benign long-turn
+        // timeout the legacy path swallows) — surface it.
+        if (!res) emitAgentError(sessionId, new Error('Could not start the turn — the run-request failed to enqueue. Is the desktop host connected?'));
+      })();
+      return Promise.resolve({});
+    }
+    // 3. Legacy: run the session as a background task (Studio desktop, or mobile via the
+    //    Ugly Proxy); its frames stream back via task.listen. Kept behind the kill-switch.
     void (async () => {
       let id: string;
       try {
@@ -1035,9 +1054,11 @@ const handlers: Record<string, Handler> = {
       void import('../agent/claudeCliAgent').then((m) => { m.abortClaudeCli(sessionId); });
       return Promise.resolve({});
     }
-    const taskId = sessionTaskIds.get(sessionId);
-    // We run the session as a task → interrupt it there (no-op if no turn is in flight).
-    if (taskId) void native.task.call(taskId, 'interrupt').catch(() => {/* noop */});
+    // The task id is deterministic (`coding:<sessionId>`) — under doc-driven send the
+    // renderer never forked it (the host did), so `sessionTaskIds` is empty; fall back to
+    // the deterministic id so stop still reaches the host's task. No-op if none is live.
+    const taskId = sessionTaskIds.get(sessionId) ?? ('coding:' + sessionId);
+    void native.task.call(taskId, 'interrupt').catch(() => {/* noop */});
     return Promise.resolve({});
   },
   // `/clear`: wipe the conversation in place. Reset the running task's in-memory
