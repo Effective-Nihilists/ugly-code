@@ -43,6 +43,7 @@ import {
   putInteraction,
   resolveInteraction,
   askInteractionId,
+  stepInteractionId,
   type ActiveRow,
   type StoredRole,
   type ToolResultPayload,
@@ -1135,6 +1136,12 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         // the final committed row (onTurn) share `_id = sessionId:streamSeq`.
         state.streamSeq = state.seq++;
         emitMessage(emitRef.current, sessionId, 'assistant', parts, { id: state.streamMsgId, action: 'created' });
+        // Cold-start catch-up: a trackDocs({includeTransient}) sub still warming up on a
+        // fresh / just-switched-into session can miss the first transient frames (they're
+        // relay-only, no refetch). Re-emit the cumulative row a beat later so a warming sub
+        // gets the live tail. One-shot (no long-lived timer); guarded on the turn still
+        // streaming. Later token frames are cumulative, so this only needs to fire once.
+        setTimeout(() => { if (state.streamSeq !== null) scheduleTransientFlush(state, sessionId); }, 500);
       } else {
         emitMessage(emitRef.current, sessionId, 'assistant', parts, { id: state.streamMsgId, action: 'updated' });
       }
@@ -1698,6 +1705,7 @@ async function parkForStepReview(
   patternId: PatternId | null,
 ): Promise<import('./stepReviewBroker').StepReviewReply> {
   const id = rid();
+  const createdAt = Date.now();
   state.pendingStepReviews = [
     ...state.pendingStepReviews,
     {
@@ -1706,15 +1714,21 @@ async function parkForStepReview(
       stepId: step.id,
       stepLabel: step.label,
       patternId: patternId ?? '',
-      createdAt: Date.now(),
+      createdAt,
     },
   ];
   emitTelemetry(state, sessionId);
+  // Doc-driven: post the review gate so a proxy-less client renders the approve/iterate
+  // strip + can answer it. `stepId` on the doc holds the REVIEW id (what answerStepReview
+  // needs); the display fields ride the question JSON. Resolves via awaitStepReview.
+  const interactionId = stepInteractionId(sessionId, id);
+  void putInteraction({ id: interactionId, sessionId, kind: 'step_review', stepId: id, question: JSON.stringify({ stepId: step.id, stepLabel: step.label, patternId: patternId ?? '', createdAt }) });
   try {
     return await awaitStepReview(id, sessionId);
   } finally {
     state.pendingStepReviews = state.pendingStepReviews.filter((p) => p.id !== id);
     emitTelemetry(state, sessionId);
+    void resolveInteraction(interactionId);
   }
 }
 

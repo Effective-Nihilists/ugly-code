@@ -3731,6 +3731,18 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           const toolCallId = d.toolCallId ?? d._id;
           return { id: toolCallId, sessionId: sid, toolCallId, question: q.question ?? '', options: q.options ?? [] };
         }));
+        const reviews = docs.filter((d) => d.kind === 'step_review' && d.status === 'pending');
+        setPendingStepReviews(reviews.map((d) => {
+          let q: { stepId?: string; stepLabel?: string; patternId?: string; specId?: string; createdAt?: number } = {};
+          try { q = JSON.parse(d.question ?? '{}') as typeof q; } catch { /* keep defaults */ }
+          // `d.stepId` holds the REVIEW id (answerStepReview target); the display step id
+          // rides the question JSON.
+          const reviewId = d.stepId ?? d._id;
+          return {
+            id: reviewId, sessionId: sid, stepId: q.stepId ?? '', stepLabel: q.stepLabel ?? '',
+            patternId: q.patternId ?? '', ...(q.specId ? { specId: q.specId } : {}), createdAt: q.createdAt ?? 0,
+          };
+        }));
       },
     );
     return () => { unsub(); };

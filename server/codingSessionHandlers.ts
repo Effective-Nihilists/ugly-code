@@ -262,14 +262,15 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       await db.setDocFields(collections.codingRunRequest, id, { status: 'claimed', host });
       return { claimed: true };
     },
-    codingRunRequestComplete: async (userId, { id, status, error }) => {
+    codingRunRequestComplete: async (userId, { id }) => {
       const db = getDb();
       const req = await db.getDoc(collections.codingRunRequest, id);
       if (req?.userId !== userId) return { ok: false }; // missing or wrong user
-      await db.setDocFields(collections.codingRunRequest, id, {
-        status,
-        ...(error ? { error } : {}),
-      });
+      // GC: DELETE the request on completion rather than leaving a terminal row to
+      // accumulate forever (the host re-scans ALL of a user's requests on every change).
+      // Safe: the client watchdog stops at `claimed` (long before completion), and a real
+      // turn error is surfaced on the SESSION doc's lastError, not read back off this row.
+      await db.deleteDoc(collections.codingRunRequest, id);
       return { ok: true };
     },
     // Client watchdog read: is this request still `pending` (→ no host claimed it)?
@@ -309,12 +310,14 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       await db.setDocFields(collections.codingInteraction, id, { status: 'answered', response });
       return { ok: true };
     },
-    // Host/agent marks it handled after forwarding to the task.
+    // Host/agent marks it handled after forwarding to the task — DELETE it (GC; the client
+    // only renders `pending` cards, so a resolved row is inert, and the host tracks the
+    // whole collection). Idempotent: a double-resolve just no-ops on the missing row.
     codingInteractionResolve: async (userId, { id }) => {
       const db = getDb();
       const it = await db.getDoc(collections.codingInteraction, id);
       if (it?.userId !== userId) return { ok: false }; // missing or wrong user
-      await db.setDocFields(collections.codingInteraction, id, { status: 'done' });
+      await db.deleteDoc(collections.codingInteraction, id);
       return { ok: true };
     },
   };

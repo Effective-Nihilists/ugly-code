@@ -22,7 +22,8 @@ function memDb() {
         store.set(id, d);
         return d;
       },
-      deleteDoc: async () => {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      deleteDoc: async (_c: unknown, id: string) => { store.delete(id); },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
   };
@@ -53,14 +54,16 @@ describe('codingRunRequest — doc-triggered task lifecycle + CAS claim', () => 
     expect(await H(fake).codingRunRequestClaim('u1', { id: 'run:missing:9', host: 'h' })).toEqual({ claimed: false });
   });
 
-  it('complete sets a terminal status + error text', async () => {
+  it('complete DELETES the request (GC) once terminal; wrong-user cannot', async () => {
     const fake = memDb();
     await H(fake).codingRunRequestCreate('u1', { sessionId: 'cs:a', projectId: 'p1', seq: 3, prompt: 'x', buildId: 'b1' });
     await H(fake).codingRunRequestClaim('u1', { id: 'run:cs:a:3', host: 'h' });
-    expect(await H(fake).codingRunRequestComplete('u1', { id: 'run:cs:a:3', status: 'error', error: 'boom' })).toEqual({ ok: true });
-    expect(fake.store.get('run:cs:a:3')).toMatchObject({ status: 'error', error: 'boom' });
-    // Another user can't complete it.
+    // Another user can't complete it (guarded before delete).
     expect(await H(fake).codingRunRequestComplete('u2', { id: 'run:cs:a:3', status: 'done' })).toEqual({ ok: false });
+    expect(fake.store.has('run:cs:a:3')).toBe(true);
+    // The owner completes → the row is deleted (no terminal row left to accumulate).
+    expect(await H(fake).codingRunRequestComplete('u1', { id: 'run:cs:a:3', status: 'error', error: 'boom' })).toEqual({ ok: true });
+    expect(fake.store.has('run:cs:a:3')).toBe(false);
   });
 
   it('interaction lifecycle: put (question/command) → respond → resolve; wrong-user guarded', async () => {
@@ -73,9 +76,9 @@ describe('codingRunRequest — doc-triggered task lifecycle + CAS claim', () => 
     // Client answers → answered + response (the host then forwards it).
     expect(await H1.codingInteractionRespond('u1', { id: 'int:cs:ask:t1', response: JSON.stringify({ answer: 'B' }) })).toEqual({ ok: true });
     expect(fake.store.get('int:cs:ask:t1')).toMatchObject({ status: 'answered', response: JSON.stringify({ answer: 'B' }) });
-    // Host resolves after forwarding.
+    // Host resolves after forwarding → the interaction is DELETED (GC).
     expect(await H1.codingInteractionResolve('u1', { id: 'int:cs:ask:t1' })).toEqual({ ok: true });
-    expect(fake.store.get('int:cs:ask:t1').status).toBe('done');
+    expect(fake.store.has('int:cs:ask:t1')).toBe(false);
     // A client STOP command starts pending (host forwards it).
     await H1.codingInteractionPut('u1', { id: 'int:cs:stop:9', sessionId: 'cs', kind: 'stop' });
     expect(fake.store.get('int:cs:stop:9')).toMatchObject({ status: 'pending', kind: 'stop' });
@@ -91,8 +94,9 @@ describe('codingRunRequest — doc-triggered task lifecycle + CAS claim', () => 
     expect(await H(fake).codingRunRequestGet('u1', { id: 'run:cs:a:4' })).toEqual({ status: 'pending' });
     await H(fake).codingRunRequestClaim('u1', { id: 'run:cs:a:4', host: 'dev-1' });
     expect(await H(fake).codingRunRequestGet('u1', { id: 'run:cs:a:4' })).toEqual({ status: 'claimed', host: 'dev-1' });
-    await H(fake).codingRunRequestComplete('u1', { id: 'run:cs:a:4', status: 'error', error: 'boom' });
-    expect(await H(fake).codingRunRequestGet('u1', { id: 'run:cs:a:4' })).toEqual({ status: 'error', host: 'dev-1', error: 'boom' });
+    // complete GC-deletes → get now returns null (the watchdog already stopped at 'claimed').
+    await H(fake).codingRunRequestComplete('u1', { id: 'run:cs:a:4', status: 'done' });
+    expect(await H(fake).codingRunRequestGet('u1', { id: 'run:cs:a:4' })).toBeNull();
     // Not the caller's / missing → null.
     expect(await H(fake).codingRunRequestGet('u2', { id: 'run:cs:a:4' })).toBeNull();
     expect(await H(fake).codingRunRequestGet('u1', { id: 'run:missing:9' })).toBeNull();
