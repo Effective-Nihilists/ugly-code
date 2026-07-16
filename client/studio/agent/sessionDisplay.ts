@@ -21,7 +21,7 @@ export interface Part {
  * tool_call so a running tool's duration timer survives a reload — the live emit
  * omits it (the tool_progress meta event supplies it while running).
  */
-export function assistantParts(content: ContentPart[], toolStartedAt?: Record<string, number>): Part[] {
+export function assistantParts(content: ContentPart[], toolStartedAt?: Record<string, number>, pending?: boolean): Part[] {
   const parts: Part[] = [];
   for (const blk of content) {
     if (blk.type === 'text' && blk.text) {
@@ -41,7 +41,9 @@ export function assistantParts(content: ContentPart[], toolStartedAt?: Record<st
       });
     }
   }
-  parts.push({ type: 'finish' });
+  // An in-flight (transient streaming) row omits the terminal `finish` so it renders as
+  // `isStreaming`; the durable commit (no `pending`) appends it → the row flips finished.
+  if (!pending) parts.push({ type: 'finish' });
   return parts;
 }
 
@@ -79,8 +81,8 @@ export function rowsToDisplayMessages(sessionId: string, rows: StoredMessageRow[
         ],
       });
     } else if (r.role === 'assistant') {
-      const { content, model, toolStartedAt } = decodeAssistantPayload(payload);
-      out.push({ id: baseId, role: 'assistant', parts: assistantParts(content, toolStartedAt), ...(model ? { model } : {}) });
+      const { content, model, toolStartedAt, pending } = decodeAssistantPayload(payload);
+      out.push({ id: baseId, role: 'assistant', parts: assistantParts(content, toolStartedAt, pending), ...(model ? { model } : {}) });
     } else if (r.role === 'tool') {
       const results = (payload as Partial<ToolRowPayload>).results ?? [];
       results.forEach((x, i) => {

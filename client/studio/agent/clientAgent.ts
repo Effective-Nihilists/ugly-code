@@ -1104,7 +1104,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       if (state.streamSeq !== null) {
         void sessionApi.appendMessage({
           sessionId, seq: state.streamSeq, role: 'assistant',
-          content: JSON.stringify({ content: [{ type: 'text', text: state.streamText }] }),
+          // `pending: true` marks this as an in-flight streaming row so the doc-driven
+          // transcript renders it as `isStreaming` (no terminal `finish` part); the
+          // durable onTurn commit at the same seq drops it → the row flips finished.
+          content: JSON.stringify({ content: [{ type: 'text', text: state.streamText }], pending: true }),
           transient: true,
         });
       }

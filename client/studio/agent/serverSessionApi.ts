@@ -60,7 +60,11 @@ export interface ToolRowPayload { results: ToolResultPayload[] }
 // bare ContentPart[] — `decodeAssistantPayload` accepts both.
 // `toolStartedAt` maps a tool_use id → wall-clock start (persisted so a running
 // tool's duration timer survives reload; see clientAgent onTurn).
-export interface AssistantContentPayload { content: ContentPart[]; model?: string; toolStartedAt?: Record<string, number> }
+// `pending` marks an in-flight STREAMING assistant row (a transient setDoc, D-child):
+// its content is still growing, so the display omits the terminal `finish` part and the
+// row renders as `isStreaming`. The durable commit at the same seq drops `pending` → the
+// row flips finished. Only ever set on transient writes; committed rows never carry it.
+export interface AssistantContentPayload { content: ContentPart[]; model?: string; toolStartedAt?: Record<string, number>; pending?: boolean }
 export function decodeAssistantPayload(raw: unknown): AssistantContentPayload {
   if (Array.isArray(raw)) return { content: raw as ContentPart[] }; // legacy: bare content
   const p = (raw ?? {}) as Partial<AssistantContentPayload>;
@@ -68,6 +72,7 @@ export function decodeAssistantPayload(raw: unknown): AssistantContentPayload {
     content: p.content ?? [],
     ...(p.model ? { model: p.model } : {}),
     ...(p.toolStartedAt ? { toolStartedAt: p.toolStartedAt } : {}),
+    ...(p.pending ? { pending: true } : {}),
   };
 }
 

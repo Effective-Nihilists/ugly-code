@@ -3690,7 +3690,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           .sort(compareCodingMessages)
           .map((d) => ({ seq: d.seq, role: d.role, kind: d.kind, compacted: d.compacted, content: d.content }));
         const display = rowsToDisplayMessages(sid, rows);
-        setMessages(projectAgentMessagesToChat(display));
+        const chat = projectAgentMessagesToChat(display);
+        setMessages(chat);
+        // Streaming indicator derived purely from docs: a `pending` (transient) assistant
+        // row projects to `isStreaming` (no `finish` part); its durable commit flips it
+        // finished. So the spinner reflects the live turn without the gated event stream.
+        setIsStreaming(chat.some((m) => m.role === 'assistant' && m.isStreaming));
         setIsLoadingHistory(false);
       },
     );
