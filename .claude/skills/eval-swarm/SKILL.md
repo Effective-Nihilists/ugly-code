@@ -91,6 +91,23 @@ Store `BASE_URL="$(npx ugly-app url)"` for the run. Everything the swarm reads a
 lives on **this local server** — the framework read CLIs (`ugly-app feedback`, `errors`,
 `logs`) query **prod**, not local, so don't use them to inspect the run.
 
+### Local vs. prod target
+
+Default to **local** (above) — it isolates the run and tests your current checkout. But
+target **prod** (`BASE_URL=https://<app-domain>`, skip step 5's dev server) when the app is
+**consume-heavy and the data only exists in prod** — e.g. a corpus/search app whose local
+DB is empty, where every consume-persona would fail Step 2. Only the user can OK a prod run
+(real users' app, real feedback queue). When you do run against prod:
+- **Verify auth first:** load `$BASE_URL` in Playwright with a bot's `auth_token` cookie and
+  confirm the app renders authed (not a login page) before dispatching — an SSO app may not
+  honor the cookie, which would waste the whole (billed) swarm.
+- **Tag feedback:** `feedback:submit` writes to the **real** prod queue that `ugly-app
+  feedback` / `/fix-feedback` read. Have every persona prefix its message with `[eval-swarm]`
+  so synthetic findings are filterable from genuine user feedback. (Upside vs. local: the
+  fixer *can* read these — no in-context handoff needed.)
+- You're testing the **deployed** build, not your checkout — deploy first if you want your
+  latest changes evaluated.
+
 ---
 
 ## Step 1 — Design the personas (grounded in THIS app)
@@ -205,9 +222,60 @@ rows. Don't hand off by telling a fixer to "go read the feedback" — it can't.)
    output, then UX friction, then wishes.
 4. Present one ranked list: for each item — feature, severity, how many personas hit it,
    the sharpest one-line evidence, and the persona verdicts (did the tool work?).
-5. Hand off the ranked list **as content** for fixing — either fix the items directly in
+5. **Rate the product 1–5 stars** (see rubric) with a one-line justification. Lead the
+   presentation with the rating — it is the headline the user wants; the ranked list is the
+   evidence behind it.
+6. Hand off the ranked list **as content** for fixing — either fix the items directly in
    this session, or paste the list into a `/fix-feedback`-style pass (using its ambition
    policy), since the fixer cannot pull these local rows itself.
+
+**A persona reports a SYMPTOM; you diagnose the CAUSE before fixing.** "Exact search
+returns only one book" is a symptom — the cause was an FTS index the D1 cutover never
+backfilled (72k fragments, only the newest book indexed), found by querying prod D1
+directly (`wrangler d1 execute … "SELECT count(*) FROM <c>_fts"`), not by reading the UI.
+Root-cause at the data/infra layer (indexes, migrations, provisioning, backfills) before
+touching surface code — several personas' separate complaints often trace to one cause,
+and patching the surface leaves it broken.
+
+### Iterating to a target rating (fix → re-run)
+
+Eval-swarm is a *loop*, not a one-shot: run → rate → fix → re-run → confirm the rating
+moved. That's how a product climbs from ★★★ to ★★★★★.
+
+- **Reuse the same bot accounts across rounds.** They don't delete and idle ones bill
+  nothing; a re-run just re-drives the app with fresh chats ("New chat"), so you don't
+  mint (and pay to warm) a new roster each round.
+- **Keep the round-N+1 goals the same** (don't tell personas "we fixed X, confirm it") —
+  their existing goals naturally re-exercise the fixed areas, and a fresh, unbiased
+  verdict is the honest signal. The rigorous persona's re-verification is the one that
+  actually moves the rating.
+- **Deploy before re-running a prod-target swarm** — personas test the *deployed* build,
+  so a fix that's only committed won't show. (Data/index fixes like a backfill are live
+  immediately; code fixes need a deploy.)
+- **Track the trajectory**: report round N's rating, the ceiling finding, what you fixed,
+  and round N+1's rating. The ceiling finding is your fix list — clear it and the next
+  round's ceiling rises.
+- **A billed re-run is the user's call.** After fixing, you may have *directly verified*
+  every ceiling item yourself (drove the flow, read the screenshot); say so and offer the
+  independent re-run rather than auto-spending another swarm's worth of tokens.
+
+### Rating rubric (1–5 stars)
+
+Rate the product as a whole, computed from the **worst core-feature outcome**, **how many
+personas completed their primary goal**, and the **persona verdicts**. A broken feature
+caps the score — polish can't buy back a blocker.
+
+| Stars | Meaning | Gate |
+|-------|---------|------|
+| ★☆☆☆☆ **1 — Broken** | A core feature fails; a real user cannot accomplish the primary job. | Any blocker on a *primary* feature, or most personas' verdict = "broken". |
+| ★★☆☆☆ **2 — Rough** | Only happy paths work; a primary feature is broken-with-workaround, or several high-severity bugs. | A primary feature is unreliable, or ≥2 high-severity correctness/empty-output findings. |
+| ★★★☆☆ **3 — Usable** | Core jobs work but with real friction, wrong/empty AI output, or a broken *secondary* feature. | Any blocker/high on a secondary feature, or mixed persona verdicts. |
+| ★★★★☆ **4 — Solid** | All core jobs work; findings are UX polish, edge cases, or wishes. | All personas completed their goal; no blocker/high on a core path. |
+| ★★★★★ **5 — Excellent** | Every persona completed their goal; outputs accurate and trustworthy; only cosmetic nits. | Every verdict "works"; no finding above `low`. |
+
+Caps are hard: one blocker on a primary feature means **≤2 stars no matter how good the
+rest is**; a broken secondary feature caps at **3**. Half-stars are fine (e.g. ★★★½).
+State the single finding that set the ceiling.
 
 ---
 
@@ -230,6 +298,16 @@ pnpm exec playwright screenshot --wait-for-selector "$WAIT_SEL" --browser chromi
 If `WAIT_SEL` never appears **and you've confirmed it's the right selector for this app**,
 the page genuinely failed to render — report that as a real bug. Never fall back to a
 no-wait capture.
+
+**Writing your own Playwright script (multi-step journeys):** the CLI `pnpm exec playwright
+screenshot` is one-shot; a persona driving a real journey (search → click → chat → wait)
+writes a `.mjs` script instead. Two gotchas that will `ERR_MODULE_NOT_FOUND` you:
+- **Import from the package that's actually installed.** Many apps ship `@playwright/test`,
+  not standalone `playwright` — `import { chromium } from '@playwright/test'`. Check with
+  `ls node_modules | grep playwright` first.
+- **Put the script inside the project dir** (e.g. `./.eval-<slug>.mjs`), not `/tmp` — Node
+  resolves bare imports from the script's own folder upward, so a script in a scratchpad
+  can't find the app's `node_modules`. Delete it when done.
 
 ---
 
@@ -256,6 +334,54 @@ If no config exists, invent personas per Step 1 — that is the normal path.
 
 ---
 
+## Standard ugly-app capabilities (what's cheap to build)
+
+Every ugly-app child app is built on the same framework, so a large feature set is
+**standard and low-cost to wire** — it's a handler + a collection + a page, not new
+infrastructure. Use this list two ways: (1) when a persona wishes for something the app
+lacks, check here — if it's a standard capability, mark the `feature` finding **"low-cost
+(framework-standard)"** so the fixer knows it's an easy win, not a moonshot; (2) when
+designing personas, exercise the AI-bearing standard features hardest — they have the most
+to get wrong.
+
+**Data & search**
+- Typed collections on D1 or Neon (`createTypedDB` / `defineCollections`, zod schemas); CRUD via `socket.request` handlers.
+- Full-text search (FTS5, `meta.search`); semantic/vector search (Cloudflare Vectorize, `meta.vector`); RRF hybrid fusion of the two.
+- Structured queries: filters (`$in`, ranges), sort, pagination, counts.
+- `trackDocs` / collab — live-syncing documents with realtime updates (no manual polling).
+
+**AI (all user-billed or owner-proxied)**
+- Text generation with multiple providers (Claude, DeepSeek, GLM…), streaming via SSE, `reasoningEffort`.
+- Client-driven **agent loop** (`agentTurn` + tools + `sessionStore` memory) — a tool-using chat agent with durable per-user memory.
+- Image generation (`createImageGen`), TTS (with viseme + 3D-avatar pipeline), embeddings (`createEmbeddingClient`), web search (`createWebSearchClient`).
+- Grounded RAG: retrieval tool + citations that open the source (as in andalib's research chat).
+
+**Auth & users**
+- ugly.bot SSO (silent login, magic-link), `getUserId`/`getUserToken`/`userContextStore`; per-user preferences persisted cross-device.
+- Bot/test accounts (`auth:create-bot`); user profiles (`userGet`).
+
+**Comms & sharing**
+- Push notifications (`pushSendTyped`), email (`emailSend` + templates), public login-free **share links** (`shareLink`), cross-app chat hub.
+
+**Files, media & content**
+- Uploads/storage via `ctx.storage` (R2), blob upload, public-prefix serving.
+- Markdown editor + viewer (rich editing, streaming-markdown repair, annotations, heading labels).
+- Conversations engine (threads, messages, sharing).
+
+**App structure & ops**
+- Pages & routing (`definePage`/`definePages`, typed params, deep-link + push routing, popups), SSR.
+- Cron / scheduled tasks; A/B experiments; owner alerts.
+- Telemetry to D1 — error logs, feedback reports, perf snapshots (queryable via `ugly-app errors`/`feedback`/`perf`).
+
+**Trivially-assembled app features** (primitives already exist, ~a collection + a list/page):
+bookmarks/favorites, search history/recents, calendar/events, comments/annotations,
+tags/filters, a settings page, an admin gate.
+
+If a wished-for feature is **not** on this list (needs a new provider, a novel algorithm,
+native/mobile work, or cross-app infra), say so — that's a real-cost item, not an easy win.
+
+---
+
 ## Red flags — STOP
 
 | Thought | Reality |
@@ -269,8 +395,8 @@ If no config exists, invent personas per Step 1 — that is the normal path.
 
 ## Completion
 
-One-line summary:
+One-line summary — lead with the star rating:
 
 ```
-Eval swarm complete. Personas: {N}/{M} succeeded. Findings: {total} ({dedup} unique). Top issue: {…}. Verdict: {works / broken}.
+Eval swarm complete. Rating: {★★★☆☆ 3/5} ({ceiling finding}). Personas: {N}/{M} succeeded. Findings: {total} ({dedup} unique). Top issue: {…}.
 ```
