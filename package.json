@@ -1,11 +1,12 @@
 {
   "name": "ugly-code",
-  "version": "0.1.125",
+  "version": "0.1.126",
   "type": "module",
   "bin": {
     "ugly-code": "bin/ugly-code.mjs"
   },
   "scripts": {
+    "preinstall": "npx only-allow pnpm",
     "dev": "ugly-app dev --watch",
     "typecheck": "tsc --noEmit",
     "build": "ugly-app build",
@@ -58,7 +59,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.183.2",
-    "ugly-app": "^0.1.855",
+    "ugly-app": "^0.1.856",
     "yjs": "^13.6.30",
     "zod": "^4.3.6"
   },
