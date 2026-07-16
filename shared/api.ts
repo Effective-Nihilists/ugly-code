@@ -306,6 +306,17 @@ export const requests = defineRequests({
     output: z.object({ ok: z.boolean() }),
     rateLimit: { max: 600, window: 60 },
   }),
+  // Doc-driven codebase-index readiness: the task's readiness poll writes the header pill's
+  // state onto the session doc (partial field write — never touches telemetry), so it streams
+  // to every client via trackDocs. Retires the `codebase_readiness` task.listen control event.
+  codingSessionSetReadiness: authReq({
+    input: z.object({
+      sessionId: z.string(),
+      readiness: z.object({ indexer: z.unknown().optional(), diagnostics: z.unknown().optional() }),
+    }),
+    output: z.object({ ok: z.boolean() }),
+    rateLimit: { max: 1200, window: 60 },
+  }),
   // Read a run-request's status — the client watchdog polls this after a doc-triggered
   // send: if it never leaves `pending`, no desktop host is connected to claim it.
   // Returns null when the request doesn't exist / isn't the caller's.

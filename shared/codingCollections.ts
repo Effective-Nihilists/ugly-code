@@ -57,6 +57,12 @@ export const CodingSessionSchema = z.object({
   // renderer-only and never hit the transcript). Cleared on the next successful
   // turn. See clientAgent.persistMeta.
   lastError: z.string().optional(),
+  // Codebase-index readiness for the chat header pill. Doc-driven: the task's readiness poll
+  // writes it here each tick (codingSessionSetReadiness) so the pill streams to EVERY client
+  // via trackDocs — replacing the old `codebase_readiness` control event, which only reached
+  // the host-attached renderer over task.listen (never a headless/remote client). Loose shape
+  // (JSONB); the reader validates with CodebaseReadinessSchema.
+  codebaseReadiness: z.object({ indexer: z.unknown().optional(), diagnostics: z.unknown().optional() }).optional(),
 });
 export type CodingSessionStatus = 'running' | 'idle' | 'done' | 'error';
 export type CodingSession = Omit<InferDocType<typeof CodingSessionSchema>, 'status'> & {

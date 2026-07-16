@@ -24,6 +24,7 @@ type CodingSessionHandlers = Pick<
   | 'codingSessionList'
   | 'codingSessionArchive'
   | 'codingSessionClearMessages'
+  | 'codingSessionSetReadiness'
   | 'codingRunRequestCreate'
   | 'codingRunRequestClaim'
   | 'codingRunRequestComplete'
@@ -102,6 +103,10 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         // persistMeta (worker turn) omits it, so preserve the stored value.
         ...((input.config ?? existing?.config) ? { config: input.config ?? existing?.config } : {}),
         ...((input.branch ?? existing?.branch) ? { branch: input.branch ?? existing?.branch } : {}),
+        // Doc-driven codebase readiness is written by codingSessionSetReadiness (partial), never
+        // by persistMeta — so preserve it across a full upsert or a per-turn write would wipe the
+        // pill state (and the poll has since stopped, so nothing would rewrite it).
+        ...(existing?.codebaseReadiness ? { codebaseReadiness: existing.codebaseReadiness } : {}),
         // lastError: omitted (undefined) preserves; '' clears (recovered turn); a
         // non-empty string sets the new failure text.
         ...(() => {
@@ -265,6 +270,17 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       if (req.status !== 'pending') return { claimed: false }; // already claimed/terminal
       await db.setDocFields(collections.codingRunRequest, id, { status: 'claimed', host });
       return { claimed: true };
+    },
+    // Doc-driven readiness (partial write): stamp the pill state onto the session doc so it
+    // fans out via trackDocs. setDocFields touches ONLY codebaseReadiness — cost/tokens/status
+    // are untouched (the reason readiness never rode a full session_state snapshot). A tick
+    // that beats the session doc's creation just no-ops; the next tick lands.
+    codingSessionSetReadiness: async (userId, { sessionId, readiness }) => {
+      const db = getDb();
+      const existing = await db.getDoc(collections.codingSession, sessionId);
+      if (existing?.userId !== userId) return { ok: false };
+      await db.setDocFields(collections.codingSession, sessionId, { codebaseReadiness: readiness });
+      return { ok: true };
     },
     codingRunRequestComplete: async (userId, { id }) => {
       const db = getDb();

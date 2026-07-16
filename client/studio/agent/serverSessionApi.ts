@@ -60,6 +60,15 @@ export async function getRunRequestStatus(
   return api('codingRunRequestGet', { id });
 }
 
+/** Doc-driven codebase readiness: stamp the pill's state onto the session doc so it streams to
+ *  every client via trackDocs (replaces the `codebase_readiness` task.listen control event). */
+export async function setCodebaseReadiness(
+  sessionId: string,
+  readiness: { indexer?: unknown; diagnostics?: unknown },
+): Promise<{ ok: boolean } | null> {
+  return api('codingSessionSetReadiness', { sessionId, readiness });
+}
+
 // ── Interactive control (doc-driven) — the id scheme both sides reconstruct ──────────
 export const askInteractionId = (sessionId: string, toolCallId: string): string => `int:${sessionId}:ask:${toolCallId}`;
 export const stepInteractionId = (sessionId: string, stepId: string): string => `int:${sessionId}:step:${stepId}`;

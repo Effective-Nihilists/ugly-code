@@ -44,6 +44,7 @@ import {
   resolveInteraction,
   askInteractionId,
   stepInteractionId,
+  setCodebaseReadiness,
   type ActiveRow,
   type StoredRole,
   type ToolResultPayload,
@@ -987,23 +988,24 @@ function emitTelemetry(s: SessionAgentState, sessionId: string): void {
  * tracks indexing whether or not the user has sent a turn yet. `startCodebasePoll` is keyed by
  * sessionId and no-ops if already running, so the two call sites can't double-poll.
  *
- * The event carries ONLY readiness (never a full session_state snapshot): a boot-time snapshot
- * would zero-out cost/tokens and clobber a resumed session's live telemetry header while the
- * indexer runs. session_state still folds readiness in during turns (emitTelemetry) for the
+ * Readiness is written to the session DOC (`codebaseReadiness` field) via a partial setDocFields
+ * write — NEVER a full session_state snapshot — so it fans out to every client through trackDocs
+ * (host, headless, remote) without clobbering a resumed session's live cost/token telemetry while
+ * the indexer runs. session_state still folds readiness in during turns (emitTelemetry) for the
  * mount-snapshot path.
  */
-export function ensureCodebaseAnalysis(sessionId: string, emit: Emit): void {
+export function ensureCodebaseAnalysis(sessionId: string): void {
   const cwd = getActiveProjectPath() ?? '';
   // Worktree-isolated sessions reconcile their overlay against disk once ready.
   const ws = getSessionWorkspace(sessionId);
   const worktreeRoot = ws?.isWorktree ? ws.dir : undefined;
   startCodebasePoll(sessionId, cwd, (r) => {
     codebaseReadinessBySession.set(sessionId, r as SessionSnapshot['codebaseReadiness']);
-    safeEmit(emit, {
-      type: 'codingAgent:event',
-      sessionId,
-      event: { type: 'codebase_readiness', payload: { payload: r } },
-    });
+    // Doc-driven delivery: stamp readiness onto the session doc so EVERY client's pill updates
+    // via trackDocs — not just the host-attached renderer that used to hear the `task.listen`
+    // `codebase_readiness` event. setDocFields touches only this field (never telemetry).
+    // Fire-and-forget; a tick that beats the session doc's creation no-ops (the next lands).
+    void setCodebaseReadiness(sessionId, r);
   }, worktreeRoot);
 }
 
@@ -1065,7 +1067,7 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
   // first turn — see ensureCodebaseAnalysis. Peer sub-sessions (model axis) skip this: they run
   // vanilla and share the parent's project, so re-indexing per peer is wasteful.
   if (!opts?.peer) {
-    ensureCodebaseAnalysis(sessionId, emitRef.current);
+    ensureCodebaseAnalysis(sessionId);
     ensureSkillsDiscovered(sessionId);
     ensureUglyAppFlag(sessionId);
     // Seed the MEMORY.md content cache so the systemPrompt getter doesn't

@@ -44,6 +44,8 @@ interface CodingSessionMetaDoc {
   contextTokens?: number;
   contextWindow?: number;
   contextBudget?: number;
+  // Doc-driven codebase-index readiness (written by the task's poll via codingSessionSetReadiness).
+  codebaseReadiness?: { indexer?: unknown; diagnostics?: unknown };
 }
 
 /** A `codingInteraction` doc (doc-driven ask_user/step_review cards). */
@@ -1810,14 +1812,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // `permission_request` / `ask_user_request` / `lsp_event`.
       // The legacy granular events still go out (other consumers
       // may rely on them) — the client just no longer reduces them.
-      if (eventType === 'codebase_readiness') {
-        // Standalone readiness push (host indexer poll). Updates ONLY the header pill — no full
-        // snapshot — so it fills in before the first turn without clobbering telemetry. Reaching
-        // here already means the event passed the acceptedSessionId gate above, so it's ours.
-        const readiness = parseCodebaseReadinessEvent(payload);
-        if (readiness) setCodebaseReadiness(readiness);
-        return;
-      }
+      // NOTE: `codebase_readiness` is no longer delivered as a task.listen event — readiness
+      // now rides the `codingSession` doc's `codebaseReadiness` field (written by the task's
+      // poll), so the header pill renders on every client via trackDocs. See the doc-driven
+      // read in the context-meter effect below. The producer stopped emitting the event.
 
       if (eventType === 'session_state') {
         // VALIDATE, don't cast: this snapshot is untyped wire data primed by the host's
@@ -3256,7 +3254,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       { keys: { userId: app.userId } },
       (docs) => {
         const d = docs.find((x) => x._id === sid);
-        if (!d || (d.contextTokens === undefined && d.contextWindow === undefined)) return;
+        if (!d) return;
+        // Doc-driven codebase pill: readiness now rides the session doc (not a task.listen
+        // `codebase_readiness` event), so it renders on every client — including ones with no
+        // task channel (headless/remote). Validate with the same parser the event path used.
+        if (d.codebaseReadiness !== undefined) {
+          const r = parseCodebaseReadinessEvent({ payload: d.codebaseReadiness });
+          if (r) setCodebaseReadiness(r);
+        }
+        if (d.contextTokens === undefined && d.contextWindow === undefined) return;
         setSessionInfo((prev) => ({
           ...(prev ?? { cwd: '' }),
           ...(d.contextTokens !== undefined ? { contextTokens: d.contextTokens } : {}),
