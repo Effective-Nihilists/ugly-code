@@ -137,6 +137,19 @@ export function Modal({
     );
   }, [handle, stack.stack]);
 
+  // Only the TOP modal reacts to outside-press / Escape. Without this, a modal
+  // opened FROM another modal (rendered as a sibling portal on top — e.g. the
+  // settings → "how modes work" explainer) makes every click inside the child
+  // count as an outside-press for the PARENT, so dismissing the child also tears
+  // down the parent. Escape has the same problem: both contexts would fire.
+  const isTopModal = useMemo(() => {
+    if (!handle) return true;
+    return (
+      stack.stack.findIndex((e) => e.id === handle.id) ===
+      stack.stack.length - 1
+    );
+  }, [handle, stack.stack]);
+
   const { refs, context } = useFloating({
     open,
     onOpenChange: (next) => {
@@ -145,8 +158,10 @@ export function Modal({
   });
 
   const dismiss = useDismiss(context, {
-    outsidePress: closeOnBackdrop,
-    escapeKey: closeOnEscape,
+    // Gate on isTopModal so a stacked child modal's interactions don't dismiss
+    // the parent underneath it (see isTopModal above).
+    outsidePress: closeOnBackdrop && isTopModal,
+    escapeKey: closeOnEscape && isTopModal,
     // Modals are root-level interactive surfaces — pointerdown outside the
     // card (i.e. on the backdrop) should dismiss when allowed.
     outsidePressEvent: 'mousedown',

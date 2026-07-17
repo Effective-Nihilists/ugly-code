@@ -40,8 +40,8 @@ export function ProdDeployGate({
           lineHeight: 1.5,
         }}
       >
-        This project hasn’t been published, so there’s no production {what} to
-        show. Publish it first to provision it — then it’ll appear here.
+        This project hasn’t been published yet, so there’s nothing to show
+        here. Publish it first to provision it — then it’ll appear.
       </span>
       {onDeploy && (
         <button

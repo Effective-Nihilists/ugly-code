@@ -573,9 +573,9 @@ export function NewSessionHero({
               >
                 {shortcut('Enter')}
               </span>
-              {/* "spec first" hints at the spec→build→verify pattern, which is an
-                  advanced-only feature — don't surface it on the simple default path. */}
-              to start{showAdvancedModes ? ' · spec first' : ''}
+              {/* Just "to start" — the old "· spec first" suffix was hardcoded and
+                  contradicted the actual pattern pill (which defaults to "No plan"). */}
+              to start
             </div>
             <div
               style={{
@@ -593,10 +593,11 @@ export function NewSessionHero({
                   whiteSpace: 'nowrap',
                   marginRight: 2,
                 }}
-                data-us-tooltip="Optional run settings — the defaults work fine; hover any pill for what it controls."
+                data-us-tooltip="The defaults work fine; hover any pill for what it controls."
                 data-us-tooltip-placement="top"
               >
-                Run options
+                Run options{' '}
+                <span style={{ opacity: 0.7 }}>· optional</span>
               </span>
               {showAdvancedModes && (
                 <BranchDropdown value={branchMode} onChange={setBranchMode} />
