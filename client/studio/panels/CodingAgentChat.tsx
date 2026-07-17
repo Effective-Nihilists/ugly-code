@@ -6723,121 +6723,132 @@ CodingAgentChatProps = {}) {
       // run so a subsequent dirty state (rare but possible — e.g.
       // hooks that touch the working tree) re-commits silently.
       let commitDirtyMainBeforeMerge = false;
-      for (let attempt = 0; attempt <= MAX_AUTOFIX_ATTEMPTS; attempt++) {
-        const result = await finishSession({
-          ...gates,
-          // Pause before the squash so the chat UI can render the
-          // review modal. Accept/Reject is gated through the
-          // `mergeFinishedSession` RPC (Accept) or no-op (Reject).
-          pauseBeforeSquash: true,
-          ...(commitDirtyMainBeforeMerge
-            ? { commitDirtyMainBeforeMerge: true }
-            : {}),
-        });
-        // Validation passed and the server is waiting for review. Open
-        // the modal — Accept will fire `mergeFinishedSession`. We don't
-        // loop further; the merge RPC owns the squash + cleanup tail.
-        if (result.stage === 'awaiting_review') {
-          setReviewModal({
-            proposedCommitMessage: result.proposedCommitMessage ?? '',
-            parentBranch:
-              result.parentBranch ?? worktreeRef.current?.parentBranch ?? '',
-            sessionBranch:
-              result.sessionBranch ?? worktreeRef.current?.branch ?? '',
-            worktreePath:
-              result.worktreePath ?? worktreeRef.current?.path ?? '',
+      try {
+        for (let attempt = 0; attempt <= MAX_AUTOFIX_ATTEMPTS; attempt++) {
+          const result = await finishSession({
+            ...gates,
+            // Pause before the squash so the chat UI can render the
+            // review modal. Accept/Reject is gated through the
+            // `mergeFinishedSession` RPC (Accept) or no-op (Reject).
+            pauseBeforeSquash: true,
+            ...(commitDirtyMainBeforeMerge
+              ? { commitDirtyMainBeforeMerge: true }
+              : {}),
           });
-          return;
-        }
-        if (result.ok) {
-          // No-op finish (no commits to merge) short-circuits
-          // server-side without a review pause; treat it as success.
-          setShowArchivePrompt(true);
-          return;
-        }
-        const failedStage = result.stage;
-        // Dirty main repo at squash time. Ask the user whether to
-        // commit the local edits in main first; on confirm, retry the
-        // pipeline with `commitDirtyMainBeforeMerge: true` so the
-        // server auto-commits before squashing. On cancel, the Done
-        // run ends with no merge — exactly what the user picked.
-        if (failedStage === 'precheck_dirty_main') {
+          // Validation passed and the server is waiting for review. Open
+          // the modal — Accept will fire `mergeFinishedSession`. We don't
+          // loop further; the merge RPC owns the squash + cleanup tail.
+          if (result.stage === 'awaiting_review') {
+            setReviewModal({
+              proposedCommitMessage: result.proposedCommitMessage ?? '',
+              parentBranch:
+                result.parentBranch ?? worktreeRef.current?.parentBranch ?? '',
+              sessionBranch:
+                result.sessionBranch ?? worktreeRef.current?.branch ?? '',
+              worktreePath:
+                result.worktreePath ?? worktreeRef.current?.path ?? '',
+            });
+            return;
+          }
+          if (result.ok) {
+            // No-op finish (no commits to merge) short-circuits
+            // server-side without a review pause; treat it as success.
+            setShowArchivePrompt(true);
+            return;
+          }
+          const failedStage = result.stage;
+          // Dirty main repo at squash time. Ask the user whether to
+          // commit the local edits in main first; on confirm, retry the
+          // pipeline with `commitDirtyMainBeforeMerge: true` so the
+          // server auto-commits before squashing. On cancel, the Done
+          // run ends with no merge — exactly what the user picked.
+          if (failedStage === 'precheck_dirty_main') {
+            if (attempt >= MAX_AUTOFIX_ATTEMPTS) {
+              openFailurePopup('precheck_dirty_main', result);
+              return;
+            }
+            const files = result.dirtyFiles ?? [];
+            const commit = await askDirtyMainPrompt(files);
+            if (!commit) return;
+            commitDirtyMainBeforeMerge = true;
+            continue;
+          }
+          // Auto-resolve merge conflicts: when merge_parent or
+          // merge_squash conflicts hit, fire the same "reconcile these
+          // markers" prompt the worktree-banner uses, wait for the
+          // agent to finish resolving + committing, then re-run. No
+          // user click needed — the user already chose to finish.
+          if (failedStage === 'conflict') {
+            if (attempt >= MAX_AUTOFIX_ATTEMPTS) {
+              openFailurePopup('conflict', result);
+              return;
+            }
+            const conflicts = result.conflicts ?? [];
+            if (conflicts.length === 0) {
+              openFailurePopup('conflict', result);
+              return;
+            }
+            const parentBranch =
+              finishPipelineRef.current.conflictStage === 'merge_squash'
+                ? 'parent'
+                : (worktreeRef.current?.parentBranch ?? 'parent');
+            const fileList = conflicts.map((f) => `- \`${f}\``).join('\n');
+            const conflictMsg =
+              `Merge from \`${parentBranch}\` produced conflicts during Finish.\n\n` +
+              `**Conflicting files:**\n${fileList}\n\n` +
+              '**Resolve:**\n' +
+              '1. Reconcile the `<<<<<<<` / `=======` / `>>>>>>>` markers in each file. Keep edits minimal — do not touch unrelated code.\n' +
+              '2. `git add` each resolved file.\n' +
+              '3. `git commit` with no `-m` flag, letting git use the default merge message.\n\n' +
+              `After you commit, I will automatically re-run the Finish pipeline.`;
+            await sendMessage(conflictMsg);
+            await waitForStreamEnd();
+            continue;
+          }
+          // Auto-fix typecheck + lint via the AI; tests and cleanup are
+          // not retried (a failing test usually flags real intent
+          // conflict). Either way, on exhaustion we surface the
+          // FinishFailurePopup with stage-specific guidance.
+          if (failedStage !== 'tsc' && failedStage !== 'lint') {
+            if (
+              failedStage === 'tests' ||
+              failedStage === 'cleanup' ||
+              failedStage === 'merge_squash' ||
+              failedStage === 'merge_parent'
+            ) {
+              openFailurePopup(failedStage, result);
+            }
+            return;
+          }
           if (attempt >= MAX_AUTOFIX_ATTEMPTS) {
-            openFailurePopup('precheck_dirty_main', result);
-            return;
-          }
-          const files = result.dirtyFiles ?? [];
-          const commit = await askDirtyMainPrompt(files);
-          if (!commit) return;
-          commitDirtyMainBeforeMerge = true;
-          continue;
-        }
-        // Auto-resolve merge conflicts: when merge_parent or
-        // merge_squash conflicts hit, fire the same "reconcile these
-        // markers" prompt the worktree-banner uses, wait for the
-        // agent to finish resolving + committing, then re-run. No
-        // user click needed — the user already chose to finish.
-        if (failedStage === 'conflict') {
-          if (attempt >= MAX_AUTOFIX_ATTEMPTS) {
-            openFailurePopup('conflict', result);
-            return;
-          }
-          const conflicts = result.conflicts ?? [];
-          if (conflicts.length === 0) {
-            openFailurePopup('conflict', result);
-            return;
-          }
-          const parentBranch =
-            finishPipelineRef.current.conflictStage === 'merge_squash'
-              ? 'parent'
-              : (worktreeRef.current?.parentBranch ?? 'parent');
-          const fileList = conflicts.map((f) => `- \`${f}\``).join('\n');
-          const conflictMsg =
-            `Merge from \`${parentBranch}\` produced conflicts during Finish.\n\n` +
-            `**Conflicting files:**\n${fileList}\n\n` +
-            '**Resolve:**\n' +
-            '1. Reconcile the `<<<<<<<` / `=======` / `>>>>>>>` markers in each file. Keep edits minimal — do not touch unrelated code.\n' +
-            '2. `git add` each resolved file.\n' +
-            '3. `git commit` with no `-m` flag, letting git use the default merge message.\n\n' +
-            `After you commit, I will automatically re-run the Finish pipeline.`;
-          await sendMessage(conflictMsg);
-          await waitForStreamEnd();
-          continue;
-        }
-        // Auto-fix typecheck + lint via the AI; tests and cleanup are
-        // not retried (a failing test usually flags real intent
-        // conflict). Either way, on exhaustion we surface the
-        // FinishFailurePopup with stage-specific guidance.
-        if (failedStage !== 'tsc' && failedStage !== 'lint') {
-          if (
-            failedStage === 'tests' ||
-            failedStage === 'cleanup' ||
-            failedStage === 'merge_squash' ||
-            failedStage === 'merge_parent'
-          ) {
             openFailurePopup(failedStage, result);
+            return;
           }
-          return;
+          const stages = finishPipelineRef.current.stages;
+          const stageInfo = stages.find((s) => s.name === failedStage);
+          if (!stageInfo?.output) {
+            openFailurePopup(failedStage, result);
+            return;
+          }
+          const fixMsg =
+            `\`${
+              stageInfo.command ?? failedStage
+            }\` failed during Finish. Fix the underlying issues — keep changes minimal, do not touch unrelated code.\n\nOutput:\n\n\`\`\`\n${stageInfo.output.slice(
+              -4000,
+            )}\n\`\`\`\n\n` +
+            `After your fix I will automatically re-run the Finish pipeline.`;
+          await sendMessage(fixMsg);
+          await waitForStreamEnd();
         }
-        if (attempt >= MAX_AUTOFIX_ATTEMPTS) {
-          openFailurePopup(failedStage, result);
-          return;
-        }
-        const stages = finishPipelineRef.current.stages;
-        const stageInfo = stages.find((s) => s.name === failedStage);
-        if (!stageInfo?.output) {
-          openFailurePopup(failedStage, result);
-          return;
-        }
-        const fixMsg =
-          `\`${
-            stageInfo.command ?? failedStage
-          }\` failed during Finish. Fix the underlying issues — keep changes minimal, do not touch unrelated code.\n\nOutput:\n\n\`\`\`\n${stageInfo.output.slice(
-            -4000,
-          )}\n\`\`\`\n\n` +
-          `After your fix I will automatically re-run the Finish pipeline.`;
-        await sendMessage(fixMsg);
-        await waitForStreamEnd();
+      } catch (err) {
+        // Apply/Done threw OUTSIDE the pipeline's own stage results — a finish-task 400, an
+        // unreachable host, or a downstream TypeError. The callers `void runFinish()`, so an
+        // uncaught rejection here is invisible: the button does nothing and the user is left
+        // guessing. Surface it as a failure popup instead (eval R7-9).
+        console.error('[runFinish] apply to project failed', err);
+        openFailurePopup('apply', {
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     },
     [

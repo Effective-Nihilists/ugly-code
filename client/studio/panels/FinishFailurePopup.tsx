@@ -17,7 +17,10 @@ export type FailureStage =
   | 'tests'
   | 'merge_squash'
   | 'cleanup'
-  | 'conflict';
+  | 'conflict'
+  // The Apply/Done action itself threw before/outside the pipeline (e.g. the finish task
+  // 400'd or the host was unreachable) — surfaced so the failure isn't swallowed silently.
+  | 'apply';
 
 export interface FinishFailureInfo {
   stage: FailureStage;
@@ -42,6 +45,15 @@ interface CopyEntry {
 
 function getCopy(info: FinishFailureInfo): CopyEntry {
   switch (info.stage) {
+    case 'apply':
+      return {
+        headline: 'Apply to project failed',
+        howToFix:
+          `Applying this session's changes to your project didn't complete${
+            info.message ? `: ${info.message}` : '.'
+          } This is usually a transient host/connection error — click Retry. If it ` +
+          'persists, make sure the project host (Studio, or your run host) is running and reachable.',
+      };
     case 'precheck_dirty_main':
       return {
         headline: 'Main repo has uncommitted changes',
