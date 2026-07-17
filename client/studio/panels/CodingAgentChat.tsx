@@ -200,21 +200,36 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
  * `styles.css`) instead of `title=` so dark-mode users don't see
  * the OS's white-on-light native tooltip.
  */
-// Tools whose output is usually worth seeing at a glance — shell opens them
-// by default. Everything else starts collapsed.
-const DEFAULT_EXPANDED_TOOLS = new Set([
-  'bash',
-  'delegate',
-  'delegate_parallel',
-  'python',
-  'write',
-  'edit',
-  'multiedit',
-  'think',
-]);
+// Tool cards start COLLAPSED — a turn that touches many files should read as a scannable list
+// of steps (each header carries path + ±lines + status), not a wall of expanded diffs. Two
+// exceptions: a card auto-opens while its tool is RUNNING (so live output is visible), and any
+// card you open by hand stays open — that choice is remembered per tool call, so it survives a
+// reload. See `toolCardExpanded` below.
+const TOOL_CARD_EXPAND_KEY = 'ugly-studio:toolCardExpanded';
+const TOOL_CARD_EXPAND_CAP = 400; // bound the map; oldest entries fall off
 
-function isDefaultExpanded(name: string): boolean {
-  return DEFAULT_EXPANDED_TOOLS.has(name.toLowerCase());
+function readToolCardExpanded(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(TOOL_CARD_EXPAND_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Remember (or forget) one card's hand-picked expand state, keyed by tool-call id.
+ *  Re-inserting at the end keeps the map ordered oldest→newest so the cap drops stale ids. */
+function writeToolCardExpanded(id: string, expanded: boolean | null): void {
+  try {
+    const entries = Object.entries(readToolCardExpanded()).filter(([k]) => k !== id);
+    if (expanded !== null) entries.push([id, expanded]);
+    localStorage.setItem(
+      TOOL_CARD_EXPAND_KEY,
+      JSON.stringify(Object.fromEntries(entries.slice(-TOOL_CARD_EXPAND_CAP))),
+    );
+  } catch {
+    /* storage full / disabled — expand state just won't persist */
+  }
 }
 
 /** Shared card shell. Owns expand state, header click, and chevron placement
@@ -226,7 +241,7 @@ function ToolCardShell({
   status,
   children,
   headerExtras,
-  defaultExpanded = false,
+  persistKey,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -234,9 +249,21 @@ function ToolCardShell({
   status?: ToolUse['status'];
   children: React.ReactNode;
   headerExtras?: React.ReactNode;
-  defaultExpanded?: boolean;
+  /** Tool-call id. The hand-picked expand state is remembered under this key so it
+   *  survives a reload. Omit for cards with no stable identity (never persisted). */
+  persistKey?: string;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  // `null` = untouched → follow the default (open only while running). Once the user clicks,
+  // their choice wins and is written through to localStorage.
+  const [userChoice, setUserChoice] = useState<boolean | null>(() =>
+    persistKey ? (readToolCardExpanded()[persistKey] ?? null) : null,
+  );
+  const isRunning = status === 'running' || status === 'executing';
+  const expanded = userChoice ?? isRunning;
+  const setExpanded = (next: boolean): void => {
+    setUserChoice(next);
+    if (persistKey) writeToolCardExpanded(persistKey, next);
+  };
   // Debounce the "running" visual treatment so tools that finish in
   // <500ms don't briefly flash as orange before settling into done.
   const [showRunning, setShowRunning] = useState(false);
@@ -1364,7 +1391,7 @@ function EditCard({ tool }: { tool: ToolUse }) {
         </span>
       }
       status={tool.status}
-      defaultExpanded={isDefaultExpanded(tool.name)}
+      persistKey={tool.id}
     >
       <div
         style={{
@@ -1786,7 +1813,7 @@ function BashCard({
         </span>
       }
       status={tool.status}
-      defaultExpanded={running || isDefaultExpanded(tool.name)}
+      persistKey={tool.id}
       headerExtras={
         <>
           {exitCode !== null && exitCode !== 0 && (
@@ -2083,7 +2110,7 @@ function DevServerCard({
           : 'stop'
       }
       status={tool.status}
-      defaultExpanded={running || isDefaultExpanded(tool.name)}
+      persistKey={tool.id}
       headerExtras={
         <>
           {running && liveElapsed >= 1000 && (
@@ -2212,7 +2239,7 @@ function GlobCard({ tool }: { tool: ToolUse }) {
         </span>
       }
       status={tool.status}
-      defaultExpanded={isDefaultExpanded(tool.name)}
+      persistKey={tool.id}
       headerExtras={
         <span
           style={{
@@ -2318,7 +2345,7 @@ function GrepCard({ tool }: { tool: ToolUse }) {
         </span>
       }
       status={tool.status}
-      defaultExpanded={isDefaultExpanded(tool.name)}
+      persistKey={tool.id}
       headerExtras={
         <span
           style={{
@@ -2431,7 +2458,7 @@ function ToolUseCard({ tool }: { tool: ToolUse }) {
       title={tool.name}
       subtitle={formatToolInput(tool.name, tool.input, cwd)}
       status={tool.status}
-      defaultExpanded={isDefaultExpanded(tool.name)}
+      persistKey={tool.id}
     >
       <div style={{ padding: '8px 10px', maxHeight: 360, overflow: 'auto' }}>
         {tool.input && (
