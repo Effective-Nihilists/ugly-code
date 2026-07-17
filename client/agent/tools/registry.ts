@@ -5,7 +5,7 @@
 
 import type { TextGenTool } from 'ugly-app/shared';
 import type { AgentToolSpec, ToolName } from '../../../shared/agent';
-import type { ToolContext } from '../tools';
+import type { ToolContext, ToolResult } from '../tools';
 import { grepTool } from './grep';
 import { globTool } from './glob';
 import { multieditTool } from './multiedit';
@@ -41,11 +41,13 @@ export interface ToolModule {
   /** Model-facing JSON-schema spec (added to AGENT_TOOLS). Its `name` is
    *  overwritten with `this.name` when specs are assembled. */
   spec: TextGenTool;
-  /** Execute the tool; returns the string fed back as tool_result. */
+  /** Execute the tool. A plain string is the model-visible tool_result content; the
+   *  `{ content, metadata }` form additionally attaches UI-only metadata (e.g. an edit's
+   *  diff rows) that the card reads but the model never sees. See `ToolResult`. */
   run(
     input: Record<string, unknown>,
     ctx: ToolContext | undefined,
-  ): Promise<string>;
+  ): Promise<ToolResult>;
 }
 
 export const TOOL_REGISTRY: ToolModule[] = [
@@ -90,7 +92,7 @@ export async function runRegisteredTool(
   name: string,
   input: Record<string, unknown>,
   ctx: ToolContext | undefined,
-): Promise<string | undefined> {
+): Promise<ToolResult | undefined> {
   const mod = TOOL_REGISTRY.find((t) => t.name === name);
   if (!mod) return undefined;
   return mod.run(input, ctx);

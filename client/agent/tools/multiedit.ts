@@ -8,7 +8,7 @@ import { native } from 'ugly-app/native';
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
 import { resolvePath } from '../tools';
-import { editStatSuffix } from './editStat';
+import { editStatSuffix, editDiffRows } from './editStat';
 import { markDirty } from './codebaseDirty';
 import { applyEdit, type EditOp } from './applyEdit';
 
@@ -114,7 +114,11 @@ export const multieditTool: ToolModule = {
     await native.fs.writeFile(abs, content);
     if (ctx?.sessionId) markDirty(ctx.sessionId, abs);
     // Real line delta across the whole set — the card can't derive it (anchor edits carry
-    // no old_string) and badged every replacement as "+N −0".
-    return `Applied ${args.edits.length} edit(s) to ${rawPath}${editStatSuffix(original, content)}`;
+    // no old_string) and badged every replacement as "+N −0". Ship the diff rows out-of-band
+    // so the card renders the actual removed (−) lines, same as the single-edit tool.
+    return {
+      content: `Applied ${args.edits.length} edit(s) to ${rawPath}${editStatSuffix(original, content)}`,
+      metadata: { edit: { rows: editDiffRows(original, content) } },
+    };
   },
 };
