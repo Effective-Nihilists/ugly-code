@@ -69,6 +69,7 @@ import {
   parseGrepOutput,
   searchBadge,
 } from './toolCardSummary';
+import { findTurnVerifyFailed, turnStartIndex } from './turnVerify';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
 import { formatCurrency } from '../shared/Currency';
 import { estimateCost, isSubscriptionProvider } from '../shared/model-rates';
@@ -7408,6 +7409,22 @@ CodingAgentChatProps = {}) {
     return findTurnTodos(messages, turnStart, messages.length - 1);
   }, [messages]);
 
+  // R7-6: whether this turn's latest typecheck reported errors (see turnVerify.ts).
+  const verifyFailedThisTurn = useMemo<boolean>(
+    () =>
+      findTurnVerifyFailed(
+        messages,
+        turnStartIndex(messages),
+        messages.length - 1,
+      ),
+    [messages],
+  );
+
+  // The model reports all its todos complete AND the latest typecheck still has errors — the
+  // contradiction the "unverified" banner exists to surface.
+  const allTodosDone =
+    !!latestTodos && latestTodos.every((t) => t.status === 'completed');
+
   // Critique-group counters. Lifted out of the render loop into a
   // memo so per-row rendering is O(1).
   const { critiqueGroupIndex, critiqueGroupTotal } = useMemo(() => {
@@ -8230,6 +8247,34 @@ CodingAgentChatProps = {}) {
               )}
             </div>
           )}
+
+        {/* R7-6: todos are the model's self-report; when it marks everything done but the
+            run's last typecheck still has errors, say so — a green checklist alone is
+            misleading. PinnedTodos hides itself once all todos are done, so this stands in
+            for it. */}
+        {allTodosDone && verifyFailedThisTurn && (
+          <div
+            data-id="unverified-banner"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 10px',
+              borderBottom: '1px solid var(--border)',
+              background:
+                'color-mix(in srgb, var(--warning, #d80) 12%, var(--bg-secondary))',
+              color: 'var(--warning, #d80)',
+              fontSize: 11,
+              flexShrink: 0,
+            }}
+          >
+            <AlertCircle size={13} style={{ flexShrink: 0 }} />
+            <span>
+              All todos are marked done, but the last typecheck in this run
+              still reported errors — these changes may be incomplete.
+            </span>
+          </div>
+        )}
 
         {latestTodos && (
           <PinnedTodos todos={latestTodos} isStreaming={isStreaming} />
