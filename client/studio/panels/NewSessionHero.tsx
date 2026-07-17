@@ -544,6 +544,19 @@ export function NewSessionHero({
                 flexWrap: 'wrap',
               }}
             >
+              <span
+                style={{
+                  fontFamily: 'var(--font-label)',
+                  fontSize: 11,
+                  color: 'var(--text-muted)',
+                  whiteSpace: 'nowrap',
+                  marginRight: 2,
+                }}
+                data-us-tooltip="Optional run settings — the defaults work fine; hover any pill for what it controls."
+                data-us-tooltip-placement="top"
+              >
+                Run options
+              </span>
               <BranchDropdown value={branchMode} onChange={setBranchMode} />
               <AgentAxisSelector
                 permission={permissionMode}

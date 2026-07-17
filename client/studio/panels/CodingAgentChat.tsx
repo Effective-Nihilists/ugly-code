@@ -5710,7 +5710,7 @@ function CodebaseReadinessPill({
     nativeMissing
       ? 'Codebase analysis runs on your machine — open this project in the Ugly Studio desktop app'
       : tone === 'loading'
-      ? 'Codebase analysis: loading…'
+      ? 'Codebase analysis: loading — you can start now; it runs in the background'
       : tone === 'active'
       ? 'Codebase analysis running — AI coding quality reduced until ready'
       : tone === 'ready'
@@ -5725,6 +5725,9 @@ function CodebaseReadinessPill({
   const detailLines = [idxLabel];
   if (tone === 'loading') {
     detailLines.push(
+      '',
+      "You don't need to wait — start your prompt anytime. The agent works",
+      'right away; semantic search just sharpens its results once ready.',
       '',
       'The host indexer is starting up. On first use it downloads a Python',
       'runtime + embedding model — this can take a few minutes, especially on',
