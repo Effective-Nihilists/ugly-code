@@ -52,6 +52,7 @@ import {
 } from './serverSessionApi';
 import { assistantParts, type Part } from './sessionDisplay';
 import { ensureSessionWorkspace, getSessionWorkspace, removeSessionWorkspace } from './sessionWorkspace';
+import { queueWrite } from './metaWriteQueue';
 import type { ToolName } from '../../../shared/agent';
 import { axesToConfig, coerceModelMode } from '../../../shared/sessionConfig';
 import { getPattern } from './patterns/registry';
@@ -820,7 +821,12 @@ function persistMeta(
     reasoningEffort: s.reasoningEffort,
     patternMode: s.patternMode,
   });
-  void sessionApi.upsert({
+  // Serialized per session. These writes are issued from two places — 'running' on every
+  // assistant message, 'idle'/'error' on the terminal event — microseconds apart. Issued
+  // un-awaited they raced, and whenever the earlier 'running' landed AFTER the terminal
+  // 'idle' it clobbered it: the session showed THINKING forever, with nothing left to
+  // write again. Queueing makes them land in issue order, so the terminal status wins.
+  void queueWrite(sessionId, () => sessionApi.upsert({
     sessionId,
     projectId: s.projectId,
     title: s.title,
@@ -843,6 +849,10 @@ function persistMeta(
     // errored; clear it ('') on any non-error status so a recovered session
     // stops reporting a stale error. The `⚠` chat bubble is renderer-only.
     lastError: status === 'error' ? (errorMessage ?? 'Turn failed').slice(0, 2000) : '',
+  }), (e: unknown) => {
+    // Never silent: a dropped status write is exactly how a session gets stuck showing
+    // THINKING, and the old `void upsert(...)` swallowed the reason.
+    console.error('[clientAgent:persistMeta]', JSON.stringify({ sessionId, status, error: e instanceof Error ? e.message : String(e) }));
   });
 }
 
