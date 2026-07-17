@@ -53,6 +53,7 @@ import {
 import { registerFeedbackContextProvider } from 'ugly-app/client';
 import { MdastViewer } from 'ugly-app/markdown/client';
 import { isNativeAvailable } from 'ugly-app/native';
+import { buildDiffRows, diffStats, type Part } from './tokenDiff';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
 import { formatCurrency } from '../shared/Currency';
 import { estimateCost, isSubscriptionProvider } from '../shared/model-rates';
@@ -1570,6 +1571,77 @@ function EditCard({ tool }: { tool: ToolUse }) {
   );
 }
 
+// One row of the unified diff. The sign sits in its own fixed column and the code
+// flows in a wrapping cell beside it — that gives long lines a natural hanging
+// indent instead of clipping at the card edge.
+function DiffLineRow({
+  sign,
+  children,
+  bg,
+  signColor,
+  color,
+}: {
+  sign: string;
+  children: React.ReactNode;
+  bg?: string;
+  signColor: string;
+  color: string;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 6, background: bg, padding: '0 6px', borderRadius: 2 }}>
+      <span style={{ flexShrink: 0, width: 8, color: signColor, userSelect: 'none' }}>{sign}</span>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          color,
+          whiteSpace: 'pre-wrap',
+          overflowWrap: 'anywhere',
+        }}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
+const DIFF_TONE = {
+  del: { bg: 'rgba(227,18,11,0.06)', mark: 'rgba(227,18,11,0.22)', sign: 'var(--error)' },
+  add: { bg: 'rgba(30,180,90,0.06)', mark: 'rgba(30,180,90,0.22)', sign: 'var(--success)' },
+} as const;
+
+function DiffParts({ parts, mark }: { parts: Part[]; mark: string }) {
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.changed ? (
+          // <mark> carries the semantics; the inline style overrides the UA yellow.
+          <mark
+            key={i}
+            style={{
+              background: mark,
+              color: 'inherit',
+              borderRadius: 2,
+              padding: '0 1px',
+            }}
+          >
+            {p.text}
+          </mark>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+// Unified, token-level diff of an edit.
+//
+// This used to render two full blocks (BEFORE then AFTER). For a one-identifier change
+// on a long line that showed two ~90%-identical lines and left the reader to spot the
+// difference by eye — a harsh-critic finding. Now the changed tokens are highlighted
+// inside a single unified view, unchanged context collapses, and there's one Copy
+// button instead of two (the old per-block pair was chrome tax on every card).
 function EditBeforeAfter({
   oldStr,
   newStr,
@@ -1577,91 +1649,76 @@ function EditBeforeAfter({
   oldStr?: string;
   newStr?: string;
 }) {
+  const rows = useMemo(() => buildDiffRows(oldStr ?? '', newStr ?? ''), [oldStr, newStr]);
+  const stats = useMemo(() => diffStats(rows), [rows]);
   if (!oldStr && !newStr) return null;
+  if (rows.length === 0) return null;
   return (
-    <>
-      {oldStr && (
-        <div style={{ marginBottom: newStr ? 8 : 0 }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginBottom: 2,
-              fontFamily: 'Inter, sans-serif',
-            }}
-          >
-            <span
-              style={{
-                color: 'var(--error)',
-                fontWeight: 600,
-                fontSize: 10,
-                textTransform: 'uppercase',
-              }}
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 2,
+          fontFamily: 'Inter, sans-serif',
+        }}
+      >
+        <span style={{ fontWeight: 600, fontSize: 10, letterSpacing: 0.3 }}>
+          <span style={{ color: 'var(--success)' }}>+{stats.added}</span>{' '}
+          <span style={{ color: 'var(--error)' }}>−{stats.removed}</span>
+        </span>
+        <CopyButton text={newStr ?? oldStr ?? ''} />
+      </div>
+      <pre style={{ margin: 0, whiteSpace: 'normal' }}>
+        {rows.map((row, i) => {
+          if (row.kind === 'gap') {
+            return (
+              <div
+                key={i}
+                style={{
+                  color: 'var(--text-muted)',
+                  padding: '1px 6px',
+                  fontSize: 10,
+                  fontFamily: 'Inter, sans-serif',
+                }}
+              >
+                ⋯ {row.count} unchanged {row.count === 1 ? 'line' : 'lines'}
+              </div>
+            );
+          }
+          if (row.kind === 'context') {
+            return (
+              <DiffLineRow key={i} sign=" " signColor="transparent" color="var(--text-muted)">
+                {row.text || ' '}
+              </DiffLineRow>
+            );
+          }
+          const tone = row.kind === 'add' ? DIFF_TONE.add : DIFF_TONE.del;
+          return (
+            <DiffLineRow
+              key={i}
+              sign={row.kind === 'add' ? '+' : '−'}
+              bg={tone.bg}
+              signColor={tone.sign}
+              color="var(--text-secondary)"
             >
-              Before
-            </span>
-            <CopyButton text={oldStr} />
-          </div>
-          <pre
-            style={{
-              margin: 0,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              color: 'var(--text-secondary)',
-              background: 'rgba(227,18,11,0.06)',
-              padding: '4px 6px',
-              borderRadius: 4,
-            }}
-          >
-            {oldStr}
-          </pre>
-        </div>
-      )}
-      {newStr && (
-        <div>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginBottom: 2,
-              fontFamily: 'Inter, sans-serif',
-            }}
-          >
-            <span
-              style={{
-                color: 'var(--success)',
-                fontWeight: 600,
-                fontSize: 10,
-                textTransform: 'uppercase',
-              }}
-            >
-              After
-            </span>
-            <CopyButton text={newStr} />
-          </div>
-          <pre
-            style={{
-              margin: 0,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              color: 'var(--text-secondary)',
-              background: 'rgba(30,180,90,0.06)',
-              padding: '4px 6px',
-              borderRadius: 4,
-            }}
-          >
-            {newStr}
-          </pre>
-        </div>
-      )}
-    </>
+              <DiffParts parts={row.parts} mark={tone.mark} />
+            </DiffLineRow>
+          );
+        })}
+      </pre>
+    </div>
   );
 }
 
+// Pre-formatted unified diff (the tool supplied the diff text itself).
+// Lines wrap with a hanging indent rather than clipping at the card edge — a long
+// minified or deeply-indented line used to run off the right with no way to read it.
 function DiffBlock({ text }: { text: string }) {
   const lines = text.split('\n');
   return (
-    <pre style={{ margin: 0, whiteSpace: 'pre', overflowX: 'auto' }}>
+    <pre style={{ margin: 0, whiteSpace: 'normal' }}>
       {lines.map((line, i) => {
         let color = 'var(--text-secondary)';
         let bg: string | undefined;
@@ -1675,7 +1732,17 @@ function DiffBlock({ text }: { text: string }) {
         return (
           <div
             key={i}
-            style={{ color, background: bg, padding: bg ? '0 4px' : undefined }}
+            style={{
+              color,
+              background: bg,
+              padding: bg ? '0 4px' : undefined,
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
+              // Wrapped remainder lines indent past the +/- column so the sign
+              // stays scannable down the left edge.
+              paddingLeft: 12,
+              textIndent: -12,
+            }}
           >
             {line || ' '}
           </div>

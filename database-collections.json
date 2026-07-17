@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-16T15:28:05.117Z",
+  "generatedAt": "2026-07-16T21:00:51.746Z",
   "source": "shared/collections.ts",
   "collections": {
     "authMagicLink": {
@@ -464,6 +464,20 @@
           },
           "cacheReadTokens": {
             "type": "number",
+            "required": false
+          },
+          "codebaseReadiness": {
+            "type": "object",
+            "fields": {
+              "diagnostics": {
+                "type": "unknown",
+                "required": false
+              },
+              "indexer": {
+                "type": "unknown",
+                "required": false
+              }
+            },
             "required": false
           },
           "completionTokens": {
