@@ -153,3 +153,28 @@ export function parseEditStat(result: string | undefined): { added: number; remo
   const m = /\(\+(\d+)\s*[−-](\d+)\)\s*$/.exec((result ?? '').trim());
   return m ? { added: parseInt(m[1], 10), removed: parseInt(m[2], 10) } : null;
 }
+
+/**
+ * Human name for a `grep` call, by mode. `grep` is the implementation, not the operation:
+ * a typecheck runs as `grep {mode:'lsp-diagnostics'}`, so when it failed the transcript
+ * showed a nameless "grep — failed" chip with an empty pattern. The one card that mattered
+ * (the safety net didn't run) read as the least important thing on screen. Name what it
+ * DOES; nothing about a missing tsserver is a "grep" problem to a user.
+ */
+export function grepOperationName(mode: string | undefined): string {
+  switch (mode) {
+    case 'lsp-diagnostics': return 'typecheck';
+    case 'lsp-defs': return 'find definition';
+    case 'lsp-refs': return 'find references';
+    case 'lsp-impls': return 'find implementations';
+    case 'semantic': return 'semantic search';
+    case 'fts': return 'text search';
+    case 'mixed': return 'hybrid search';
+    default: return 'grep';
+  }
+}
+
+/** True when the card's pattern chip would be meaningless (whole-project operations). */
+export function grepHidesPattern(mode: string | undefined): boolean {
+  return mode === 'lsp-diagnostics';
+}

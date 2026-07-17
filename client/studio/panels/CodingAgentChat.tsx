@@ -55,7 +55,7 @@ import { MdastViewer } from 'ugly-app/markdown/client';
 import { isNativeAvailable } from 'ugly-app/native';
 import { sessionBranchName, sessionWorktreeDir } from '../agent/sessionWorkspace';
 import { buildDiffRows, diffStats, type Part } from './tokenDiff';
-import { badgeLabel, grepBadgeNoun, grepResultCount, parseEditStat, parseGlobFiles, parseGrepOutput, searchBadge } from './toolCardSummary';
+import { badgeLabel, grepBadgeNoun, grepHidesPattern, grepOperationName, grepResultCount, parseEditStat, parseGlobFiles, parseGrepOutput, searchBadge } from './toolCardSummary';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
 import { formatCurrency } from '../shared/Currency';
 import { estimateCost, isSubscriptionProvider } from '../shared/model-rates';
@@ -1316,6 +1316,8 @@ interface ToolInput {
   content?: string;
   /** grep's result shape — the badge must count what the mode actually returns. */
   output_mode?: 'content' | 'files_with_matches' | 'count';
+  /** grep's operation (exact/semantic/lsp-diagnostics/…) — the card names THIS, not "grep". */
+  mode?: string;
   edits?: ToolInputEdit[];
   thought?: string;
   filter?: string;
@@ -2368,6 +2370,9 @@ function GrepCard({ tool }: { tool: ToolUse }) {
   // gives "file:N" — neither parses as a hit, so the search that found every file the
   // agent edited badged "0 matches" while listing them in its own body.
   const outputMode: string | undefined = typeof input.output_mode === 'string' ? input.output_mode : undefined;
+  // `grep` is the implementation; the card must name the OPERATION. A failed typecheck
+  // (grep mode 'lsp-diagnostics') rendered as a nameless "grep failed" chip.
+  const grepMode: string | undefined = typeof input.mode === 'string' ? input.mode : undefined;
   const badge = searchBadge(tool.status, tool.result, metaMatches, truncated,
     (t) => grepResultCount(t, outputMode));
 
@@ -2381,9 +2386,12 @@ function GrepCard({ tool }: { tool: ToolUse }) {
   return (
     <ToolCardShell
       icon={<Search size={13} />}
-      title="grep"
+      title={grepOperationName(grepMode)}
       subtitle={
         <span>
+          {/* A whole-project operation (typecheck) has no meaningful pattern — an empty
+              chip made the failed card look like a broken text search. */}
+          {!grepHidesPattern(grepMode) && (
           <code
             style={{
               background: 'var(--bg-primary)',
@@ -2393,6 +2401,7 @@ function GrepCard({ tool }: { tool: ToolUse }) {
           >
             {pattern}
           </code>
+          )}
           {include && (
             <>
               {' '}
