@@ -179,14 +179,21 @@ export function AxisDropdown<T extends string>({
 }) {
   const selected = options.find((o) => o.value === value) ?? options[0];
   const triggerLabel = displayLabel ?? selected.label;
+  // Say what the setting MEANS, not just its name. The trigger renders a bare word
+  // ("Edit", "None", "High") and the tooltip only repeated it — so a first-time user
+  // reads a row of anonymous pills and leaves them all alone. That matters most for the
+  // permission axis: its default decides whether the agent touches your files or a
+  // worktree copy, and not understanding it is how people lose track of their change.
+  // Every option already carries a `hint`; it was just never shown here.
+  const describe = `${axisLabel}: ${triggerLabel}${selected.hint ? ` — ${selected.hint}` : ''}`;
 
   const trigger = (
     <button
       data-id="agent-axis-trigger"
       type="button"
       disabled={disabled}
-      aria-label={`${axisLabel}: ${triggerLabel}`}
-      data-us-tooltip={`${axisLabel}: ${triggerLabel}`}
+      aria-label={describe}
+      data-us-tooltip={describe}
       data-us-tooltip-placement="top"
       style={{
         background: 'var(--bg-secondary, #1a1a2e)',

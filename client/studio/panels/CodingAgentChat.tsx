@@ -1373,6 +1373,28 @@ function EditCard({ tool }: { tool: ToolUse }) {
   // path for tool calls that target /tmp / system paths.
   const shortPath = relativizePath(filePath, cwd);
 
+  // +N −M for the COLLAPSED card. The tool only sometimes reports additions/removals in
+  // metadata — multiedit never does — so the cards that actually change your code were
+  // the only ones with no result badge, while a glob got "4 files" for free. Derive the
+  // counts from the same diff the expanded view renders, so the default (collapsed) view
+  // answers "what did it do to my repo?" with zero clicks.
+  const derived = useMemo(() => {
+    if (additions > 0 || removals > 0) return { added: additions, removed: removals };
+    const tally = (o: string | undefined, n: string | undefined): { added: number; removed: number } =>
+      diffStats(buildDiffRows(o ?? '', n ?? ''));
+    if (multiEdits.length > 0) {
+      return multiEdits.reduce(
+        (acc: { added: number; removed: number }, e: ToolInputEdit) => {
+          const s = tally(e.old_string, e.new_string ?? e.new_content);
+          return { added: acc.added + s.added, removed: acc.removed + s.removed };
+        },
+        { added: 0, removed: 0 },
+      );
+    }
+    if (oldContent !== undefined || newContent !== undefined) return tally(oldContent, newContent);
+    return { added: 0, removed: 0 };
+  }, [additions, removals, multiEdits, oldContent, newContent]);
+
   return (
     <ToolCardShell
       icon={<Pencil size={13} />}
@@ -1386,11 +1408,11 @@ function EditCard({ tool }: { tool: ToolUse }) {
               · {editsApplied} edit{editsApplied === 1 ? '' : 's'}
             </>
           )}
-          {(additions > 0 || removals > 0) && (
+          {(derived.added > 0 || derived.removed > 0) && (
             <>
               {' '}
-              <span style={{ color: 'var(--success)' }}>+{additions}</span>{' '}
-              <span style={{ color: 'var(--error)' }}>-{removals}</span>
+              <span style={{ color: 'var(--success)' }}>+{derived.added}</span>{' '}
+              <span style={{ color: 'var(--error)' }}>−{derived.removed}</span>
             </>
           )}
         </span>
@@ -8452,6 +8474,62 @@ CodingAgentChatProps = {}) {
           The four axis dropdowns (Permission · Model · Pattern ·
           Reason) live INSIDE the input area's toolbar row alongside
           Pull / Done — see `axisSelector` below. */}
+        {/* Where the work actually IS. A session edits a git worktree on its own branch,
+            NOT the user's files — and nothing said so. The agent reports "updated
+            cleanly" while the project on disk is untouched, so the only way to learn
+            the truth was to open a terminal and grep, which is the job you came here to
+            delegate. The finish action exists (DoneCard's `done-entry-finish`) but is
+            gated behind a `status` message in the transcript, so a first-time user hunts
+            for it and concludes there isn't one. This banner is unconditional whenever a
+            worktree exists: it names the branch and offers the action. */}
+        {!isChildSession && worktree?.branch && (
+          <div
+            data-id="worktree-banner"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '5px 10px',
+              borderTop: '1px solid var(--border)',
+              background: 'var(--bg-secondary)',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 11,
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <GitBranch size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Edits are on <code style={{ fontFamily: 'SF Mono, Fira Code, Consolas, monospace' }}>{worktree.branch}</code>
+              {' — not in '}
+              <code style={{ fontFamily: 'SF Mono, Fira Code, Consolas, monospace' }}>{worktree.parentBranch}</code>
+              {' yet.'}
+            </span>
+            <button
+              type="button"
+              data-id="worktree-banner-finish"
+              title={`Merge this session's changes into ${worktree.parentBranch}`}
+              onClick={() => { void runFinish(); }}
+              style={{
+                marginLeft: 'auto',
+                flexShrink: 0,
+                background: 'var(--accent)',
+                color: '#fff',
+                border: '1px solid var(--accent)',
+                borderRadius: 4,
+                padding: '3px 10px',
+                fontFamily: 'var(--font-label)',
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              Apply to project
+            </button>
+          </div>
+        )}
+
         {isChildSession ? null : (
           <CodingAgentInputArea
             axisSelector={renderAxisSelector()}

@@ -17,6 +17,7 @@ import type { AppSocket } from 'ugly-app/client';
 import { native, permissions, taskEntryUrl } from 'ugly-app/native';
 import { buildId } from '../../../shared/Build';
 import type { AppRegistry, ReasoningEffort, SessionSnapshot } from '../shared/api';
+import { stripComments } from '../shared/stripComments';
 import { composeSessionSnapshot } from '../agent/sessionSnapshot';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
@@ -811,10 +812,16 @@ const handlers: Record<string, Handler> = {
       try { src = await native.fs.readFile(proj + rel); break; } catch { /* try next */ }
     }
     if (!src) return { available: false, reason: 'No shared/cron.ts in this project.', workers: [] };
+    // Scan LIVE CODE only. This is a regex over source text, which has no idea what a
+    // comment is: every scaffold ships a commented-out example
+    //   //   nightly: defineWorker({ schedule: '0 3 * * *', description: '…' }),
+    // and it was being listed as a real worker with an "Enqueue on Prod" button for a
+    // task that doesn't exist (its description rendered as the literal '…').
+    const code = stripComments(src);
     const workers: { name: string; schedule?: string; description?: string; defaultInput: unknown }[] = [];
     const re = /(\w+)\s*:\s*defineWorker\(\s*\{([\s\S]*?)\}\s*\)/g;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(src)) !== null) {
+    while ((m = re.exec(code)) !== null) {
       const name = m[1];
       const body = m[2];
       const schedule = /schedule\s*:\s*['"]([^'"]*)['"]/.exec(body)?.[1];
