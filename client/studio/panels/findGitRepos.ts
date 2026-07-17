@@ -128,10 +128,31 @@ export function getCachedRepos(): GitRepo[] {
 
 /** Check whether a given repo path is known to have ugly-app as a dependency,
  *  based on the cached scan results. Returns false (not ugly-app) when the
- *  scan hasn't finished yet (the cache is still null). */
+ *  scan hasn't finished yet (the cache is still null).
+ *
+ *  CAUTION: this answers "is it in the scan and flagged", NOT "is it an ugly-app
+ *  project". A path the scan never visited — every session worktree under
+ *  `.ugly-studio/worktrees/` — is false here no matter what's on disk. Use
+ *  `resolveIsUglyApp` for a decision about an arbitrary path. */
 export function isRepoUglyApp(repoPath: string): boolean {
   if (!cachedRepos) return false;
   return cachedRepos.some((r) => r.path === repoPath && r.isUglyApp);
+}
+
+/**
+ * Is `path` an ugly-app project? Asks the FILESYSTEM, falling back to the scan cache
+ * only as a fast path.
+ *
+ * The scan-cache-only check told the Preview panel that a session worktree "is not an
+ * ugly-app project" — because the scan never walks `.ugly-studio/` — even though the
+ * worktree has a `.uglyapp` marker and a real package.json. So Preview could never boot
+ * a dev server for the code the agent had just written, and the agent's dev_server_*
+ * tools dead-ended chasing a server that would never start.
+ */
+export async function resolveIsUglyApp(path: string): Promise<boolean> {
+  const cached = cachedRepos?.find((r) => r.path === path);
+  if (cached?.isUglyApp === true) return true;
+  return checkIsUglyApp(path);
 }
 
 let scanPromise: Promise<GitRepo[]> | null = null;

@@ -4,12 +4,14 @@ import 'highlight.js/styles/github.css';
 import { native } from 'ugly-app/native';
 import { MdastViewer } from 'ugly-app/markdown/client';
 import { getActiveProjectPath } from '../hooks/useSocket';
+import { sessionWorktreeDir } from '../agent/sessionWorkspace';
 import { useTheme } from '../theme/ThemeProvider';
 import { OpenUriContext } from '../components/LinkifiedText';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { FileIcon } from './navIcons';
 import { CodeMirrorFileEditor, type CmEditorHandle } from '../components/CodeMirrorFileEditor';
 import { ReferencesPanel } from '../components/ReferencesPanel';
+import { GitBranch } from 'lucide-react';
 import { CodebaseSearch } from './CodebaseSearch';
 import {
   runDefinition,
@@ -121,13 +123,41 @@ const IGNORED = new Set(['.git', 'node_modules', '.next', 'dist', '.turbo', '.ca
 export function FilePanel({
   openTarget,
   onOpened,
+  sessionId,
 }: {
   /** A file (+ optional line) to open, requested from another panel (e.g. a
    *  clicked tool-card path). Consumed once, then cleared via `onOpened`. */
   openTarget?: { path: string; line?: number } | null;
   onOpened?: () => void;
+  /** Active session — the tree must show that session's worktree, like Git/Preview. */
+  sessionId?: string | null;
 } = {}): React.ReactElement {
-  const root = getActiveProjectPath();
+  // Root at the SESSION WORKTREE when there is one, exactly as GitPanel does.
+  // Previously this panel always rooted at the project, so with a session selected it
+  // rendered the untouched main checkout while Git — one click away, same session —
+  // listed those same files as modified. Three surfaces disagreed about one file, and
+  // the one users trust to answer "did that happen?" was the one showing stale content.
+  // Polled: the worktree only appears on the first turn, after this panel may have mounted.
+  const projectPath = getActiveProjectPath();
+  const [root, setRoot] = React.useState<string | null>(projectPath);
+  const [rootIsWorktree, setRootIsWorktree] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    const resolve = async (): Promise<void> => {
+      let dir = projectPath;
+      let isWt = false;
+      if (sessionId && projectPath) {
+        const wt = sessionWorktreeDir(projectPath, sessionId);
+        try {
+          if (await native.fs.exists(wt)) { dir = wt; isWt = true; }
+        } catch { /* fall back to the project root */ }
+      }
+      if (!cancelled) { setRoot(dir); setRootIsWorktree(isWt); }
+    };
+    void resolve();
+    const t = setInterval(() => void resolve(), 5000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [projectPath, sessionId]);
   const [open, setOpen] = React.useState<Record<string, Entry[] | undefined>>({});
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [selected, setSelected] = React.useState<string | null>(null);
@@ -521,6 +551,29 @@ export function FilePanel({
       {!isMobile && (
         <div style={S.tree}>
           <CodebaseSearch onOpen={(p) => { void openFile(p); }} />
+          {/* Name the tree. Without this the panel can show the session's worktree or the
+              main checkout with no way to tell which — and a stale-looking file reads as
+              "the agent didn't do it" rather than "you're looking at the other tree". */}
+          <div
+            data-id="file-tree-scope"
+            title={root}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '3px 8px',
+              fontSize: 10,
+              fontFamily: 'Inter, sans-serif',
+              color: 'var(--text-muted)',
+              borderBottom: '1px solid var(--border)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            <GitBranch size={10} style={{ flexShrink: 0 }} />
+            {rootIsWorktree ? 'session worktree' : 'main checkout'}
+          </div>
           {renderDir(root, 0)}
         </div>
       )}

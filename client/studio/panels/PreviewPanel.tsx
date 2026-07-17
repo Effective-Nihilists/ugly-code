@@ -9,7 +9,7 @@ import { ansiToNodes, stripAnsi } from './ansi';
 import { registerFeedbackContextProvider } from 'ugly-app/client';
 
 import { GitRepoSelector, useActiveRepoPath } from './GitRepoSelector';
-import { isRepoUglyApp } from './findGitRepos';
+import { resolveIsUglyApp } from './findGitRepos';
 import { getActiveProjectPath } from '../projectPath';
 
 // The desktop daemon gates `native.process.spawn` on (a) the binary being bundled
@@ -110,17 +110,32 @@ function startTunnel(d: DevServer, projectPath: string, port: number): void {
   }
 }
 
+/**
+ * Start the dev server, once we've confirmed the target really is an ugly-app project.
+ *
+ * The ugly-app check is ASYNC and asks the filesystem (resolveIsUglyApp). It used to be a
+ * sync lookup in the repo-scan cache, which is false for any path the scan never walked —
+ * including every session worktree under `.ugly-studio/`. So Preview refused to boot the
+ * agent's own code with "<session dir> is not an ugly-app project" (the message prints the
+ * path's last segment, which is why it looked like a session id was being used as a name).
+ */
 function startDev(key: string, projectPath: string, port: number, databaseUrl?: string): void {
   const d = getDev(key, port);
-  // Reject repos that aren't ugly-app projects — `pnpm dev` won't work there.
-  if (!isRepoUglyApp(projectPath)) {
-    d.log = `[error] Cannot start dev server: "${projectPath.split('/').pop()}" is not an ugly-app project.\n` +
-      `The dev server requires \`pnpm dev\` (ugly-app CLI) to run.\n` +
-      `Select an ugly-app project from the repo selector (★).\n`;
-    d.running = false;
-    notify(d);
-    return;
-  }
+  void resolveIsUglyApp(projectPath).then((ok) => {
+    if (!ok) {
+      d.log = `[error] Cannot start dev server: ${projectPath} is not an ugly-app project.\n` +
+        `The dev server requires \`pnpm dev\` (ugly-app CLI) to run — no .uglyapp marker or\n` +
+        `ugly-app dependency was found there.\n`;
+      d.running = false;
+      notify(d);
+      return;
+    }
+    startDevChecked(key, projectPath, port, databaseUrl);
+  });
+}
+
+function startDevChecked(key: string, projectPath: string, port: number, databaseUrl?: string): void {
+  const d = getDev(key, port);
   d.stopping = true; // killing any prior proc below is intentional, not a crash
   if (d.proc) { try { d.proc.kill(); } catch { /* already gone */ } }
   d.proc = null;
