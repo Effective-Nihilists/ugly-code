@@ -41,6 +41,9 @@ interface CodingSessionMetaDoc {
   version: number;
   created: Date;
   updated: Date;
+  /** Turn lifecycle: 'running' between send and the terminal event. The TURN's state —
+   *  not a message's — which is what the Stop control must follow. */
+  status?: string;
   contextTokens?: number;
   contextWindow?: number;
   contextBudget?: number;
@@ -1182,6 +1185,13 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     tailFollowingRef.current = !hasMoreNewer;
   }, [hasMoreNewer]);
   const [isStreaming, setIsStreaming] = useState(false);
+  // A TURN is running; a MESSAGE streams. `isStreaming` below is derived from "is an
+  // assistant row mid-stream right now?", which is FALSE in the gaps — the row commits,
+  // then a tool runs for seconds with no pending row. That's most of a turn, and it's
+  // exactly when you'd want to abort: measured on a real turn, the Stop control was
+  // present at t=0, GONE from t=4s–12s while the agent edited, and back at t=16s as the
+  // turn ended. Follow the session doc's turn status instead.
+  const [turnRunning, setTurnRunning] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   // Auto-mark-viewed on running→done while the user is still watching
@@ -3262,6 +3272,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           const r = parseCodebaseReadinessEvent({ payload: d.codebaseReadiness });
           if (r) setCodebaseReadiness(r);
         }
+        // Turn status first: the early return below (context fields) would otherwise
+        // skip it entirely on docs that carry no context numbers.
+        setTurnRunning(d.status === 'running');
         if (d.contextTokens === undefined && d.contextWindow === undefined) return;
         setSessionInfo((prev) => ({
           ...(prev ?? { cwd: '' }),
@@ -3992,7 +4005,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
      * of waiting indefinitely without feedback.
      */
     peerStuckState,
-    isStreaming,
+    /**
+     * True for the whole TURN, not just while an assistant row streams. Consumers gate
+     * the Stop control on this: deriving it from the message alone made Stop disappear
+     * during every tool call (measured: gone t=4s–12s of a 16s turn), so there was no way
+     * to abort a turn you were being billed for. `turnRunning` follows the session doc's
+     * status, which is written at the turn's real boundaries.
+     */
+    isStreaming: isStreaming || turnRunning,
     sendMessage,
     stopGeneration,
     stopTool,
