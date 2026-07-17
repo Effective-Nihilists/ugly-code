@@ -6417,9 +6417,13 @@ CodingAgentChatProps = {}) {
   const [worktreeOnDisk, setWorktreeOnDisk] = useState<{ branch: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    const projectPath = getActiveProjectPath();
-    if (!sessionId || !projectPath) { setWorktreeOnDisk(null); return; }
+    // Re-check inside the tick, never bail before arming it: `getActiveProjectPath()`
+    // isn't reactive, so an early return here (project not resolved yet on a fresh
+    // session) left the poll unarmed and the banner never appeared until a reload —
+    // the exact moment it's needed least. Both inputs are cheap to re-read.
     const check = async (): Promise<void> => {
+      const projectPath = getActiveProjectPath();
+      if (!sessionId || !projectPath) { if (!cancelled) setWorktreeOnDisk(null); return; }
       try {
         const dir = sessionWorktreeDir(projectPath, sessionId);
         const exists = await native.fs.exists(dir);
@@ -6427,7 +6431,8 @@ CodingAgentChatProps = {}) {
       } catch { if (!cancelled) setWorktreeOnDisk(null); }
     };
     void check();
-    const t = setInterval(() => void check(), 5000); // appears on the first turn
+    // The worktree is created by the first turn, after this mounts — so poll.
+    const t = setInterval(() => void check(), 3000);
     return () => { cancelled = true; clearInterval(t); };
   }, [sessionId]);
 
