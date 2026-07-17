@@ -125,7 +125,16 @@ export function isTool(name: string, tool: ToolName): boolean {
  * shell command (`sh -c`), so these are the tools reachable from within it
  * (surfaced to the model as guidance, mirroring the monolith's bundled-tool list).
  */
-export const AGENT_BINARIES = ['node', 'git', 'curl', 'python', 'uv', 'rg', 'ffmpeg', 'imagemagick'] as const;
+export const AGENT_BINARIES = [
+  'node',
+  'git',
+  'curl',
+  'python',
+  'uv',
+  'rg',
+  'ffmpeg',
+  'imagemagick',
+] as const;
 
 /** Tool specs sent to the model (OpenAI/Anthropic JSON-schema function shape).
  *  `name` is typed `ToolName` so these can't drift from the UI / registry. */
@@ -137,9 +146,19 @@ export const AGENT_TOOLS: AgentToolSpec[] = [
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'File path. Relative paths resolve against the project (or worktree) root; absolute, ~, and ../ paths also work.' },
-        offset: { type: 'number', description: 'First line to read (0-indexed). Default 0.' },
-        limit: { type: 'number', description: 'Max lines to read. Default 2000.' },
+        path: {
+          type: 'string',
+          description:
+            'File path. Relative paths resolve against the project (or worktree) root; absolute, ~, and ../ paths also work.',
+        },
+        offset: {
+          type: 'number',
+          description: 'First line to read (0-indexed). Default 0.',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max lines to read. Default 2000.',
+        },
       },
       required: ['path'],
       additionalProperties: false,
@@ -147,11 +166,16 @@ export const AGENT_TOOLS: AgentToolSpec[] = [
   },
   {
     name: 'write',
-    description: 'Create or overwrite a file with the EXACT given contents (the whole final file body, never a stub/TODO). Creates parent directories as needed. Use `edit`/`multiedit` for surgical changes and `bash mv` for renames.',
+    description:
+      'Create or overwrite a file with the EXACT given contents (the whole final file body, never a stub/TODO). Creates parent directories as needed. Use `edit`/`multiedit` for surgical changes and `bash mv` for renames.',
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'File path. Relative paths resolve against the project (or worktree) root; absolute, ~, and ../ paths also work.' },
+        path: {
+          type: 'string',
+          description:
+            'File path. Relative paths resolve against the project (or worktree) root; absolute, ~, and ../ paths also work.',
+        },
         content: { type: 'string', description: 'The full new file contents.' },
       },
       required: ['path', 'content'],
@@ -165,14 +189,43 @@ export const AGENT_TOOLS: AgentToolSpec[] = [
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'File path. Relative paths resolve against the project (or worktree) root; absolute, ~, and ../ paths also work.' },
-        old_string: { type: 'string', description: 'Exact text to replace (string-match mode).' },
-        new_string: { type: 'string', description: 'Replacement text (string-match mode).' },
-        replace_all: { type: 'boolean', description: 'Replace every occurrence of old_string (default: first/unique only).' },
-        anchor: { type: 'string', description: 'A `<n>:<hash>` (or bare line number) anchor to replace that single line.' },
-        insert_after: { type: 'string', description: 'An anchor to insert `new_content` after.' },
-        range: { type: 'string', description: 'An inclusive anchor range, e.g. "42..47" or "42:a3..47:b1".' },
-        new_content: { type: 'string', description: 'Replacement/inserted content for anchor/insert_after/range modes.' },
+        path: {
+          type: 'string',
+          description:
+            'File path. Relative paths resolve against the project (or worktree) root; absolute, ~, and ../ paths also work.',
+        },
+        old_string: {
+          type: 'string',
+          description: 'Exact text to replace (string-match mode).',
+        },
+        new_string: {
+          type: 'string',
+          description: 'Replacement text (string-match mode).',
+        },
+        replace_all: {
+          type: 'boolean',
+          description:
+            'Replace every occurrence of old_string (default: first/unique only).',
+        },
+        anchor: {
+          type: 'string',
+          description:
+            'A `<n>:<hash>` (or bare line number) anchor to replace that single line.',
+        },
+        insert_after: {
+          type: 'string',
+          description: 'An anchor to insert `new_content` after.',
+        },
+        range: {
+          type: 'string',
+          description:
+            'An inclusive anchor range, e.g. "42..47" or "42:a3..47:b1".',
+        },
+        new_content: {
+          type: 'string',
+          description:
+            'Replacement/inserted content for anchor/insert_after/range modes.',
+        },
       },
       required: ['path'],
       additionalProperties: false,
@@ -180,15 +233,28 @@ export const AGENT_TOOLS: AgentToolSpec[] = [
   },
   {
     name: 'bash',
-    description:
-      `Execute a shell command via POSIX sh. Chain with \`;\`/\`&&\` (state does NOT persist between calls — don't \`cd\`). Avoid \`find\`/\`grep\`/\`cat\`/\`sed\`/\`echo\` — use \`glob\`/\`grep\`/\`read\`/\`edit\`/\`write\` instead. Bash is for tests, lint/typecheck, one-line verifications, and long-running processes. Do NOT use it for git — the harness manages commits/branches/pushes. Bundled on PATH: ${AGENT_BINARIES.join(', ')} (plus \`pnpm\` for node projects).`,
+    description: `Execute a shell command via POSIX sh. Chain with \`;\`/\`&&\` (state does NOT persist between calls — don't \`cd\`). Avoid \`find\`/\`grep\`/\`cat\`/\`sed\`/\`echo\` — use \`glob\`/\`grep\`/\`read\`/\`edit\`/\`write\` instead. Bash is for tests, lint/typecheck, one-line verifications, and long-running processes. Do NOT use it for git — the harness manages commits/branches/pushes. Bundled on PATH: ${AGENT_BINARIES.join(', ')} (plus \`pnpm\` for node projects).`,
     parameters: {
       type: 'object',
       properties: {
-        command: { type: 'string', description: 'The shell command to run (POSIX sh).' },
-        description: { type: 'string', description: 'A ≤10-word description of what this command does and why.' },
-        working_dir: { type: 'string', description: 'Directory to run in (defaults to the project/worktree root).' },
-        timeout_ms: { type: 'number', description: 'Timeout in ms (default 120000).' },
+        command: {
+          type: 'string',
+          description: 'The shell command to run (POSIX sh).',
+        },
+        description: {
+          type: 'string',
+          description:
+            'A ≤10-word description of what this command does and why.',
+        },
+        working_dir: {
+          type: 'string',
+          description:
+            'Directory to run in (defaults to the project/worktree root).',
+        },
+        timeout_ms: {
+          type: 'number',
+          description: 'Timeout in ms (default 120000).',
+        },
       },
       required: ['command', 'description'],
       additionalProperties: false,
@@ -201,16 +267,29 @@ export const AGENT_TOOLS: AgentToolSpec[] = [
     parameters: {
       type: 'object',
       properties: {
-        collection: { type: 'string', description: 'Collection/table name, e.g. "todo".' },
+        collection: {
+          type: 'string',
+          description: 'Collection/table name, e.g. "todo".',
+        },
         filters: {
           type: 'array',
           description: 'Optional structured filters (ANDed).',
           items: {
             type: 'object',
             properties: {
-              field: { type: 'string', description: 'A field inside `data`, e.g. "status".' },
-              op: { type: 'string', enum: ['eq', 'ne', 'contains', 'exists'], description: 'Comparison operator.' },
-              value: { description: 'The value to compare against (omit for `exists`).' },
+              field: {
+                type: 'string',
+                description: 'A field inside `data`, e.g. "status".',
+              },
+              op: {
+                type: 'string',
+                enum: ['eq', 'ne', 'contains', 'exists'],
+                description: 'Comparison operator.',
+              },
+              value: {
+                description:
+                  'The value to compare against (omit for `exists`).',
+              },
             },
             required: ['field', 'op'],
             additionalProperties: false,
@@ -221,14 +300,25 @@ export const AGENT_TOOLS: AgentToolSpec[] = [
           description: 'Optional sort (defaults to created DESC).',
           properties: {
             field: { type: 'string', description: 'Field to sort by.' },
-            dir: { type: 'string', enum: ['asc', 'desc'], description: 'Sort direction.' },
+            dir: {
+              type: 'string',
+              enum: ['asc', 'desc'],
+              description: 'Sort direction.',
+            },
           },
           required: ['field'],
           additionalProperties: false,
         },
-        limit: { type: 'number', description: 'Max rows (default 50, max 1000).' },
+        limit: {
+          type: 'number',
+          description: 'Max rows (default 50, max 1000).',
+        },
         skip: { type: 'number', description: 'Rows to skip (pagination).' },
-        dev_or_prod_mode: { type: 'string', enum: ['dev', 'prod'], description: 'Which database (only `dev` is available locally).' },
+        dev_or_prod_mode: {
+          type: 'string',
+          enum: ['dev', 'prod'],
+          description: 'Which database (only `dev` is available locally).',
+        },
       },
       required: ['collection'],
       additionalProperties: false,
@@ -242,9 +332,20 @@ export const AGENT_TOOLS: AgentToolSpec[] = [
       type: 'object',
       properties: {
         sql: { type: 'string', description: 'A single SQL statement.' },
-        params: { type: 'array', description: 'Optional positional parameters ($1, $2, …).', items: {} },
-        row_limit: { type: 'number', description: 'Cap returned rows (default/max applied by the server).' },
-        dev_or_prod_mode: { type: 'string', enum: ['dev', 'prod'], description: 'Which database (only `dev` is available locally).' },
+        params: {
+          type: 'array',
+          description: 'Optional positional parameters ($1, $2, …).',
+          items: {},
+        },
+        row_limit: {
+          type: 'number',
+          description: 'Cap returned rows (default/max applied by the server).',
+        },
+        dev_or_prod_mode: {
+          type: 'string',
+          enum: ['dev', 'prod'],
+          description: 'Which database (only `dev` is available locally).',
+        },
       },
       required: ['sql'],
       additionalProperties: false,

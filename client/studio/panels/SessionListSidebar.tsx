@@ -69,7 +69,7 @@ function useTransitionList<T extends { compositeId: string }>(
         const carried = prevDelayById.get(item.compositeId);
         const delayMs = firstBatch
           ? baseDelayMs + idx * staggerMs
-          : carried ?? 0;
+          : (carried ?? 0);
         return { item, phase: 'visible' as const, delayMs };
       });
 
@@ -127,7 +127,9 @@ function useTransitionList<T extends { compositeId: string }>(
     const t = setTimeout(() => {
       setEntries((curr) => curr.filter((e) => e.phase !== 'leaving'));
     }, duration);
-    return () => { clearTimeout(t); };
+    return () => {
+      clearTimeout(t);
+    };
   }, [entries, duration]);
 
   return entries;
@@ -476,7 +478,9 @@ export function SessionListSidebar({
               {...(item.disabled ? { disabled: true } : {})}
               onClick={item.onClick}
               icon={item.icon}
-              {...(item.badgeCount != null ? { badgeCount: item.badgeCount } : {})}
+              {...(item.badgeCount != null
+                ? { badgeCount: item.badgeCount }
+                : {})}
               {...(i < footerNav.length - 1 ? { divider: true } : {})}
             />
           ))}
@@ -536,15 +540,15 @@ function SidebarFooterButton({
   badgeCount,
   'data-id': dataId,
 }: {
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  divider?: boolean;
-  icon: React.ReactNode;
+  'label': string;
+  'active'?: boolean;
+  'disabled'?: boolean;
+  'onClick': () => void;
+  'divider'?: boolean;
+  'icon': React.ReactNode;
   /** Optional accent-colored count shown after the label. Right-aligned
    *  via a flex spacer. Hidden when 0 / undefined. */
-  badgeCount?: number;
+  'badgeCount'?: number;
   'data-id'?: string;
 }): React.ReactElement {
   return (
@@ -566,8 +570,8 @@ function SidebarFooterButton({
         color: disabled
           ? 'var(--text-muted)'
           : active
-          ? 'var(--accent)'
-          : 'var(--text-secondary)',
+            ? 'var(--accent)'
+            : 'var(--text-secondary)',
         fontFamily: '"JetBrains Mono", monospace',
         fontSize: 11,
         fontWeight: 700,
@@ -630,7 +634,11 @@ function SidebarFooterButton({
  * active treatment used by SessionRow / SidebarFooterButton so the selected view
  * reads consistently with the rest of the rail.
  */
-function SessionSubNav({ items }: { items: SidebarNavItem[] }): React.ReactElement {
+function SessionSubNav({
+  items,
+}: {
+  items: SidebarNavItem[];
+}): React.ReactElement {
   return (
     <div
       data-id="session-subnav"
@@ -666,10 +674,12 @@ function SessionSubNav({ items }: { items: SidebarNavItem[] }): React.ReactEleme
             textAlign: 'left',
           }}
           onMouseEnter={(e) => {
-            if (!item.active) e.currentTarget.style.color = 'var(--text-primary)';
+            if (!item.active)
+              e.currentTarget.style.color = 'var(--text-primary)';
           }}
           onMouseLeave={(e) => {
-            if (!item.active) e.currentTarget.style.color = 'var(--text-secondary)';
+            if (!item.active)
+              e.currentTarget.style.color = 'var(--text-secondary)';
           }}
         >
           {item.active && (
@@ -704,9 +714,6 @@ function SessionSubNav({ items }: { items: SidebarNavItem[] }): React.ReactEleme
     </div>
   );
 }
-
-
-
 
 /**
  * Renders the regular-session rows with enter/leave animations and
@@ -797,55 +804,65 @@ function SessionRowList({
         const { s, isChild } = item;
         const leaving = phase === 'leaving';
         const deleting = sessionDeletion.isDeleting(s.compositeId);
-        const showViews =
-          !leaving && s.compositeId === activeCompositeId;
+        const showViews = !leaving && s.compositeId === activeCompositeId;
         return (
           <React.Fragment key={s.compositeId}>
-          <AnimatedRow
-            leaving={leaving}
-            isChild={isChild}
-            delayMs={delayMs}
-          >
-            {/* SessionRow tags its own interactive root (role="button")
+            <AnimatedRow leaving={leaving} isChild={isChild} delayMs={delayMs}>
+              {/* SessionRow tags its own interactive root (role="button")
                 internally; it exposes no data-id prop to forward here. */}
-            {/* eslint-disable-next-line ugly-app/require-data-id */}
-            <SessionRow
-              session={{
-                compositeId: s.compositeId,
-                // Peer rows use the model id as the visible title —
-                // each peer session's own title is whichever step
-                // instruction the orchestrator sent first, which is
-                // confusing in the list. The model is what matters.
-                title: isChild ? s.model : s.title,
-                time: timeAgo(s.updated_at),
-                running: s.running,
-                ...(s.errored ? { errored: true } : {}),
-                blocked: s.blocked ?? false,
-                ...(s.blockedReason ? { blockedReason: s.blockedReason } : {}),
-                ...(s.creating ? { creating: true } : {}),
-                model: s.model,
-                totalTokens: s.totalTokens,
-                totalCost: s.totalCost,
-                ...(s.branch ? { branch: s.branch } : {}),
-              }}
-              active={s.compositeId === activeCompositeId}
-              onClick={() => {
-                if (leaving) return;
-                onSelect(s.compositeId);
-              }}
-              // Archive is parent-only — peers cascade off the
-              // parent's archive. Pending (creating) rows hide it
-              // too — closing happens via the inline Stop/Close on
-              // the center pane.
-              {...(isChild || s.creating
-                ? {}
-                : { onArchive: () => { onArchiveSession(s.compositeId); } })}
-              compact={isChild}
-              {...(onRenameSession && !isChild ? { onRename: (title: string) => { onRenameSession(s.compositeId, title); } } : {})}
-              deleting={deleting} data-id="session-row"
-            />
-          </AnimatedRow>
-          {showViews && sessionViews && <SessionSubNav items={sessionViews} />}
+              {/* eslint-disable-next-line ugly-app/require-data-id */}
+              <SessionRow
+                session={{
+                  compositeId: s.compositeId,
+                  // Peer rows use the model id as the visible title —
+                  // each peer session's own title is whichever step
+                  // instruction the orchestrator sent first, which is
+                  // confusing in the list. The model is what matters.
+                  title: isChild ? s.model : s.title,
+                  time: timeAgo(s.updated_at),
+                  running: s.running,
+                  ...(s.errored ? { errored: true } : {}),
+                  blocked: s.blocked ?? false,
+                  ...(s.blockedReason
+                    ? { blockedReason: s.blockedReason }
+                    : {}),
+                  ...(s.creating ? { creating: true } : {}),
+                  model: s.model,
+                  totalTokens: s.totalTokens,
+                  totalCost: s.totalCost,
+                  ...(s.branch ? { branch: s.branch } : {}),
+                }}
+                active={s.compositeId === activeCompositeId}
+                onClick={() => {
+                  if (leaving) return;
+                  onSelect(s.compositeId);
+                }}
+                // Archive is parent-only — peers cascade off the
+                // parent's archive. Pending (creating) rows hide it
+                // too — closing happens via the inline Stop/Close on
+                // the center pane.
+                {...(isChild || s.creating
+                  ? {}
+                  : {
+                      onArchive: () => {
+                        onArchiveSession(s.compositeId);
+                      },
+                    })}
+                compact={isChild}
+                {...(onRenameSession && !isChild
+                  ? {
+                      onRename: (title: string) => {
+                        onRenameSession(s.compositeId, title);
+                      },
+                    }
+                  : {})}
+                deleting={deleting}
+                data-id="session-row"
+              />
+            </AnimatedRow>
+            {showViews && sessionViews && (
+              <SessionSubNav items={sessionViews} />
+            )}
           </React.Fragment>
         );
       })}

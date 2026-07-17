@@ -23,7 +23,8 @@ import {
   stripAnsi,
 } from '../../../client/studio/panels/tests/parsers';
 
-const fx = (n: string): string => readFileSync(join(__dirname, 'fixtures', n), 'utf8');
+const fx = (n: string): string =>
+  readFileSync(join(__dirname, 'fixtures', n), 'utf8');
 const lines = (s: string): string[] => s.split('\n');
 
 // ── testId round-trip ────────────────────────────────────────────────────────
@@ -56,7 +57,9 @@ describe('escapeRegex', () => {
   it('escapes chars that appear in real test names', () => {
     // Verified real vitest name: "has a special [name] with (regex) chars"
     const escaped = escapeRegex('has [brackets] and (parens) + $x');
-    expect(new RegExp(escaped).test('has [brackets] and (parens) + $x')).toBe(true);
+    expect(new RegExp(escaped).test('has [brackets] and (parens) + $x')).toBe(
+      true,
+    );
     // Unescaped, `[brackets]` would be a character class and would NOT match.
     expect(new RegExp(escaped).test('has b and (parens) + $x')).toBe(false);
   });
@@ -64,7 +67,9 @@ describe('escapeRegex', () => {
 
 describe('relativize', () => {
   it('strips the repo root', () => {
-    expect(relativize('/repo/tests/a.test.ts', '/repo')).toBe('tests/a.test.ts');
+    expect(relativize('/repo/tests/a.test.ts', '/repo')).toBe(
+      'tests/a.test.ts',
+    );
   });
   it('leaves an outside path alone', () => {
     expect(relativize('/other/a.ts', '/repo')).toBe('/other/a.ts');
@@ -126,8 +131,16 @@ describe('vitest', () => {
   });
 
   it('reads authoritative statuses + failure detail from the json report', () => {
-    const { statuses, failures } = parseVitestReport(fx('vitest-report.json'), '/Users/admin/Documents/GitHub/ugly-code');
-    const id = (n: string): string => makeTestId('vitest', 'tests/unit/__tmp_fail.test.ts', `fixture suite > ${n}`);
+    const { statuses, failures } = parseVitestReport(
+      fx('vitest-report.json'),
+      '/Users/admin/Documents/GitHub/ugly-code',
+    );
+    const id = (n: string): string =>
+      makeTestId(
+        'vitest',
+        'tests/unit/__tmp_fail.test.ts',
+        `fixture suite > ${n}`,
+      );
 
     expect(statuses.get(id('passes'))).toBe('passed');
     expect(statuses.get(id('fails with a diff'))).toBe('failed');
@@ -146,7 +159,9 @@ describe('vitest', () => {
     const { statuses } = parseVitestReport(fx('vitest-report.json'), root);
     // The whole design rests on the two producing identical ids.
     for (const ev of streamed) {
-      expect(statuses.get(ev.id), `no report entry for ${ev.id}`).toBe(ev.status);
+      expect(statuses.get(ev.id), `no report entry for ${ev.id}`).toBe(
+        ev.status,
+      );
     }
   });
 });
@@ -190,8 +205,12 @@ describe('pytest', () => {
   });
 
   it('ignores the session header and progress noise', () => {
-    expect(parsePytestVerboseLine('collecting ... collected 6 items')).toBeNull();
-    expect(parsePytestVerboseLine('=========== test session starts ===========')).toBeNull();
+    expect(
+      parsePytestVerboseLine('collecting ... collected 6 items'),
+    ).toBeNull();
+    expect(
+      parsePytestVerboseLine('=========== test session starts ==========='),
+    ).toBeNull();
   });
 
   it('derives the JUnit key from a nodeid (classname is not invertible)', () => {
@@ -214,7 +233,9 @@ describe('pytest', () => {
     expect(f?.message).toContain('AssertionError: one is not two');
     expect(f?.stack).toContain('assert 1 == 2');
     // Skips are not failures.
-    expect(failures.has(pytestJunitKey('tests/test_demo.py::test_skipped'))).toBe(false);
+    expect(
+      failures.has(pytestJunitKey('tests/test_demo.py::test_skipped')),
+    ).toBe(false);
   });
 
   it('every junit failure key is reachable from a collected nodeid', () => {
@@ -245,7 +266,10 @@ describe('playwright', () => {
   });
 
   it('prefixes rootDir so ids are repo-relative (json file is rootDir-relative)', () => {
-    const cases = parsePlaywrightList(fx('playwright-report.json'), 'tests/e2e');
+    const cases = parsePlaywrightList(
+      fx('playwright-report.json'),
+      'tests/e2e',
+    );
     expect(cases[0]?.file.startsWith('tests/e2e/')).toBe(true);
   });
 
@@ -293,8 +317,11 @@ describe('playwright', () => {
   });
 
   it('aggregates per-project results: any failure fails the spec', () => {
-    const { statuses, failures } = parsePlaywrightReport(fx('playwright-report.json'));
-    const id = (l: number, t: string): string => makeTestId('playwright', 'demo.spec.ts', `${l}::${t}`);
+    const { statuses, failures } = parsePlaywrightReport(
+      fx('playwright-report.json'),
+    );
+    const id = (l: number, t: string): string =>
+      makeTestId('playwright', 'demo.spec.ts', `${l}::${t}`);
     expect(statuses.get(id(3, 'passes fine'))).toBe('passed');
     expect(statuses.get(id(4, 'fails hard'))).toBe('failed');
     expect(statuses.get(id(5, 'is skipped'))).toBe('skipped');
@@ -303,7 +330,9 @@ describe('playwright', () => {
 
   it('strips ANSI from failure messages', () => {
     const { failures } = parsePlaywrightReport(fx('playwright-report.json'));
-    const msg = failures.get(makeTestId('playwright', 'demo.spec.ts', '4::fails hard'))?.message ?? '';
+    const msg =
+      failures.get(makeTestId('playwright', 'demo.spec.ts', '4::fails hard'))
+        ?.message ?? '';
     expect(msg).not.toMatch(/\[/);
     expect(stripAnsi(msg)).toBe(msg);
   });

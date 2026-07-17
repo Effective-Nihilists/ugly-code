@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getCodingAgentModels, type CodingAgentModel, isByoKeyTextGenModel } from 'ugly-app/shared';
+import {
+  getCodingAgentModels,
+  type CodingAgentModel,
+  isByoKeyTextGenModel,
+} from 'ugly-app/shared';
 import {
   agenticCostTier,
   agenticPriceIndex,
@@ -101,9 +105,45 @@ const BASE_MODELS = getCodingAgentModels()
  *  on the user's machine (provider 'claude-cli' so the family filter groups them
  *  under the Claude CLI tab). Selecting one routes turns to the local CLI runner. */
 const CLAUDE_CLI_MODELS = [
-  { id: 'claude-code', name: 'Claude CLI', provider: 'claude-cli', contextWindow: 200000, speed: 'medium', vision: true, reasoning: 'strong', supportsReasoning: true, smartness: 5, sweBenchVerified: 72, costPerM: 0 },
-  { id: 'claude-code:opus', name: 'Claude CLI · Opus', provider: 'claude-cli', contextWindow: 200000, speed: 'slow', vision: true, reasoning: 'strong', supportsReasoning: true, smartness: 5, sweBenchVerified: 74, costPerM: 0 },
-  { id: 'claude-code:sonnet', name: 'Claude CLI · Sonnet', provider: 'claude-cli', contextWindow: 200000, speed: 'medium', vision: true, reasoning: 'strong', supportsReasoning: true, smartness: 5, sweBenchVerified: 72, costPerM: 0 },
+  {
+    id: 'claude-code',
+    name: 'Claude CLI',
+    provider: 'claude-cli',
+    contextWindow: 200000,
+    speed: 'medium',
+    vision: true,
+    reasoning: 'strong',
+    supportsReasoning: true,
+    smartness: 5,
+    sweBenchVerified: 72,
+    costPerM: 0,
+  },
+  {
+    id: 'claude-code:opus',
+    name: 'Claude CLI · Opus',
+    provider: 'claude-cli',
+    contextWindow: 200000,
+    speed: 'slow',
+    vision: true,
+    reasoning: 'strong',
+    supportsReasoning: true,
+    smartness: 5,
+    sweBenchVerified: 74,
+    costPerM: 0,
+  },
+  {
+    id: 'claude-code:sonnet',
+    name: 'Claude CLI · Sonnet',
+    provider: 'claude-cli',
+    contextWindow: 200000,
+    speed: 'medium',
+    vision: true,
+    reasoning: 'strong',
+    supportsReasoning: true,
+    smartness: 5,
+    sweBenchVerified: 72,
+    costPerM: 0,
+  },
 ] as unknown as CodingAgentModel[];
 
 /** Old export kept for back-compat with reasoning-detection helpers. */
@@ -287,7 +327,9 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
         }),
       ),
     );
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
   // Collapsed ugly.bot section shows only the auto-pool (pinned) models +
   // any currently-selected catalog row. Expanding reveals the full ugly.bot
@@ -339,9 +381,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
   // and called for single-select picks (the menu dismisses after a choice);
   // multi-select keeps the menu open so the user can toggle several rows.
   const isSingle = props.mode === 'single';
-  const selectedSet = !isSingle
-    ? new Set(props.values.map((m) => m.id))
-    : null;
+  const selectedSet = !isSingle ? new Set(props.values.map((m) => m.id)) : null;
 
   const selectModel = (model: CodingAgentModel, close: () => void) => {
     if (props.mode === 'single') {
@@ -405,7 +445,12 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
   const triggerCss = triggerStyle === 'row' ? rowTrigger : chipTrigger;
 
   const trigger = (
-    <button type="button" data-id="model-picker-trigger" disabled={disabled} style={triggerCss}>
+    <button
+      type="button"
+      data-id="model-picker-trigger"
+      disabled={disabled}
+      style={triggerCss}
+    >
       {icon}
       <span
         style={{
@@ -438,7 +483,9 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
         type="button"
         role="menuitem"
         data-id={`model-picker-row-${model.id}`}
-        onClick={() => { selectModel(model, close); }}
+        onClick={() => {
+          selectModel(model, close);
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -499,7 +546,9 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
       type="button"
       role="menuitem"
       data-id={`model-picker-auto-${mode}`}
-      onClick={() => { selectAuto(mode, close); }}
+      onClick={() => {
+        selectAuto(mode, close);
+      }}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -544,8 +593,8 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
       !showAutoOptions || props.mode !== 'single'
         ? []
         : showAutoOptions === true
-        ? VISIBLE_AUTO_MODES
-        : (showAutoOptions).filter((m) => m !== 'auto:cheap');
+          ? VISIBLE_AUTO_MODES
+          : showAutoOptions.filter((m) => m !== 'auto:cheap');
 
     const sections = SUBSCRIPTION_ORDER.filter((key) => {
       if (!familyAllows(family, key)) return false;
@@ -614,13 +663,14 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
           <div style={popupGroupHeader}>{subscriptionLabel(key)}</div>
           {pinnedRows.map((m) => renderModelRow(m, close))}
           {featuredRows.map((m) => renderModelRow(m, close))}
-          {uglyBotExpanded &&
-            hiddenRows.map((m) => renderModelRow(m, close))}
+          {uglyBotExpanded && hiddenRows.map((m) => renderModelRow(m, close))}
           {hasHidden && (
             <button
               type="button"
               data-id="model-picker-toggle-hidden"
-              onClick={() => { setUglyBotExpanded((v) => !v); }}
+              onClick={() => {
+                setUglyBotExpanded((v) => !v);
+              }}
               style={{
                 display: 'block',
                 width: '100%',
@@ -665,7 +715,11 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
       maxHeight={560}
       disabled={disabled}
     >
-      {(ctx) => renderPopupContent(() => { ctx.close(); })}
+      {(ctx) =>
+        renderPopupContent(() => {
+          ctx.close();
+        })
+      }
     </Popover>
   );
 

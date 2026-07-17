@@ -49,7 +49,10 @@ export function EventsPanel({ hideHeader, onDeploy }: EventsPanelProps = {}) {
   const deploy = useProdDeployGate(true);
 
   useEffect(() => {
-    if (deploy !== 'deployed') { setLoading(false); return; }
+    if (deploy !== 'deployed') {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     Promise.all([
       socket.request('eventTopEvents', { limit: 20 }),
@@ -59,8 +62,12 @@ export function EventsPanel({ hideHeader, onDeploy }: EventsPanelProps = {}) {
         setTopEvents(topRes.events);
         setRecentEvents(listRes.events);
       })
-      .catch((e: unknown) => { console.error('[EventsPanel]', e); })
-      .finally(() => { setLoading(false); });
+      .catch((e: unknown) => {
+        console.error('[EventsPanel]', e);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [deploy]);
 
   if (deploy === 'undeployed') {

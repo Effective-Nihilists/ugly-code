@@ -1,4 +1,11 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type React from 'react';
 
 /**
@@ -38,10 +45,10 @@ export function ModalStackProvider({
     return { id, release };
   }, []);
 
-  const value = useMemo<ModalStackApi>(() => ({ register, stack }), [
-    register,
-    stack,
-  ]);
+  const value = useMemo<ModalStackApi>(
+    () => ({ register, stack }),
+    [register, stack],
+  );
 
   return (
     <ModalStackContext.Provider value={value}>

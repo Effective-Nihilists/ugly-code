@@ -1,17 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { parentPath, joinPath, basename, matchesExtension, filterEntries, resolveStart } from '../../client/studio/components/filePickerUtils';
+import {
+  parentPath,
+  joinPath,
+  basename,
+  matchesExtension,
+  filterEntries,
+  resolveStart,
+} from '../../client/studio/components/filePickerUtils';
 import type { HostDirent } from 'ugly-app/native';
 
-const dir = (name: string): HostDirent => ({ name, isDirectory: true, isFile: false }) as HostDirent;
-const file = (name: string): HostDirent => ({ name, isDirectory: false, isFile: true }) as HostDirent;
+const dir = (name: string): HostDirent =>
+  ({ name, isDirectory: true, isFile: false }) as HostDirent;
+const file = (name: string): HostDirent =>
+  ({ name, isDirectory: false, isFile: true }) as HostDirent;
 
 describe('resolveStart', () => {
   it("passes '~'-based and absolute paths through; empty defaults to home", () => {
-    expect(resolveStart('~/Documents/Ugly Studio')).toBe('~/Documents/Ugly Studio');
+    expect(resolveStart('~/Documents/Ugly Studio')).toBe(
+      '~/Documents/Ugly Studio',
+    );
     expect(resolveStart('~')).toBe('~');
     expect(resolveStart('')).toBe('~');
     expect(resolveStart(undefined)).toBe('~');
-    expect(resolveStart('/Users/admin/Documents')).toBe('/Users/admin/Documents');
+    expect(resolveStart('/Users/admin/Documents')).toBe(
+      '/Users/admin/Documents',
+    );
   });
 });
 
@@ -28,7 +41,9 @@ describe('parentPath', () => {
 
 describe('joinPath / basename', () => {
   it('joins and extracts the last segment', () => {
-    expect(joinPath('/Users/admin', 'Documents')).toBe('/Users/admin/Documents');
+    expect(joinPath('/Users/admin', 'Documents')).toBe(
+      '/Users/admin/Documents',
+    );
     expect(joinPath('~/', 'Code')).toBe('~/Code');
     expect(basename('/Users/admin/project')).toBe('project');
     expect(basename('/Users/admin/project/')).toBe('project');
@@ -48,7 +63,14 @@ describe('matchesExtension', () => {
 });
 
 describe('filterEntries', () => {
-  const entries = [file('z.ts'), dir('src'), file('.hidden'), dir('.git'), file('readme.md'), dir('assets')];
+  const entries = [
+    file('z.ts'),
+    dir('src'),
+    file('.hidden'),
+    dir('.git'),
+    file('readme.md'),
+    dir('assets'),
+  ];
 
   it('folder mode: only folders, sorted, no files, hidden dropped', () => {
     expect(filterEntries(entries, 'folder', undefined, false)).toEqual([
@@ -75,7 +97,9 @@ describe('filterEntries', () => {
   });
 
   it('showHidden includes dot entries', () => {
-    const names = filterEntries(entries, 'both', undefined, true).map((e) => e.name);
+    const names = filterEntries(entries, 'both', undefined, true).map(
+      (e) => e.name,
+    );
     expect(names).toContain('.git');
     expect(names).toContain('.hidden');
   });

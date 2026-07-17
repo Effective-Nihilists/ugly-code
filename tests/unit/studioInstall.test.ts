@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildInstallDownloadUrl, requestStudioInstall } from '../../client/lib/studioInstall';
+import {
+  buildInstallDownloadUrl,
+  requestStudioInstall,
+} from '../../client/lib/studioInstall';
 
 describe('buildInstallDownloadUrl', () => {
   it('builds /dl URLs for code-bearing targets with correct extension', () => {
@@ -25,7 +28,9 @@ describe('requestStudioInstall', () => {
   it('POSTs the intent and returns the code', async () => {
     const fetchFn = vi.fn(
       async () =>
-        new Response(JSON.stringify({ result: { code: 'zzz9999999' } }), { status: 200 }),
+        new Response(JSON.stringify({ result: { code: 'zzz9999999' } }), {
+          status: 200,
+        }),
     ) as unknown as typeof fetch;
     const code = await requestStudioInstall('https://code.ugly.bot', fetchFn);
     expect(code).toBe('zzz9999999');
@@ -38,12 +43,16 @@ describe('requestStudioInstall', () => {
     const fetchFn = vi.fn(
       async () => new Response('nope', { status: 429 }),
     ) as unknown as typeof fetch;
-    expect(await requestStudioInstall('https://code.ugly.bot', fetchFn)).toBeNull();
+    expect(
+      await requestStudioInstall('https://code.ugly.bot', fetchFn),
+    ).toBeNull();
   });
   it('returns null when fetch throws', async () => {
     const fetchFn = vi.fn(async () => {
       throw new Error('offline');
     }) as unknown as typeof fetch;
-    expect(await requestStudioInstall('https://code.ugly.bot', fetchFn)).toBeNull();
+    expect(
+      await requestStudioInstall('https://code.ugly.bot', fetchFn),
+    ).toBeNull();
   });
 });

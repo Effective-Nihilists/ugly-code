@@ -3,7 +3,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetMock, mockFiles } from '../../helpers/uglyNativeMock';
 import { multieditTool } from '../../../client/agent/tools/multiedit';
 
-beforeEach(() => resetMock({ files: { '/proj/a.ts': 'let x = 1;\nlet y = 2;\nlet y = 2;\n' } }));
+beforeEach(() =>
+  resetMock({
+    files: { '/proj/a.ts': 'let x = 1;\nlet y = 2;\nlet y = 2;\n' },
+  }),
+);
 
 describe('multiedit', () => {
   it('applies edits in sequence', async () => {
@@ -22,10 +26,17 @@ describe('multiedit', () => {
 
   it('replace_all replaces every occurrence', async () => {
     await multieditTool.run(
-      { path: '/proj/a.ts', edits: [{ old_string: 'y = 2', new_string: 'y = 9', replace_all: true }] },
+      {
+        path: '/proj/a.ts',
+        edits: [
+          { old_string: 'y = 2', new_string: 'y = 9', replace_all: true },
+        ],
+      },
       undefined,
     );
-    expect(mockFiles().get('/proj/a.ts')).toBe('let x = 1;\nlet y = 9;\nlet y = 9;\n');
+    expect(mockFiles().get('/proj/a.ts')).toBe(
+      'let x = 1;\nlet y = 9;\nlet y = 9;\n',
+    );
   });
 
   it('aborts atomically when an old_string is missing', async () => {
@@ -42,7 +53,9 @@ describe('multiedit', () => {
     expect(out).toMatch(/not found|no match/i);
     expect(out).toMatch(/edit 2|index 1/i);
     // file unchanged
-    expect(mockFiles().get('/proj/a.ts')).toBe('let x = 1;\nlet y = 2;\nlet y = 2;\n');
+    expect(mockFiles().get('/proj/a.ts')).toBe(
+      'let x = 1;\nlet y = 2;\nlet y = 2;\n',
+    );
   });
 });
 

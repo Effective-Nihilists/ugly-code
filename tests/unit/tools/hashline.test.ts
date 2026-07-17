@@ -36,7 +36,10 @@ describe('parseAnchor', () => {
     expect(parseAnchor('42:a3')).toEqual({ lineNumber: 42, hash: 'a3' });
     expect(parseAnchor('42')).toEqual({ lineNumber: 42 });
     expect(parseAnchor(42)).toEqual({ lineNumber: 42 });
-    expect(parseAnchor('42:a3|const x = 1;')).toEqual({ lineNumber: 42, hash: 'a3' });
+    expect(parseAnchor('42:a3|const x = 1;')).toEqual({
+      lineNumber: 42,
+      hash: 'a3',
+    });
   });
   it('rejects garbage and out-of-range', () => {
     expect(parseAnchor('nope')).toBeNull();
@@ -77,25 +80,44 @@ describe('applyHashlineOp', () => {
   const body = 'a\nb\nc\n';
   const an = annotateLines(body);
   it('replace_line', () => {
-    const r = applyHashlineOp(body, { kind: 'replace_line', anchor: { lineNumber: 2, hash: an[1].hash }, newContent: 'B' });
+    const r = applyHashlineOp(body, {
+      kind: 'replace_line',
+      anchor: { lineNumber: 2, hash: an[1].hash },
+      newContent: 'B',
+    });
     expect(r.ok).toBe(true);
     expect(r.newBody).toBe('a\nB\nc\n');
   });
   it('insert_after', () => {
-    const r = applyHashlineOp(body, { kind: 'insert_after', anchor: { lineNumber: 1 }, newContent: 'X' });
+    const r = applyHashlineOp(body, {
+      kind: 'insert_after',
+      anchor: { lineNumber: 1 },
+      newContent: 'X',
+    });
     expect(r.newBody).toBe('a\nX\nb\nc\n');
   });
   it('replace_range', () => {
-    const r = applyHashlineOp(body, { kind: 'replace_range', range: { start: { lineNumber: 1 }, end: { lineNumber: 2 } }, newContent: 'Z' });
+    const r = applyHashlineOp(body, {
+      kind: 'replace_range',
+      range: { start: { lineNumber: 1 }, end: { lineNumber: 2 } },
+      newContent: 'Z',
+    });
     expect(r.newBody).toBe('Z\nc\n');
   });
   it('delete_range', () => {
-    const r = applyHashlineOp(body, { kind: 'delete_range', range: { start: { lineNumber: 2 }, end: { lineNumber: 2 } } });
+    const r = applyHashlineOp(body, {
+      kind: 'delete_range',
+      range: { start: { lineNumber: 2 }, end: { lineNumber: 2 } },
+    });
     expect(r.newBody).toBe('a\nc\n');
   });
   it('stale-hash op -> failure diagnostic', () => {
     const wrong = an[1].hash === '00' ? '01' : '00';
-    const r = applyHashlineOp(body, { kind: 'replace_line', anchor: { lineNumber: 2, hash: wrong }, newContent: 'B' });
+    const r = applyHashlineOp(body, {
+      kind: 'replace_line',
+      anchor: { lineNumber: 2, hash: wrong },
+      newContent: 'B',
+    });
     expect(r.ok).toBe(false);
     expect(r.diagnostic).toMatch(/stale hash/);
   });
@@ -110,7 +132,8 @@ describe('formatHashlineRead', () => {
     expect(out).toMatch(/<\/file>/);
   });
   it('respects offset/limit + emits a truncation notice', () => {
-    const body = Array.from({ length: 5 }, (_, i) => `L${i + 1}`).join('\n') + '\n';
+    const body =
+      Array.from({ length: 5 }, (_, i) => `L${i + 1}`).join('\n') + '\n';
     const out = formatHashlineRead('a.ts', body, 1, 2);
     expect(out).toMatch(/2:[0-9a-f]{2}\|L2/);
     expect(out).toMatch(/3:[0-9a-f]{2}\|L3/);

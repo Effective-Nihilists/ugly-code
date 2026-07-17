@@ -27,10 +27,14 @@ export const NAMED_PATTERN_IDS: readonly PatternId[] = [
 ] as const;
 
 export function isPatternId(s: unknown): s is PatternId {
-  return typeof s === 'string' && (NAMED_PATTERN_IDS as readonly string[]).includes(s);
+  return (
+    typeof s === 'string' &&
+    (NAMED_PATTERN_IDS as readonly string[]).includes(s)
+  );
 }
 
-export type SuperPatternId = 'super-spec-build-verify' | 'super-investigate-fix';
+export type SuperPatternId =
+  'super-spec-build-verify' | 'super-investigate-fix';
 
 export function isSuperPattern(p: PatternId | null): p is SuperPatternId {
   return p === 'super-spec-build-verify' || p === 'super-investigate-fix';
@@ -85,7 +89,9 @@ export const ALL_STEP_IDS: readonly StepId[] = [
 ] as const;
 
 export function isStepId(s: unknown): s is StepId {
-  return typeof s === 'string' && (ALL_STEP_IDS as readonly string[]).includes(s);
+  return (
+    typeof s === 'string' && (ALL_STEP_IDS as readonly string[]).includes(s)
+  );
 }
 
 /** Step variant id — selects insightsPrompt and (if terminal) finalPickerPrompt. */

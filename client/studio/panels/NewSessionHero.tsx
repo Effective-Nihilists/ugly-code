@@ -13,7 +13,9 @@ import {
   useStudioUserSettingsHydrated,
 } from '../hooks/useStudioUserSetting';
 import { shortcut } from '../utils/platform';
-import { GitBranch } from 'lucide-react';import { Popover } from '../system';import { type SubscriptionProvider } from './ModelSelector';
+import { GitBranch } from 'lucide-react';
+import { Popover } from '../system';
+import { type SubscriptionProvider } from './ModelSelector';
 import {
   ReasoningSelector,
   supportsReasoningClient,
@@ -136,8 +138,10 @@ export function NewSessionHero({
   );
   const [reasoningEffort, setReasoningEffort] =
     useStudioUserSetting<ReasoningEffort>(REASONING_SETTING_KEY, 'high');
-  const [branchMode, setBranchMode] =
-    useStudioUserSetting<'worktree' | 'main'>(BRANCH_MODE_SETTING_KEY, 'worktree');
+  const [branchMode, setBranchMode] = useStudioUserSetting<'worktree' | 'main'>(
+    BRANCH_MODE_SETTING_KEY,
+    'worktree',
+  );
 
   // When the user pins a single model via the Model axis, also write
   // that id to the legacy `codingAgentModel` slot so non-hero
@@ -253,7 +257,9 @@ export function NewSessionHero({
   // Hold a matching-background placeholder until settings hydrate, then mount the
   // hero so its intro animations run a single time against the persisted values.
   if (!settingsHydrated) {
-    return <div style={{ flex: 1, minHeight: 0, background: 'var(--bg-primary)' }} />;
+    return (
+      <div style={{ flex: 1, minHeight: 0, background: 'var(--bg-primary)' }} />
+    );
   }
 
   return (
@@ -383,7 +389,9 @@ export function NewSessionHero({
               <button
                 data-id="new-session-hero-cancel-eval-task"
                 type="button"
-                onClick={() => { setPendingEvalTask(null); }}
+                onClick={() => {
+                  setPendingEvalTask(null);
+                }}
                 title="Cancel eval task — start a regular session instead"
                 style={{
                   fontFamily: 'var(--font-label)',
@@ -407,7 +415,9 @@ export function NewSessionHero({
           <form
             className="us-fade-up"
             style={{ animationDuration: '480ms', animationDelay: '440ms' }}
-            onSubmit={(e) => { handleSubmit(e); }}
+            onSubmit={(e) => {
+              handleSubmit(e);
+            }}
           >
             <div
               style={{
@@ -430,50 +440,52 @@ export function NewSessionHero({
                   minWidth: 0,
                 }}
               >
-              <span
-                style={{
-                  fontFamily: 'var(--font-label)',
-                  fontWeight: 700,
-                  fontSize: 24,
-                  color: 'var(--accent)',
-                  padding: '22px 20px 0 22px',
-                  lineHeight: 1,
-                }}
-              >
-                &gt;
-              </span>
-              <textarea
-                data-id="home-prompt-input"
-                ref={promptRef}
-                value={prompt}
-                onChange={(e) => { setPrompt(e.target.value); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    handleSubmit(e);
-                  }
-                }}
-                placeholder="Describe a change, a bug, or an experiment…"
-                autoFocus
-                rows={1}
-                style={{
-                  flex: 1,
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-primary)',
-                  fontSize: 18,
-                  fontWeight: 500,
-                  padding: '22px 0',
-                  outline: 'none',
-                  letterSpacing: '-0.01em',
-                  fontFamily: 'inherit',
-                  resize: 'none',
-                  lineHeight: 1.4,
-                  minHeight: 96,
-                  minWidth: 0,
-                  overflowY: 'hidden',
-                }}
-              />
+                <span
+                  style={{
+                    fontFamily: 'var(--font-label)',
+                    fontWeight: 700,
+                    fontSize: 24,
+                    color: 'var(--accent)',
+                    padding: '22px 20px 0 22px',
+                    lineHeight: 1,
+                  }}
+                >
+                  &gt;
+                </span>
+                <textarea
+                  data-id="home-prompt-input"
+                  ref={promptRef}
+                  value={prompt}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
+                  placeholder="Describe a change, a bug, or an experiment…"
+                  autoFocus
+                  rows={1}
+                  style={{
+                    flex: 1,
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    fontSize: 18,
+                    fontWeight: 500,
+                    padding: '22px 0',
+                    outline: 'none',
+                    letterSpacing: '-0.01em',
+                    fontFamily: 'inherit',
+                    resize: 'none',
+                    lineHeight: 1.4,
+                    minHeight: 96,
+                    minWidth: 0,
+                    overflowY: 'hidden',
+                  }}
+                />
               </div>
               <button
                 data-id="home-start-session"
@@ -495,7 +507,16 @@ export function NewSessionHero({
                 }}
               >
                 Start
-                <span style={{ margin: '0 8px', fontSize: 10, opacity: 0.8, textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
+                <span
+                  style={{
+                    margin: '0 8px',
+                    fontSize: 10,
+                    opacity: 0.8,
+                    textTransform: 'none',
+                    letterSpacing: 0,
+                    fontWeight: 600,
+                  }}
+                >
                   {shortcut('Enter')}
                 </span>
                 →
@@ -572,7 +593,9 @@ export function NewSessionHero({
                 onPermissionChange={setPermissionMode}
                 onModelChange={handleModelModeChange}
                 onPatternChange={setPatternMode}
-                onModelNeedsKey={(provider) => { onOpenSettings(provider); }}
+                onModelNeedsKey={(provider) => {
+                  onOpenSettings(provider);
+                }}
               />
               <ReasoningSelector
                 value={reasoningEffort}
@@ -629,7 +652,12 @@ function BranchDropdown({
       <GitBranch size={13} />
       <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
       <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
-        <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path
+          d="M1 1L5 5L9 1"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
       </svg>
     </button>
   );
@@ -641,36 +669,80 @@ function BranchDropdown({
             data-id="branch-mode-option-worktree"
             role="menuitem"
             type="button"
-            onClick={() => { onChange('worktree'); ctx.close(); }}
+            onClick={() => {
+              onChange('worktree');
+              ctx.close();
+            }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
               padding: '8px 10px',
-              background: value === 'worktree' ? 'var(--bg-hover, rgba(255,85,0,0.1))' : 'transparent',
-              border: 'none', borderRadius: 6, cursor: 'pointer',
-              color: 'var(--text-primary, #e0e0e0)', fontSize: 12, textAlign: 'left',
+              background:
+                value === 'worktree'
+                  ? 'var(--bg-hover, rgba(255,85,0,0.1))'
+                  : 'transparent',
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer',
+              color: 'var(--text-primary, #e0e0e0)',
+              fontSize: 12,
+              textAlign: 'left',
             }}
           >
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+              }}
+            >
               <span>Worktree</span>
-              <span style={{ color: 'var(--text-muted, #666)', fontSize: 10 }}>Isolated git worktree on a new branch</span>
+              <span style={{ color: 'var(--text-muted, #666)', fontSize: 10 }}>
+                Isolated git worktree on a new branch
+              </span>
             </span>
           </button>
           <button
             data-id="branch-mode-option-main"
             role="menuitem"
             type="button"
-            onClick={() => { onChange('main'); ctx.close(); }}
+            onClick={() => {
+              onChange('main');
+              ctx.close();
+            }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
               padding: '8px 10px',
-              background: value === 'main' ? 'var(--bg-hover, rgba(255,85,0,0.1))' : 'transparent',
-              border: 'none', borderRadius: 6, cursor: 'pointer',
-              color: 'var(--text-primary, #e0e0e0)', fontSize: 12, textAlign: 'left',
+              background:
+                value === 'main'
+                  ? 'var(--bg-hover, rgba(255,85,0,0.1))'
+                  : 'transparent',
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer',
+              color: 'var(--text-primary, #e0e0e0)',
+              fontSize: 12,
+              textAlign: 'left',
             }}
           >
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+              }}
+            >
               <span>Main branch</span>
-              <span style={{ color: 'var(--text-muted, #666)', fontSize: 10 }}>Directly on the project main branch (no isolation)</span>
+              <span style={{ color: 'var(--text-muted, #666)', fontSize: 10 }}>
+                Directly on the project main branch (no isolation)
+              </span>
             </span>
           </button>
         </>

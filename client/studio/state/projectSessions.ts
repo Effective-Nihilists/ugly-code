@@ -37,7 +37,8 @@ export interface StoredSession {
   totalCost?: number;
 }
 
-const keyFor = (projectPath: string): string => `ugly-studio:sessions:${projectPath}`;
+const keyFor = (projectPath: string): string =>
+  `ugly-studio:sessions:${projectPath}`;
 
 export function loadSessions(projectPath: string | undefined): StoredSession[] {
   if (!projectPath) return [];
@@ -45,20 +46,29 @@ export function loadSessions(projectPath: string | undefined): StoredSession[] {
     const raw = localStorage.getItem(keyFor(projectPath));
     const arr = raw ? (JSON.parse(raw) as unknown) : [];
     if (!Array.isArray(arr)) return [];
-    return arr.filter((s): s is StoredSession => !!s && typeof (s as StoredSession).compositeId === 'string');
+    return arr.filter(
+      (s): s is StoredSession =>
+        !!s && typeof (s as StoredSession).compositeId === 'string',
+    );
   } catch {
     return [];
   }
 }
 
-export function saveSessions(projectPath: string | undefined, sessions: StoredSession[]): void {
+export function saveSessions(
+  projectPath: string | undefined,
+  sessions: StoredSession[],
+): void {
   if (!projectPath) return;
   try {
     // Strip branch + status + created_at + lastError before persisting to
     // localStorage — all are server-persisted (branch for cross-browser visibility,
     // status + lastError are live + transient, created_at drives ordering), so a
     // stale localStorage copy must never shadow the poll.
-    const stripped = sessions.map(({ branch: _b, status: _s, created_at: _c, lastError: _e, ...rest }) => rest);
+    const stripped = sessions.map(
+      ({ branch: _b, status: _s, created_at: _c, lastError: _e, ...rest }) =>
+        rest,
+    );
     localStorage.setItem(keyFor(projectPath), JSON.stringify(stripped));
   } catch {
     /* best effort */

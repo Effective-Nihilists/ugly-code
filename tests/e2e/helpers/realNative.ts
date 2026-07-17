@@ -12,14 +12,20 @@ import type { Page } from '@playwright/test';
  * native-backed queries. Must be called before `page.goto()`. All paths are
  * sandboxed to `root`; a path that escapes it throws.
  */
-export async function installRealNative(page: Page, root: string): Promise<void> {
+export async function installRealNative(
+  page: Page,
+  root: string,
+): Promise<void> {
   const rp = (p: string): string => {
     const r = resolve(isAbsolute(p) ? p : join(root, p));
-    if (!r.startsWith(resolve(root))) throw new Error(`path escapes project root: ${p}`);
+    if (!r.startsWith(resolve(root)))
+      throw new Error(`path escapes project root: ${p}`);
     return r;
   };
 
-  await page.exposeFunction('__nfsReadFile', (p: string) => fs.readFileSync(rp(p), 'utf8'));
+  await page.exposeFunction('__nfsReadFile', (p: string) =>
+    fs.readFileSync(rp(p), 'utf8'),
+  );
   await page.exposeFunction('__nfsWriteFile', (p: string, c: string) => {
     fs.writeFileSync(rp(p), c ?? '');
     return true;
@@ -27,7 +33,11 @@ export async function installRealNative(page: Page, root: string): Promise<void>
   await page.exposeFunction('__nfsReaddir', (p: string) =>
     fs
       .readdirSync(rp(p), { withFileTypes: true })
-      .map((d) => ({ name: d.name, isDirectory: d.isDirectory(), isFile: d.isFile() })),
+      .map((d) => ({
+        name: d.name,
+        isDirectory: d.isDirectory(),
+        isFile: d.isFile(),
+      })),
   );
   await page.exposeFunction('__nfsMkdir', (p: string) => {
     fs.mkdirSync(rp(p), { recursive: true });
@@ -43,7 +53,12 @@ export async function installRealNative(page: Page, root: string): Promise<void>
   });
   await page.exposeFunction('__nfsStat', (p: string) => {
     const s = fs.statSync(rp(p));
-    return { size: s.size, isDirectory: s.isDirectory(), isFile: s.isFile(), mtimeMs: s.mtimeMs };
+    return {
+      size: s.size,
+      isDirectory: s.isDirectory(),
+      isFile: s.isFile(),
+      mtimeMs: s.mtimeMs,
+    };
   });
   await page.exposeFunction('__nfsExists', (p: string) => {
     try {
@@ -54,17 +69,30 @@ export async function installRealNative(page: Page, root: string): Promise<void>
   });
   await page.exposeFunction(
     '__nproc',
-    (cmd: string, args: string[], cwd: string | undefined, env: Record<string, string> | undefined) =>
-      new Promise<{ stdout: string; stderr: string; code: number | null }>((res) => {
-        let out = '';
-        let err = '';
-        const safeCwd = cwd && resolve(cwd).startsWith(resolve(root)) ? cwd : root;
-        const proc = spawn(cmd, args ?? [], { cwd: safeCwd, env: { ...process.env, ...(env ?? {}) } });
-        proc.stdout?.on('data', (d) => (out += d));
-        proc.stderr?.on('data', (d) => (err += d));
-        proc.on('error', (e) => res({ stdout: out, stderr: err + String(e), code: 1 }));
-        proc.on('close', (code) => res({ stdout: out, stderr: err, code }));
-      }),
+    (
+      cmd: string,
+      args: string[],
+      cwd: string | undefined,
+      env: Record<string, string> | undefined,
+    ) =>
+      new Promise<{ stdout: string; stderr: string; code: number | null }>(
+        (res) => {
+          let out = '';
+          let err = '';
+          const safeCwd =
+            cwd && resolve(cwd).startsWith(resolve(root)) ? cwd : root;
+          const proc = spawn(cmd, args ?? [], {
+            cwd: safeCwd,
+            env: { ...process.env, ...(env ?? {}) },
+          });
+          proc.stdout?.on('data', (d) => (out += d));
+          proc.stderr?.on('data', (d) => (err += d));
+          proc.on('error', (e) =>
+            res({ stdout: out, stderr: err + String(e), code: 1 }),
+          );
+          proc.on('close', (code) => res({ stdout: out, stderr: err, code }));
+        },
+      ),
   );
 
   // The in-page UglyNative routes the unified protocol to the exposed Node
@@ -74,7 +102,8 @@ export async function installRealNative(page: Page, root: string): Promise<void>
     type Cb = (d: unknown) => void;
     const listeners: Record<string, Cb[]> = {};
     let seq = 0;
-    const emit = (e: string, d: unknown): void => (listeners[e] ?? []).forEach((cb) => cb(d));
+    const emit = (e: string, d: unknown): void =>
+      (listeners[e] ?? []).forEach((cb) => cb(d));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any;
     w.UglyNative = {
@@ -105,7 +134,10 @@ export async function installRealNative(page: Page, root: string): Promise<void>
             await w.__nfsRm(String(p.path));
             return {};
           case 'fs.rename':
-            await w.__nfsRename(String(p.from ?? p.oldPath), String(p.to ?? p.newPath));
+            await w.__nfsRename(
+              String(p.from ?? p.oldPath),
+              String(p.to ?? p.newPath),
+            );
             return {};
           case 'fs.stat':
             return await w.__nfsStat(String(p.path));
@@ -116,12 +148,19 @@ export async function installRealNative(page: Page, root: string): Promise<void>
           case 'process.spawn': {
             const id = 'p' + seq++;
             void w
-              .__nproc(String(p.cmd), (p.args ?? []).map(String), p.cwd ? String(p.cwd) : undefined, p.env ?? {})
+              .__nproc(
+                String(p.cmd),
+                (p.args ?? []).map(String),
+                p.cwd ? String(p.cwd) : undefined,
+                p.env ?? {},
+              )
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .then((r: any) =>
                 setTimeout(() => {
-                  if (r.stdout) emit('process.stdout:' + id, { chunk: r.stdout });
-                  if (r.stderr) emit('process.stderr:' + id, { chunk: r.stderr });
+                  if (r.stdout)
+                    emit('process.stdout:' + id, { chunk: r.stdout });
+                  if (r.stderr)
+                    emit('process.stderr:' + id, { chunk: r.stderr });
                   emit('process.exit:' + id, { code: r.code });
                 }, 0),
               );

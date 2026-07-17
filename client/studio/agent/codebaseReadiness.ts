@@ -21,7 +21,11 @@ export interface CodebaseReadiness {
     elapsedSeconds?: number;
     error?: string;
   };
-  diagnostics?: { message?: string; lastError?: string | null; logTail?: string };
+  diagnostics?: {
+    message?: string;
+    lastError?: string | null;
+    logTail?: string;
+  };
 }
 
 const pollers = new Map<string, ReturnType<typeof setInterval>>();
@@ -52,7 +56,12 @@ export function startCodebasePoll(
       onReadiness(r);
 
       const idx = local.indexer.status;
-      if (idx === 'ready' && worktreeRoot && worktreeRoot !== cwd && !reconciled.has(sessionId)) {
+      if (
+        idx === 'ready' &&
+        worktreeRoot &&
+        worktreeRoot !== cwd &&
+        !reconciled.has(sessionId)
+      ) {
         reconciled.add(sessionId);
         codebaseProvider().reconcile(cwd, worktreeRoot);
       }

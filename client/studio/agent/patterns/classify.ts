@@ -29,7 +29,8 @@ const FALLBACK: ClassifyOutput = {
   pattern: 'spec-build-verify',
   confidence: 0,
   difficulty: 0.5,
-  reason: 'classifier failed; falling back to spec-build-verify / 0.5 difficulty (safest defaults)',
+  reason:
+    'classifier failed; falling back to spec-build-verify / 0.5 difficulty (safest defaults)',
   parseError: 'no parseable response',
 };
 
@@ -49,7 +50,7 @@ const SYSTEM_PROMPT = [
   '',
   'Output the BASE pattern name (`spec-build-verify` / `quick-edit` / `investigate-fix` / `chat-qa` / `chat-advisory`). Do NOT prefix with `super-`. The harness automatically promotes `spec-build-verify` → `super-spec-build-verify` and `investigate-fix` → `super-investigate-fix` when difficulty ≥ 0.7. Your job is to set difficulty honestly; the promotion is deterministic.',
   '',
-  "`spec-build-verify` is the most expensive pattern. Pick it ONLY when the user is clearly asking for NEW behavior. If the prompt could plausibly be repair (fix / repair / unbreak / restore / patch, or \"X is broken\", \"X doesn't work\", \"regression in Y\"), prefer investigate-fix.",
+  '`spec-build-verify` is the most expensive pattern. Pick it ONLY when the user is clearly asking for NEW behavior. If the prompt could plausibly be repair (fix / repair / unbreak / restore / patch, or "X is broken", "X doesn\'t work", "regression in Y"), prefer investigate-fix.',
   '',
   'DIFFICULTY (0..1) — bias TOWARD the higher end when any deceptive-scope cue applies, even if the surface sounds local:',
   '  - 0.0 .. 0.3 — trivial. Typo, single-line change, simple rename in one file.',
@@ -67,27 +68,39 @@ const STACKTRACE_RE =
   /(?:^|\n)(?:\s*at\s+\w[\w.$]*\s*\([^\n]+:\d+:\d+\)|^\s*Error:|TypeError:|SyntaxError:|stack\s*trace)/im;
 const DIFF_RE = /^\s*(?:diff --git|---\s+[ab]\/|\+\+\+\s+[ab]\/)/m;
 const TRACE_WORD_RE = /(?:^|\W)(?:traceback|stacktrace|panic:)/i;
-const QUESTION_RE = /^(?:what|which|how|when|where|why|who|does|do|is|are|can)\b/i;
+const QUESTION_RE =
+  /^(?:what|which|how|when|where|why|who|does|do|is|are|can)\b/i;
 const CODE_REF_RE =
   /(?:`[^`]+`|\.[a-z]{1,4}\b|\/[a-z]+|implement|build|fix|add|remove|delete|refactor|rename)/i;
 
 /** Cheap deterministic shortcuts for obvious cases (skip the LLM call). */
 export function heuristicShortcut(userMessage: string): ClassifyOutput | null {
   const text = userMessage.trim();
-  if (STACKTRACE_RE.test(text) || DIFF_RE.test(text) || TRACE_WORD_RE.test(text)) {
+  if (
+    STACKTRACE_RE.test(text) ||
+    DIFF_RE.test(text) ||
+    TRACE_WORD_RE.test(text)
+  ) {
     return {
       pattern: 'investigate-fix',
       confidence: 0.92,
       difficulty: 0.55,
-      reason: 'message contains a stacktrace / error signature / git diff — clearly an investigation.',
+      reason:
+        'message contains a stacktrace / error signature / git diff — clearly an investigation.',
     };
   }
-  if (text.length < 200 && QUESTION_RE.test(text) && !CODE_REF_RE.test(text) && text.includes('?')) {
+  if (
+    text.length < 200 &&
+    QUESTION_RE.test(text) &&
+    !CODE_REF_RE.test(text) &&
+    text.includes('?')
+  ) {
     return {
       pattern: 'chat-qa',
       confidence: 0.85,
       difficulty: 0.15,
-      reason: 'short bare question with no imperative verb and no code references.',
+      reason:
+        'short bare question with no imperative verb and no code references.',
     };
   }
   return null;
@@ -100,8 +113,10 @@ function isClassifiable(s: string): s is PatternId {
 /** Promote base → super when difficulty signals a hard task (deterministic). */
 export function promoteSuperIfHard(out: ClassifyOutput): ClassifyOutput {
   if (out.difficulty < DEFAULT_MAX_THRESHOLD) return out;
-  if (out.pattern === 'spec-build-verify') return { ...out, pattern: 'super-spec-build-verify' };
-  if (out.pattern === 'investigate-fix') return { ...out, pattern: 'super-investigate-fix' };
+  if (out.pattern === 'spec-build-verify')
+    return { ...out, pattern: 'super-spec-build-verify' };
+  if (out.pattern === 'investigate-fix')
+    return { ...out, pattern: 'super-investigate-fix' };
   return out;
 }
 
@@ -112,44 +127,63 @@ function parseClassifier(raw: string): ClassifyOutput {
   try {
     o = JSON.parse(m[0]) as Record<string, unknown>;
   } catch (err) {
-    return { ...FALLBACK, parseError: `JSON.parse failed: ${(err as Error).message}` };
+    return {
+      ...FALLBACK,
+      parseError: `JSON.parse failed: ${(err as Error).message}`,
+    };
   }
   const patternRaw = o.pattern;
   if (typeof patternRaw !== 'string' || !isClassifiable(patternRaw)) {
-    return { ...FALLBACK, parseError: `invalid pattern: ${String(patternRaw)}` };
+    return {
+      ...FALLBACK,
+      parseError: `invalid pattern: ${String(patternRaw)}`,
+    };
   }
   const clamp = (n: unknown, d: number): number =>
     typeof n === 'number' && n >= 0 && n <= 1 ? n : d;
   const runnerUpRaw = o.runnerUp;
   const runnerUp =
-    typeof runnerUpRaw === 'string' && isClassifiable(runnerUpRaw) && runnerUpRaw !== patternRaw
-      ? (runnerUpRaw)
+    typeof runnerUpRaw === 'string' &&
+    isClassifiable(runnerUpRaw) &&
+    runnerUpRaw !== patternRaw
+      ? runnerUpRaw
       : undefined;
   const runnerUpConfRaw = o.runnerUpConfidence;
   const runnerUpConfidence =
-    typeof runnerUpConfRaw === 'number' && runnerUpConfRaw >= 0 && runnerUpConfRaw <= 1
+    typeof runnerUpConfRaw === 'number' &&
+    runnerUpConfRaw >= 0 &&
+    runnerUpConfRaw <= 1
       ? runnerUpConfRaw
       : undefined;
   return {
     pattern: patternRaw,
     confidence: clamp(o.confidence, 0),
     difficulty: clamp(o.difficulty, 0.5),
-    reason: typeof o.reason === 'string' ? o.reason.slice(0, 200) : '(no reason)',
+    reason:
+      typeof o.reason === 'string' ? o.reason.slice(0, 200) : '(no reason)',
     ...(runnerUp ? { runnerUp } : {}),
     ...(runnerUpConfidence !== undefined ? { runnerUpConfidence } : {}),
   };
 }
 
 /** Classify the first user message: heuristic shortcut, else one cheap judge call. */
-export async function classifyForAuto(userText: string, judge: Judge): Promise<ClassifyOutput> {
-  const cleaned = userText.replace(/<project_index>[\s\S]*?<\/project_index>\s*/g, '').trim();
+export async function classifyForAuto(
+  userText: string,
+  judge: Judge,
+): Promise<ClassifyOutput> {
+  const cleaned = userText
+    .replace(/<project_index>[\s\S]*?<\/project_index>\s*/g, '')
+    .trim();
   const shortcut = heuristicShortcut(cleaned);
   if (shortcut) return promoteSuperIfHard(shortcut);
   let raw: string;
   try {
     raw = await judge(SYSTEM_PROMPT, cleaned.slice(0, 4000), 1500);
   } catch (err) {
-    return { ...FALLBACK, parseError: `classifier call failed: ${(err as Error).message}` };
+    return {
+      ...FALLBACK,
+      parseError: `classifier call failed: ${(err as Error).message}`,
+    };
   }
   return promoteSuperIfHard(parseClassifier(raw));
 }

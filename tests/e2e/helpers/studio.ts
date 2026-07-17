@@ -1,5 +1,8 @@
 import type { Page } from '@playwright/test';
-import { installUglyNativeMock, type UglyNativeMock } from 'ugly-app/playwright';
+import {
+  installUglyNativeMock,
+  type UglyNativeMock,
+} from 'ugly-app/playwright';
 import { authenticate, type DevAuth } from './auth';
 
 // Enters the REAL Studio shell (HomeGate → StudioShell → ProjectOnboarding) in a
@@ -34,8 +37,14 @@ export async function enterStudioShell(
 
 /** From the project picker, open a folder (openProject echoes name+path) so the
  *  StudioProjectPage + coding-agent chat (NewSessionHero) mount. */
-export async function openProject(page: Page, path = '/tmp/demo-project'): Promise<void> {
-  await page.getByRole('button', { name: /Open Folder/ }).first().click();
+export async function openProject(
+  page: Page,
+  path = '/tmp/demo-project',
+): Promise<void> {
+  await page
+    .getByRole('button', { name: /Open Folder/ })
+    .first()
+    .click();
   await page.getByPlaceholder(/project$/).fill(path);
   await page.getByRole('button', { name: /Open Folder →/i }).click();
   await page.locator('[data-id=home-prompt-input]').waitFor();

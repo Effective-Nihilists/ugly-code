@@ -14,7 +14,10 @@ const SPEC: TextGenTool = {
     type: 'object',
     properties: {
       code: { type: 'string', description: 'Python source to execute.' },
-      timeout_ms: { type: 'number', description: 'Max run time in ms (default 60000).' },
+      timeout_ms: {
+        type: 'number',
+        description: 'Max run time in ms (default 60000).',
+      },
     },
     required: ['code'],
     additionalProperties: false,
@@ -28,8 +31,13 @@ export const pythonExecTool: ToolModule = {
     const code = typeof input.code === 'string' ? input.code : '';
     if (!code) return 'python_exec: `code` is required';
     const root = projectRoot(ctx) ?? undefined;
-    const timeoutMs = typeof input.timeout_ms === 'number' ? input.timeout_ms : undefined;
-    const r = await runPythonOneShot({ code, ...(root ? { cwd: root } : {}), ...(timeoutMs ? { timeoutMs } : {}) });
+    const timeoutMs =
+      typeof input.timeout_ms === 'number' ? input.timeout_ms : undefined;
+    const r = await runPythonOneShot({
+      code,
+      ...(root ? { cwd: root } : {}),
+      ...(timeoutMs ? { timeoutMs } : {}),
+    });
     return r.output || '(no output)';
   },
 };

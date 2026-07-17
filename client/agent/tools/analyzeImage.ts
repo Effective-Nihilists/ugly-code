@@ -24,7 +24,10 @@ const SPEC: TextGenTool = {
     properties: {
       path: { type: 'string', description: 'Workspace image file path.' },
       url: { type: 'string', description: 'Image URL (alternative to path).' },
-      prompt: { type: 'string', description: 'What to look for (default: describe it).' },
+      prompt: {
+        type: 'string',
+        description: 'What to look for (default: describe it).',
+      },
     },
     required: [],
     additionalProperties: false,
@@ -35,16 +38,28 @@ export const analyzeImageTool: ToolModule = {
   name: 'analyze_image',
   spec: SPEC,
   async run(input, ctx) {
-    const prompt = (typeof input.prompt === 'string' ? input.prompt : 'Describe this image in detail.');
+    const prompt =
+      typeof input.prompt === 'string'
+        ? input.prompt
+        : 'Describe this image in detail.';
     let imageUrl: string;
     if (typeof input.url === 'string' && input.url) {
       imageUrl = input.url;
     } else if (typeof input.path === 'string' && input.path) {
       try {
-        const bytes = await native.fs.readFileBytes(resolvePath(ctx, input.path));
+        const bytes = await native.fs.readFileBytes(
+          resolvePath(ctx, input.path),
+        );
         imageUrl = `data:image/png;base64,${bytesToBase64(bytes)}`;
       } catch (e) {
-        console.error('[analyzeImageTool:readFile]', JSON.stringify({ path: input.path, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+        console.error(
+          '[analyzeImageTool:readFile]',
+          JSON.stringify({
+            path: input.path,
+            error: e instanceof Error ? e.message : String(e),
+          }),
+          e instanceof Error ? e.stack : undefined,
+        );
         return `analyze_image: could not read ${input.path}: ${(e as Error).message}`;
       }
     } else {
@@ -65,7 +80,15 @@ export const analyzeImageTool: ToolModule = {
       if (typeof res === 'string') return res;
       return res.text ?? res.content ?? '(no analysis returned)';
     } catch (e) {
-      console.error('[analyzeImageTool:textGen]', JSON.stringify({ hasUrl: typeof input.url === 'string' && !!input.url, path: input.path, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[analyzeImageTool:textGen]',
+        JSON.stringify({
+          hasUrl: typeof input.url === 'string' && !!input.url,
+          path: input.path,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       return `analyze_image failed (vision unavailable?): ${(e as Error).message}`;
     }
   },

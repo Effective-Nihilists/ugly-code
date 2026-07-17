@@ -29,20 +29,44 @@ const SPEC: TextGenTool = {
   parameters: {
     type: 'object',
     properties: {
-      path: { type: 'string', description: 'File path relative to the workspace root.' },
+      path: {
+        type: 'string',
+        description: 'File path relative to the workspace root.',
+      },
       edits: {
         type: 'array',
         description: 'Edits applied in order.',
         items: {
           type: 'object',
           properties: {
-            old_string: { type: 'string', description: 'Exact text to replace (string-match mode).' },
-            new_string: { type: 'string', description: 'Replacement text (string-match mode).' },
-            replace_all: { type: 'boolean', description: 'Replace every occurrence.' },
-            anchor: { type: 'string', description: 'A `<n>:<hash>`/line anchor to replace.' },
-            insert_after: { type: 'string', description: 'An anchor to insert after.' },
-            range: { type: 'string', description: 'An inclusive anchor range "42..47".' },
-            new_content: { type: 'string', description: 'Content for anchor/insert_after/range modes.' },
+            old_string: {
+              type: 'string',
+              description: 'Exact text to replace (string-match mode).',
+            },
+            new_string: {
+              type: 'string',
+              description: 'Replacement text (string-match mode).',
+            },
+            replace_all: {
+              type: 'boolean',
+              description: 'Replace every occurrence.',
+            },
+            anchor: {
+              type: 'string',
+              description: 'A `<n>:<hash>`/line anchor to replace.',
+            },
+            insert_after: {
+              type: 'string',
+              description: 'An anchor to insert after.',
+            },
+            range: {
+              type: 'string',
+              description: 'An inclusive anchor range "42..47".',
+            },
+            new_content: {
+              type: 'string',
+              description: 'Content for anchor/insert_after/range modes.',
+            },
           },
           additionalProperties: false,
         },
@@ -68,7 +92,14 @@ export const multieditTool: ToolModule = {
     try {
       content = await native.fs.readFile(abs);
     } catch (e) {
-      console.error('[multieditTool:readFile]', JSON.stringify({ path: rawPath, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[multieditTool:readFile]',
+        JSON.stringify({
+          path: rawPath,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       return `multiedit: could not read ${rawPath}: ${(e as Error).message}`;
     }
     const original = content;

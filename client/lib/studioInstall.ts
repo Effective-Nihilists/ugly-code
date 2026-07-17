@@ -16,12 +16,15 @@ export type InstallOs =
 // Only these targets can recover the code from the filename: AppImage via
 // $APPIMAGE, win via the NSIS hook, mac-pkg via the postinstall script (Plan 2).
 const CODE_BEARING: Partial<Record<InstallOs, string>> = {
-  win: 'exe',
+  'win': 'exe',
   'linux-appimage': 'AppImage',
   'mac-pkg': 'pkg',
 };
 
-export function buildInstallDownloadUrl(os: InstallOs, code: string): string | null {
+export function buildInstallDownloadUrl(
+  os: InstallOs,
+  code: string,
+): string | null {
   const ext = CODE_BEARING[os];
   if (!ext) return null;
   const filename = encodeURIComponent(`Ugly Studio-${code}.${ext}`);

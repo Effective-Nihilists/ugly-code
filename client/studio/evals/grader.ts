@@ -7,7 +7,11 @@
 
 import type { EvalGate } from './registry';
 import type { EvalGradeResult } from '../shared/api';
-import { deriveCriteria, gradeAgainstCriteria, type Judge as JudgeFn } from '../agent/patterns/judge';
+import {
+  deriveCriteria,
+  gradeAgainstCriteria,
+  type Judge as JudgeFn,
+} from '../agent/patterns/judge';
 import { getMutationSuite } from './l6/mutation';
 import { getHiddenSuite } from './l6/hidden';
 import { getUxFlowSuite, UX_RUNNER } from './l6/uxflows';
@@ -19,7 +23,12 @@ export interface GradeDeps {
    *  mutationScore gate relies on this so a mutant that makes the agent's suite
    *  hang (e.g. a synchronous infinite loop vitest cannot interrupt) is scored as
    *  detected instead of wedging the whole eval. */
-  run(cmd: string, args: string[], cwd: string, timeoutMs?: number): Promise<{ out: string; code: number | null }>;
+  run(
+    cmd: string,
+    args: string[],
+    cwd: string,
+    timeoutMs?: number,
+  ): Promise<{ out: string; code: number | null }>;
   readFile(path: string): Promise<string>;
   exists(path: string): Promise<boolean>;
   /** Required by the `mutationScore` / `hiddenTests` gates, which write files into the project. */
@@ -32,7 +41,11 @@ export interface GradeDeps {
   judge?(system: string, user: string): Promise<string>;
 }
 
-interface Check { name: string; passed: boolean; detail?: string }
+interface Check {
+  name: string;
+  passed: boolean;
+  detail?: string;
+}
 type Judge = NonNullable<EvalGradeResult['judgeResults']>[number];
 
 const COUNT_TS_ERRORS = /error TS\d+:/g;
@@ -44,8 +57,15 @@ function countTscErrors(out: string): number {
  *  (0–N) scoring of a fixture's own vector suite. Reads the last `Tests …` line:
  *  `Tests  30 passed | 20 failed (50)` → {30, 50}. Total falls back to
  *  passed+failed when the `(N)` is absent; {0,0} when no suite ran. */
-export function parseVitestCounts(out: string): { passed: number; total: number } {
-  const line = out.split('\n').reverse().find((l) => /Tests\s+\d+\s+(passed|failed)/.test(l)) ?? '';
+export function parseVitestCounts(out: string): {
+  passed: number;
+  total: number;
+} {
+  const line =
+    out
+      .split('\n')
+      .reverse()
+      .find((l) => /Tests\s+\d+\s+(passed|failed)/.test(l)) ?? '';
   const passed = Number(/(\d+)\s+passed/.exec(line)?.[1] ?? 0);
   const failed = Number(/(\d+)\s+failed/.exec(line)?.[1] ?? 0);
   const totalMatch = /\((\d+)\)/.exec(line);
@@ -57,7 +77,9 @@ export function parseVitestCounts(out: string): { passed: number; total: number 
  *  (which may itself contain colons). */
 function splitFileMatches(rest: string): { path: string; regex: string } {
   const i = rest.indexOf(':');
-  return i === -1 ? { path: rest, regex: '' } : { path: rest.slice(0, i), regex: rest.slice(i + 1) };
+  return i === -1
+    ? { path: rest, regex: '' }
+    : { path: rest.slice(0, i), regex: rest.slice(i + 1) };
 }
 
 export interface GradeInput {
@@ -74,7 +96,10 @@ export interface GradeInput {
 
 /** Parse the judge's `{"points": n, "verdict": "..."}` reply, tolerant of
  *  code fences / prose around the JSON. */
-export function parseJudge(text: string, max: number): { points: number; verdict: string } {
+export function parseJudge(
+  text: string,
+  max: number,
+): { points: number; verdict: string } {
   const m = /\{[\s\S]*\}/.exec(text);
   if (m) {
     try {
@@ -88,7 +113,9 @@ export function parseJudge(text: string, max: number): { points: number; verdict
             ? ''
             : typeof v === 'object'
               ? JSON.stringify(v)
-              : typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint'
+              : typeof v === 'number' ||
+                  typeof v === 'boolean' ||
+                  typeof v === 'bigint'
                 ? v.toString()
                 : typeof v === 'symbol'
                   ? v.toString()
@@ -98,10 +125,16 @@ export function parseJudge(text: string, max: number): { points: number; verdict
       /* fall through */
     }
   }
-  return { points: 0, verdict: `unparseable judge reply: ${text.slice(0, 200)}` };
+  return {
+    points: 0,
+    verdict: `unparseable judge reply: ${text.slice(0, 200)}`,
+  };
 }
 
-export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<EvalGradeResult> {
+export async function gradeProject(
+  input: GradeInput,
+  deps: GradeDeps,
+): Promise<EvalGradeResult> {
   const checks: Check[] = [];
   const judgeResults: Judge[] = [];
   let tscExit: number | null = null;
@@ -130,85 +163,154 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
       tscErrors = countTscErrors(r.out);
       const passed = r.code === 0 && tscErrors === 0;
       if (!passed) tscErrorSample = r.out.slice(0, 800);
-      checks.push({ name: gate.name, passed, detail: passed ? undefined : `${tscErrors} type error(s)` });
+      checks.push({
+        name: gate.name,
+        passed,
+        detail: passed ? undefined : `${tscErrors} type error(s)`,
+      });
       detMax += pts;
       if (passed) detScore += pts;
     } else if (kind === 'vitest' || kind.startsWith('vitest:')) {
-      const file = kind.startsWith('vitest:') ? kind.slice('vitest:'.length) : '';
-      const r = await deps.run('npx', ['vitest', 'run', ...(file ? [file] : [])], input.projectPath);
+      const file = kind.startsWith('vitest:')
+        ? kind.slice('vitest:'.length)
+        : '';
+      const r = await deps.run(
+        'npx',
+        ['vitest', 'run', ...(file ? [file] : [])],
+        input.projectPath,
+      );
       const passed = r.code === 0;
-      checks.push({ name: gate.name, passed, detail: passed ? undefined : `vitest exit ${r.code ?? 'null'}` });
+      checks.push({
+        name: gate.name,
+        passed,
+        detail: passed ? undefined : `vitest exit ${r.code ?? 'null'}`,
+      });
       detMax += pts;
       if (passed) detScore += pts;
     } else if (kind === 'vitestScore' || kind.startsWith('vitestScore:')) {
       // Proportional pass-rate scoring against the fixture's own vitest suite
       // (e.g. rrule's 50 RFC-5545 vectors): award round(pts · passed/total) so a
       // partial implementation earns partial credit and improvements are visible.
-      const file = kind.startsWith('vitestScore:') ? kind.slice('vitestScore:'.length) : '';
-      const r = await deps.run('npx', ['vitest', 'run', ...(file ? [file] : [])], input.projectPath);
+      const file = kind.startsWith('vitestScore:')
+        ? kind.slice('vitestScore:'.length)
+        : '';
+      const r = await deps.run(
+        'npx',
+        ['vitest', 'run', ...(file ? [file] : [])],
+        input.projectPath,
+      );
       const { passed: np, total: nt } = parseVitestCounts(r.out);
       const awarded = nt > 0 ? Math.round((pts * np) / nt) : 0;
-      checks.push({ name: `${gate.name} (${np}/${nt})`, passed: nt > 0 && np === nt, detail: nt > 0 ? undefined : `no vitest suite ran (exit ${r.code ?? 'null'})` });
+      checks.push({
+        name: `${gate.name} (${np}/${nt})`,
+        passed: nt > 0 && np === nt,
+        detail:
+          nt > 0 ? undefined : `no vitest suite ran (exit ${r.code ?? 'null'})`,
+      });
       detMax += pts;
       detScore += awarded;
     } else if (kind === 'mutationScore') {
       // Score the suite the agent WROTE by how many seeded bugs it catches.
       const r = await scoreMutations(input, deps, pts);
-      checks.push({ name: r.label ? `${gate.name} (${r.label})` : gate.name, passed: r.passed, detail: r.detail });
+      checks.push({
+        name: r.label ? `${gate.name} (${r.label})` : gate.name,
+        passed: r.passed,
+        detail: r.detail,
+      });
       detMax += pts;
       detScore += r.awarded;
     } else if (kind === 'uxFlows') {
       // Build the agent's app, serve the static client, drive a hidden Playwright
       // flow battery in headless chromium, score per-flow. Objective UX grading.
       const r = await runUxFlows(input, deps, pts);
-      checks.push({ name: r.label ? `${gate.name} (${r.label})` : gate.name, passed: r.passed, detail: r.detail });
+      checks.push({
+        name: r.label ? `${gate.name} (${r.label})` : gate.name,
+        passed: r.passed,
+        detail: r.detail,
+      });
       detMax += pts;
       detScore += r.awarded;
     } else if (kind === 'hiddenTests' || kind.startsWith('hiddenTests:')) {
       // Inject a regression suite the agent never saw, run it, remove it.
       // `hiddenTests:<key>` selects a named suite when a task vendors several
       // (registry key `<taskName>#<key>`), e.g. spec-conformance core vs interaction.
-      const key = kind.startsWith('hiddenTests:') ? kind.slice('hiddenTests:'.length) : '';
+      const key = kind.startsWith('hiddenTests:')
+        ? kind.slice('hiddenTests:'.length)
+        : '';
       const r = await runHiddenTests(input, deps, pts, key);
-      checks.push({ name: r.label ? `${gate.name} (${r.label})` : gate.name, passed: r.passed, detail: r.detail });
+      checks.push({
+        name: r.label ? `${gate.name} (${r.label})` : gate.name,
+        passed: r.passed,
+        detail: r.detail,
+      });
       detMax += pts;
       detScore += r.awarded;
     } else if (kind.startsWith('diffBudget:')) {
       // Reward restraint: a surgical fix, not a rewrite of everything nearby.
-      const [softS, hardS, dir = '.'] = kind.slice('diffBudget:'.length).split(':');
+      const [softS, hardS, dir = '.'] = kind
+        .slice('diffBudget:'.length)
+        .split(':');
       const soft = Number(softS);
       const hard = Number(hardS);
       const changed = await countChangedLines(input.projectPath, dir, deps);
-      const awarded = changed <= soft ? pts : changed >= hard ? 0 : Math.round((pts * (hard - changed)) / (hard - soft));
+      const awarded =
+        changed <= soft
+          ? pts
+          : changed >= hard
+            ? 0
+            : Math.round((pts * (hard - changed)) / (hard - soft));
       checks.push({
         name: `${gate.name} (${changed} lines in ${dir}/)`,
         passed: changed <= soft,
-        detail: changed <= soft ? undefined : `${changed} changed lines exceeds the ${soft}-line budget (zero at ${hard})`,
+        detail:
+          changed <= soft
+            ? undefined
+            : `${changed} changed lines exceeds the ${soft}-line budget (zero at ${hard})`,
       });
       detMax += pts;
       detScore += awarded;
     } else if (kind.startsWith('unchanged:')) {
       const rel = kind.slice('unchanged:'.length);
-      const st = await deps.run('git', ['status', '--porcelain', '--', rel], input.projectPath);
+      const st = await deps.run(
+        'git',
+        ['status', '--porcelain', '--', rel],
+        input.projectPath,
+      );
       const passed = st.out.trim() === '';
-      checks.push({ name: gate.name, passed, detail: passed ? undefined : `${rel} was modified or deleted` });
+      checks.push({
+        name: gate.name,
+        passed,
+        detail: passed ? undefined : `${rel} was modified or deleted`,
+      });
       detMax += pts;
       if (passed) detScore += pts;
     } else if (kind.startsWith('fileExists:')) {
       const rel = kind.slice('fileExists:'.length);
       const passed = await deps.exists(joinPath(input.projectPath, rel));
-      checks.push({ name: gate.name, passed, detail: passed ? undefined : `${rel} not found` });
+      checks.push({
+        name: gate.name,
+        passed,
+        detail: passed ? undefined : `${rel} not found`,
+      });
       detMax += pts;
       if (passed) detScore += pts;
     } else if (kind.startsWith('fileMatches:')) {
-      const { path, regex } = splitFileMatches(kind.slice('fileMatches:'.length));
+      const { path, regex } = splitFileMatches(
+        kind.slice('fileMatches:'.length),
+      );
       let passed = false;
       try {
-        passed = new RegExp(regex).test(await deps.readFile(joinPath(input.projectPath, path)));
+        passed = new RegExp(regex).test(
+          await deps.readFile(joinPath(input.projectPath, path)),
+        );
       } catch {
         passed = false;
       }
-      checks.push({ name: gate.name, passed, detail: passed ? undefined : `/${regex}/ not in ${path}` });
+      checks.push({
+        name: gate.name,
+        passed,
+        detail: passed ? undefined : `/${regex}/ not in ${path}`,
+      });
       detMax += pts;
       if (passed) detScore += pts;
     } else if (kind.startsWith('judge:')) {
@@ -227,15 +329,36 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
           `## The agent's diff\n${diff || '(no changes detected)'}`;
         try {
           const awarded = parseJudge(await deps.judge(system, user), pts);
-          judgeResults.push({ gateName: gate.name, points: pts, pointsAwarded: awarded.points, rubricKey, verdict: awarded.verdict });
+          judgeResults.push({
+            gateName: gate.name,
+            points: pts,
+            pointsAwarded: awarded.points,
+            rubricKey,
+            verdict: awarded.verdict,
+          });
         } catch (e) {
           // A judge that THROWS (transport/parse failure after retries) is
           // UNGRADED, not a genuine 0 — award 0 out of 0 so the gate is excluded
           // from the score max instead of silently docking the cell. Otherwise a
           // flaky judge call turns a correct solution into a spurious -1 point
           // (this is exactly what made glm's correct breaking-change fix read 4/5).
-          console.error('[grader:judge]', JSON.stringify({ gateName: gate.name, rubricKey, points: pts, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
-          judgeResults.push({ gateName: gate.name, points: 0, pointsAwarded: 0, rubricKey, verdict: `ungraded — judge unreachable, gate excluded from score: ${(e as Error).message}` });
+          console.error(
+            '[grader:judge]',
+            JSON.stringify({
+              gateName: gate.name,
+              rubricKey,
+              points: pts,
+              error: e instanceof Error ? e.message : String(e),
+            }),
+            e instanceof Error ? e.stack : undefined,
+          );
+          judgeResults.push({
+            gateName: gate.name,
+            points: 0,
+            pointsAwarded: 0,
+            rubricKey,
+            verdict: `ungraded — judge unreachable, gate excluded from score: ${(e as Error).message}`,
+          });
           manual.push(`${gate.name} (judge unreachable)`);
         }
       } else {
@@ -245,13 +368,18 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
           points: pts,
           pointsAwarded: 0,
           rubricKey,
-          verdict: 'LLM judge unavailable — review against the rubric manually.',
+          verdict:
+            'LLM judge unavailable — review against the rubric manually.',
         });
         manual.push(gate.name);
       }
     } else {
       // custom:<id> — repo-specific checker; not generically runnable client-side.
-      checks.push({ name: gate.name, passed: false, detail: 'manual: run the task’s eval/ checker' });
+      checks.push({
+        name: gate.name,
+        passed: false,
+        detail: 'manual: run the task’s eval/ checker',
+      });
       manual.push(gate.name);
     }
   }
@@ -262,16 +390,29 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
   // tests) or a rubric can't be derived.
   if (gates.length === 0) {
     let graded = false;
-    if (deps.judge && input.successCriteria && input.successCriteria.trim().length > 0) {
+    if (
+      deps.judge &&
+      input.successCriteria &&
+      input.successCriteria.trim().length > 0
+    ) {
       const judgeFn: JudgeFn = (system, user) => deps.judge!(system, user);
       const diff = await collectDiff(input.projectPath, deps);
       const evidence = input.finalText
         ? `${diff}\n\n## Agent's final message\n${input.finalText.slice(0, 8000)}`
         : diff;
       try {
-        const criteria = await deriveCriteria(input.successCriteria, '', judgeFn);
+        const criteria = await deriveCriteria(
+          input.successCriteria,
+          '',
+          judgeFn,
+        );
         if (criteria.length >= 2) {
-          const g = await gradeAgainstCriteria(input.successCriteria, criteria, evidence, judgeFn);
+          const g = await gradeAgainstCriteria(
+            input.successCriteria,
+            criteria,
+            evidence,
+            judgeFn,
+          );
           if (g.parsed && g.verdicts.length > 0) {
             const stmt = new Map(criteria.map((c) => [c.id, c.statement]));
             for (const v of g.verdicts) {
@@ -296,32 +437,53 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
             'Respond with JSON only: {"points": <int 0-5>, "verdict": "<one sentence>"}.';
           const user = `## Success criteria\n${input.successCriteria}\n\n## The agent's change + final message\n${evidence || '(no changes detected)'}`;
           const awarded = parseJudge(await deps.judge(system, user), 5);
-          checks.push({ name: 'rubric (0–5)', passed: awarded.points >= 3, detail: awarded.verdict });
+          checks.push({
+            name: 'rubric (0–5)',
+            passed: awarded.points >= 3,
+            detail: awarded.verdict,
+          });
           detScore = awarded.points;
           detMax = 5;
           graded = true;
         }
       } catch (e) {
-        console.error('[grader:judge0to5]', JSON.stringify({ taskName: input.taskName, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+        console.error(
+          '[grader:judge0to5]',
+          JSON.stringify({
+            taskName: input.taskName,
+            error: e instanceof Error ? e.message : String(e),
+          }),
+          e instanceof Error ? e.stack : undefined,
+        );
       }
     }
     if (!graded) {
       // Coarse fallback (0–2): tsc clean for TS projects + the test script. tsc is
       // only counted when a tsconfig.json exists (else `npx tsc` fails spuriously).
-      const isTsProject = await deps.exists(`${input.projectPath}/tsconfig.json`);
+      const isTsProject = await deps.exists(
+        `${input.projectPath}/tsconfig.json`,
+      );
       if (isTsProject) {
         const r = await tsc();
         tscExit = r.code;
         tscErrors = countTscErrors(r.out);
         const tscOk = r.code === 0 && tscErrors === 0;
         if (!tscOk) tscErrorSample = r.out.slice(0, 800);
-        checks.push({ name: 'tsc clean', passed: tscOk, detail: tscOk ? undefined : `${tscErrors} type error(s)` });
+        checks.push({
+          name: 'tsc clean',
+          passed: tscOk,
+          detail: tscOk ? undefined : `${tscErrors} type error(s)`,
+        });
         detMax += 1;
         if (tscOk) detScore += 1;
       }
       const t = await deps.run('npm', ['test', '--silent'], input.projectPath);
       const testsOk = t.code === 0;
-      checks.push({ name: 'tests pass', passed: testsOk, detail: testsOk ? undefined : `npm test exit ${t.code ?? 'null'}` });
+      checks.push({
+        name: 'tests pass',
+        passed: testsOk,
+        detail: testsOk ? undefined : `npm test exit ${t.code ?? 'null'}`,
+      });
       detMax += 1;
       if (testsOk) detScore += 1;
     }
@@ -348,9 +510,15 @@ export async function gradeProject(input: GradeInput, deps: GradeDeps): Promise<
   };
 }
 
-function buildSummary(score: number, max: number, judgeCount: number, manual: string[]): string {
+function buildSummary(
+  score: number,
+  max: number,
+  judgeCount: number,
+  manual: string[],
+): string {
   let s = `Auto-graded ${score}/${max} deterministic point(s).`;
-  if (judgeCount) s += ` ${judgeCount} LLM-judge gate(s) pending manual review.`;
+  if (judgeCount)
+    s += ` ${judgeCount} LLM-judge gate(s) pending manual review.`;
   if (manual.length) s += ` Manual gates: ${manual.join(', ')}.`;
   return s;
 }
@@ -367,9 +535,17 @@ interface MutationOutcome {
 }
 
 /** Added + deleted lines under `dir`, counting files the agent created. */
-async function countChangedLines(projectPath: string, dir: string, deps: GradeDeps): Promise<number> {
+async function countChangedLines(
+  projectPath: string,
+  dir: string,
+  deps: GradeDeps,
+): Promise<number> {
   await deps.run('git', ['add', '-A', '--', dir], projectPath);
-  const r = await deps.run('git', ['diff', '--cached', '--numstat', '--', dir], projectPath);
+  const r = await deps.run(
+    'git',
+    ['diff', '--cached', '--numstat', '--', dir],
+    projectPath,
+  );
   let total = 0;
   for (const line of r.out.split('\n')) {
     // Binary files report '-' for both counts; Number('-') is NaN → 0.
@@ -386,15 +562,33 @@ async function countChangedLines(projectPath: string, dir: string, deps: GradeDe
  * playwright). Score = floor(pts · flowsPassed / flowsTotal). No LLM judge; no
  * backend — the client is served statically.
  */
-async function runUxFlows(input: GradeInput, deps: GradeDeps, pts: number): Promise<MutationOutcome> {
+async function runUxFlows(
+  input: GradeInput,
+  deps: GradeDeps,
+  pts: number,
+): Promise<MutationOutcome> {
   const suite = getUxFlowSuite(input.taskName);
-  if (!suite) return { awarded: 0, passed: false, detail: `no ux-flow battery registered for ${input.taskName}` };
-  if (!deps.writeFile) return { awarded: 0, passed: false, detail: 'grader deps lack writeFile — cannot run ux flows' };
+  if (!suite)
+    return {
+      awarded: 0,
+      passed: false,
+      detail: `no ux-flow battery registered for ${input.taskName}`,
+    };
+  if (!deps.writeFile)
+    return {
+      awarded: 0,
+      passed: false,
+      detail: 'grader deps lack writeFile — cannot run ux flows',
+    };
   const cwd = input.projectPath;
 
   const build = await deps.run('bash', ['-lc', suite.buildCmd], cwd, 600_000);
   if (!(await deps.exists(joinPath(cwd, suite.clientDir)))) {
-    return { awarded: 0, passed: false, detail: `build produced no ${suite.clientDir} (build exit ${build.code ?? 'null'}): ${build.out.slice(-400)}` };
+    return {
+      awarded: 0,
+      passed: false,
+      detail: `build produced no ${suite.clientDir} (build exit ${build.code ?? 'null'}): ${build.out.slice(-400)}`,
+    };
   }
 
   const runnerPath = joinPath(cwd, '__uxrunner.mjs');
@@ -403,18 +597,40 @@ async function runUxFlows(input: GradeInput, deps: GradeDeps, pts: number): Prom
     await deps.writeFile(runnerPath, UX_RUNNER);
     await deps.writeFile(batteryPath, JSON.stringify(suite.battery));
     const port = 4400 + (Math.abs(hashString(input.taskName)) % 200);
-    const r = await deps.run('node', ['__uxrunner.mjs', suite.clientDir, '__uxbattery.json', String(port)], cwd, 300_000);
-    const line = r.out.split('\n').reverse().find((l) => l.includes('UXFLOWS_RESULT'));
-    if (!line) return { awarded: 0, passed: false, detail: `flow runner produced no result (exit ${r.code ?? 'null'}): ${r.out.slice(-400)}` };
-    const parsed = JSON.parse(line.slice(line.indexOf('UXFLOWS_RESULT') + 'UXFLOWS_RESULT'.length)) as {
-      passed: number; total: number; results: { name: string; ok: boolean; why?: string }[];
+    const r = await deps.run(
+      'node',
+      ['__uxrunner.mjs', suite.clientDir, '__uxbattery.json', String(port)],
+      cwd,
+      300_000,
+    );
+    const line = r.out
+      .split('\n')
+      .reverse()
+      .find((l) => l.includes('UXFLOWS_RESULT'));
+    if (!line)
+      return {
+        awarded: 0,
+        passed: false,
+        detail: `flow runner produced no result (exit ${r.code ?? 'null'}): ${r.out.slice(-400)}`,
+      };
+    const parsed = JSON.parse(
+      line.slice(line.indexOf('UXFLOWS_RESULT') + 'UXFLOWS_RESULT'.length),
+    ) as {
+      passed: number;
+      total: number;
+      results: { name: string; ok: boolean; why?: string }[];
     };
-    const failed = parsed.results.filter((x) => !x.ok).map((x) => `${x.name}${x.why ? ` — ${x.why}` : ''}`);
+    const failed = parsed.results
+      .filter((x) => !x.ok)
+      .map((x) => `${x.name}${x.why ? ` — ${x.why}` : ''}`);
     return {
-      awarded: parsed.total > 0 ? Math.floor((pts * parsed.passed) / parsed.total) : 0,
+      awarded:
+        parsed.total > 0 ? Math.floor((pts * parsed.passed) / parsed.total) : 0,
       passed: parsed.total > 0 && parsed.passed === parsed.total,
       label: `${parsed.passed}/${parsed.total} flows`,
-      detail: failed.length ? `failed:\n  - ${failed.join('\n  - ')}` : undefined,
+      detail: failed.length
+        ? `failed:\n  - ${failed.join('\n  - ')}`
+        : undefined,
     };
   } finally {
     await deps.run('rm', ['-f', '__uxrunner.mjs', '__uxbattery.json'], cwd);
@@ -423,7 +639,8 @@ async function runUxFlows(input: GradeInput, deps: GradeDeps, pts: number): Prom
 
 function hashString(s: string): number {
   let h = 0;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  for (let i = 0; i < s.length; i++)
+    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   return h;
 }
 
@@ -432,24 +649,53 @@ function hashString(s: string): number {
  * it cannot be read, tuned to, or deleted; written in, run, then removed so it
  * does not pollute the diff that later gates measure.
  */
-async function runHiddenTests(input: GradeInput, deps: GradeDeps, pts: number, key = ''): Promise<MutationOutcome> {
+async function runHiddenTests(
+  input: GradeInput,
+  deps: GradeDeps,
+  pts: number,
+  key = '',
+): Promise<MutationOutcome> {
   const registryKey = key ? `${input.taskName}#${key}` : input.taskName;
   const suite = getHiddenSuite(registryKey);
-  if (!suite) return { awarded: 0, passed: false, detail: `no hidden suite registered for ${registryKey}` };
-  if (!deps.writeFile) return { awarded: 0, passed: false, detail: 'grader deps lack writeFile — cannot inject hidden tests' };
+  if (!suite)
+    return {
+      awarded: 0,
+      passed: false,
+      detail: `no hidden suite registered for ${registryKey}`,
+    };
+  if (!deps.writeFile)
+    return {
+      awarded: 0,
+      passed: false,
+      detail: 'grader deps lack writeFile — cannot inject hidden tests',
+    };
 
   try {
-    await deps.writeFile(joinPath(input.projectPath, suite.path), suite.content);
-    const r = await deps.run('npx', ['vitest', 'run', suite.path], input.projectPath, 90_000);
+    await deps.writeFile(
+      joinPath(input.projectPath, suite.path),
+      suite.content,
+    );
+    const r = await deps.run(
+      'npx',
+      ['vitest', 'run', suite.path],
+      input.projectPath,
+      90_000,
+    );
     const { passed: np, total: nt } = parseVitestCounts(r.out);
-    if (nt === 0) return { awarded: 0, passed: false, detail: `hidden suite did not run (exit ${r.code ?? 'null'})` };
+    if (nt === 0)
+      return {
+        awarded: 0,
+        passed: false,
+        detail: `hidden suite did not run (exit ${r.code ?? 'null'})`,
+      };
     return {
       // Floor, for the same reason as scoreMutations: a failing regression is a
       // failing regression, and must not round up to full credit.
       awarded: Math.floor((pts * np) / nt),
       passed: np === nt,
       label: `${np}/${nt}`,
-      detail: np === nt ? undefined : `${nt - np} hidden regression test(s) failed`,
+      detail:
+        np === nt ? undefined : `${nt - np} hidden regression test(s) failed`,
     };
   } finally {
     await deps.run('rm', ['-f', suite.path], input.projectPath);
@@ -467,10 +713,24 @@ async function runHiddenTests(input: GradeInput, deps: GradeDeps, pts: number, k
  *   - the suite goes red on a behaviour-PRESERVING rewrite (it asserts on source
  *     text — hashing/snapshotting the file — to farm the mutation score)
  */
-async function scoreMutations(input: GradeInput, deps: GradeDeps, pts: number): Promise<MutationOutcome> {
+async function scoreMutations(
+  input: GradeInput,
+  deps: GradeDeps,
+  pts: number,
+): Promise<MutationOutcome> {
   const suite = getMutationSuite(input.taskName);
-  if (!suite) return { awarded: 0, passed: false, detail: `no mutation suite registered for ${input.taskName}` };
-  if (!deps.writeFile) return { awarded: 0, passed: false, detail: 'grader deps lack writeFile — cannot seed mutants' };
+  if (!suite)
+    return {
+      awarded: 0,
+      passed: false,
+      detail: `no mutation suite registered for ${input.taskName}`,
+    };
+  if (!deps.writeFile)
+    return {
+      awarded: 0,
+      passed: false,
+      detail: 'grader deps lack writeFile — cannot seed mutants',
+    };
   const writeFile = deps.writeFile.bind(deps);
 
   const cwd = input.projectPath;
@@ -480,17 +740,31 @@ async function scoreMutations(input: GradeInput, deps: GradeDeps, pts: number): 
   // infinite loop, which vitest's own test-timeout cannot interrupt. Kill it and
   // count the mutant as detected (the bug did manifest — as a hang).
   const MUTANT_TIMEOUT_MS = 90_000;
-  const vitest = (timeoutMs?: number): Promise<{ out: string; code: number | null }> =>
+  const vitest = (
+    timeoutMs?: number,
+  ): Promise<{ out: string; code: number | null }> =>
     deps.run('npx', ['vitest', 'run'], cwd, timeoutMs);
 
-  const status = await deps.run('git', ['status', '--porcelain', '--', srcDir], cwd);
+  const status = await deps.run(
+    'git',
+    ['status', '--porcelain', '--', srcDir],
+    cwd,
+  );
   if (status.out.trim()) {
-    return { awarded: 0, passed: false, detail: `${srcDir}/ was modified — the implementation is the contract, not the variable` };
+    return {
+      awarded: 0,
+      passed: false,
+      detail: `${srcDir}/ was modified — the implementation is the contract, not the variable`,
+    };
   }
 
   const reference = await deps.readFile(targetPath);
   if ((await vitest(MUTANT_TIMEOUT_MS)).code !== 0) {
-    return { awarded: 0, passed: false, detail: 'suite is red against the correct implementation (or hung on it)' };
+    return {
+      awarded: 0,
+      passed: false,
+      detail: 'suite is red against the correct implementation (or hung on it)',
+    };
   }
 
   try {
@@ -511,13 +785,16 @@ async function scoreMutations(input: GradeInput, deps: GradeDeps, pts: number): 
     const survivors: string[] = [];
     for (const m of suite.mutants) {
       if (!reference.includes(m.find)) {
-        survivors.push(`${m.id} (could not be applied — fixture drifted from the mutant set)`);
+        survivors.push(
+          `${m.id} (could not be applied — fixture drifted from the mutant set)`,
+        );
         continue;
       }
       await writeFile(targetPath, reference.replace(m.find, m.replace));
       // code 0 = suite green = mutant survived. A non-zero exit OR a timeout
       // (code null, the mutant hung the suite) both count as the mutant killed.
-      if ((await vitest(MUTANT_TIMEOUT_MS)).code === 0) survivors.push(`${m.id}: ${m.desc}`);
+      if ((await vitest(MUTANT_TIMEOUT_MS)).code === 0)
+        survivors.push(`${m.id}: ${m.desc}`);
     }
 
     const total = suite.mutants.length;
@@ -529,7 +806,9 @@ async function scoreMutations(input: GradeInput, deps: GradeDeps, pts: number): 
       awarded: Math.floor((pts * killed) / total),
       passed: killed === total,
       label: `${killed}/${total} bugs caught`,
-      detail: survivors.length ? `survived:\n  - ${survivors.join('\n  - ')}` : undefined,
+      detail: survivors.length
+        ? `survived:\n  - ${survivors.join('\n  - ')}`
+        : undefined,
     };
   } finally {
     await writeFile(targetPath, reference);
@@ -565,21 +844,40 @@ const DIFF_EXCLUDES = [
  *  baseline seed, so `--cached` diffs against that; with no baseline commit it
  *  diffs against the empty tree (still shows the new files). Junk dirs
  *  (node_modules/dist/…) are excluded so real edits survive the cap. */
-async function collectDiff(projectPath: string, deps: GradeDeps): Promise<string> {
-  await deps.run('git', ['add', '-A', '--', '.', ...DIFF_EXCLUDES], projectPath);
+async function collectDiff(
+  projectPath: string,
+  deps: GradeDeps,
+): Promise<string> {
+  await deps.run(
+    'git',
+    ['add', '-A', '--', '.', ...DIFF_EXCLUDES],
+    projectPath,
+  );
   // A --stat summary FIRST, so the judge always sees the COMPLETE set of changed
   // files + line counts even when the detailed diff below is truncated. `git diff`
   // orders files alphabetically, so late-sorting dirs (server/, shared/) fall off
   // the cap on a large build and the judge wrongly concludes that logic is absent
   // (e.g. "the server-side AI call isn't present") — a systematic under-grade of
   // big builds. This was self-identified by the improve-harness eval itself.
-  const stat = (await deps.run('git', ['diff', '--cached', '--stat', '--', '.', ...DIFF_EXCLUDES], projectPath)).out;
-  const r = await deps.run('git', ['diff', '--cached', '--no-color', '--', '.', ...DIFF_EXCLUDES], projectPath);
+  const stat = (
+    await deps.run(
+      'git',
+      ['diff', '--cached', '--stat', '--', '.', ...DIFF_EXCLUDES],
+      projectPath,
+    )
+  ).out;
+  const r = await deps.run(
+    'git',
+    ['diff', '--cached', '--no-color', '--', '.', ...DIFF_EXCLUDES],
+    projectPath,
+  );
   // 60KB default (was 20KB — too small for a full-app build, which truncated the
   // graded logic). Override via UGLY_GRADER_DIFF_CAP. ~15k tokens for the judge.
   const CAP = Number(process.env.UGLY_GRADER_DIFF_CAP) || 60_000;
-  const detail = r.out.length > CAP
-    ? r.out.slice(0, CAP) + `\n…(diff detail truncated at ${CAP} chars — consult the complete file summary above; do NOT assume a file not shown here is missing or stubbed)`
-    : r.out;
+  const detail =
+    r.out.length > CAP
+      ? r.out.slice(0, CAP) +
+        `\n…(diff detail truncated at ${CAP} chars — consult the complete file summary above; do NOT assume a file not shown here is missing or stubbed)`
+      : r.out;
   return `## Changed files (complete list)\n${stat}\n\n## Diff detail\n${detail}`;
 }

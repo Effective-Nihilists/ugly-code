@@ -3,7 +3,9 @@
 import type { SearchHit } from '../../agent/tools/searchResponse';
 
 /** `src/a.ts:3-5`, or `src/a.ts:7` for a single-line span. */
-export function resultLabel(h: Pick<SearchHit, 'file_path' | 'start_line' | 'end_line'>): string {
+export function resultLabel(
+  h: Pick<SearchHit, 'file_path' | 'start_line' | 'end_line'>,
+): string {
   return h.start_line === h.end_line
     ? `${h.file_path}:${h.start_line}`
     : `${h.file_path}:${h.start_line}-${h.end_line}`;
@@ -23,8 +25,12 @@ export function parseGrepHits(text: string): SearchHit[] {
     const m = /^(.+?):(\d+):(.*)$/.exec(line);
     if (!m) continue;
     out.push({
-      file_path: m[1], start_line: Number(m[2]), end_line: Number(m[2]),
-      content: m[3], mode: 'grep', score: 0,
+      file_path: m[1],
+      start_line: Number(m[2]),
+      end_line: Number(m[2]),
+      content: m[3],
+      mode: 'grep',
+      score: 0,
     });
   }
   return out;

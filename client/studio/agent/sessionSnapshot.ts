@@ -53,7 +53,8 @@ export function composeSessionSnapshot(args: {
     cwd: args.cwd,
     createdAt: args.createdAt,
     updatedAt: args.updatedAt,
-    mode: args.permissionMode === 'yolo' ? ('yolo' as const) : ('edit' as const),
+    mode:
+      args.permissionMode === 'yolo' ? ('yolo' as const) : ('edit' as const),
     model: args.model,
     reasoningEffort: args.reasoningEffort,
     supportsReasoning: false,

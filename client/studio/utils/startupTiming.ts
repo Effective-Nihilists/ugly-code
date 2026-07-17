@@ -16,12 +16,13 @@ const t0 =
 export function bootMark(label: string, extra?: Record<string, unknown>): void {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- BOOT_TIMING is a manual compile-time toggle (flipped to false before commit)
   if (!BOOT_TIMING) return;
-  const delta = (
+  const delta =
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard against runtimes exposing `performance` without `now`
-    (typeof performance !== 'undefined' && performance.now
-      ? performance.now()
-      : Date.now()) - t0
-  ).toFixed(1);
+    (
+      (typeof performance !== 'undefined' && performance.now
+        ? performance.now()
+        : Date.now()) - t0
+    ).toFixed(1);
   if (extra) {
     console.log(`[startup-timing] T+${delta}ms ${label}`, extra);
   } else {

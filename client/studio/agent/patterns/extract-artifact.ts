@@ -82,7 +82,9 @@ export function extractArtifact(input: ExtractInput): string {
       // back to the last assistant text so a candidate that produced
       // rationale but no `.specs` doc isn't misranked vs one that did.
       if (spec.trim().length > 0) return clamp(spec);
-      return clamp(lastAssistantText.length > 0 ? lastAssistantText : '(empty)');
+      return clamp(
+        lastAssistantText.length > 0 ? lastAssistantText : '(empty)',
+      );
     }
     case 'diff': {
       // Machine-shaped — fed to `git apply` in the SBP grader.
@@ -97,7 +99,9 @@ export function extractArtifact(input: ExtractInput): string {
       return lastAssistantText ? clamp(lastAssistantText) : '';
     }
     case 'prose': {
-      return clamp(lastAssistantText.length > 0 ? lastAssistantText : '(empty)');
+      return clamp(
+        lastAssistantText.length > 0 ? lastAssistantText : '(empty)',
+      );
     }
     default: {
       // Exhaustiveness guard — surface a clear error if a new kind is

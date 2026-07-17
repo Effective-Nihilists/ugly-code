@@ -4,7 +4,12 @@
 // server/coding-agent/patterns/max-mode-host.ts, trimmed to the core cross-
 // pollination flow (the eval-only levers — peerTemps, peerVariants, adversarial
 // revise, zero-diff recovery — are omitted). Host-agnostic via MaxModeCallbacks.
-import type { MaxModeCallbacks, MaxModePeer, PeerProvider, PeerStepToolPolicy } from './peerTypes';
+import type {
+  MaxModeCallbacks,
+  MaxModePeer,
+  PeerProvider,
+  PeerStepToolPolicy,
+} from './peerTypes';
 import type { Pattern, Step } from './types';
 import { extractArtifact } from './extract-artifact';
 import { extractInsights, buildPeerInsightsNudge } from './extract-insights';
@@ -14,15 +19,29 @@ import { renderStepDecoration, decorateForStep } from './decorate';
 function policyFor(step: Step): PeerStepToolPolicy {
   return {
     ...(step.allowedTools ? { allowedTools: step.allowedTools } : {}),
-    ...(step.toolDescriptionSuffixes ? { descriptionSuffixes: step.toolDescriptionSuffixes } : {}),
+    ...(step.toolDescriptionSuffixes
+      ? { descriptionSuffixes: step.toolDescriptionSuffixes }
+      : {}),
   };
 }
 
 /** Build a peer's artifact for the current step (diff for edit steps; spec/prose
  *  otherwise), sourced from the host callbacks. */
-async function peerArtifact(cb: MaxModeCallbacks, peer: MaxModePeer, step: Step): Promise<string> {
-  const [diff, spec] = await Promise.all([cb.getPeerDiff(peer), cb.getPeerSpec(peer)]);
-  return extractArtifact({ kind: step.pickerArtifact, diff, spec, lastAssistantText: spec });
+async function peerArtifact(
+  cb: MaxModeCallbacks,
+  peer: MaxModePeer,
+  step: Step,
+): Promise<string> {
+  const [diff, spec] = await Promise.all([
+    cb.getPeerDiff(peer),
+    cb.getPeerSpec(peer),
+  ]);
+  return extractArtifact({
+    kind: step.pickerArtifact,
+    diff,
+    spec,
+    lastAssistantText: spec,
+  });
 }
 
 export interface MaxModeInput {
@@ -52,12 +71,17 @@ export interface MaxModeResult {
  * all losers are torn down. Throws if the pool is empty.
  */
 export async function runMaxMode(input: MaxModeInput): Promise<MaxModeResult> {
-  if (input.peerModels.length === 0) throw new Error('max-mode: empty model pool');
+  if (input.peerModels.length === 0)
+    throw new Error('max-mode: empty model pool');
   const steps = input.pattern.steps;
   // Per-peer pending insight nudge for the next step (index-aligned with `peers`).
   const pendingNudges: string[] = [];
-  input.onProgress?.(`Spawning ${input.peerModels.length} peers for max-mode (${input.pattern.label})…`);
-  const peers = await input.callbacks.spawnPeers(input.peerModels, { peerKind: 'single' });
+  input.onProgress?.(
+    `Spawning ${input.peerModels.length} peers for max-mode (${input.pattern.label})…`,
+  );
+  const peers = await input.callbacks.spawnPeers(input.peerModels, {
+    peerKind: 'single',
+  });
   try {
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
@@ -65,10 +89,16 @@ export async function runMaxMode(input: MaxModeInput): Promise<MaxModeResult> {
       // Deliver this step to every peer in parallel.
       await Promise.all(
         peers.map((peer, pi) => {
-          const base = isFirst ? decorateForStep(input.userRequest, step) : renderStepDecoration(step);
+          const base = isFirst
+            ? decorateForStep(input.userRequest, step)
+            : renderStepDecoration(step);
           const nudge = pendingNudges[pi];
           const text = nudge ? `${base}\n\n${nudge}` : base;
-          return input.callbacks.sendToPeerAndSettle(peer, text, policyFor(step));
+          return input.callbacks.sendToPeerAndSettle(
+            peer,
+            text,
+            policyFor(step),
+          );
         }),
       );
       pendingNudges.length = 0;
@@ -76,7 +106,10 @@ export async function runMaxMode(input: MaxModeInput): Promise<MaxModeResult> {
       // and inject the peer-insights nudge into every peer's NEXT step.
       if (!step.isTerminal && input.pollinator !== 'none') {
         const artifacts = await Promise.all(
-          peers.map(async (peer) => ({ name: peer.modelId, content: await peerArtifact(input.callbacks, peer, step) })),
+          peers.map(async (peer) => ({
+            name: peer.modelId,
+            content: await peerArtifact(input.callbacks, peer, step),
+          })),
         );
         try {
           const { insights } = await extractInsights({
@@ -97,7 +130,10 @@ export async function runMaxMode(input: MaxModeInput): Promise<MaxModeResult> {
     // Terminal picker over the final artifacts.
     const terminal = steps[steps.length - 1];
     const candidates = await Promise.all(
-      peers.map(async (peer) => ({ model: peer.modelId, artifact: await peerArtifact(input.callbacks, peer, terminal) })),
+      peers.map(async (peer) => ({
+        model: peer.modelId,
+        artifact: await peerArtifact(input.callbacks, peer, terminal),
+      })),
     );
     input.onProgress?.('Picking the winner…');
     const pick = await pickWinner({
@@ -111,10 +147,16 @@ export async function runMaxMode(input: MaxModeInput): Promise<MaxModeResult> {
     const winner = peers[pick.winnerIndex] ?? peers[0];
     const winnerDiff = await input.callbacks.getPeerDiff(winner);
     // Tear down losers only; the winner's worktree survives for the caller to apply.
-    await Promise.all(peers.filter((p) => p.id !== winner.id).map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)));
+    await Promise.all(
+      peers
+        .filter((p) => p.id !== winner.id)
+        .map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)),
+    );
     return { winner, winnerDiff, reason: pick.reason };
   } catch (err) {
-    await Promise.all(peers.map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)));
+    await Promise.all(
+      peers.map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)),
+    );
     throw err;
   }
 }

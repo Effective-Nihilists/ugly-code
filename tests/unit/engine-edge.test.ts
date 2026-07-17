@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { runAgent, type AgentEvent, type StepFn } from '../../client/agent/engine';
+import {
+  runAgent,
+  type AgentEvent,
+  type StepFn,
+} from '../../client/agent/engine';
 import type { AgentMessage } from '../../shared/agent';
 
 // Edge cases of the client-side agent loop that the happy-path suite
@@ -13,7 +17,9 @@ describe('agent engine — edge cases', () => {
     let stepCalls = 0;
     const step: StepFn = () => {
       stepCalls++;
-      return Promise.resolve({ message: { role: 'assistant', content: 'nope' } });
+      return Promise.resolve({
+        message: { role: 'assistant', content: 'nope' },
+      });
     };
     const events: AgentEvent[] = [];
     const history: AgentMessage[] = [{ role: 'user', content: 'go' }];
@@ -37,8 +43,18 @@ describe('agent engine — edge cases', () => {
       {
         role: 'assistant',
         content: [
-          { type: 'tool_use', id: 't1', name: 'read_file', input: { path: 'a' } },
-          { type: 'tool_use', id: 't2', name: 'list_dir', input: { path: '.' } },
+          {
+            type: 'tool_use',
+            id: 't1',
+            name: 'read_file',
+            input: { path: 'a' },
+          },
+          {
+            type: 'tool_use',
+            id: 't2',
+            name: 'list_dir',
+            input: { path: '.' },
+          },
         ],
       },
       { role: 'assistant', content: 'done' },
@@ -107,7 +123,10 @@ describe('agent engine — edge cases', () => {
 
   it('truncates oversized tool results before feeding them back to the model', async () => {
     const turns: AgentMessage[] = [
-      { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'read_file', input: {} }] },
+      {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 't1', name: 'read_file', input: {} }],
+      },
       { role: 'assistant', content: 'ok' },
     ];
     let i = 0;
@@ -117,7 +136,8 @@ describe('agent engine — edge cases', () => {
 
     await runAgent({ history, step, dispatch: () => Promise.resolve(big) });
 
-    const fedBack = (history[2] as { content: Array<{ content: string }> }).content[0]!.content;
+    const fedBack = (history[2] as { content: Array<{ content: string }> })
+      .content[0]!.content;
     expect(fedBack.length).toBeLessThan(big.length);
     expect(fedBack).toContain('[truncated 10000 chars]');
   });

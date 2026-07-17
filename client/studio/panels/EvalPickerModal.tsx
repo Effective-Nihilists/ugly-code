@@ -61,7 +61,11 @@ export function EvalPickerModal({
 }: {
   onCancel: () => void;
   onPick: (taskName: string) => void;
-  onOpenRun: (projectName: string, projectPath: string, sessionId: string) => void;
+  onOpenRun: (
+    projectName: string,
+    projectPath: string,
+    sessionId: string,
+  ) => void;
 }): React.ReactElement {
   const socket = useSocket();
   const [tasks, setTasks] = useState<TaskListItem[] | null>(null);
@@ -87,7 +91,13 @@ export function EvalPickerModal({
       } catch (err) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (cancelled) return;
-        console.error('[EvalPickerModal:evalListTasks]', JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          '[EvalPickerModal:evalListTasks]',
+          JSON.stringify({
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setError(err instanceof Error ? err.message : 'failed to load tasks');
       }
     })();
@@ -101,7 +111,14 @@ export function EvalPickerModal({
       await socket.request('evalDeleteRun', { projectName });
       setHistory((prev) => prev.filter((r) => r.projectName !== projectName));
     } catch (err) {
-      console.error('[EvalPickerModal:evalDeleteRun]', JSON.stringify({ projectName, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        '[EvalPickerModal:evalDeleteRun]',
+        JSON.stringify({
+          projectName,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setError(err instanceof Error ? err.message : 'failed to delete run');
     }
   };
@@ -175,148 +192,155 @@ export function EvalPickerModal({
         gap: 16,
       }}
     >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 16,
+        }}
+      >
         <div
           style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            justifyContent: 'space-between',
-            gap: 16,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: 'var(--font-heading)',
-              fontSize: 22,
-              fontWeight: 800,
-              color: 'var(--text-primary)',
-              letterSpacing: '-0.02em',
-              lineHeight: 1.15,
-            }}
-          >
-            Pick an eval task
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: 'var(--text-secondary)',
-              fontFamily: 'var(--font-label)',
-              letterSpacing: '0.10em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {tasks ? `${tasks.length} available` : 'loading…'}
-          </div>
-        </div>
-
-        <input
-          data-id="eval-task-filter"
-          type="text"
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); }}
-          placeholder="Filter by name or success criteria…"
-          autoFocus
-          style={{
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
+            fontFamily: 'var(--font-heading)',
+            fontSize: 22,
+            fontWeight: 800,
             color: 'var(--text-primary)',
-            padding: '8px 12px',
-            fontSize: 13,
-            outline: 'none',
-            width: '100%',
-          }}
-        />
-
-        <div
-          style={{
-            overflow: 'auto',
-            flex: '1 1 auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
-            paddingRight: 4,
+            letterSpacing: '-0.02em',
+            lineHeight: 1.15,
           }}
         >
-          {error && (
-            <div style={{ color: '#FF5500', fontSize: 13 }}>{error}</div>
-          )}
-          {!tasks && !error && (
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              Loading tasks…
-            </div>
-          )}
-          {filtered?.length === 0 && (
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              No tasks match the current filter.
-            </div>
-          )}
-          {grouped && grouped.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {grouped.map(([level, rows]) => (
-                <div key={level} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-label)',
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                      color: 'var(--text-secondary)',
-                      borderBottom: '1px solid var(--border)',
-                      paddingBottom: 4,
-                    }}
-                  >
-                    {LEVEL_LABELS[level] ?? `Level ${level}`} · {rows.length}
-                  </div>
-                  {rows.map((t) => (
-                    <TaskRow
-                      key={t.name}
-                      task={t}
-                      history={historyByTask.get(t.name) ?? []}
-                      disabled={submittingFor !== null && submittingFor !== t.name}
-                      isSubmitting={submittingFor === t.name}
-                      onPick={() => { handlePick(t.name); }}
-                      onOpenRun={onOpenRun}
-                      onDeleteRun={(p) => void handleDeleteRun(p)}
-                    />
-                  ))}
+          Pick an eval task
+        </div>
+        <div
+          style={{
+            fontSize: 11,
+            color: 'var(--text-secondary)',
+            fontFamily: 'var(--font-label)',
+            letterSpacing: '0.10em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {tasks ? `${tasks.length} available` : 'loading…'}
+        </div>
+      </div>
+
+      <input
+        data-id="eval-task-filter"
+        type="text"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+        }}
+        placeholder="Filter by name or success criteria…"
+        autoFocus
+        style={{
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-primary)',
+          padding: '8px 12px',
+          fontSize: 13,
+          outline: 'none',
+          width: '100%',
+        }}
+      />
+
+      <div
+        style={{
+          overflow: 'auto',
+          flex: '1 1 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          paddingRight: 4,
+        }}
+      >
+        {error && <div style={{ color: '#FF5500', fontSize: 13 }}>{error}</div>}
+        {!tasks && !error && (
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Loading tasks…
+          </div>
+        )}
+        {filtered?.length === 0 && (
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            No tasks match the current filter.
+          </div>
+        )}
+        {grouped && grouped.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {grouped.map(([level, rows]) => (
+              <div
+                key={level}
+                style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'var(--font-label)',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-secondary)',
+                    borderBottom: '1px solid var(--border)',
+                    paddingBottom: 4,
+                  }}
+                >
+                  {LEVEL_LABELS[level] ?? `Level ${level}`} · {rows.length}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                {rows.map((t) => (
+                  <TaskRow
+                    key={t.name}
+                    task={t}
+                    history={historyByTask.get(t.name) ?? []}
+                    disabled={
+                      submittingFor !== null && submittingFor !== t.name
+                    }
+                    isSubmitting={submittingFor === t.name}
+                    onPick={() => {
+                      handlePick(t.name);
+                    }}
+                    onOpenRun={onOpenRun}
+                    onDeleteRun={(p) => void handleDeleteRun(p)}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-        <div
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 12,
+          borderTop: '1px solid var(--border)',
+          paddingTop: 12,
+        }}
+      >
+        <button
+          type="button"
+          data-id="eval-picker-cancel"
+          onClick={onCancel}
+          disabled={submittingFor !== null}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: 12,
-            borderTop: '1px solid var(--border)',
-            paddingTop: 12,
+            fontFamily: 'var(--font-label)',
+            fontSize: 10,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            color: 'var(--text-secondary)',
+            background: 'transparent',
+            border: '1px solid var(--border)',
+            padding: '5px 10px',
+            cursor: submittingFor !== null ? 'not-allowed' : 'pointer',
+            opacity: submittingFor !== null ? 0.5 : 1,
           }}
         >
-          <button
-            type="button"
-            data-id="eval-picker-cancel"
-            onClick={onCancel}
-            disabled={submittingFor !== null}
-            style={{
-              fontFamily: 'var(--font-label)',
-              fontSize: 10,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              fontWeight: 700,
-              color: 'var(--text-secondary)',
-              background: 'transparent',
-              border: '1px solid var(--border)',
-              padding: '5px 10px',
-              cursor: submittingFor !== null ? 'not-allowed' : 'pointer',
-              opacity: submittingFor !== null ? 0.5 : 1,
-            }}
-          >
-            Cancel
-          </button>
-        </div>
+          Cancel
+        </button>
+      </div>
     </Modal>
   );
 }
@@ -335,7 +359,11 @@ function TaskRow({
   disabled: boolean;
   isSubmitting: boolean;
   onPick: () => void;
-  onOpenRun: (projectName: string, projectPath: string, sessionId: string) => void;
+  onOpenRun: (
+    projectName: string,
+    projectPath: string,
+    sessionId: string,
+  ) => void;
   onDeleteRun: (projectName: string) => void;
 }): React.ReactElement {
   const isSbpro = task.tags?.includes('swe-bench-pro') ?? false;
@@ -450,10 +478,12 @@ function TaskRow({
             <HistoryRunRow
               key={run.sessionId}
               run={run}
-              onOpen={() =>
-                { onOpenRun(run.projectName, run.projectPath, run.sessionId); }
-              }
-              onDelete={() => { onDeleteRun(run.projectName); }}
+              onOpen={() => {
+                onOpenRun(run.projectName, run.projectPath, run.sessionId);
+              }}
+              onDelete={() => {
+                onDeleteRun(run.projectName);
+              }}
             />
           ))}
         </div>
@@ -484,14 +514,16 @@ function HistoryRunRow({
     typeof run.score === 'number' && typeof run.scoreMax === 'number'
       ? `${run.score}/${run.scoreMax}`
       : run.gradedAt
-      ? 'graded'
-      : 'in progress';
+        ? 'graded'
+        : 'in progress';
   const handleCopy = (e: React.MouseEvent): void => {
     e.stopPropagation();
     void navigator.clipboard.writeText(run.sessionId).then(
       () => {
         setCopied(true);
-        setTimeout(() => { setCopied(false); }, 1200);
+        setTimeout(() => {
+          setCopied(false);
+        }, 1200);
       },
       () => undefined,
     );
@@ -584,7 +616,9 @@ function HistoryRunRow({
             setConfirming(false);
           } else {
             setConfirming(true);
-            setTimeout(() => { setConfirming(false); }, 2500);
+            setTimeout(() => {
+              setConfirming(false);
+            }, 2500);
           }
         }}
         title={confirming ? 'Click again to confirm delete' : 'Delete this run'}

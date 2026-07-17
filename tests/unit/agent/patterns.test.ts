@@ -6,12 +6,22 @@ import {
   CLASSIFIABLE_PATTERN_IDS,
   PATTERN_REGISTRY,
 } from '../../../client/studio/agent/patterns/registry';
-import { renderStepDecoration, decorateForStep, filterToolsForStep } from '../../../client/studio/agent/patterns/decorate';
-import { superToBasePattern, isSuperPattern, NAMED_PATTERN_IDS } from '../../../client/studio/agent/patterns/types';
+import {
+  renderStepDecoration,
+  decorateForStep,
+  filterToolsForStep,
+} from '../../../client/studio/agent/patterns/decorate';
+import {
+  superToBasePattern,
+  isSuperPattern,
+  NAMED_PATTERN_IDS,
+} from '../../../client/studio/agent/patterns/types';
 
 describe('pattern registry — all 7 patterns', () => {
   it('registers every named pattern', () => {
-    expect(Object.keys(PATTERN_REGISTRY).sort()).toEqual([...NAMED_PATTERN_IDS].sort());
+    expect(Object.keys(PATTERN_REGISTRY).sort()).toEqual(
+      [...NAMED_PATTERN_IDS].sort(),
+    );
     expect(CLASSIFIABLE_PATTERN_IDS).toHaveLength(7);
   });
 
@@ -39,13 +49,20 @@ describe('pattern registry — all 7 patterns', () => {
 
   it('investigate-fix runs repro → diagnose → fix → verify with read-only investigation steps', () => {
     const p = getPattern('investigate-fix')!;
-    expect(p.steps.map((s) => s.id)).toEqual(['repro', 'diagnose', 'fix', 'verify']);
+    expect(p.steps.map((s) => s.id)).toEqual([
+      'repro',
+      'diagnose',
+      'fix',
+      'verify',
+    ]);
     // repro + diagnose are read-only (no edit family); fix + verify are full.
     expect(p.steps[0].allowedTools).not.toContain('edit');
     expect(p.steps[1].allowedTools).not.toContain('edit');
     expect(p.steps[2].allowedTools).toBeUndefined();
     // diagnose pauses for user review.
-    expect(getStep('investigate-fix', 'diagnose')?.pauseForUserReviewAfter).toBe(true);
+    expect(
+      getStep('investigate-fix', 'diagnose')?.pauseForUserReviewAfter,
+    ).toBe(true);
   });
 
   it('chat-qa is a single one-shot answer step; chat-advisory researches then synthesizes', () => {
@@ -67,9 +84,15 @@ describe('pattern registry — all 7 patterns', () => {
   });
 
   it('super patterns reuse their base steps (reference equality) and map back via superToBasePattern', () => {
-    expect(getPattern('super-spec-build-verify')!.steps).toBe(getPattern('spec-build-verify')!.steps);
-    expect(getPattern('super-investigate-fix')!.steps).toBe(getPattern('investigate-fix')!.steps);
-    expect(superToBasePattern('super-spec-build-verify')).toBe('spec-build-verify');
+    expect(getPattern('super-spec-build-verify')!.steps).toBe(
+      getPattern('spec-build-verify')!.steps,
+    );
+    expect(getPattern('super-investigate-fix')!.steps).toBe(
+      getPattern('investigate-fix')!.steps,
+    );
+    expect(superToBasePattern('super-spec-build-verify')).toBe(
+      'spec-build-verify',
+    );
     expect(superToBasePattern('super-investigate-fix')).toBe('investigate-fix');
     expect(superToBasePattern('quick-edit')).toBe('quick-edit'); // identity for non-super
     expect(isSuperPattern('super-spec-build-verify')).toBe(true);
@@ -101,8 +124,16 @@ describe('decoration + tool filtering', () => {
   });
 
   it('filters tools to the step allowlist; passes all through when unset', () => {
-    const specs = [{ name: 'edit' }, { name: 'delegate' }, { name: 'spec_write' }] as never[];
-    expect(filterToolsForStep(specs, spec).map((s: { name: string }) => s.name).sort()).toEqual(['edit', 'spec_write']);
+    const specs = [
+      { name: 'edit' },
+      { name: 'delegate' },
+      { name: 'spec_write' },
+    ] as never[];
+    expect(
+      filterToolsForStep(specs, spec)
+        .map((s: { name: string }) => s.name)
+        .sort(),
+    ).toEqual(['edit', 'spec_write']);
     expect(filterToolsForStep(specs, build)).toHaveLength(3);
     expect(filterToolsForStep(specs, null)).toHaveLength(3);
   });

@@ -50,7 +50,11 @@ export function spliceMissingUserRows<M extends OrderableRow>(
         break;
       }
     }
-    out = [...out.slice(0, insertAt), makeUserRow(hm.id, hm.text), ...out.slice(insertAt)];
+    out = [
+      ...out.slice(0, insertAt),
+      makeUserRow(hm.id, hm.text),
+      ...out.slice(insertAt),
+    ];
     have.add(hm.id);
   }
   return out;

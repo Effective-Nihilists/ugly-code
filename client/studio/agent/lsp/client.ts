@@ -47,11 +47,7 @@ export interface LspDiagnostic {
 }
 
 export type LspState =
-  | 'initializing'
-  | 'ready'
-  | 'error'
-  | 'disabled'
-  | 'closed';
+  'initializing' | 'ready' | 'error' | 'disabled' | 'closed';
 
 export type LspLanguage = 'typescript' | 'python';
 
@@ -448,7 +444,9 @@ export class LspClient {
     this.proc = proc;
 
     // native.process delivers already-decoded strings on stdout/stderr.
-    proc.onStdout((chunk) => { this.handleStdout(chunk); });
+    proc.onStdout((chunk) => {
+      this.handleStdout(chunk);
+    });
     proc.onStderr((text) => {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- DEBUG is a compile-time toggle flipped to true locally when tracing
       if (DEBUG) {
@@ -608,10 +606,16 @@ export class LspClient {
 
       // Check between microtasks
       const cur = this.diagnosticsPublishedAt.get(abs) ?? 0;
-      if (cur > baselinePublishedAt) { done(); return; }
+      if (cur > baselinePublishedAt) {
+        done();
+        return;
+      }
 
       let arr = this.diagnosticsWaiters.get(abs);
-      if (!arr) { arr = []; this.diagnosticsWaiters.set(abs, arr); }
+      if (!arr) {
+        arr = [];
+        this.diagnosticsWaiters.set(abs, arr);
+      }
       arr.push({ resolve: done, baselineAt: baselinePublishedAt });
 
       const cleanup = (): void => {

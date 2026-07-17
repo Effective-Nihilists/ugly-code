@@ -124,133 +124,150 @@ export function FinishFailurePopup({
         boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
       }}
     >
+      <div
+        style={{
+          padding: '14px 18px',
+          borderBottom: '1px solid var(--border)',
+          background: 'rgba(239, 68, 68, 0.08)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          flexShrink: 0,
+        }}
+      >
         <div
           style={{
-            padding: '14px 18px',
-            borderBottom: '1px solid var(--border)',
-            background: 'rgba(239, 68, 68, 0.08)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-            flexShrink: 0,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: 'var(--error)',
           }}
         >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--error)',
-            }}
-          >
-            Done failed · {info.stage}
-          </div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 15,
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-            }}
-          >
-            {headline}
-          </h2>
+          Done failed · {info.stage}
+        </div>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 15,
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+          }}
+        >
+          {headline}
+        </h2>
+      </div>
+
+      <div
+        style={{
+          padding: '14px 18px',
+          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--text-primary)',
+            lineHeight: 1.5,
+          }}
+        >
+          {howToFix}
         </div>
 
-        <div
-          style={{
-            padding: '14px 18px',
-            overflow: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--text-primary)',
-              lineHeight: 1.5,
-            }}
-          >
-            {howToFix}
-          </div>
-
-          {info.dirtyFiles && info.dirtyFiles.length > 0 && (
-            <FileList
-              title="Dirty files in main repo"
-              items={info.dirtyFiles}
-            />
-          )}
-          {info.conflicts && info.conflicts.length > 0 && (
-            <FileList title="Conflicting files" items={info.conflicts} />
-          )}
-          {info.lastStageOutput && info.lastStageOutput.length > 0 && (
-            <div>
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-secondary)',
-                  marginBottom: 4,
-                }}
-              >
-                Last stage output
-              </div>
-              <pre
-                style={{
-                  margin: 0,
-                  padding: 8,
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 4,
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  color: 'var(--text-primary)',
-                  whiteSpace: 'pre-wrap',
-                  maxHeight: 220,
-                  overflow: 'auto',
-                }}
-              >
-                {info.lastStageOutput.slice(-4000)}
-              </pre>
-            </div>
-          )}
-
-          {info.message && (
+        {info.dirtyFiles && info.dirtyFiles.length > 0 && (
+          <FileList title="Dirty files in main repo" items={info.dirtyFiles} />
+        )}
+        {info.conflicts && info.conflicts.length > 0 && (
+          <FileList title="Conflicting files" items={info.conflicts} />
+        )}
+        {info.lastStageOutput && info.lastStageOutput.length > 0 && (
+          <div>
             <div
               style={{
-                fontSize: 11,
-                color: 'var(--text-muted)',
-                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'var(--text-secondary)',
+                marginBottom: 4,
               }}
             >
-              {info.message}
+              Last stage output
             </div>
-          )}
-        </div>
+            <pre
+              style={{
+                margin: 0,
+                padding: 8,
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: 4,
+                fontSize: 11,
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--text-primary)',
+                whiteSpace: 'pre-wrap',
+                maxHeight: 220,
+                overflow: 'auto',
+              }}
+            >
+              {info.lastStageOutput.slice(-4000)}
+            </pre>
+          </div>
+        )}
 
-        <div
+        {info.message && (
+          <div
+            style={{
+              fontSize: 11,
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            {info.message}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          padding: '12px 18px',
+          borderTop: '1px solid var(--border)',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 8,
+          flexShrink: 0,
+          flexWrap: 'wrap',
+        }}
+      >
+        <button
+          type="button"
+          data-id="finish-failure-close"
+          onClick={onClose}
           style={{
-            padding: '12px 18px',
-            borderTop: '1px solid var(--border)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 8,
-            flexShrink: 0,
-            flexWrap: 'wrap',
+            background: 'transparent',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: 4,
+            padding: '6px 16px',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
           }}
         >
+          Close
+        </button>
+        {skippable && onSkipGate && (
           <button
             type="button"
-            data-id="finish-failure-close"
-            onClick={onClose}
+            data-id="finish-failure-skip-gate"
+            onClick={() => {
+              onSkipGate(info.stage as 'tsc' | 'lint' | 'tests');
+            }}
             style={{
               background: 'transparent',
-              color: 'var(--text-secondary)',
+              color: 'var(--text-primary)',
               border: '1px solid var(--border)',
               borderRadius: 4,
               padding: '6px 16px',
@@ -259,47 +276,29 @@ export function FinishFailurePopup({
               cursor: 'pointer',
             }}
           >
-            Close
+            Retry without {info.stage}
           </button>
-          {skippable && onSkipGate && (
-            <button
-              type="button"
-              data-id="finish-failure-skip-gate"
-              onClick={() => { onSkipGate(info.stage as 'tsc' | 'lint' | 'tests'); }}
-              style={{
-                background: 'transparent',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border)',
-                borderRadius: 4,
-                padding: '6px 16px',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Retry without {info.stage}
-            </button>
-          )}
-          {onRetry && (
-            <button
-              type="button"
-              data-id="finish-failure-retry"
-              onClick={onRetry}
-              style={{
-                background: 'var(--accent)',
-                color: 'var(--on-accent)',
-                border: '1px solid var(--accent)',
-                borderRadius: 4,
-                padding: '6px 16px',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Retry Finish
-            </button>
-          )}
-        </div>
+        )}
+        {onRetry && (
+          <button
+            type="button"
+            data-id="finish-failure-retry"
+            onClick={onRetry}
+            style={{
+              background: 'var(--accent)',
+              color: 'var(--on-accent)',
+              border: '1px solid var(--accent)',
+              borderRadius: 4,
+              padding: '6px 16px',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Retry Finish
+          </button>
+        )}
+      </div>
     </Modal>
   );
 }

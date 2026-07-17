@@ -12,9 +12,14 @@ import { authenticate, loadDevAuth } from './helpers/auth';
 const auth = loadDevAuth();
 
 test.describe('authenticated session (real cookie)', () => {
-  test.skip(!auth, 'No ~/.ugly-bot/auth.json — run inside a logged-in Ugly Studio env');
+  test.skip(
+    !auth,
+    'No ~/.ugly-bot/auth.json — run inside a logged-in Ugly Studio env',
+  );
 
-  test('injected auth cookie renders the logged-in auth-demo view', async ({ page }) => {
+  test('injected auth cookie renders the logged-in auth-demo view', async ({
+    page,
+  }) => {
     await authenticate(page, auth!);
     await page.goto('/auth-demo');
 

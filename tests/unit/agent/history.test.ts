@@ -5,16 +5,34 @@ vi.mock('ugly-app/native', () => ({
   native: {
     fs: {
       mkdir: () => Promise.resolve(),
-      writeFile: (p: string, s: string) => { files.set(p, s); return Promise.resolve(); },
-      readFile: (p: string) => (files.has(p) ? Promise.resolve(files.get(p)!) : Promise.reject(new Error('ENOENT'))),
+      writeFile: (p: string, s: string) => {
+        files.set(p, s);
+        return Promise.resolve();
+      },
+      readFile: (p: string) =>
+        files.has(p)
+          ? Promise.resolve(files.get(p)!)
+          : Promise.reject(new Error('ENOENT')),
     },
   },
 }));
 
-import { appendRunHistory, listRunHistory, deleteRunFromHistory, type RunHistoryEntry } from '../../../client/studio/evals/history';
+import {
+  appendRunHistory,
+  listRunHistory,
+  deleteRunFromHistory,
+  type RunHistoryEntry,
+} from '../../../client/studio/evals/history';
 
 function entry(over: Partial<RunHistoryEntry>): RunHistoryEntry {
-  return { taskName: 't', projectName: 'p', projectPath: '/p', sessionId: 's', createdAt: '2026-07-05', ...over };
+  return {
+    taskName: 't',
+    projectName: 'p',
+    projectPath: '/p',
+    sessionId: 's',
+    createdAt: '2026-07-05',
+    ...over,
+  };
 }
 
 describe('eval history ledger', () => {
@@ -28,7 +46,11 @@ describe('eval history ledger', () => {
   });
 
   it('serializes concurrent appends without losing entries', async () => {
-    await Promise.all(Array.from({ length: 6 }, (_, i) => appendRunHistory(entry({ projectName: `p${i}` }))));
+    await Promise.all(
+      Array.from({ length: 6 }, (_, i) =>
+        appendRunHistory(entry({ projectName: `p${i}` })),
+      ),
+    );
     const { runs } = await listRunHistory();
     expect(runs).toHaveLength(6);
   });

@@ -10,7 +10,9 @@ export default function UserPage({
     <PageLayout
       header={
         <div>
-          <a href="/" data-id="user-home">← Home</a>
+          <a href="/" data-id="user-home">
+            ← Home
+          </a>
         </div>
       }
     >

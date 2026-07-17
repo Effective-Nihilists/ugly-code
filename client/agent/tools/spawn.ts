@@ -37,16 +37,37 @@ export function spawnCollect(
       const proc = native.process.spawn(cmd, args, { ...(cwd ? { cwd } : {}) });
       proc.onStdout((c: string) => (stdout += c));
       proc.onStderr((c: string) => (stderr += c));
-      proc.onError((e: string) => { settle({ stdout, stderr: stderr + e, code: null }); });
-      proc.onExit((code: number | null) => { settle({ stdout, stderr, code }); });
+      proc.onError((e: string) => {
+        settle({ stdout, stderr: stderr + e, code: null });
+      });
+      proc.onExit((code: number | null) => {
+        settle({ stdout, stderr, code });
+      });
       if (timeoutMs) {
         timer = setTimeout(() => {
-          try { proc.kill(); } catch { /* already gone */ }
-          settle({ stdout: stdout.trimEnd(), stderr: stderr + `\n[timed out after ${Math.round(timeoutMs / 1000)}s]`, code: null });
+          try {
+            proc.kill();
+          } catch {
+            /* already gone */
+          }
+          settle({
+            stdout: stdout.trimEnd(),
+            stderr:
+              stderr + `\n[timed out after ${Math.round(timeoutMs / 1000)}s]`,
+            code: null,
+          });
         }, timeoutMs);
       }
     } catch (e) {
-      console.error('[spawnTool:spawn]', JSON.stringify({ cmd, args, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[spawnTool:spawn]',
+        JSON.stringify({
+          cmd,
+          args,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       settle({ stdout, stderr: (e as Error).message, code: null });
     }
   });

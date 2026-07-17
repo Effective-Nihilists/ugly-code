@@ -33,7 +33,10 @@ const CONTEXT = 3;
  */
 const PAIR_SIMILARITY = 0.3;
 
-interface Op { kind: 'eq' | 'del' | 'add'; text: string }
+interface Op {
+  kind: 'eq' | 'del' | 'add';
+  text: string;
+}
 
 /** Words, runs of whitespace, and single punctuation chars — the units a reader scans. */
 export function tokenize(line: string): string[] {
@@ -45,7 +48,10 @@ export function tokenize(line: string): string[] {
  * Bails to a whole-replacement op list when the inputs are too big to diff cheaply.
  */
 function lcsOps(a: string[], b: string[]): Op[] {
-  if (a.length * b.length > SIZE_GUARD * SIZE_GUARD || a.length + b.length === 0) {
+  if (
+    a.length * b.length > SIZE_GUARD * SIZE_GUARD ||
+    a.length + b.length === 0
+  ) {
     return [
       ...a.map((text): Op => ({ kind: 'del', text })),
       ...b.map((text): Op => ({ kind: 'add', text })),
@@ -54,10 +60,15 @@ function lcsOps(a: string[], b: string[]): Op[] {
   const n = a.length;
   const m = b.length;
   // dp[i][j] = LCS length of a[i:] and b[j:]
-  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  const dp: number[][] = Array.from({ length: n + 1 }, () =>
+    new Array<number>(m + 1).fill(0),
+  );
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
-      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      dp[i][j] =
+        a[i] === b[j]
+          ? dp[i + 1][j + 1] + 1
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
     }
   }
   const ops: Op[] = [];
@@ -98,7 +109,10 @@ function coalesce(parts: Part[]): Part[] {
  * Token-diff one changed line against its counterpart. Returns the parts for the
  * deleted line and the added line, each marking only the tokens unique to it.
  */
-export function diffLinePair(oldLine: string, newLine: string): { del: Part[]; add: Part[] } {
+export function diffLinePair(
+  oldLine: string,
+  newLine: string,
+): { del: Part[]; add: Part[] } {
   const ops = lcsOps(tokenize(oldLine), tokenize(newLine));
   const del: Part[] = [];
   const add: Part[] = [];
@@ -143,8 +157,10 @@ function emitRun(dels: string[], adds: string[], out: DiffRow[]): void {
       out.push({ kind: 'add', parts: [{ text: n, changed: true }] });
     }
   }
-  for (const o of dels.slice(pairs)) out.push({ kind: 'del', parts: [{ text: o, changed: true }] });
-  for (const n of adds.slice(pairs)) out.push({ kind: 'add', parts: [{ text: n, changed: true }] });
+  for (const o of dels.slice(pairs))
+    out.push({ kind: 'del', parts: [{ text: o, changed: true }] });
+  for (const n of adds.slice(pairs))
+    out.push({ kind: 'add', parts: [{ text: n, changed: true }] });
 }
 
 /**
@@ -175,11 +191,16 @@ export function buildDiffRows(oldStr: string, newStr: string): DiffRow[] {
   flush();
 
   // Collapse context runs that are far from any change.
-  const isChange = (r: DiffRow): boolean => r.kind === 'del' || r.kind === 'add';
+  const isChange = (r: DiffRow): boolean =>
+    r.kind === 'del' || r.kind === 'add';
   const keep = rows.map((r, i) => {
     if (isChange(r)) return true;
     for (let d = 1; d <= CONTEXT; d++) {
-      if ((rows[i - d] && isChange(rows[i - d])) || (rows[i + d] && isChange(rows[i + d]))) return true;
+      if (
+        (rows[i - d] && isChange(rows[i - d])) ||
+        (rows[i + d] && isChange(rows[i + d]))
+      )
+        return true;
     }
     return false;
   });

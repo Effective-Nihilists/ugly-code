@@ -46,25 +46,28 @@ import type { ReasoningEffort } from './ReasoningSelector';
 
 type ModelModeKind = 'auto' | 'max' | 'single' | 'group';
 
-const MODEL_MODE_CHOICES: { kind: ModelModeKind; label: string; hint: string }[] =
-  [
-    { kind: 'auto', label: 'Auto', hint: 'cheap router picks a model per turn' },
-    {
-      kind: 'max',
-      label: 'Max',
-      hint: 'runs the default peer pool in parallel; a picker LLM keeps the winner',
-    },
-    {
-      kind: 'single',
-      label: 'Single',
-      hint: 'pin one model for every turn',
-    },
-    {
-      kind: 'group',
-      label: 'Group',
-      hint: 'run N chosen peers concurrently, each with an optional persona',
-    },
-  ];
+const MODEL_MODE_CHOICES: {
+  kind: ModelModeKind;
+  label: string;
+  hint: string;
+}[] = [
+  { kind: 'auto', label: 'Auto', hint: 'cheap router picks a model per turn' },
+  {
+    kind: 'max',
+    label: 'Max',
+    hint: 'runs the default peer pool in parallel; a picker LLM keeps the winner',
+  },
+  {
+    kind: 'single',
+    label: 'Single',
+    hint: 'pin one model for every turn',
+  },
+  {
+    kind: 'group',
+    label: 'Group',
+    hint: 'run N chosen peers concurrently, each with an optional persona',
+  },
+];
 
 const labelCss: React.CSSProperties = {
   fontFamily: 'var(--font-label)',
@@ -105,7 +108,9 @@ function Section({
   hint?: string;
 }): React.ReactElement {
   return (
-    <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)' }}>
+    <div
+      style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)' }}
+    >
       <div style={labelCss}>{title}</div>
       {children}
       {hint && <div style={hintCss}>{hint}</div>}
@@ -180,10 +185,14 @@ function GlmCodingKeySection(): React.ReactElement {
             type="password"
             autoComplete="off"
             spellCheck={false}
-            placeholder={hydrated ? 'Paste your Z.ai Coding Plan key' : 'Loading…'}
+            placeholder={
+              hydrated ? 'Paste your Z.ai Coding Plan key' : 'Loading…'
+            }
             value={draft}
             disabled={!hydrated || busy}
-            onChange={(e) => { setDraft(e.target.value); }}
+            onChange={(e) => {
+              setDraft(e.target.value);
+            }}
             style={{ ...selectCss, flex: 1 }}
           />
           <button
@@ -210,7 +219,9 @@ function GlmCodingKeySection(): React.ReactElement {
         </div>
       )}
       {error && (
-        <div style={{ fontSize: 12, color: '#e53935', marginTop: 6 }}>{error}</div>
+        <div style={{ fontSize: 12, color: '#e53935', marginTop: 6 }}>
+          {error}
+        </div>
       )}
     </Section>
   );
@@ -236,10 +247,8 @@ export function StudioSettingsModal({
     MODEL_MODE_SETTING_KEY,
     { kind: 'single', model: 'deepseek_v4_pro' },
   );
-  const [reasoningEffort, setReasoningEffort] = useStudioUserSetting<ReasoningEffort>(
-    REASONING_SETTING_KEY,
-    'high',
-  );
+  const [reasoningEffort, setReasoningEffort] =
+    useStudioUserSetting<ReasoningEffort>(REASONING_SETTING_KEY, 'high');
   const [branchMode, setBranchMode] = useStudioUserSetting<'worktree' | 'main'>(
     BRANCH_MODE_SETTING_KEY,
     'worktree',
@@ -284,7 +293,7 @@ export function StudioSettingsModal({
         const seed =
           modelMode.kind === 'single'
             ? modelMode.model
-            : DEFAULT_POOL_PINNED_IDS[0] ?? 'deepseek_v4_pro';
+            : (DEFAULT_POOL_PINNED_IDS[0] ?? 'deepseek_v4_pro');
         applyModelMode({ kind: 'single', model: seed });
       } else {
         // group — seed from the default peer pool when we don't already
@@ -302,13 +311,13 @@ export function StudioSettingsModal({
   // ── Single-mode picker binding.
   const singleValue: CodingAgentModel | 'auto' =
     modelMode.kind === 'single'
-      ? byId.get(modelMode.model) ?? 'auto'
+      ? (byId.get(modelMode.model) ?? 'auto')
       : 'auto';
 
   // ── Group-mode picker binding.
   const groupModels = modelMode.kind === 'group' ? modelMode.models : [];
   const groupPersonas =
-    modelMode.kind === 'group' ? modelMode.personas ?? {} : {};
+    modelMode.kind === 'group' ? (modelMode.personas ?? {}) : {};
   const groupValues = useMemo(
     () =>
       groupModels
@@ -339,7 +348,8 @@ export function StudioSettingsModal({
     (modelId: string, persona: PersonaId | '') => {
       // Rebuild without the cleared key (no dynamic delete): default/'' → drop it.
       const personas: Record<string, string> = {};
-      for (const [k, v] of Object.entries(groupPersonas)) if (k !== modelId) personas[k] = v;
+      for (const [k, v] of Object.entries(groupPersonas))
+        if (k !== modelId) personas[k] = v;
       if (persona !== '' && persona !== 'default') personas[modelId] = persona;
       applyModelMode({
         kind: 'group',
@@ -404,9 +414,7 @@ export function StudioSettingsModal({
         {/* ── Model mode default ── */}
         <Section
           title="Model mode default"
-          hint={
-            MODEL_MODE_CHOICES.find((c) => c.kind === currentKind)?.hint
-          }
+          hint={MODEL_MODE_CHOICES.find((c) => c.kind === currentKind)?.hint}
         >
           <div
             style={{
@@ -545,7 +553,9 @@ export function StudioSettingsModal({
           <select
             data-id="settings-reasoning-select"
             value={reasoningEffort}
-            onChange={(e) => { setReasoningEffort(e.target.value as ReasoningEffort); }}
+            onChange={(e) => {
+              setReasoningEffort(e.target.value as ReasoningEffort);
+            }}
             style={selectCss}
           >
             <option value="high">High — thorough reasoning</option>
@@ -562,7 +572,9 @@ export function StudioSettingsModal({
           <select
             data-id="settings-branch-mode-select"
             value={branchMode}
-            onChange={(e) => { setBranchMode(e.target.value as 'worktree' | 'main'); }}
+            onChange={(e) => {
+              setBranchMode(e.target.value as 'worktree' | 'main');
+            }}
             style={selectCss}
           >
             <option value="worktree">Worktree (isolated branch)</option>

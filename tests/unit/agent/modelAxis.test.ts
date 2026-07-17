@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import type { MaxModeCallbacks, MaxModePeer, PeerProvider } from '../../../client/studio/agent/patterns/peerTypes';
+import type {
+  MaxModeCallbacks,
+  MaxModePeer,
+  PeerProvider,
+} from '../../../client/studio/agent/patterns/peerTypes';
 import { getPattern } from '../../../client/studio/agent/patterns/registry';
-import { runMidFanout, synthBoundaryOf } from '../../../client/studio/agent/patterns/mid-mode-host';
+import {
+  runMidFanout,
+  synthBoundaryOf,
+} from '../../../client/studio/agent/patterns/mid-mode-host';
 import { runMaxMode } from '../../../client/studio/agent/patterns/max-mode-host';
 import { runGroupMode } from '../../../client/studio/agent/patterns/group-mode-host';
 import { resolveModel } from '../../../client/studio/agent/patterns/resolve-model';
@@ -9,7 +16,11 @@ import { resolveModel } from '../../../client/studio/agent/patterns/resolve-mode
 // A recording stub for MaxModeCallbacks — captures the host's peer interactions so
 // tests can assert spawn/settle/teardown counts and winner selection without a real
 // session runtime (the monolith's own host-agnostic test strategy).
-function stub(): { cb: MaxModeCallbacks; log: string[]; spawned: MaxModePeer[] } {
+function stub(): {
+  cb: MaxModeCallbacks;
+  log: string[];
+  spawned: MaxModePeer[];
+} {
   const log: string[] = [];
   const spawned: MaxModePeer[] = [];
   const cb: MaxModeCallbacks = {
@@ -41,8 +52,16 @@ function stub(): { cb: MaxModeCallbacks; log: string[]; spawned: MaxModePeer[] }
   return { cb, log, spawned };
 }
 
-const pickerProvider: PeerProvider = { async complete() { return '{"winner": 1, "reason": "stub picks #1"}'; } };
-const specProvider: PeerProvider = { async complete() { return 'CONSOLIDATED SUPER SPEC BODY'; } };
+const pickerProvider: PeerProvider = {
+  async complete() {
+    return '{"winner": 1, "reason": "stub picks #1"}';
+  },
+};
+const specProvider: PeerProvider = {
+  async complete() {
+    return 'CONSOLIDATED SUPER SPEC BODY';
+  },
+};
 
 describe('synthBoundaryOf', () => {
   it('is the index of the first edit-family step', () => {
@@ -69,7 +88,10 @@ describe('runMidFanout (mid-mode / super-*)', () => {
     expect(res.injection.length).toBeGreaterThan(0);
     // 3 peers spawned + torn down; SPEC (1 pre-step) sent to each.
     expect(log.filter((l) => l.startsWith('spawn')).length).toBe(1);
-    expect(log.filter((l) => l === 'send:m1' || l === 'send:m2' || l === 'send:m3').length).toBe(3);
+    expect(
+      log.filter((l) => l === 'send:m1' || l === 'send:m2' || l === 'send:m3')
+        .length,
+    ).toBe(3);
     expect(log.filter((l) => l.startsWith('teardown')).length).toBe(3);
   });
 
@@ -103,7 +125,9 @@ describe('runMaxMode', () => {
     // 3 steps × 3 peers = 9 sends.
     expect(log.filter((l) => l.startsWith('send:')).length).toBe(9);
     // losers m0 + m2 torn down; winner m1 kept.
-    expect(log.filter((l) => l === 'teardown:m0' || l === 'teardown:m2').length).toBe(2);
+    expect(
+      log.filter((l) => l === 'teardown:m0' || l === 'teardown:m2').length,
+    ).toBe(2);
     expect(log).not.toContain('teardown:m1');
   });
 });
@@ -132,6 +156,8 @@ describe('resolveModel', () => {
   it('maps tiers to concrete ids and honors an allowlist', () => {
     expect(resolveModel({ hint: 'strong' })).toBe('deepseek_v4_pro');
     expect(typeof resolveModel({ hint: 'cheap' })).toBe('string');
-    expect(resolveModel({ hint: 'strong', allowlist: ['minimax_m2_7'] })).toBe('minimax_m2_7');
+    expect(resolveModel({ hint: 'strong', allowlist: ['minimax_m2_7'] })).toBe(
+      'minimax_m2_7',
+    );
   });
 });

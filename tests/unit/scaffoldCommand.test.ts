@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildScaffoldCommand, parseScaffoldResult, normalizeScaffoldPath } from '../../client/studio/panels/scaffoldCommand';
+import {
+  buildScaffoldCommand,
+  parseScaffoldResult,
+  normalizeScaffoldPath,
+} from '../../client/studio/panels/scaffoldCommand';
 
 describe('buildScaffoldCommand', () => {
   it('expands a leading ~ to $HOME and quotes name + parent', () => {
@@ -23,19 +27,26 @@ describe('buildScaffoldCommand', () => {
   });
 
   it('appends --with for selected features', () => {
-    expect(buildScaffoldCommand('a', '~', ['todo', 'chat'])).toContain('init "a" --with todo,chat');
+    expect(buildScaffoldCommand('a', '~', ['todo', 'chat'])).toContain(
+      'init "a" --with todo,chat',
+    );
   });
 
   it('drops malformed feature ids (only [a-z] allowed)', () => {
-    expect(buildScaffoldCommand('a', '~', ['todo', 'bad;rm -rf'])).toContain('--with todo');
-    expect(buildScaffoldCommand('a', '~', ['todo', 'bad;rm -rf'])).not.toContain('rm -rf');
+    expect(buildScaffoldCommand('a', '~', ['todo', 'bad;rm -rf'])).toContain(
+      '--with todo',
+    );
+    expect(
+      buildScaffoldCommand('a', '~', ['todo', 'bad;rm -rf']),
+    ).not.toContain('rm -rf');
   });
 });
 
 describe('parseScaffoldResult', () => {
   it('returns the last non-empty line as path on exit 0', () => {
-    expect(parseScaffoldResult('[ugly-app] Creating…\n/Users/x/proj\n\n', 0))
-      .toEqual({ ok: true, path: '/Users/x/proj' });
+    expect(
+      parseScaffoldResult('[ugly-app] Creating…\n/Users/x/proj\n\n', 0),
+    ).toEqual({ ok: true, path: '/Users/x/proj' });
   });
 
   it('reports failure on non-zero exit', () => {
@@ -51,16 +62,21 @@ describe('normalizeScaffoldPath', () => {
   it('maps an MSYS/Git-Bash pwd path to native Windows (the C:\\c\\ bug)', () => {
     // Git-Bash `pwd` prints /c/Users/...; Node path.resolve would otherwise
     // mangle it to C:\c\Users\... (drive-root-relative).
-    expect(normalizeScaffoldPath('/c/Users/theju/Documents/Ugly Studio/test', true))
-      .toBe('C:\\Users\\theju\\Documents\\Ugly Studio\\test');
+    expect(
+      normalizeScaffoldPath('/c/Users/theju/Documents/Ugly Studio/test', true),
+    ).toBe('C:\\Users\\theju\\Documents\\Ugly Studio\\test');
   });
 
   it('normalizes a forward-slash drive path (pwd -W style) to backslashes', () => {
-    expect(normalizeScaffoldPath('C:/Users/theju/proj', true)).toBe('C:\\Users\\theju\\proj');
+    expect(normalizeScaffoldPath('C:/Users/theju/proj', true)).toBe(
+      'C:\\Users\\theju\\proj',
+    );
   });
 
   it('leaves an already-native Windows path unchanged', () => {
-    expect(normalizeScaffoldPath('C:\\Users\\theju\\proj', true)).toBe('C:\\Users\\theju\\proj');
+    expect(normalizeScaffoldPath('C:\\Users\\theju\\proj', true)).toBe(
+      'C:\\Users\\theju\\proj',
+    );
   });
 
   it('is a no-op on non-Windows (POSIX paths pass through)', () => {
@@ -69,6 +85,8 @@ describe('normalizeScaffoldPath', () => {
   });
 
   it('trims surrounding whitespace', () => {
-    expect(normalizeScaffoldPath('  /Users/x/proj \n', false)).toBe('/Users/x/proj');
+    expect(normalizeScaffoldPath('  /Users/x/proj \n', false)).toBe(
+      '/Users/x/proj',
+    );
   });
 });

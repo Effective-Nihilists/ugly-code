@@ -102,7 +102,8 @@ const app = createApp(
 
     toggleTodo: async (userId, { todoId }) => {
       const todo = await app.db.getDoc(collections.todo, todoId);
-      if (!todo?.userId || todo.userId !== userId) throw new Error('Todo not found');
+      if (!todo?.userId || todo.userId !== userId)
+        throw new Error('Todo not found');
       const updated: Todo = { ...todo, done: !todo.done, ...dbDefaults() };
       await app.db.setDoc(collections.todo, updated);
       return { done: updated.done };
@@ -110,7 +111,8 @@ const app = createApp(
 
     deleteTodo: async (userId, { todoId }) => {
       const todo = await app.db.getDoc(collections.todo, todoId);
-      if (!todo?.userId || todo.userId !== userId) throw new Error('Todo not found');
+      if (!todo?.userId || todo.userId !== userId)
+        throw new Error('Todo not found');
       await app.db.deleteDoc(collections.todo, todoId);
       return { ok: true };
     },
@@ -120,10 +122,16 @@ const app = createApp(
     // desktop bumps lastOpened in place rather than piling up rows. The
     // collection's trackKeys: ['userId'] makes the write fan out to every other
     // session/device of this user via trackDocs.
-    recordRecentProject: async (userId, { deviceId, deviceLabel, path, name }) => {
+    recordRecentProject: async (
+      userId,
+      { deviceId, deviceLabel, path, name },
+    ) => {
       const _id = `${userId}:${deviceId}:${path}`;
       const trimmed = name.trim();
-      const label = trimmed !== '' ? trimmed : (path.split('/').filter(Boolean).pop() ?? path);
+      const label =
+        trimmed !== ''
+          ? trimmed
+          : (path.split('/').filter(Boolean).pop() ?? path);
       const doc: RecentProject = {
         _id,
         userId,
@@ -142,12 +150,16 @@ const app = createApp(
       const row = await app.db.getDoc(collections.recentProject, id);
       // Ownership check: only the user who recorded it may remove it. Treat an
       // already-missing row as success (idempotent delete).
-      if (row && row.userId !== userId) throw new Error('Recent project not found');
+      if (row && row.userId !== userId)
+        throw new Error('Recent project not found');
       if (row) await app.db.deleteDoc(collections.recentProject, id);
       return { ok: true };
     },
 
-    sendPush: async (_userId, { targetUserId, title, body, page, query, imageUrl }): Promise<{ sent: boolean }> => {
+    sendPush: async (
+      _userId,
+      { targetUserId, title, body, page, query, imageUrl },
+    ): Promise<{ sent: boolean }> => {
       try {
         const result = await app.pushSend({
           targetUserId,
@@ -174,7 +186,10 @@ const app = createApp(
       throw new Error(msg);
     },
 
-    testWorkerDbMutation: async (userId, { text }): Promise<{ id: string; verified: boolean }> => {
+    testWorkerDbMutation: async (
+      userId,
+      { text },
+    ): Promise<{ id: string; verified: boolean }> => {
       const _id = `worker-test-${crypto.randomUUID()}`;
       const todo: Todo = { _id, userId, text, done: false, ...dbDefaults() };
       await app.db.setDoc(collections.todo, todo);
@@ -228,7 +243,9 @@ const app = createApp(
     resetUserSettings: async (userId): Promise<UserSettings> => {
       // Delete the doc so a fresh read falls back to defaults (best-effort — a
       // missing doc already reads as defaults).
-      void app.db.deleteDoc(collections.userSettings, userId).catch(() => {/* noop */});
+      void app.db.deleteDoc(collections.userSettings, userId).catch(() => {
+        /* noop */
+      });
       return DEFAULT_USER_SETTINGS;
     },
 
@@ -252,38 +269,56 @@ const app = createApp(
     configurator.setWorkers(cronTasks, cronHandlers);
     configurator.setOnEmail(async (inbound: InboundEmail) => {
       await Promise.resolve();
-      console.log('[Email] Received:', { from: inbound.from, id: inbound.id, subject: inbound.subject });
+      console.log('[Email] Received:', {
+        from: inbound.from,
+        id: inbound.id,
+        subject: inbound.subject,
+      });
     });
 
     // ── Conversations (AI chat) ────────────────────────────────────────────
     // Note: ConversationDeps.db is set lazily since `app` isn't assigned yet during createApp.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const convDeps: any = { db: null, collections: {}, userGet: () => null, userPrivateGet: () => null };
+    const convDeps: any = {
+      db: null,
+      collections: {},
+      userGet: () => null,
+      userPrivateGet: () => null,
+    };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const convServer = enableConversations(configurator, {
-      conversationCollection: 'conversation',
-      messageCollection: 'message',
-      aiChat: {
-        async *onMessage(session, userMessage) {
-          // `uglyBotRequest` is typed by op name — the result is inferred from
-          // the `textGen` op (no generic) and may be null on failure.
-          const data = await uglyBotRequest('textGen', {
-            model: 'gemini_2_5_flash',
-            messages: [
-              ...session.messages.map((m) => ({ role: m.role, content: m.text })),
-              { role: 'user', content: userMessage },
-            ],
-            options: { maxTokens: 512 },
-          });
-          // `content` is a string OR an array of blocks ([{ type:'text', text }, …]).
-          const content = data?.message.content;
-          yield typeof content === 'string'
-            ? content
-            : (content ?? []).map((b) => (b.type === 'text' ? b.text : '')).join('');
+    const convServer = enableConversations(
+      configurator,
+      {
+        conversationCollection: 'conversation',
+        messageCollection: 'message',
+        aiChat: {
+          async *onMessage(session, userMessage) {
+            // `uglyBotRequest` is typed by op name — the result is inferred from
+            // the `textGen` op (no generic) and may be null on failure.
+            const data = await uglyBotRequest('textGen', {
+              model: 'gemini_2_5_flash',
+              messages: [
+                ...session.messages.map((m) => ({
+                  role: m.role,
+                  content: m.text,
+                })),
+                { role: 'user', content: userMessage },
+              ],
+              options: { maxTokens: 512 },
+            });
+            // `content` is a string OR an array of blocks ([{ type:'text', text }, …]).
+            const content = data?.message.content;
+            yield typeof content === 'string'
+              ? content
+              : (content ?? [])
+                  .map((b) => (b.type === 'text' ? b.text : ''))
+                  .join('');
+          },
         },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       },
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    }, convDeps);
+      convDeps,
+    );
 
     // ── Collaborative editing ──────────────────────────────────────────────
     enableCollab(configurator, {
@@ -291,7 +326,9 @@ const app = createApp(
         try {
           const doc = await app.db.getDoc(collections.collabDoc, docId);
           return doc?.yjsState ?? null;
-        } catch { return null; }
+        } catch {
+          return null;
+        }
       },
       async saveState(docId, state, serialized) {
         await app.db.setDoc(collections.collabDoc, {

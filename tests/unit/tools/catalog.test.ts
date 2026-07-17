@@ -2,7 +2,10 @@
 // Replaces the earlier dynamic-catalog tests — tool availability is now decided
 // statically per mode / project / feature (the monolith's model).
 import { describe, it, expect } from 'vitest';
-import { allowedToolNames, sessionToolSpecs } from '../../../client/agent/tools/gating';
+import {
+  allowedToolNames,
+  sessionToolSpecs,
+} from '../../../client/agent/tools/gating';
 import { toolSearchTool } from '../../../client/agent/tools/toolSearch';
 import { toolRequestTool } from '../../../client/agent/tools/toolRequest';
 
@@ -43,11 +46,19 @@ describe('static tool gating', () => {
     expect(def.has('memory_add')).toBe(true);
     expect(def.has('spec_write')).toBe(true);
 
-    const on = allowedToolNames({ mode: 'single', isUglyApp: false, features: { multiAgent: true } });
+    const on = allowedToolNames({
+      mode: 'single',
+      isUglyApp: false,
+      features: { multiAgent: true },
+    });
     expect(on.has('delegate')).toBe(true);
     expect(on.has('delegate_parallel')).toBe(true);
 
-    const noMem = allowedToolNames({ mode: 'single', isUglyApp: false, features: { memory: false } });
+    const noMem = allowedToolNames({
+      mode: 'single',
+      isUglyApp: false,
+      features: { memory: false },
+    });
     expect(noMem.has('memory_add')).toBe(false);
   });
 
@@ -65,16 +76,24 @@ describe('static tool gating', () => {
 
 describe('tool_request / tool_search utilities', () => {
   it('tool_request explains why an existing tool is out of scope', async () => {
-    const out = await toolRequestTool.run({ name: 'blackboard_post' }, undefined);
+    const out = await toolRequestTool.run(
+      { name: 'blackboard_post' },
+      undefined,
+    );
     expect(out).toMatch(/gated/i);
   });
 
   it('tool_request reports a truly unknown tool', async () => {
-    expect(await toolRequestTool.run({ name: 'does_not_exist' }, undefined)).toMatch(/no such tool/i);
+    expect(
+      await toolRequestTool.run({ name: 'does_not_exist' }, undefined),
+    ).toMatch(/no such tool/i);
   });
 
   it('tool_search ranks the catalog by intent', async () => {
-    const out = await toolSearchTool.run({ query: 'fetch the contents of a web page url' }, undefined);
+    const out = await toolSearchTool.run(
+      { query: 'fetch the contents of a web page url' },
+      undefined,
+    );
     expect(out).toContain('web_fetch');
   });
 });

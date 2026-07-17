@@ -41,7 +41,10 @@ import { buildId } from '../../../shared/Build.js';
 // Trying both, in this order, covers prod and dev. It happens once per indexer
 // version (then the `.complete` sentinel short-circuits), so the extra probe is
 // negligible.
-const ASSET_BASES = [`/${buildId}/coding-agent/indexer`, `/coding-agent/indexer`];
+const ASSET_BASES = [
+  `/${buildId}/coding-agent/indexer`,
+  `/coding-agent/indexer`,
+];
 
 export interface IndexerManifest {
   version: string;
@@ -50,7 +53,9 @@ export interface IndexerManifest {
 
 /** Root of the on-disk cache, shared with the Python's model cache. */
 export function cacheRoot(): string {
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  const env = (
+    globalThis as { process?: { env?: Record<string, string | undefined> } }
+  ).process?.env;
   return env?.UGLY_STUDIO_CACHE ?? join(homedir(), '.ugly-studio');
 }
 
@@ -118,7 +123,9 @@ export async function ensureIndexerSources(): Promise<string> {
       await rename(staging, dir);
       return dir;
     } catch (e) {
-      await rm(staging, { recursive: true, force: true }).catch(() => undefined);
+      await rm(staging, { recursive: true, force: true }).catch(
+        () => undefined,
+      );
       throw e;
     } finally {
       inflight = null;
@@ -143,7 +150,9 @@ async function fetchFromOrigin(name: string): Promise<Response> {
     if ((res.headers.get('content-type') ?? '').includes('text/html')) continue; // SPA shell
     return res;
   }
-  throw new Error(`indexer asset ${name} not served by the origin (last HTTP ${lastStatus})`);
+  throw new Error(
+    `indexer asset ${name} not served by the origin (last HTTP ${lastStatus})`,
+  );
 }
 
 async function fetchManifest(): Promise<IndexerManifest> {

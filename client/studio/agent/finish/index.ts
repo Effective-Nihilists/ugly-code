@@ -7,18 +7,41 @@
 import { ensureSessionWorkspace } from '../sessionWorkspace';
 import { git } from './gitExec';
 import { derivedCommitMessage } from './squashMerge';
-import { runSquashAndCleanup, startFinishPipeline, type RunningFinish } from './finishPipeline';
-import { refreshWorktree, teardownWorktree, worktreeAheadCount, worktreeBehindCount } from './worktreeOps';
-import type { FinishEventPayload, FinishOptions, FinishResult, FinishStage, SessionWorktree } from './types';
+import {
+  runSquashAndCleanup,
+  startFinishPipeline,
+  type RunningFinish,
+} from './finishPipeline';
+import {
+  refreshWorktree,
+  teardownWorktree,
+  worktreeAheadCount,
+  worktreeBehindCount,
+} from './worktreeOps';
+import type {
+  FinishEventPayload,
+  FinishOptions,
+  FinishResult,
+  FinishStage,
+  SessionWorktree,
+} from './types';
 
-export type { FinishEventPayload, FinishOptions, FinishResult, FinishStage } from './types';
+export type {
+  FinishEventPayload,
+  FinishOptions,
+  FinishResult,
+  FinishStage,
+} from './types';
 
 // One in-flight pipeline per session (for Stop). A session finishes serially, so
 // a single-slot map is enough.
 const running = new Map<string, RunningFinish>();
 
 /** Build the worktree descriptor, or null when the session isn't isolated. */
-async function resolveWorktree(sessionId: string, projectPath: string | null): Promise<SessionWorktree | null> {
+async function resolveWorktree(
+  sessionId: string,
+  projectPath: string | null,
+): Promise<SessionWorktree | null> {
   if (!projectPath) return null;
   const ws = await ensureSessionWorkspace(sessionId, projectPath);
   if (!ws.isWorktree || !ws.dir || !ws.branch) return null;
@@ -26,7 +49,12 @@ async function resolveWorktree(sessionId: string, projectPath: string | null): P
   // finish time; the common case is the branch the worktree forked from.
   const head = await git(projectPath, ['rev-parse', '--abbrev-ref', 'HEAD']);
   const parentBranch = head.stdout.trim() || 'main';
-  return { path: ws.dir, branch: ws.branch, parentBranch, mainRepo: projectPath };
+  return {
+    path: ws.dir,
+    branch: ws.branch,
+    parentBranch,
+    mainRepo: projectPath,
+  };
 }
 
 /** Run the Finish pipeline. Emits finish_event frames via `emit`. */
@@ -40,7 +68,11 @@ export async function runFinish(args: {
 }): Promise<FinishResult> {
   const worktree = await resolveWorktree(args.sessionId, args.projectPath);
   if (!worktree) {
-    return { ok: false, message: 'This session has no isolated worktree to finish (it runs on the main branch, or is un-provisioned).' };
+    return {
+      ok: false,
+      message:
+        'This session has no isolated worktree to finish (it runs on the main branch, or is un-provisioned).',
+    };
   }
   const handle = startFinishPipeline({
     sessionId: args.sessionId,
@@ -72,17 +104,30 @@ export async function mergeFinished(args: {
   emit: (e: FinishEventPayload) => void;
 }): Promise<FinishResult> {
   const worktree = await resolveWorktree(args.sessionId, args.projectPath);
-  if (!worktree) return { ok: false, message: 'No isolated worktree to merge.' };
+  if (!worktree)
+    return { ok: false, message: 'No isolated worktree to merge.' };
   // Empty message (user cleared the review field) → derive a safe fallback so
   // `git commit -m` never runs with an empty subject.
   const commitMessage =
     args.commitMessage.trim() ||
-    derivedCommitMessage({ title: null, firstUserMessageText: null, compositeId: args.sessionId });
-  return runSquashAndCleanup({ sessionId: args.sessionId, worktree, commitMessage, emit: args.emit });
+    derivedCommitMessage({
+      title: null,
+      firstUserMessageText: null,
+      compositeId: args.sessionId,
+    });
+  return runSquashAndCleanup({
+    sessionId: args.sessionId,
+    worktree,
+    commitMessage,
+    emit: args.emit,
+  });
 }
 
 /** Abandon: discard the worktree + branch without merging. */
-export async function abandonSession(sessionId: string, projectPath: string | null): Promise<{ ok: boolean; error?: string }> {
+export async function abandonSession(
+  sessionId: string,
+  projectPath: string | null,
+): Promise<{ ok: boolean; error?: string }> {
   const worktree = await resolveWorktree(sessionId, projectPath);
   if (!worktree) return { ok: true }; // nothing isolated to tear down
   try {
@@ -102,13 +147,21 @@ export interface RefreshResult {
 }
 
 /** Pull from parent: merge the parent branch into the worktree. */
-export async function refreshSession(sessionId: string, projectPath: string | null): Promise<RefreshResult> {
+export async function refreshSession(
+  sessionId: string,
+  projectPath: string | null,
+): Promise<RefreshResult> {
   const worktree = await resolveWorktree(sessionId, projectPath);
   if (!worktree) return { ok: true };
   const outcome = await refreshWorktree(worktree);
   switch (outcome.kind) {
     case 'conflict':
-      return { ok: false, blocked: true, conflicts: outcome.conflicts, conflictKind: 'merge' };
+      return {
+        ok: false,
+        blocked: true,
+        conflicts: outcome.conflicts,
+        conflictKind: 'merge',
+      };
     case 'skipped':
     case 'noop':
     case 'merged':
@@ -117,7 +170,10 @@ export async function refreshSession(sessionId: string, projectPath: string | nu
 }
 
 /** Commits the session branch is ahead of parent (0 when not a worktree). */
-export async function aheadCount(sessionId: string, projectPath: string | null): Promise<number> {
+export async function aheadCount(
+  sessionId: string,
+  projectPath: string | null,
+): Promise<number> {
   const worktree = await resolveWorktree(sessionId, projectPath);
   if (!worktree) return 0;
   const n = await worktreeAheadCount(worktree);
@@ -125,7 +181,10 @@ export async function aheadCount(sessionId: string, projectPath: string | null):
 }
 
 /** Commits the parent is ahead of the worktree (0 when not a worktree). */
-export async function behindCount(sessionId: string, projectPath: string | null): Promise<number> {
+export async function behindCount(
+  sessionId: string,
+  projectPath: string | null,
+): Promise<number> {
   const worktree = await resolveWorktree(sessionId, projectPath);
   if (!worktree) return 0;
   const n = await worktreeBehindCount(worktree);

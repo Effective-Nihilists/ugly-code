@@ -12,7 +12,10 @@ import { DEFAULT_USER_SETTINGS } from '../../shared/userSettings';
 const settingsDoc = (glmCodingKey?: string) => ({
   data: JSON.stringify({
     ...DEFAULT_USER_SETTINGS,
-    codingAgent: { ...DEFAULT_USER_SETTINGS.codingAgent, ...(glmCodingKey ? { glmCodingKey } : {}) },
+    codingAgent: {
+      ...DEFAULT_USER_SETTINGS.codingAgent,
+      ...(glmCodingKey ? { glmCodingKey } : {}),
+    },
   }),
 });
 
@@ -60,7 +63,9 @@ describe('makeResolveApiKey', () => {
     // propagates through streamAgentTurn and shows the user the REAL reason.
     const getDoc = vi.fn().mockRejectedValue(new Error('D1_ERROR: overloaded'));
     const resolve = makeResolveApiKey(() => ({ getDoc }));
-    await expect(resolve('u1', 'glm_coding_plan')).rejects.toThrow(/z\.?ai|coding plan|load/i);
+    await expect(resolve('u1', 'glm_coding_plan')).rejects.toThrow(
+      /z\.?ai|coding plan|load/i,
+    );
   });
 
   it('never throws for a metered model even if the DB handle is unavailable', async () => {
@@ -74,6 +79,8 @@ describe('makeResolveApiKey', () => {
   it('handles a user with no settings doc at all', async () => {
     const getDoc = vi.fn().mockResolvedValue(null);
     const resolve = makeResolveApiKey(() => ({ getDoc }));
-    await expect(resolve('new-user', 'glm_coding_plan')).resolves.toBeUndefined();
+    await expect(
+      resolve('new-user', 'glm_coding_plan'),
+    ).resolves.toBeUndefined();
   });
 });

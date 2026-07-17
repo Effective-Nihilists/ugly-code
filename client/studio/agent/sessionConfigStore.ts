@@ -18,7 +18,9 @@ export {
 } from '../../../shared/sessionConfig';
 
 /** Read a session's persisted config from the server (null if none stored yet). */
-export async function readServerConfig(sessionId: string): Promise<SessionConfig | null> {
+export async function readServerConfig(
+  sessionId: string,
+): Promise<SessionConfig | null> {
   const projectId = await resolveProjectId(getActiveProjectPath() ?? '');
   if (!projectId) return null;
   const data = await sessionApi.list({ projectId });
@@ -27,7 +29,10 @@ export async function readServerConfig(sessionId: string): Promise<SessionConfig
 }
 
 /** Persist a session's config to the server (per-session; does NOT touch others). */
-export async function writeServerConfig(sessionId: string, config: SessionConfig): Promise<void> {
+export async function writeServerConfig(
+  sessionId: string,
+  config: SessionConfig,
+): Promise<void> {
   const projectId = await resolveProjectId(getActiveProjectPath() ?? '');
   if (!projectId) return;
   await sessionApi.upsert({ sessionId, projectId, config });

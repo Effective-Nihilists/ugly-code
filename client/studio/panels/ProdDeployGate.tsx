@@ -17,24 +17,45 @@ export function ProdDeployGate({
     <div
       data-id="prod-publish-gate"
       style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: '100%', gap: 12, padding: 24, textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        gap: 12,
+        padding: 24,
+        textAlign: 'center',
       }}
     >
-      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+      <span
+        style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}
+      >
         No production {what} yet
       </span>
-      <span style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 440, lineHeight: 1.5 }}>
-        This project hasn’t been published, so there’s no production {what} to show.
-        Publish it first to provision it — then it’ll appear here.
+      <span
+        style={{
+          fontSize: 13,
+          color: 'var(--text-secondary)',
+          maxWidth: 440,
+          lineHeight: 1.5,
+        }}
+      >
+        This project hasn’t been published, so there’s no production {what} to
+        show. Publish it first to provision it — then it’ll appear here.
       </span>
       {onDeploy && (
         <button
           data-id="publish-first"
           onClick={onDeploy}
           style={{
-            background: 'var(--accent)', color: 'var(--on-accent, #fff)', border: 'none',
-            borderRadius: 6, padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            background: 'var(--accent)',
+            color: 'var(--on-accent, #fff)',
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
           }}
         >
           Deploy project →

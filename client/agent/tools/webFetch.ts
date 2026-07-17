@@ -16,7 +16,11 @@ const SPEC: TextGenTool = {
     type: 'object',
     properties: {
       url: { type: 'string', description: 'http/https URL to fetch.' },
-      format: { type: 'string', enum: ['readability', 'text', 'html'], description: 'Extraction format.' },
+      format: {
+        type: 'string',
+        enum: ['readability', 'text', 'html'],
+        description: 'Extraction format.',
+      },
     },
     required: ['url'],
     additionalProperties: false,
@@ -27,14 +31,26 @@ export const webFetchTool: ToolModule = {
   name: 'web_fetch',
   spec: SPEC,
   async run(input) {
-    const url = (typeof input.url === 'string' ? input.url : '');
-    if (!/^https?:\/\//i.test(url)) return `web_fetch: only http/https URLs are supported (got ${url})`;
-    const format = input.format === 'html' || input.format === 'text' ? input.format : 'readability';
+    const url = typeof input.url === 'string' ? input.url : '';
+    if (!/^https?:\/\//i.test(url))
+      return `web_fetch: only http/https URLs are supported (got ${url})`;
+    const format =
+      input.format === 'html' || input.format === 'text'
+        ? input.format
+        : 'readability';
     try {
       const page = await native.browse.extract(url, { format });
       return `# ${page.title}\n${page.url}\n\n${page.content.slice(0, 20000)}`;
     } catch (e) {
-      console.error('[webFetchTool:extract]', JSON.stringify({ url, format, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[webFetchTool:extract]',
+        JSON.stringify({
+          url,
+          format,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       return `web_fetch failed: ${(e as Error).message}`;
     }
   },

@@ -19,16 +19,33 @@ function controlPath(projectPath: string): string {
 }
 
 /** Agent side: request a dev-server action. Returns the nonce written. */
-export async function writeDevControl(projectPath: string, cmd: DevControlCmd, nonce: string): Promise<void> {
-  await native.fs.mkdir(`${projectPath.replace(/\/+$/, '')}/.ugly-studio`, true);
-  await native.fs.writeFile(controlPath(projectPath), JSON.stringify({ cmd, nonce } satisfies DevControl));
+export async function writeDevControl(
+  projectPath: string,
+  cmd: DevControlCmd,
+  nonce: string,
+): Promise<void> {
+  await native.fs.mkdir(
+    `${projectPath.replace(/\/+$/, '')}/.ugly-studio`,
+    true,
+  );
+  await native.fs.writeFile(
+    controlPath(projectPath),
+    JSON.stringify({ cmd, nonce } satisfies DevControl),
+  );
 }
 
 /** PreviewPanel side: read the pending command (or null if none / unreadable). */
-export async function readDevControl(projectPath: string): Promise<DevControl | null> {
+export async function readDevControl(
+  projectPath: string,
+): Promise<DevControl | null> {
   try {
-    const raw = JSON.parse(await native.fs.readFile(controlPath(projectPath))) as Partial<DevControl>;
-    if ((raw.cmd === 'start' || raw.cmd === 'stop' || raw.cmd === 'restart') && typeof raw.nonce === 'string') {
+    const raw = JSON.parse(
+      await native.fs.readFile(controlPath(projectPath)),
+    ) as Partial<DevControl>;
+    if (
+      (raw.cmd === 'start' || raw.cmd === 'stop' || raw.cmd === 'restart') &&
+      typeof raw.nonce === 'string'
+    ) {
       return { cmd: raw.cmd, nonce: raw.nonce };
     }
     return null;

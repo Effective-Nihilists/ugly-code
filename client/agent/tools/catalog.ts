@@ -14,8 +14,13 @@ export function fullCatalog(): AgentToolSpec[] {
 }
 
 /** Rank the full catalog against a natural-language query by word overlap. */
-export function searchCatalog(query: string): { name: string; description: string; score: number }[] {
-  const words = query.toLowerCase().split(/\W+/).filter((w) => w.length > 2);
+export function searchCatalog(
+  query: string,
+): { name: string; description: string; score: number }[] {
+  const words = query
+    .toLowerCase()
+    .split(/\W+/)
+    .filter((w) => w.length > 2);
   return fullCatalog()
     .map((t) => {
       const hay = `${t.name} ${t.description}`.toLowerCase();

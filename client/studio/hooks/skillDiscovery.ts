@@ -16,7 +16,9 @@ import { getActiveProjectPath } from './useSocket';
 import type { Skill } from './useSlashCommands';
 
 /** Minimal `---\nkey: value\n---` frontmatter parser (no YAML dep). */
-function parseFrontmatter(source: string): Record<string, string | undefined> | null {
+function parseFrontmatter(
+  source: string,
+): Record<string, string | undefined> | null {
   if (!source.startsWith('---')) return null;
   const end = source.indexOf('\n---', 3);
   if (end === -1) return null;
@@ -30,7 +32,10 @@ function parseFrontmatter(source: string): Record<string, string | undefined> | 
   return out;
 }
 
-async function loadSkillsFromDir(dir: string, scope: Skill['scope']): Promise<Skill[]> {
+async function loadSkillsFromDir(
+  dir: string,
+  scope: Skill['scope'],
+): Promise<Skill[]> {
   let entries: { name: string; isDirectory: boolean }[];
   try {
     entries = await native.fs.readdir(dir);
@@ -43,7 +48,13 @@ async function loadSkillsFromDir(dir: string, scope: Skill['scope']): Promise<Sk
     try {
       const skillPath = `${dir}/${e.name}/SKILL.md`;
       const fm = parseFrontmatter(await native.fs.readFile(skillPath));
-      if (fm?.name) out.push({ name: fm.name, description: fm.description ?? '', scope, path: skillPath });
+      if (fm?.name)
+        out.push({
+          name: fm.name,
+          description: fm.description ?? '',
+          scope,
+          path: skillPath,
+        });
     } catch {
       /* not a skill dir (no SKILL.md) — skip */
     }
@@ -60,7 +71,9 @@ function homeFromProject(projectPath: string): string | null {
 async function loadPluginSkills(home: string): Promise<Skill[]> {
   let enabled: Set<string>;
   try {
-    const settings = JSON.parse(await native.fs.readFile(`${home}/.claude/settings.json`)) as {
+    const settings = JSON.parse(
+      await native.fs.readFile(`${home}/.claude/settings.json`),
+    ) as {
       enabledPlugins?: Record<string, boolean>;
     };
     enabled = new Set(
@@ -74,7 +87,11 @@ async function loadPluginSkills(home: string): Promise<Skill[]> {
   if (enabled.size === 0) return [];
   let manifest: { plugins?: Record<string, { installPath?: string }[]> };
   try {
-    manifest = JSON.parse(await native.fs.readFile(`${home}/.claude/plugins/installed_plugins.json`)) as typeof manifest;
+    manifest = JSON.parse(
+      await native.fs.readFile(
+        `${home}/.claude/plugins/installed_plugins.json`,
+      ),
+    ) as typeof manifest;
   } catch {
     return [];
   }
@@ -84,7 +101,9 @@ async function loadPluginSkills(home: string): Promise<Skill[]> {
     const installPath = entries[0]?.installPath;
     if (installPath) dirs.push(`${installPath}/skills`);
   }
-  const all = await Promise.all(dirs.map((d) => loadSkillsFromDir(d, 'plugin')));
+  const all = await Promise.all(
+    dirs.map((d) => loadSkillsFromDir(d, 'plugin')),
+  );
   return all.flat();
 }
 
@@ -92,8 +111,12 @@ export async function discoverSkills(): Promise<Skill[]> {
   const project = getActiveProjectPath();
   const home = project ? homeFromProject(project) : null;
   const [projectSkills, userSkills, pluginSkills] = await Promise.all([
-    project ? loadSkillsFromDir(`${project}/.claude/skills`, 'project') : Promise.resolve([] as Skill[]),
-    home ? loadSkillsFromDir(`${home}/.claude/skills`, 'user') : Promise.resolve([] as Skill[]),
+    project
+      ? loadSkillsFromDir(`${project}/.claude/skills`, 'project')
+      : Promise.resolve([] as Skill[]),
+    home
+      ? loadSkillsFromDir(`${home}/.claude/skills`, 'user')
+      : Promise.resolve([] as Skill[]),
     home ? loadPluginSkills(home) : Promise.resolve([] as Skill[]),
   ]);
   // Project overrides user overrides plugin.
@@ -108,9 +131,13 @@ export async function discoverSkills(): Promise<Skill[]> {
  *  Each line: `- <name> (<scope>): <description> [<path>]`. Empty → "(none)".
  *  Pure — the agent reads `path` with read_file (per the skills_usage rules). */
 export function formatAvailableSkills(skills: Skill[]): string {
-  if (skills.length === 0) return '<available_skills>\n(none)\n</available_skills>';
+  if (skills.length === 0)
+    return '<available_skills>\n(none)\n</available_skills>';
   const lines = skills
     .filter((s) => s.kind !== 'command')
-    .map((s) => `- ${s.name} (${s.scope}): ${s.description}${s.path ? `\n  path: ${s.path}` : ''}`);
+    .map(
+      (s) =>
+        `- ${s.name} (${s.scope}): ${s.description}${s.path ? `\n  path: ${s.path}` : ''}`,
+    );
   return `<available_skills>\n${lines.join('\n')}\n</available_skills>`;
 }

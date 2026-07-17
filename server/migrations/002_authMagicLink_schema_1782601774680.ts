@@ -10,6 +10,10 @@ export async function up(query: typeof pgQuery): Promise<void> {
     updated  TIMESTAMPTZ NOT NULL DEFAULT now(),
     version  INTEGER NOT NULL DEFAULT 1
   )`);
-  await query(`CREATE INDEX IF NOT EXISTS "idx_authMagicLink_data" ON "authMagicLink" USING GIN (data)`);
-  await query(`CREATE INDEX IF NOT EXISTS "idx_authMagicLink_expiresAt" ON "authMagicLink" ((data->>'expiresAt'))`);
+  await query(
+    `CREATE INDEX IF NOT EXISTS "idx_authMagicLink_data" ON "authMagicLink" USING GIN (data)`,
+  );
+  await query(
+    `CREATE INDEX IF NOT EXISTS "idx_authMagicLink_expiresAt" ON "authMagicLink" ((data->>'expiresAt'))`,
+  );
 }

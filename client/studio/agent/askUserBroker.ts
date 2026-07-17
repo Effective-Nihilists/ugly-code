@@ -20,7 +20,10 @@ export function awaitAskUser(toolCallId: string): Promise<string> {
 }
 
 /** Resolve a pending ask_user call. Returns false when the id is unknown. */
-export function answerPendingAskUser(toolCallId: string, answer: string): boolean {
+export function answerPendingAskUser(
+  toolCallId: string,
+  answer: string,
+): boolean {
   const resolve = pending.get(toolCallId);
   if (!resolve) return false;
   pending.delete(toolCallId);

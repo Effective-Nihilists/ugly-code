@@ -76,7 +76,9 @@ if (!MODE_FLAG) MODE = 'both';
 else if (MODE_FLAG === '--capture') MODE = 'capture';
 else if (MODE_FLAG === '--submit') MODE = 'submit';
 else {
-  console.error(`[${SLUG}] unknown mode flag "${MODE_FLAG}" — use --capture or --submit`);
+  console.error(
+    `[${SLUG}] unknown mode flag "${MODE_FLAG}" — use --capture or --submit`,
+  );
   process.exit(2);
 }
 
@@ -96,7 +98,9 @@ const SCREENSHOTS_DIR = path.join(
 // --- Read persona credentials ----------------------------------------
 const envPath = path.join(BOT_DIR, '.env');
 if (!fs.existsSync(envPath)) {
-  console.error(`[${SLUG}] missing ${envPath} — run \`ugly-app auth:create-bot\` first`);
+  console.error(
+    `[${SLUG}] missing ${envPath} — run \`ugly-app auth:create-bot\` first`,
+  );
   process.exit(2);
 }
 const envText = fs.readFileSync(envPath, 'utf-8');
@@ -200,7 +204,10 @@ async function submitFeedback({ type, message, url, screenshot, elementMap }) {
   try {
     await execFileP('npx', args, { cwd: REPO, timeout: 30_000 });
   } catch (err) {
-    console.error(`[${SLUG}] feedback submit failed:`, err.stderr ?? err.message);
+    console.error(
+      `[${SLUG}] feedback submit failed:`,
+      err.stderr ?? err.message,
+    );
   }
 }
 
@@ -219,7 +226,10 @@ const DEFAULT_INTERACTIONS = [
   {
     name: 'hover-first',
     actions: [
-      { hover: '[data-id]:not([data-id=feedback-button]):not(input):not(textarea)' },
+      {
+        hover:
+          '[data-id]:not([data-id=feedback-button]):not(input):not(textarea)',
+      },
       { wait: 600 },
     ],
   },
@@ -255,10 +265,7 @@ function loadInteractions() {
     if (
       Array.isArray(parsed) &&
       parsed.every(
-        (e) =>
-          e &&
-          typeof e.name === 'string' &&
-          Array.isArray(e.actions),
+        (e) => e && typeof e.name === 'string' && Array.isArray(e.actions),
       )
     ) {
       return parsed;
@@ -335,12 +342,19 @@ async function runAction(page, action) {
 
 // --- Per-route helpers ----------------------------------------------
 function routeFilenames(route) {
-  const slugForFile = route === '/' ? 'home' : route.replace(/[^a-z0-9]+/gi, '-');
+  const slugForFile =
+    route === '/' ? 'home' : route.replace(/[^a-z0-9]+/gi, '-');
   return {
     slugForFile,
     screenshotPath: path.join(SCREENSHOTS_DIR, `${slugForFile}.png`),
-    elementMapPath: path.join(SCREENSHOTS_DIR, `${slugForFile}.element-map.json`),
-    legacyUxReportPath: path.join(SCREENSHOTS_DIR, `${slugForFile}.ux-report.json`),
+    elementMapPath: path.join(
+      SCREENSHOTS_DIR,
+      `${slugForFile}.element-map.json`,
+    ),
+    legacyUxReportPath: path.join(
+      SCREENSHOTS_DIR,
+      `${slugForFile}.ux-report.json`,
+    ),
     perInteractionUxReportPath: (name) =>
       path.join(SCREENSHOTS_DIR, `${slugForFile}.${name}.ux-report.json`),
     url: `${BASE_URL}${route}`,
@@ -415,7 +429,8 @@ function loadFindings(route) {
   if (fs.existsSync(findingsPath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(findingsPath, 'utf-8'));
-      if (Array.isArray(parsed)) findings = parsed.filter((f) => f && f.message);
+      if (Array.isArray(parsed))
+        findings = parsed.filter((f) => f && f.message);
     } catch {
       /* ignore — fall through to placeholder */
     }

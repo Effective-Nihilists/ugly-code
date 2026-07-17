@@ -8,5 +8,7 @@ import { dirname, join } from 'node:path';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const entry = join(root, 'client', 'cli', 'index.ts');
 const tsx = join(root, 'node_modules', '.bin', 'tsx');
-const r = spawnSync(tsx, [entry, ...process.argv.slice(2)], { stdio: 'inherit' });
+const r = spawnSync(tsx, [entry, ...process.argv.slice(2)], {
+  stdio: 'inherit',
+});
 process.exit(r.status ?? 1);

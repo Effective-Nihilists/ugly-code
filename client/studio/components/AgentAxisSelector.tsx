@@ -321,12 +321,12 @@ function ModelAxisDropdown({
     value.kind === 'auto' || value.kind === 'auto-cheap'
       ? 'auto'
       : value.kind === 'max'
-      ? 'auto:max'
-      : value.kind === 'mid'
-      ? value.survivor
-      : value.kind === 'group'
-      ? `auto:group(${value.models.length})`
-      : value.model;
+        ? 'auto:max'
+        : value.kind === 'mid'
+          ? value.survivor
+          : value.kind === 'group'
+            ? `auto:group(${value.models.length})`
+            : value.model;
   const handleChange = (s: string) => {
     if (s === 'auto') onChange({ kind: 'auto' });
     else if (s === 'auto:max') onChange({ kind: 'max' });

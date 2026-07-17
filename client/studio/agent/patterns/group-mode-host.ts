@@ -11,7 +11,12 @@
 // (persona diversity → picker over diffs) is faithful.
 import type { MaxModeCallbacks, MaxModePeer, PeerProvider } from './peerTypes';
 import { pickWinner } from './picker';
-import { getPersona, isPersonaId, applyPersonaToInitialPrompt, type PersonaId } from './peer-personas';
+import {
+  getPersona,
+  isPersonaId,
+  applyPersonaToInitialPrompt,
+  type PersonaId,
+} from './peer-personas';
 
 /** Round-robin persona assignment across the pool (contrarian always represented). */
 const DEFAULT_PERSONA_ROTATION: PersonaId[] = [
@@ -40,17 +45,28 @@ export interface GroupModeResult {
   winnerDiff: string;
   reason: string;
   /** Per-peer diffs captured before teardown (for eval / debugging). */
-  peerDiffs: readonly { peerId: string; model: string; persona: string; diff: string; isWinner: boolean }[];
+  peerDiffs: readonly {
+    peerId: string;
+    model: string;
+    persona: string;
+    diff: string;
+    isWinner: boolean;
+  }[];
 }
 
-export async function runGroupMode(input: GroupModeInput): Promise<GroupModeResult> {
-  if (input.peerModels.length === 0) throw new Error('group-mode: empty model pool');
+export async function runGroupMode(
+  input: GroupModeInput,
+): Promise<GroupModeResult> {
+  if (input.peerModels.length === 0)
+    throw new Error('group-mode: empty model pool');
   const personaIds = input.peerModels.map((modelId, i) => {
     const explicit = input.personas?.[modelId];
     if (explicit && isPersonaId(explicit)) return explicit;
     return DEFAULT_PERSONA_ROTATION[i % DEFAULT_PERSONA_ROTATION.length];
   });
-  input.onProgress?.(`Spawning ${input.peerModels.length} group peers (${personaIds.join(', ')})…`);
+  input.onProgress?.(
+    `Spawning ${input.peerModels.length} group peers (${personaIds.join(', ')})…`,
+  );
   const peers = await input.callbacks.spawnPeers(input.peerModels, {
     peerKind: 'group',
     personas: personaIds,
@@ -60,7 +76,10 @@ export async function runGroupMode(input: GroupModeInput): Promise<GroupModeResu
     await Promise.all(
       peers.map((peer, i) => {
         const persona = getPersona(personaIds[i]);
-        return input.callbacks.sendToPeerAndSettle(peer, applyPersonaToInitialPrompt(input.userRequest, persona));
+        return input.callbacks.sendToPeerAndSettle(
+          peer,
+          applyPersonaToInitialPrompt(input.userRequest, persona),
+        );
       }),
     );
     // Capture each peer's diff before any teardown.
@@ -101,10 +120,16 @@ export async function runGroupMode(input: GroupModeInput): Promise<GroupModeResu
       isWinner: d.peer.id === winner.id,
     }));
     // Tear down losers; keep the winner's worktree for the caller to apply.
-    await Promise.all(peers.filter((p) => p.id !== winner.id).map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)));
+    await Promise.all(
+      peers
+        .filter((p) => p.id !== winner.id)
+        .map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)),
+    );
     return { winner, winnerDiff, reason, peerDiffs };
   } catch (err) {
-    await Promise.all(peers.map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)));
+    await Promise.all(
+      peers.map((p) => input.callbacks.tearDownPeer(p).catch(() => undefined)),
+    );
     throw err;
   }
 }

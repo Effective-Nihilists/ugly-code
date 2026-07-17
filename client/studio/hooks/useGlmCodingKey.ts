@@ -36,8 +36,8 @@ function hydrate(socket: SettingsSocket): Promise<void> {
   hydrating = socket
     .request('getUserSettings', {})
     .then((r) => {
-      cached = (r as { codingAgent?: { glmCodingKey?: string } } | null)?.codingAgent
-        ?.glmCodingKey;
+      cached = (r as { codingAgent?: { glmCodingKey?: string } } | null)
+        ?.codingAgent?.glmCodingKey;
       hydrated = true;
       hydrating = null;
       notify();
@@ -89,7 +89,8 @@ export function useGlmCodingKey(): GlmCodingKeyApi {
       if (!socket) throw new Error('Not connected — cannot save the key.');
       // `null` clears (mergeUserSettings treats null as "remove"); '' would be
       // stored verbatim and then read back as a present-but-empty key.
-      const trimmed = next === null ? null : next.trim() === '' ? null : next.trim();
+      const trimmed =
+        next === null ? null : next.trim() === '' ? null : next.trim();
       await socket.request('updateUserSettings', {
         codingAgent: { glmCodingKey: trimmed },
       });

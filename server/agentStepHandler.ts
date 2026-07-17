@@ -14,8 +14,17 @@
 //     tools. Cheaper (skips the large AGENT_SYSTEM_PROMPT) and avoids the model
 //     emitting a tool_use block where the caller expected JSON/prose.
 import { uglyBotRequest } from 'ugly-app';
-import { isByoKeyTextGenModel, type ReasoningEffort, type TextGenModel } from 'ugly-app/shared';
-import { AGENT_DEFAULT_MODEL, AGENT_SYSTEM_PROMPT, AGENT_TOOLS, type AgentMessage } from '../shared/agent';
+import {
+  isByoKeyTextGenModel,
+  type ReasoningEffort,
+  type TextGenModel,
+} from 'ugly-app/shared';
+import {
+  AGENT_DEFAULT_MODEL,
+  AGENT_SYSTEM_PROMPT,
+  AGENT_TOOLS,
+  type AgentMessage,
+} from '../shared/agent';
 
 export interface AgentStepInput {
   messages: AgentMessage[];
@@ -58,12 +67,18 @@ export async function agentStepHandler(
 
   const data = await uglyBotRequest('textGen', {
     model: resolvedModel,
-    messages: noTools ? history : [{ role: 'system', content: AGENT_SYSTEM_PROMPT }, ...history],
+    messages: noTools
+      ? history
+      : [{ role: 'system', content: AGENT_SYSTEM_PROMPT }, ...history],
     ...(noTools ? {} : { tools: AGENT_TOOLS }),
-    options: { maxTokens: maxTokens ?? 8192, ...(reasoning ? { reasoningEffort: reasoning } : {}) },
+    options: {
+      maxTokens: maxTokens ?? 8192,
+      ...(reasoning ? { reasoningEffort: reasoning } : {}),
+    },
     // Forwarded per request; ugly.bot relays it to Z.ai and never persists it.
     ...(apiKey ? { apiKey } : {}),
   });
-  if (!data?.message) throw new Error('Agent step failed: no response from model');
+  if (!data?.message)
+    throw new Error('Agent step failed: no response from model');
   return { message: data.message as AgentMessage };
 }

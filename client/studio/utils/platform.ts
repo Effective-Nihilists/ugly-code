@@ -7,7 +7,8 @@
  */
 export const isMac = /Mac|iPhone|iPad/i.test(navigator.userAgent);
 export const isWindows = /Windows/i.test(navigator.userAgent);
-export const isLinux = !isMac && !isWindows && /Linux/i.test(navigator.userAgent);
+export const isLinux =
+  !isMac && !isWindows && /Linux/i.test(navigator.userAgent);
 
 /**
  * Localized name of the host OS's file manager, used for context-menu

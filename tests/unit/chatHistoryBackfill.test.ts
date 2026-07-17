@@ -44,10 +44,10 @@ interface MockServer {
   /** Returns a PAGE of messages. When beforeId is undefined, returns the NEWEST
    *  page. When beforeId is set, returns the page BEFORE that id.
    *  Messages within a page are in CHRONOLOGICAL order (oldest first). */
-  listMessages(opts: {
-    limit: number;
-    beforeId?: string;
-  }): { messages: WireMessage[]; hasMore: boolean };
+  listMessages(opts: { limit: number; beforeId?: string }): {
+    messages: WireMessage[];
+    hasMore: boolean;
+  };
 }
 
 /** Creates a mock server that simulates the chatListMessages API.
@@ -128,7 +128,7 @@ describe('chat history backfill ordering', () => {
     expect(allHistory[0].seq).toBe(0);
     // Newest last → seq 199 at index 199
     expect(allHistory[199].seq).toBe(199);
-    
+
     for (let i = 1; i < allHistory.length; i++) {
       expect(allHistory[i].seq).toBe(allHistory[i - 1].seq + 1);
     }
@@ -197,7 +197,8 @@ describe('chat history backfill edge cases', () => {
     const origListMessages = server.listMessages.bind(server);
     server.listMessages = (opts) => {
       pageNum++;
-      if (pageNum === 1) return { messages: msgs.slice(60, 106), hasMore: true };
+      if (pageNum === 1)
+        return { messages: msgs.slice(60, 106), hasMore: true };
       if (pageNum === 2) return { messages: msgs.slice(40, 80), hasMore: true };
       // Page 3+: normal pagination from beforeId
       return origListMessages(opts);
@@ -247,8 +248,16 @@ describe('loadOlderMessages window trimming', () => {
   it('trims from the newest end when window overflows on older load', () => {
     // Simulate the loadOlderMessages algorithm:
     // fresh (older messages) prepended to prev, then slice to WINDOW_MAX
-    const fresh = makeMessages(20).map((m) => ({ ...m, id: `older_${m.id}`, seq: m.seq })); // seq 0..19
-    const prev = makeMessages(490).map((m) => ({ ...m, id: `prev_${m.id}`, seq: m.seq + 20 })); // seq 20..509
+    const fresh = makeMessages(20).map((m) => ({
+      ...m,
+      id: `older_${m.id}`,
+      seq: m.seq,
+    })); // seq 0..19
+    const prev = makeMessages(490).map((m) => ({
+      ...m,
+      id: `prev_${m.id}`,
+      seq: m.seq + 20,
+    })); // seq 20..509
 
     let next: WireMessage[] = [...fresh, ...prev]; // 20 + 490 = 510 > 500
     expect(next.length).toBe(510);
@@ -268,8 +277,16 @@ describe('loadOlderMessages window trimming', () => {
   });
 
   it('loadNewerMessages trims from the OLDEST end', () => {
-    const prev = makeMessages(490).map((m) => ({ ...m, id: `prev_${m.id}`, seq: m.seq })); // 0..489
-    const fresh = makeMessages(20).map((m) => ({ ...m, id: `newer_${m.id}`, seq: m.seq + 490 })); // 490..509
+    const prev = makeMessages(490).map((m) => ({
+      ...m,
+      id: `prev_${m.id}`,
+      seq: m.seq,
+    })); // 0..489
+    const fresh = makeMessages(20).map((m) => ({
+      ...m,
+      id: `newer_${m.id}`,
+      seq: m.seq + 490,
+    })); // 490..509
 
     let next: WireMessage[] = [...prev, ...fresh]; // 510 > 500
     expect(next.length).toBe(510);

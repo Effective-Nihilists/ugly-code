@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { isMobileWidth, MOBILE_MAX_WIDTH } from '../../client/studio/hooks/useIsMobile';
+import {
+  isMobileWidth,
+  MOBILE_MAX_WIDTH,
+} from '../../client/studio/hooks/useIsMobile';
 
 // The repo's vitest env is `node` (no DOM), so we test the pure predicate that
 // backs useIsMobile(). The hook's reactive resize behavior is covered by the

@@ -20,7 +20,10 @@ const SPEC: TextGenTool = {
     type: 'object',
     properties: {
       action: { type: 'string', enum: ['append', 'read', 'clear'] },
-      content: { type: 'string', description: 'Text to append (for action=append).' },
+      content: {
+        type: 'string',
+        description: 'Text to append (for action=append).',
+      },
     },
     required: ['action'],
     additionalProperties: false,
@@ -35,7 +38,7 @@ export const scratchpadTool: ToolModule = {
     if (!root) return '(no project open)';
     const sid = ctx?.sessionId ?? 'default';
     const file = scratchPath(root, sid);
-    const action = (typeof input.action === 'string' ? input.action : 'read');
+    const action = typeof input.action === 'string' ? input.action : 'read';
     const readCur = async (): Promise<string> => {
       try {
         return await native.fs.readFile(file);
@@ -47,14 +50,20 @@ export const scratchpadTool: ToolModule = {
       const cur = await readCur();
       return cur.trim() || '(scratchpad is empty)';
     }
-    await native.fs.mkdir(`${root.replace(/\/+$/, '')}/.ugly-studio/scratch`, true);
+    await native.fs.mkdir(
+      `${root.replace(/\/+$/, '')}/.ugly-studio/scratch`,
+      true,
+    );
     if (action === 'clear') {
       await native.fs.writeFile(file, '');
       return 'scratchpad cleared';
     }
     // append
     const cur = await readCur();
-    const next = (cur ? cur.replace(/\n*$/, '\n') : '') + (typeof input.content === 'string' ? input.content : '') + '\n';
+    const next =
+      (cur ? cur.replace(/\n*$/, '\n') : '') +
+      (typeof input.content === 'string' ? input.content : '') +
+      '\n';
     await native.fs.writeFile(file, next);
     return 'appended to scratchpad';
   },

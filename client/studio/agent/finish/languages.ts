@@ -224,7 +224,11 @@ async function pythonTypecheck(cwd: string): Promise<AdapterCommand | null> {
     (await exists(join(cwd, '.mypy.ini'))) ||
     Boolean(pyproject?.includes('[tool.mypy]'));
   if (hasMypy) {
-    return { command: 'uv', args: ['run', 'mypy', '.'], label: 'uv run mypy .' };
+    return {
+      command: 'uv',
+      args: ['run', 'mypy', '.'],
+      label: 'uv run mypy .',
+    };
   }
   return null;
 }
@@ -250,7 +254,11 @@ async function pythonTest(cwd: string): Promise<AdapterCommand | null> {
     (await exists(join(cwd, 'pytest.ini'))) ||
     (await exists(join(cwd, 'tests')));
   if (!hasPytest) return null;
-  return { command: 'uv', args: ['run', 'pytest', '-q'], label: 'uv run pytest -q' };
+  return {
+    command: 'uv',
+    args: ['run', 'pytest', '-q'],
+    label: 'uv run pytest -q',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -297,13 +305,15 @@ async function genericTypecheck(cwd: string): Promise<AdapterCommand | null> {
   const mk = await readFileOrNull(join(cwd, 'Makefile'));
   if (mk) {
     for (const t of ['check', 'typecheck', 'build']) {
-      if (new RegExp(`^${t}:`, 'm').test(mk)) return { label: `make ${t}`, command: 'make', args: [t] };
+      if (new RegExp(`^${t}:`, 'm').test(mk))
+        return { label: `make ${t}`, command: 'make', args: [t] };
     }
   }
   const jf = await readFileOrNull(join(cwd, 'justfile'));
   if (jf) {
     for (const t of ['check', 'typecheck', 'build']) {
-      if (new RegExp(`^${t}:`, 'm').test(jf)) return { label: `just ${t}`, command: 'just', args: [t] };
+      if (new RegExp(`^${t}:`, 'm').test(jf))
+        return { label: `just ${t}`, command: 'just', args: [t] };
     }
   }
   const pkg = await readPackageJson(cwd);
@@ -325,7 +335,11 @@ const GENERIC_ADAPTER: GateAdapter = {
 
 // Declaration order == priority order: Node/TS primary, Python secondary, then the
 // language-agnostic project-declared fallback (Makefile/justfile/npm check).
-const ADAPTERS: readonly GateAdapter[] = [NODE_ADAPTER, PYTHON_ADAPTER, GENERIC_ADAPTER];
+const ADAPTERS: readonly GateAdapter[] = [
+  NODE_ADAPTER,
+  PYTHON_ADAPTER,
+  GENERIC_ADAPTER,
+];
 
 /**
  * Walk detected languages (primary first) and return the first non-null result

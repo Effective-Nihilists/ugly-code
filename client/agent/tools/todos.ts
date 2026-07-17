@@ -40,9 +40,18 @@ const SPEC: TextGenTool = {
         items: {
           type: 'object',
           properties: {
-            content: { type: 'string', description: 'Imperative description of the task.' },
-            status: { type: 'string', enum: ['pending', 'in_progress', 'completed'] },
-            activeForm: { type: 'string', description: 'Present-tense label shown while in progress.' },
+            content: {
+              type: 'string',
+              description: 'Imperative description of the task.',
+            },
+            status: {
+              type: 'string',
+              enum: ['pending', 'in_progress', 'completed'],
+            },
+            activeForm: {
+              type: 'string',
+              description: 'Present-tense label shown while in progress.',
+            },
           },
           required: ['content', 'status'],
           additionalProperties: false,

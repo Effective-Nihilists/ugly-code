@@ -90,7 +90,11 @@ export function coerceModelMode(m: {
     case 'max':
       return { kind: 'max' };
     case 'group':
-      return { kind: 'group', models: m.models ?? [], ...(m.personas ? { personas: m.personas } : {}) };
+      return {
+        kind: 'group',
+        models: m.models ?? [],
+        ...(m.personas ? { personas: m.personas } : {}),
+      };
     case 'mid':
       return { kind: 'single', model: m.survivor ?? '' };
     default: // 'auto', deprecated 'auto-cheap', or anything unknown
@@ -99,11 +103,20 @@ export function coerceModelMode(m: {
 }
 
 export function axesToConfig(a: AxisState): SessionConfig {
-  return { model: a.model, mode: a.modelMode, perm: a.permissionMode, reasoning: a.reasoningEffort, pattern: a.patternMode };
+  return {
+    model: a.model,
+    mode: a.modelMode,
+    perm: a.permissionMode,
+    reasoning: a.reasoningEffort,
+    pattern: a.patternMode,
+  };
 }
 
 /** Fill any gaps in a (possibly partial) config with a full fallback → full config. */
-export function completeConfig(partial: SessionConfigDefaults | undefined, fallback: AxisState): SessionConfig {
+export function completeConfig(
+  partial: SessionConfigDefaults | undefined,
+  fallback: AxisState,
+): SessionConfig {
   return {
     model: partial?.model ?? fallback.model,
     mode: partial?.mode ?? fallback.modelMode,

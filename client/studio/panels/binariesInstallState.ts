@@ -25,8 +25,11 @@ export function computeInstallOverlay(
 ): OverlayState {
   const entries = Object.values(tools);
   const failed = entries.some((t) => t.phase === 'failed');
-  const installing = entries.some((t) => t.phase !== 'done' && t.phase !== 'failed');
-  const allDone = entries.length > 0 && entries.every((t) => t.phase === 'done');
+  const installing = entries.some(
+    (t) => t.phase !== 'done' && t.phase !== 'failed',
+  );
+  const allDone =
+    entries.length > 0 && entries.every((t) => t.phase === 'done');
   const visible = !dismissed && (installing || failed);
   return { installing, failed, allDone, visible };
 }

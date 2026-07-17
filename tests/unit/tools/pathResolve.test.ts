@@ -7,17 +7,23 @@ import { resolvePath, relativizePath } from '../../../client/agent/tools';
 import type { ToolContext } from '../../../client/agent/tools';
 
 const posix: ToolContext = { projectDir: '/Users/theju/proj' };
-const win: ToolContext = { projectDir: 'C:\\Users\\theju\\Documents\\Ugly Studio\\test3' };
+const win: ToolContext = {
+  projectDir: 'C:\\Users\\theju\\Documents\\Ugly Studio\\test3',
+};
 
 describe('resolvePath — POSIX', () => {
   it('joins a relative path onto the project dir', () => {
-    expect(resolvePath(posix, 'src/foo.ts')).toBe('/Users/theju/proj/src/foo.ts');
+    expect(resolvePath(posix, 'src/foo.ts')).toBe(
+      '/Users/theju/proj/src/foo.ts',
+    );
   });
   it('passes an absolute path through (normalized)', () => {
     expect(resolvePath(posix, '/etc/hosts')).toBe('/etc/hosts');
   });
   it('collapses ./ and ../ segments', () => {
-    expect(resolvePath(posix, './a/../b/c.ts')).toBe('/Users/theju/proj/b/c.ts');
+    expect(resolvePath(posix, './a/../b/c.ts')).toBe(
+      '/Users/theju/proj/b/c.ts',
+    );
   });
   it('expands ~ to the derived home', () => {
     expect(resolvePath(posix, '~/notes.md')).toBe('/Users/theju/notes.md');
@@ -48,11 +54,16 @@ describe('resolvePath — Windows', () => {
 
 describe('relativizePath', () => {
   it('strips the POSIX base', () => {
-    expect(relativizePath(posix, '/Users/theju/proj/src/a.ts')).toBe('src/a.ts');
+    expect(relativizePath(posix, '/Users/theju/proj/src/a.ts')).toBe(
+      'src/a.ts',
+    );
   });
   it('strips the Windows base (separator- and case-insensitive)', () => {
     expect(
-      relativizePath(win, 'C:\\Users\\theju\\Documents\\Ugly Studio\\test3\\src\\a.ts'),
+      relativizePath(
+        win,
+        'C:\\Users\\theju\\Documents\\Ugly Studio\\test3\\src\\a.ts',
+      ),
     ).toBe('src\\a.ts');
   });
   it('returns paths outside the base unchanged', () => {

@@ -73,5 +73,8 @@ export function filterEntries(
       : visible
           .filter((e) => e.isFile && matchesExtension(e.name, extensions))
           .sort((a, b) => a.name.localeCompare(b.name));
-  return [...folders, ...files].map((e) => ({ name: e.name, isDirectory: e.isDirectory }));
+  return [...folders, ...files].map((e) => ({
+    name: e.name,
+    isDirectory: e.isDirectory,
+  }));
 }

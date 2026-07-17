@@ -60,7 +60,7 @@ export const memoryAddTool: ToolModule = {
     name: 'memory_add',
     description:
       'Record a fact you discovered that will be useful across sessions. ' +
-      'Appends to MEMORY.md which is injected into every turn\'s system prompt. ' +
+      "Appends to MEMORY.md which is injected into every turn's system prompt. " +
       'When the file exceeds 10 KB it is automatically condensed.',
     parameters: {
       type: 'object',
@@ -75,7 +75,9 @@ export const memoryAddTool: ToolModule = {
     },
   } satisfies TextGenTool,
   async run(input, ctx) {
-    const content = (typeof input.content === 'string' ? input.content : '').trim();
+    const content = (
+      typeof input.content === 'string' ? input.content : ''
+    ).trim();
     if (!content) return 'memory_add: `content` is required';
 
     const root = projectRoot(ctx);
@@ -91,7 +93,8 @@ export const memoryAddTool: ToolModule = {
     }
 
     // Append the new line
-    const separator = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+    const separator =
+      existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
     const updated = existing + separator + content + '\n';
 
     // Check size and compact if needed

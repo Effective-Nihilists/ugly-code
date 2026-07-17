@@ -18,8 +18,10 @@ beforeEach(() => {
       '/Users/admin/GitHub/keys/.git/HEAD': 'ref: refs/heads/main',
       '/Users/admin/GitHub/keys/.git/config': '[core]\nbare = false',
       '/Users/admin/GitHub/ugly-code/.git/HEAD': 'ref: refs/heads/main',
-      '/Users/admin/GitHub/ugly-code/package.json': '{"dependencies":{"ugly-app":"^0.1.812"}}',
-      '/Users/admin/GitHub/ugly-code/.git/config': '[core]\nbRepositoryFormatVersion = 0',
+      '/Users/admin/GitHub/ugly-code/package.json':
+        '{"dependencies":{"ugly-app":"^0.1.812"}}',
+      '/Users/admin/GitHub/ugly-code/.git/config':
+        '[core]\nbRepositoryFormatVersion = 0',
       '/Users/admin/GitHub/not-a-repo/readme.md': '# just docs',
     },
   });
@@ -55,15 +57,19 @@ describe('findAndCacheGitRepos', () => {
 
   it('resolves tilde paths via the HOME env fast path', async () => {
     // Set HOME so resolveTilde takes the fast path (no bash spawn)
-    const prevHome = (process as unknown as { env: Record<string, string> }).env['HOME'];
-    (process as unknown as { env: Record<string, string> }).env['HOME'] = '/Users/admin';
+    const prevHome = (process as unknown as { env: Record<string, string> })
+      .env['HOME'];
+    (process as unknown as { env: Record<string, string> }).env['HOME'] =
+      '/Users/admin';
 
     try {
       const repos = await findAndCacheGitRepos('~/GitHub');
       expect(repos.length).toBeGreaterThan(0);
       expect(repos.some((r) => r.name === 'ugly-code')).toBe(true);
     } finally {
-      if (prevHome) (process as unknown as { env: Record<string, string> }).env['HOME'] = prevHome;
+      if (prevHome)
+        (process as unknown as { env: Record<string, string> }).env['HOME'] =
+          prevHome;
     }
   });
 

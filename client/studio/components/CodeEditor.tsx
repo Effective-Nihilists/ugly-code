@@ -29,7 +29,8 @@ interface CodeEditorProps {
 }
 
 const FONT: React.CSSProperties = {
-  fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+  fontFamily:
+    'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
   fontSize: 12.5,
   lineHeight: 1.5,
   tabSize: 2,
@@ -133,7 +134,9 @@ export function CodeEditor({
           background: 'transparent',
           pointerEvents: 'none',
         }}
-        dangerouslySetInnerHTML={{ __html: html || (placeholder ? '' : '&nbsp;') }}
+        dangerouslySetInnerHTML={{
+          __html: html || (placeholder ? '' : '&nbsp;'),
+        }}
       />
       <textarea
         ref={taRef}

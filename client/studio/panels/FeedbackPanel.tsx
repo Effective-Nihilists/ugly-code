@@ -31,16 +31,33 @@ export interface FeedbackPanelProps {
 }
 
 const card: React.CSSProperties = {
-  border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 10,
-  background: 'var(--bg-panel)', display: 'flex', flexDirection: 'column', gap: 6,
+  border: '1px solid var(--border)',
+  borderRadius: 8,
+  padding: 12,
+  marginBottom: 10,
+  background: 'var(--bg-panel)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
 };
 const badge = (bg: string, fg: string): React.CSSProperties => ({
-  fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4,
-  padding: '2px 6px', borderRadius: 4, background: bg, color: fg,
+  fontSize: 10,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: 0.4,
+  padding: '2px 6px',
+  borderRadius: 4,
+  background: bg,
+  color: fg,
 });
 const btn: React.CSSProperties = {
-  fontSize: 12, padding: '4px 10px', borderRadius: 5, cursor: 'pointer',
-  border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)',
+  fontSize: 12,
+  padding: '4px 10px',
+  borderRadius: 5,
+  cursor: 'pointer',
+  border: '1px solid var(--border)',
+  background: 'var(--bg-secondary)',
+  color: 'var(--text-primary)',
 };
 
 function statusBadge(status: string): React.ReactElement {
@@ -54,7 +71,11 @@ function statusBadge(status: string): React.ReactElement {
   return <span style={badge(bg, fg)}>{status}</span>;
 }
 
-export function FeedbackPanel({ onDeploy, sessions = [], onSendToAgent }: FeedbackPanelProps = {}): React.ReactElement {
+export function FeedbackPanel({
+  onDeploy,
+  sessions = [],
+  onSendToAgent,
+}: FeedbackPanelProps = {}): React.ReactElement {
   const socket = useSocket();
   const deploy = useProdDeployGate(true);
   const [items, setItems] = React.useState<FeedbackItem[]>([]);
@@ -66,13 +87,22 @@ export function FeedbackPanel({ onDeploy, sessions = [], onSendToAgent }: Feedba
     setLoading(true);
     socket
       .request('feedbackList', { limit: 100 })
-      .then((r) => { setItems(r.items as unknown as FeedbackItem[]); })
-      .catch((e: unknown) => { console.error('[FeedbackPanel]', e); })
-      .finally(() => { setLoading(false); });
+      .then((r) => {
+        setItems(r.items as unknown as FeedbackItem[]);
+      })
+      .catch((e: unknown) => {
+        console.error('[FeedbackPanel]', e);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [socket]);
 
   React.useEffect(() => {
-    if (deploy !== 'deployed') { setLoading(false); return; }
+    if (deploy !== 'deployed') {
+      setLoading(false);
+      return;
+    }
     load();
   }, [deploy, load]);
 
@@ -85,11 +115,17 @@ export function FeedbackPanel({ onDeploy, sessions = [], onSendToAgent }: Feedba
       if (resolution == null) return;
       setBusyId(item.id);
       try {
-        await socket.request('feedbackResolve', { feedbackReportId: item.id, status, resolution });
+        await socket.request('feedbackResolve', {
+          feedbackReportId: item.id,
+          status,
+          resolution,
+        });
         load();
       } catch (e) {
         console.error('[FeedbackPanel:resolve]', e);
-        window.alert(`Resolve failed: ${e instanceof Error ? e.message : String(e)}`);
+        window.alert(
+          `Resolve failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
       } finally {
         setBusyId(null);
       }
@@ -110,47 +146,103 @@ export function FeedbackPanel({ onDeploy, sessions = [], onSendToAgent }: Feedba
   );
 
   if (deploy === 'checking') {
-    return <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Checking deploy status…</div>;
+    return (
+      <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>
+        Checking deploy status…
+      </div>
+    );
   }
   if (deploy === 'undeployed') {
     return <ProdDeployGate what="feedback" onDeploy={onDeploy} />;
   }
 
   return (
-    <div data-id="feedback-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div
+      data-id="feedback-panel"
+      style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+    >
       <div className="panel-toolbar" style={{ gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Feedback</span>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+          }}
+        >
+          Feedback
+        </span>
         <GitRepoSelector />
         <div style={{ flex: 1 }} />
-        <button data-id="feedback-refresh" style={btn} onClick={load}>↻ Refresh</button>
+        <button data-id="feedback-refresh" style={btn} onClick={load}>
+          ↻ Refresh
+        </button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
         {loading ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+            Loading…
+          </div>
         ) : items.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No feedback yet.</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+            No feedback yet.
+          </div>
         ) : (
           items.map((item) => (
             <div key={item.id} data-id="feedback-item" style={card}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={badge('rgba(255,255,255,0.08)', 'var(--text-secondary)')}>{item.type}</span>
+                <span
+                  style={badge(
+                    'rgba(255,255,255,0.08)',
+                    'var(--text-secondary)',
+                  )}
+                >
+                  {item.type}
+                </span>
                 {statusBadge(item.status)}
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                   {new Date(item.created).toLocaleString()}
                 </span>
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: 'var(--text-primary)',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
                 {item.description}
               </div>
               {item.url && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', wordBreak: 'break-all' }}>{item.url}</div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--text-muted)',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {item.url}
+                </div>
               )}
               {item.resolution && (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text-secondary)',
+                    fontStyle: 'italic',
+                  }}
+                >
                   Resolution: {item.resolution}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', position: 'relative' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 6,
+                  marginTop: 4,
+                  flexWrap: 'wrap',
+                  position: 'relative',
+                }}
+              >
                 {item.status === 'new' && (
                   <>
                     <button
@@ -174,7 +266,9 @@ export function FeedbackPanel({ onDeploy, sessions = [], onSendToAgent }: Feedba
                 <button
                   data-id="feedback-send-agent"
                   style={btn}
-                  onClick={() => { setPickerId(pickerId === item.id ? null : item.id); }}
+                  onClick={() => {
+                    setPickerId(pickerId === item.id ? null : item.id);
+                  }}
                 >
                   → Send to agent
                 </button>
@@ -182,14 +276,38 @@ export function FeedbackPanel({ onDeploy, sessions = [], onSendToAgent }: Feedba
                   <div
                     data-id="feedback-agent-picker"
                     style={{
-                      position: 'absolute', top: '100%', left: 0, zIndex: 10, marginTop: 4,
-                      minWidth: 200, maxHeight: 260, overflow: 'auto', background: 'var(--bg-panel)',
-                      border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      zIndex: 10,
+                      marginTop: 4,
+                      minWidth: 200,
+                      maxHeight: 260,
+                      overflow: 'auto',
+                      background: 'var(--bg-panel)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 6,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
                     }}
                   >
-                    <button data-id="feedback-agent-new" style={pickerRow} onClick={() => { sendToAgent(item, null); }}>+ New session</button>
+                    <button
+                      data-id="feedback-agent-new"
+                      style={pickerRow}
+                      onClick={() => {
+                        sendToAgent(item, null);
+                      }}
+                    >
+                      + New session
+                    </button>
                     {sessions.map((s) => (
-                      <button data-id="feedback-agent-session" key={s.compositeId} style={pickerRow} onClick={() => { sendToAgent(item, s.compositeId); }}>
+                      <button
+                        data-id="feedback-agent-session"
+                        key={s.compositeId}
+                        style={pickerRow}
+                        onClick={() => {
+                          sendToAgent(item, s.compositeId);
+                        }}
+                      >
                         {s.title || s.compositeId}
                       </button>
                     ))}
@@ -205,7 +323,14 @@ export function FeedbackPanel({ onDeploy, sessions = [], onSendToAgent }: Feedba
 }
 
 const pickerRow: React.CSSProperties = {
-  display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 12,
-  background: 'transparent', border: 'none', borderBottom: '1px solid var(--border)',
-  color: 'var(--text-primary)', cursor: 'pointer',
+  display: 'block',
+  width: '100%',
+  textAlign: 'left',
+  padding: '7px 12px',
+  fontSize: 12,
+  background: 'transparent',
+  border: 'none',
+  borderBottom: '1px solid var(--border)',
+  color: 'var(--text-primary)',
+  cursor: 'pointer',
 };

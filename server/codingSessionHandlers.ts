@@ -11,7 +11,13 @@
 import type { TypedDB } from 'ugly-app/server';
 import type { RequestHandlers } from 'ugly-app';
 import { dbDefaults } from 'ugly-app/shared';
-import { collections, type CodingSession, type CodingSessionMessage, type CodingRunRequest, type CodingInteraction } from '../shared/collections';
+import {
+  collections,
+  type CodingSession,
+  type CodingSessionMessage,
+  type CodingRunRequest,
+  type CodingInteraction,
+} from '../shared/collections';
 import { compareCodingMessages } from '../shared/codingCollections';
 import type { requests } from '../shared/api';
 
@@ -70,12 +76,18 @@ export function capMessageContent(content: string): string {
 }
 
 /** `getDb` returns the per-request TypedDB (app.db on Node, typedDb on Workers). */
-export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHandlers {
+export function makeCodingSessionHandlers(
+  getDb: () => TypedDB,
+): CodingSessionHandlers {
   return {
     codingSessionUpsert: async (userId, input) => {
       const db = getDb();
-      const existing = await db.getDoc(collections.codingSession, input.sessionId);
-      if (existing && existing.userId !== userId) throw new Error('Session not found');
+      const existing = await db.getDoc(
+        collections.codingSession,
+        input.sessionId,
+      );
+      if (existing && existing.userId !== userId)
+        throw new Error('Session not found');
       const doc: CodingSession = {
         _id: input.sessionId,
         sessionId: input.sessionId,
@@ -90,8 +102,16 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         // branch-only or chatCreate upsert), like costUsd. persistMeta sends all four
         // every turn.
         ...(() => {
-          const keys = ['promptTokens', 'completionTokens', 'cacheReadTokens', 'cacheCreationTokens', 'contextTokens', 'contextWindow', 'contextBudget'] as const;
-          const t: Partial<Pick<CodingSession, typeof keys[number]>> = {};
+          const keys = [
+            'promptTokens',
+            'completionTokens',
+            'cacheReadTokens',
+            'cacheCreationTokens',
+            'contextTokens',
+            'contextWindow',
+            'contextBudget',
+          ] as const;
+          const t: Partial<Pick<CodingSession, (typeof keys)[number]>> = {};
           for (const k of keys) {
             const v = input[k] ?? existing?.[k];
             if (v !== undefined) t[k] = v;
@@ -101,16 +121,25 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         archived: existing?.archived ?? false,
         // The session config is written by chatCreate + the axis set* RPCs; a plain
         // persistMeta (worker turn) omits it, so preserve the stored value.
-        ...((input.config ?? existing?.config) ? { config: input.config ?? existing?.config } : {}),
-        ...((input.branch ?? existing?.branch) ? { branch: input.branch ?? existing?.branch } : {}),
+        ...((input.config ?? existing?.config)
+          ? { config: input.config ?? existing?.config }
+          : {}),
+        ...((input.branch ?? existing?.branch)
+          ? { branch: input.branch ?? existing?.branch }
+          : {}),
         // Doc-driven codebase readiness is written by codingSessionSetReadiness (partial), never
         // by persistMeta — so preserve it across a full upsert or a per-turn write would wipe the
         // pill state (and the poll has since stopped, so nothing would rewrite it).
-        ...(existing?.codebaseReadiness ? { codebaseReadiness: existing.codebaseReadiness } : {}),
+        ...(existing?.codebaseReadiness
+          ? { codebaseReadiness: existing.codebaseReadiness }
+          : {}),
         // lastError: omitted (undefined) preserves; '' clears (recovered turn); a
         // non-empty string sets the new failure text.
         ...(() => {
-          const lastError = input.lastError === undefined ? existing?.lastError : input.lastError || undefined;
+          const lastError =
+            input.lastError === undefined
+              ? existing?.lastError
+              : input.lastError || undefined;
           return lastError ? { lastError } : {};
         })(),
         ...dbDefaults(),
@@ -121,20 +150,32 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       return { ok: true };
     },
 
-    codingSessionAppendMessage: async (userId, { sessionId, seq, role, content, transient }) => {
+    codingSessionAppendMessage: async (
+      userId,
+      { sessionId, seq, role, content, transient },
+    ) => {
       const db = getDb();
       const sess = await db.getDoc(collections.codingSession, sessionId);
       if (sess && sess.userId !== userId) throw new Error('Session not found');
       const doc: CodingSessionMessage = {
         _id: `${sessionId}:${seq}`,
-        sessionId, userId, seq, role, kind: 'message', compacted: false,
+        sessionId,
+        userId,
+        seq,
+        role,
+        kind: 'message',
+        compacted: false,
         content: capMessageContent(content),
         ...dbDefaults(),
       };
       // Streaming write: relay the in-progress row to trackDocs({includeTransient})
       // subscribers WITHOUT persisting (setDoc({transient}), ugly-app>=0.1.857). A later
       // non-transient append at the same seq commits the final content durably.
-      await db.setDoc(collections.codingSessionMessage, doc, transient ? { transient: true } : {});
+      await db.setDoc(
+        collections.codingSessionMessage,
+        doc,
+        transient ? { transient: true } : {},
+      );
       return { ok: true };
     },
 
@@ -144,19 +185,29 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
     // Mark by _id (summary rows don't follow the sessionId:seq scheme). setDoc
     // the summary AFTER marking, so re-summarizing a prior summary (same _id)
     // leaves the row active.
-    codingSessionCompact: async (userId, { sessionId, droppedIds, summaryId, summarySeq, summaryText }) => {
+    codingSessionCompact: async (
+      userId,
+      { sessionId, droppedIds, summaryId, summarySeq, summaryText },
+    ) => {
       const db = getDb();
       const sess = await db.getDoc(collections.codingSession, sessionId);
       if (sess && sess.userId !== userId) throw new Error('Session not found');
       const prefix = `${sessionId}:`;
       for (const id of droppedIds) {
         if (!id.startsWith(prefix)) continue; // scope guard: only this session's rows
-        await db.setDocFieldsOrIgnore(collections.codingSessionMessage, id, { compacted: true });
+        await db.setDocFieldsOrIgnore(collections.codingSessionMessage, id, {
+          compacted: true,
+        });
       }
       if (!summaryId.startsWith(prefix)) throw new Error('Invalid summary id');
       const summary: CodingSessionMessage = {
         _id: summaryId,
-        sessionId, userId, seq: summarySeq, role: 'user', kind: 'summary', compacted: false,
+        sessionId,
+        userId,
+        seq: summarySeq,
+        role: 'user',
+        kind: 'summary',
+        compacted: false,
         content: capMessageContent(JSON.stringify(summaryText)),
         ...dbDefaults(),
       };
@@ -164,21 +215,32 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       return { ok: true };
     },
 
-    codingSessionListMessages: async (userId, { sessionId, limit, includeCompacted }) => {
+    codingSessionListMessages: async (
+      userId,
+      { sessionId, limit, includeCompacted },
+    ) => {
       const db = getDb();
       const filter: Record<string, unknown> = { sessionId, userId };
       if (!includeCompacted) filter.compacted = false;
-      const docs: CodingSessionMessage[] = await db.getDocs(collections.codingSessionMessage, filter, {
-        sort: { seq: 1 },
-        limit: limit ?? 2000,
-      });
+      const docs: CodingSessionMessage[] = await db.getDocs(
+        collections.codingSessionMessage,
+        filter,
+        {
+          sort: { seq: 1 },
+          limit: limit ?? 2000,
+        },
+      );
       // The DB sorts `seq` as JSONB text (1,10,11,…,2,20,…) — re-sort NUMERICALLY
       // (with the summary tiebreak) so tool_calls precede their results on replay
       // and the resume seed is chronological. See compareCodingMessages.
       const sorted = [...docs].sort(compareCodingMessages);
       return {
         messages: sorted.map((d) => ({
-          seq: d.seq, role: d.role, kind: d.kind, compacted: d.compacted, content: d.content,
+          seq: d.seq,
+          role: d.role,
+          kind: d.kind,
+          compacted: d.compacted,
+          content: d.content,
         })),
       };
     },
@@ -196,15 +258,33 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       );
       return {
         sessions: docs.map((d) => ({
-          sessionId: d.sessionId, title: d.title, model: d.model,
-          status: d.status, messageCount: d.messageCount, costUsd: d.costUsd,
-          ...(d.promptTokens !== undefined ? { promptTokens: d.promptTokens } : {}),
-          ...(d.completionTokens !== undefined ? { completionTokens: d.completionTokens } : {}),
-          ...(d.cacheReadTokens !== undefined ? { cacheReadTokens: d.cacheReadTokens } : {}),
-          ...(d.cacheCreationTokens !== undefined ? { cacheCreationTokens: d.cacheCreationTokens } : {}),
-          ...(d.contextTokens !== undefined ? { contextTokens: d.contextTokens } : {}),
-          ...(d.contextWindow !== undefined ? { contextWindow: d.contextWindow } : {}),
-          ...(d.contextBudget !== undefined ? { contextBudget: d.contextBudget } : {}),
+          sessionId: d.sessionId,
+          title: d.title,
+          model: d.model,
+          status: d.status,
+          messageCount: d.messageCount,
+          costUsd: d.costUsd,
+          ...(d.promptTokens !== undefined
+            ? { promptTokens: d.promptTokens }
+            : {}),
+          ...(d.completionTokens !== undefined
+            ? { completionTokens: d.completionTokens }
+            : {}),
+          ...(d.cacheReadTokens !== undefined
+            ? { cacheReadTokens: d.cacheReadTokens }
+            : {}),
+          ...(d.cacheCreationTokens !== undefined
+            ? { cacheCreationTokens: d.cacheCreationTokens }
+            : {}),
+          ...(d.contextTokens !== undefined
+            ? { contextTokens: d.contextTokens }
+            : {}),
+          ...(d.contextWindow !== undefined
+            ? { contextWindow: d.contextWindow }
+            : {}),
+          ...(d.contextBudget !== undefined
+            ? { contextBudget: d.contextBudget }
+            : {}),
           created: new Date(d.created).getTime(),
           updated: new Date(d.updated).getTime(),
           ...(d.config ? { config: d.config } : {}),
@@ -218,7 +298,9 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       const db = getDb();
       const sess = await db.getDoc(collections.codingSession, sessionId);
       if (sess?.userId !== userId) throw new Error('Session not found');
-      await db.setDocFields(collections.codingSession, sessionId, { archived: true });
+      await db.setDocFields(collections.codingSession, sessionId, {
+        archived: true,
+      });
       return { ok: true };
     },
 
@@ -238,7 +320,10 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
         await db.deleteDoc(collections.codingSessionMessage, d._id);
       }
       if (sess) {
-        await db.setDocFields(collections.codingSession, sessionId, { messageCount: 0, costUsd: 0 });
+        await db.setDocFields(collections.codingSession, sessionId, {
+          messageCount: 0,
+          costUsd: 0,
+        });
       }
       return { ok: true, deleted: docs.length };
     },
@@ -246,12 +331,20 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
     // ── Doc-triggered background task (E) ────────────────────────────────────
     // The UI writes a run-request instead of poking native.task; the owning desktop
     // host reacts over trackDocs, CAS-claims it, drives the turn, then completes it.
-    codingRunRequestCreate: async (userId, { sessionId, projectId, seq, prompt, selection, buildId }) => {
+    codingRunRequestCreate: async (
+      userId,
+      { sessionId, projectId, seq, prompt, selection, buildId },
+    ) => {
       const db = getDb();
       const id = `run:${sessionId}:${seq}`;
       const doc: CodingRunRequest = {
         _id: id,
-        sessionId, projectId, userId, seq, prompt, buildId,
+        sessionId,
+        projectId,
+        userId,
+        seq,
+        prompt,
+        buildId,
         ...(selection ? { selection } : {}),
         status: 'pending',
         createdAt: Date.now(),
@@ -268,7 +361,10 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       const req = await db.getDoc(collections.codingRunRequest, id);
       if (req?.userId !== userId) return { claimed: false }; // missing or wrong user
       if (req.status !== 'pending') return { claimed: false }; // already claimed/terminal
-      await db.setDocFields(collections.codingRunRequest, id, { status: 'claimed', host });
+      await db.setDocFields(collections.codingRunRequest, id, {
+        status: 'claimed',
+        host,
+      });
       return { claimed: true };
     },
     // Doc-driven readiness (partial write): stamp the pill state onto the session doc so it
@@ -279,7 +375,9 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       const db = getDb();
       const existing = await db.getDoc(collections.codingSession, sessionId);
       if (existing?.userId !== userId) return { ok: false };
-      await db.setDocFields(collections.codingSession, sessionId, { codebaseReadiness: readiness });
+      await db.setDocFields(collections.codingSession, sessionId, {
+        codebaseReadiness: readiness,
+      });
       return { ok: true };
     },
     codingRunRequestComplete: async (userId, { id }) => {
@@ -307,11 +405,16 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
 
     // ── Interactive control ────────────────────────────────────────────────────────
     // Agent posts a question / client posts a command. Idempotent by _id.
-    codingInteractionPut: async (userId, { id, sessionId, kind, toolCallId, stepId, question }) => {
+    codingInteractionPut: async (
+      userId,
+      { id, sessionId, kind, toolCallId, stepId, question },
+    ) => {
       const db = getDb();
       const doc: CodingInteraction = {
         _id: id,
-        sessionId, userId, kind,
+        sessionId,
+        userId,
+        kind,
         ...(toolCallId ? { toolCallId } : {}),
         ...(stepId ? { stepId } : {}),
         ...(question ? { question } : {}),
@@ -327,7 +430,10 @@ export function makeCodingSessionHandlers(getDb: () => TypedDB): CodingSessionHa
       const db = getDb();
       const it = await db.getDoc(collections.codingInteraction, id);
       if (it?.userId !== userId) return { ok: false }; // missing or wrong user
-      await db.setDocFields(collections.codingInteraction, id, { status: 'answered', response });
+      await db.setDocFields(collections.codingInteraction, id, {
+        status: 'answered',
+        response,
+      });
       return { ok: true };
     },
     // Host/agent marks it handled after forwarding to the task — DELETE it (GC; the client

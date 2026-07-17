@@ -18,7 +18,10 @@ export function useProdDeployGate(enabled: boolean): ProdDeployState {
     let cancelled = false;
     setState('checking');
     const cwd = getActiveRepoPath();
-    if (!cwd) { setState('undeployed'); return; }
+    if (!cwd) {
+      setState('undeployed');
+      return;
+    }
     void (async () => {
       try {
         const ua = JSON.parse(await native.fs.readFile(`${cwd}/.uglyapp`)) as {
@@ -34,7 +37,9 @@ export function useProdDeployGate(enabled: boolean): ProdDeployState {
         setState('undeployed');
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [enabled]);
   return state;
 }

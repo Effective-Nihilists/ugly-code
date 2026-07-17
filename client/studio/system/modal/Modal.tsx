@@ -131,7 +131,10 @@ export function Modal({
 
   const stackIndex = useMemo(() => {
     if (!handle) return 0;
-    return Math.max(0, stack.stack.findIndex((e) => e.id === handle.id));
+    return Math.max(
+      0,
+      stack.stack.findIndex((e) => e.id === handle.id),
+    );
   }, [handle, stack.stack]);
 
   const { refs, context } = useFloating({

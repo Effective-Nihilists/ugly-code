@@ -13,7 +13,10 @@ const CTL = '/proj/.ugly-studio/dev-server.control';
 describe('dev_server_errors', () => {
   beforeEach(() =>
     resetMock({
-      files: { '/proj/.ugly-studio/dev-server.log': 'ok\nl2\nTypeError: x is not defined\n[error: boom]\nl5\n' },
+      files: {
+        '/proj/.ugly-studio/dev-server.log':
+          'ok\nl2\nTypeError: x is not defined\n[error: boom]\nl5\n',
+      },
     }),
   );
 
@@ -25,13 +28,21 @@ describe('dev_server_errors', () => {
   });
 
   it('reports a clean log', async () => {
-    resetMock({ files: { '/proj/.ugly-studio/dev-server.log': 'ready\nlistening on 4321\n' } });
-    expect(await devServerErrorsTool.run({}, { projectDir: '/proj' })).toMatch(/no errors/i);
+    resetMock({
+      files: {
+        '/proj/.ugly-studio/dev-server.log': 'ready\nlistening on 4321\n',
+      },
+    });
+    expect(await devServerErrorsTool.run({}, { projectDir: '/proj' })).toMatch(
+      /no errors/i,
+    );
   });
 
   it('reports no log at all', async () => {
     resetMock({ files: {} });
-    expect(await devServerErrorsTool.run({}, { projectDir: '/proj' })).toMatch(/no dev.?server|start it/i);
+    expect(await devServerErrorsTool.run({}, { projectDir: '/proj' })).toMatch(
+      /no dev.?server|start it/i,
+    );
   });
 });
 
@@ -50,7 +61,10 @@ describe('dev_server_start / dev_server_stop control bridge', () => {
     await devServerStartTool.run({}, { projectDir: '/proj' });
     const n1 = JSON.parse(mockFiles().get(CTL)!).nonce as string;
     await devServerStopTool.run({}, { projectDir: '/proj' });
-    const ctl = JSON.parse(mockFiles().get(CTL)!) as { cmd: string; nonce: string };
+    const ctl = JSON.parse(mockFiles().get(CTL)!) as {
+      cmd: string;
+      nonce: string;
+    };
     expect(ctl.cmd).toBe('stop');
     expect(ctl.nonce).not.toBe(n1);
   });

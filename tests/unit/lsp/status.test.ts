@@ -3,7 +3,10 @@
 // `subscribeEditorLspStatus` fires the current snapshot on subscribe.
 
 import { describe, it, expect } from 'vitest';
-import { statusFromEvent, subscribeEditorLspStatus } from '../../../client/studio/agent/lsp/registry';
+import {
+  statusFromEvent,
+  subscribeEditorLspStatus,
+} from '../../../client/studio/agent/lsp/registry';
 import type { LspEventEnvelope } from '../../../client/studio/agent/lsp/client';
 
 function envelope(
@@ -29,7 +32,10 @@ describe('statusFromEvent', () => {
 
   it('carries a lastMessage on an error event and defaults missing totals to 0', () => {
     const s = statusFromEvent(
-      envelope({ state: 'error', message: 'LSP exited with code 1' }, 'updated'),
+      envelope(
+        { state: 'error', message: 'LSP exited with code 1' },
+        'updated',
+      ),
       99,
     );
     expect(s).toEqual({

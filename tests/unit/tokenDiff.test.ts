@@ -9,13 +9,26 @@ import {
   type Part,
 } from '../../client/studio/panels/tokenDiff';
 
-const changed = (parts: Part[]): string => parts.filter((p) => p.changed).map((p) => p.text).join('');
+const changed = (parts: Part[]): string =>
+  parts
+    .filter((p) => p.changed)
+    .map((p) => p.text)
+    .join('');
 const whole = (parts: Part[]): string => parts.map((p) => p.text).join('');
 const kinds = (rows: DiffRow[]): string[] => rows.map((r) => r.kind);
 
 describe('tokenize', () => {
   it('splits into words, whitespace runs, and single punctuation', () => {
-    expect(tokenize('const a = b;')).toEqual(['const', ' ', 'a', ' ', '=', ' ', 'b', ';']);
+    expect(tokenize('const a = b;')).toEqual([
+      'const',
+      ' ',
+      'a',
+      ' ',
+      '=',
+      ' ',
+      'b',
+      ';',
+    ]);
   });
   it('keeps identifier chars ($, _, digits) inside one token', () => {
     expect(tokenize('$foo_1')).toEqual(['$foo_1']);
@@ -24,7 +37,10 @@ describe('tokenize', () => {
 
 describe('diffLinePair', () => {
   it('marks only the changed identifier, not the whole line', () => {
-    const { del, add } = diffLinePair('const total = price * qty;', 'const total = price * count;');
+    const { del, add } = diffLinePair(
+      'const total = price * qty;',
+      'const total = price * count;',
+    );
     // The point of the whole module: one token differs, so one token is marked.
     expect(changed(del)).toBe('qty');
     expect(changed(add)).toBe('count');
@@ -76,12 +92,15 @@ describe('buildDiffRows', () => {
     const gaps = rows.filter((r) => r.kind === 'gap');
     expect(gaps.length).toBeGreaterThan(0);
     // 30 lines collapse to a handful of context rows either side of the one change.
-    expect(rows.filter((r) => r.kind === 'context').length).toBeLessThanOrEqual(6);
+    expect(rows.filter((r) => r.kind === 'context').length).toBeLessThanOrEqual(
+      6,
+    );
   });
 
   it('treats a wholly different line as a swap, not a token edit (no 90%-marked noise)', () => {
     const rows = buildDiffRows('const a = 1;', 'throw new Error("boom");');
-    const del = rows.find((r) => r.kind === 'del') as { parts: Part[] } | undefined;
+    const del = rows.find((r) => r.kind === 'del') as
+      { parts: Part[] } | undefined;
     // Low similarity → the entire line is marked changed rather than token-interleaved.
     expect(del?.parts).toHaveLength(1);
     expect(del?.parts[0]?.changed).toBe(true);
@@ -93,8 +112,12 @@ describe('buildDiffRows', () => {
   });
 
   it('handles empty sides', () => {
-    expect(buildDiffRows('', 'a').filter((r) => r.kind === 'add')).toHaveLength(1);
-    expect(buildDiffRows('a', '').filter((r) => r.kind === 'del')).toHaveLength(1);
+    expect(buildDiffRows('', 'a').filter((r) => r.kind === 'add')).toHaveLength(
+      1,
+    );
+    expect(buildDiffRows('a', '').filter((r) => r.kind === 'del')).toHaveLength(
+      1,
+    );
     expect(buildDiffRows('', '')).toEqual([]);
   });
 
@@ -112,6 +135,9 @@ describe('buildDiffRows', () => {
 
 describe('diffStats', () => {
   it('counts add/del rows for the card header', () => {
-    expect(diffStats(buildDiffRows('a\nb\nc', 'a\nB\nc'))).toEqual({ added: 1, removed: 1 });
+    expect(diffStats(buildDiffRows('a\nb\nc', 'a\nB\nc'))).toEqual({
+      added: 1,
+      removed: 1,
+    });
   });
 });

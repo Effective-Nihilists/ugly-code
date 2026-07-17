@@ -13,7 +13,11 @@ export function isToolset(s: string): s is Toolset {
 }
 
 /** Filter tool specs by the named toolset (default = unchanged). */
-export function filterToolsByToolset(specs: AgentToolSpec[], toolset: Toolset | null | undefined): AgentToolSpec[] {
-  if (toolset === 'no-python') return specs.filter((s) => !PYTHON_TOOLS.has(s.name));
+export function filterToolsByToolset(
+  specs: AgentToolSpec[],
+  toolset: Toolset | null | undefined,
+): AgentToolSpec[] {
+  if (toolset === 'no-python')
+    return specs.filter((s) => !PYTHON_TOOLS.has(s.name));
   return specs;
 }

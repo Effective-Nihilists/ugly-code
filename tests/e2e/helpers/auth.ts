@@ -26,7 +26,11 @@ export function loadDevAuth(): DevAuth | null {
   try {
     const raw = JSON.parse(readFileSync(path, 'utf8')) as Partial<DevAuth>;
     if (!raw.token || !raw.userId) return null;
-    return { token: raw.token, userId: raw.userId, serverUrl: raw.serverUrl ?? 'https://ugly.bot' };
+    return {
+      token: raw.token,
+      userId: raw.userId,
+      serverUrl: raw.serverUrl ?? 'https://ugly.bot',
+    };
   } catch {
     return null;
   }

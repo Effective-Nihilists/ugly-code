@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { SessionLog, type SessionLogEntry } from '../../client/studio/agent/sessionLog';
+import {
+  SessionLog,
+  type SessionLogEntry,
+} from '../../client/studio/agent/sessionLog';
 import { mockCalls, mockFiles, resetMock } from '../helpers/uglyNativeMock';
 
 // SessionLog is the COMPLETE, uncompacted on-disk audit trail (the artifact used
@@ -12,7 +15,10 @@ async function settle(): Promise<void> {
   for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
 }
 
-const entry = (type: SessionLogEntry['type'], extra: Record<string, unknown> = {}): SessionLogEntry => ({
+const entry = (
+  type: SessionLogEntry['type'],
+  extra: Record<string, unknown> = {},
+): SessionLogEntry => ({
   ts: 1,
   type,
   ...extra,
@@ -30,7 +36,10 @@ describe('SessionLog', () => {
 
     const written = mockFiles().get('/proj/.ugly-studio/sessions/sess-1.jsonl');
     expect(written).toBeDefined();
-    expect(JSON.parse(written!.trim())).toMatchObject({ type: 'session_start', model: 'claude_sonnet_4_6' });
+    expect(JSON.parse(written!.trim())).toMatchObject({
+      type: 'session_start',
+      model: 'claude_sonnet_4_6',
+    });
   });
 
   it('rewrites the FULL log on every append (native.fs has no append)', async () => {
@@ -43,7 +52,11 @@ describe('SessionLog', () => {
     const file = mockFiles().get('/proj/.ugly-studio/sessions/s.jsonl')!;
     const lines = file.trimEnd().split('\n');
     expect(lines).toHaveLength(3);
-    expect(lines.map((l) => JSON.parse(l).type)).toEqual(['user', 'assistant', 'finish']);
+    expect(lines.map((l) => JSON.parse(l).type)).toEqual([
+      'user',
+      'assistant',
+      'finish',
+    ]);
     expect(file.endsWith('\n')).toBe(true);
   });
 
@@ -56,12 +69,16 @@ describe('SessionLog', () => {
 
     const mkdirs = mockCalls().filter((c) => c.channel === 'fs.mkdir');
     expect(mkdirs).toHaveLength(1);
-    expect(mkdirs[0]!.payload).toMatchObject({ path: '/proj/.ugly-studio/sessions' });
+    expect(mkdirs[0]!.payload).toMatchObject({
+      path: '/proj/.ugly-studio/sessions',
+    });
   });
 
   it('sanitizes composite/unsafe sessionIds into a safe filename', () => {
     const log = new SessionLog('proj:abc/def\\ghi', '/proj');
-    expect(log.path()).toBe('/proj/.ugly-studio/sessions/proj_abc_def_ghi.jsonl');
+    expect(log.path()).toBe(
+      '/proj/.ugly-studio/sessions/proj_abc_def_ghi.jsonl',
+    );
   });
 
   it('is a silent no-op (no FS writes, null path) when there is no project path', async () => {
@@ -69,7 +86,9 @@ describe('SessionLog', () => {
     expect(log.path()).toBeNull();
     log.append(entry('user', { text: 'hi' }));
     await settle();
-    expect(mockCalls().filter((c) => c.channel === 'fs.writeFile')).toHaveLength(0);
+    expect(
+      mockCalls().filter((c) => c.channel === 'fs.writeFile'),
+    ).toHaveLength(0);
     expect(mockCalls().filter((c) => c.channel === 'fs.mkdir')).toHaveLength(0);
   });
 });

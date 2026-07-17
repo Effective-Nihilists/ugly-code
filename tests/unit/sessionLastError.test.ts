@@ -36,7 +36,11 @@ const stored = (fake: ReturnType<typeof fakeDb>) => fake.store.get('s1');
 describe('codingSessionUpsert lastError (session-level diagnostics)', () => {
   it('sets the failure text when a turn errors', async () => {
     const fake = fakeDb();
-    await upsertOf(fake)('u1', { ...base, status: 'error', lastError: 'z.ai key read failed' });
+    await upsertOf(fake)('u1', {
+      ...base,
+      status: 'error',
+      lastError: 'z.ai key read failed',
+    });
     expect(stored(fake)?.lastError).toBe('z.ai key read failed');
     expect(stored(fake)?.status).toBe('error');
   });
@@ -51,7 +55,11 @@ describe('codingSessionUpsert lastError (session-level diagnostics)', () => {
 
   it('preserves the stored error when lastError is omitted', async () => {
     const fake = fakeDb();
-    await upsertOf(fake)('u1', { ...base, status: 'error', lastError: 'still broken' });
+    await upsertOf(fake)('u1', {
+      ...base,
+      status: 'error',
+      lastError: 'still broken',
+    });
     // e.g. a title-only or running-status upsert that doesn't carry the field.
     await upsertOf(fake)('u1', { ...base, status: 'running' });
     expect(stored(fake)?.lastError).toBe('still broken');
@@ -62,18 +70,35 @@ describe('codingSessionUpsert token usage (were silently dropped at the API boun
   it('persists the four token fields', async () => {
     const fake = fakeDb();
     await upsertOf(fake)('u1', {
-      ...base, status: 'idle', costUsd: 0.12,
-      promptTokens: 1000, completionTokens: 200, cacheReadTokens: 5000, cacheCreationTokens: 300,
+      ...base,
+      status: 'idle',
+      costUsd: 0.12,
+      promptTokens: 1000,
+      completionTokens: 200,
+      cacheReadTokens: 5000,
+      cacheCreationTokens: 300,
     });
     const s = stored(fake);
-    expect(s).toMatchObject({ promptTokens: 1000, completionTokens: 200, cacheReadTokens: 5000, cacheCreationTokens: 300 });
+    expect(s).toMatchObject({
+      promptTokens: 1000,
+      completionTokens: 200,
+      cacheReadTokens: 5000,
+      cacheCreationTokens: 300,
+    });
   });
 
   it('preserves stored token counts when a later upsert omits them', async () => {
     const fake = fakeDb();
-    await upsertOf(fake)('u1', { ...base, promptTokens: 42, completionTokens: 7 });
+    await upsertOf(fake)('u1', {
+      ...base,
+      promptTokens: 42,
+      completionTokens: 7,
+    });
     // A branch-only / status-only upsert that doesn't carry token usage.
     await upsertOf(fake)('u1', { ...base, status: 'running' });
-    expect(stored(fake)).toMatchObject({ promptTokens: 42, completionTokens: 7 });
+    expect(stored(fake)).toMatchObject({
+      promptTokens: 42,
+      completionTokens: 7,
+    });
   });
 });

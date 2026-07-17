@@ -20,26 +20,38 @@ describe('waitForTaskRunning', () => {
       [{ id: 'coding:s', status: 'starting' }],
       [{ id: 'coding:s', status: 'running' }],
     ];
-    const enumTasks = vi.fn(() => Promise.resolve(seq.shift() ?? [{ id: 'coding:s', status: 'running' }]));
+    const enumTasks = vi.fn(() =>
+      Promise.resolve(seq.shift() ?? [{ id: 'coding:s', status: 'running' }]),
+    );
     await waitForTaskRunning('coding:s', enumTasks, { sleep: noSleep });
     // It must have polled past the 'starting' frames, not returned on the first check.
     expect(enumTasks).toHaveBeenCalledTimes(3);
   });
 
   it('resolves immediately for an already-running (reused) task', async () => {
-    const enumTasks = vi.fn(() => Promise.resolve([{ id: 'coding:s', status: 'running' }]));
+    const enumTasks = vi.fn(() =>
+      Promise.resolve([{ id: 'coding:s', status: 'running' }]),
+    );
     await waitForTaskRunning('coding:s', enumTasks, { sleep: noSleep });
     expect(enumTasks).toHaveBeenCalledTimes(1);
   });
 
   it('throws when the task errors before becoming ready (no silent hang)', async () => {
-    const enumTasks = vi.fn(() => Promise.resolve([{ id: 'coding:s', status: 'error' }]));
-    await expect(waitForTaskRunning('coding:s', enumTasks, { sleep: noSleep })).rejects.toThrow(/failed to start/);
+    const enumTasks = vi.fn(() =>
+      Promise.resolve([{ id: 'coding:s', status: 'error' }]),
+    );
+    await expect(
+      waitForTaskRunning('coding:s', enumTasks, { sleep: noSleep }),
+    ).rejects.toThrow(/failed to start/);
   });
 
   it('throws if it never becomes ready (bounded, not infinite)', async () => {
-    const enumTasks = vi.fn(() => Promise.resolve([{ id: 'coding:s', status: 'starting' }]));
-    await expect(waitForTaskRunning('coding:s', enumTasks, { sleep: noSleep, tries: 5 })).rejects.toThrow(/not become ready/);
+    const enumTasks = vi.fn(() =>
+      Promise.resolve([{ id: 'coding:s', status: 'starting' }]),
+    );
+    await expect(
+      waitForTaskRunning('coding:s', enumTasks, { sleep: noSleep, tries: 5 }),
+    ).rejects.toThrow(/not become ready/);
     expect(enumTasks).toHaveBeenCalledTimes(5);
   });
 });

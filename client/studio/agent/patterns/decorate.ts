@@ -51,7 +51,10 @@ export function decorateForNonePattern(userText: string): string {
 
 /** Filter the model-facing tool specs to a step's allow-list (unset → all),
  *  appending any per-tool read-only description suffixes. */
-export function filterToolsForStep(specs: AgentToolSpec[], step: Step | null): AgentToolSpec[] {
+export function filterToolsForStep(
+  specs: AgentToolSpec[],
+  step: Step | null,
+): AgentToolSpec[] {
   if (!step?.allowedTools) return specs;
   const allow = new Set<string>(step.allowedTools);
   return specs

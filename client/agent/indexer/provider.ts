@@ -54,7 +54,11 @@ export interface CodebaseProvider {
     mode: SearchMode,
     opts?: SearchOpts,
   ): Promise<SearchResponse>;
-  update(projectPath: string, files: string[], worktreeRoot?: string): Promise<void>;
+  update(
+    projectPath: string,
+    files: string[],
+    worktreeRoot?: string,
+  ): Promise<void>;
   reconcile(projectPath: string, worktreeRoot?: string): void;
 }
 

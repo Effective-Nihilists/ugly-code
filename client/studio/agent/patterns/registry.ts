@@ -110,7 +110,8 @@ const BUILD_STEP: Step = {
   ].join(' '),
   askUserClause:
     'You may call `ask_user` (budget 2) only when you discover a real spec/implementation conflict that requires the user to resolve.',
-  advanceCriteria: 'Implementation matches every acceptance criterion in the spec.',
+  advanceCriteria:
+    'Implementation matches every acceptance criterion in the spec.',
   judgePromptOverride: [
     'You are judging the BUILD step of the spec-build-verify pattern.',
     'Verdict `advance` when the implementation satisfies every acceptance criterion stated in the spec.',
@@ -444,7 +445,10 @@ export function getPattern(id: string): Pattern | undefined {
   return (PATTERN_REGISTRY as Record<string, Pattern>)[id];
 }
 
-export function getStep(patternId: PatternId, stepId: string): Step | undefined {
+export function getStep(
+  patternId: PatternId,
+  stepId: string,
+): Step | undefined {
   return PATTERN_REGISTRY[patternId].steps.find((s) => s.id === stepId);
 }
 
@@ -454,4 +458,8 @@ export function getTerminalStep(patternId: PatternId): Step {
   return terminal;
 }
 
-export { READ_ONLY_TOOL_ALLOWLIST, SPEC_TOOL_ALLOWLIST, READ_ONLY_TOOL_SUFFIXES };
+export {
+  READ_ONLY_TOOL_ALLOWLIST,
+  SPEC_TOOL_ALLOWLIST,
+  READ_ONLY_TOOL_SUFFIXES,
+};

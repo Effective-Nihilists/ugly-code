@@ -13,5 +13,7 @@ export async function up(query: typeof pgQuery): Promise<void> {
     updated  TIMESTAMPTZ NOT NULL DEFAULT now(),
     version  INTEGER NOT NULL DEFAULT 1
   )`);
-  await query(`CREATE INDEX IF NOT EXISTS "idx_userSettings_data" ON "userSettings" USING GIN (data)`);
+  await query(
+    `CREATE INDEX IF NOT EXISTS "idx_userSettings_data" ON "userSettings" USING GIN (data)`,
+  );
 }

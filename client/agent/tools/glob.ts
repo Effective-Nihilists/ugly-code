@@ -18,7 +18,10 @@ export interface GlobArgs {
  *  carries `.globignore` entries. Hard excludes are always applied — including
  *  when include_ignored adds --no-ignore — because `-g '!x'` overrides are honored
  *  regardless of ignore-file parsing. */
-export function buildGlobArgs(args: GlobArgs, extraExcludes: string[] = []): string[] {
+export function buildGlobArgs(
+  args: GlobArgs,
+  extraExcludes: string[] = [],
+): string[] {
   const a = ['--files', '-g', args.pattern];
   if (args.include_ignored) a.push('--no-ignore');
   for (const dir of HARD_EXCLUDES) a.push('-g', `!${dir}`);
@@ -53,13 +56,19 @@ const SPEC: TextGenTool = {
     'Find files by name pattern (glob), e.g. "**/*.test.ts" or "src/**/*.tsx". ' +
     'Returns matching file paths, one per line. Issue this alongside other ' +
     'independent `grep`/`read` calls in the same message when you need several ' +
-    'lookups — don\'t serialize independent searches across turns.',
+    "lookups — don't serialize independent searches across turns.",
   parameters: {
     type: 'object',
     properties: {
       pattern: { type: 'string', description: 'Glob pattern, e.g. "**/*.ts".' },
-      path: { type: 'string', description: 'Optional directory to scope the search.' },
-      include_ignored: { type: 'boolean', description: 'Also include .gitignore-d files.' },
+      path: {
+        type: 'string',
+        description: 'Optional directory to scope the search.',
+      },
+      include_ignored: {
+        type: 'boolean',
+        description: 'Also include .gitignore-d files.',
+      },
     },
     required: ['pattern'],
     additionalProperties: false,
@@ -73,9 +82,13 @@ export const globTool: ToolModule = {
     const args = input as unknown as GlobArgs;
     const root = projectRoot(ctx) ?? undefined;
     const extraExcludes = await readGlobignore(root);
-    const { stdout, stderr, code } = await spawnCollect('rg', buildGlobArgs(args, extraExcludes), {
-      ...(root ? { cwd: root } : {}),
-    });
+    const { stdout, stderr, code } = await spawnCollect(
+      'rg',
+      buildGlobArgs(args, extraExcludes),
+      {
+        ...(root ? { cwd: root } : {}),
+      },
+    );
     // code === null means the spawn never ran (rg not on PATH) or we killed it on
     // timeout — NOT an empty result set. THROW, don't return a string: the framework
     // turns a thrown tool error into `Error: …` with is_error=true (runAgent.ts), which
@@ -83,13 +96,17 @@ export const globTool: ToolModule = {
     // returned string got success chrome, so a missing binary was indistinguishable from
     // an empty project and the agent concluded the codebase had no files.
     if (code === null) {
-      throw new Error(`glob failed — the search did not run: ${stderr.trim() || 'could not start ripgrep (rg)'}`);
+      throw new Error(
+        `glob failed — the search did not run: ${stderr.trim() || 'could not start ripgrep (rg)'}`,
+      );
     }
     if (code === 1 || (code === 0 && !stdout.trim())) {
       return `(no files match ${JSON.stringify(args.pattern)})`;
     }
     if (code !== 0) {
-      throw new Error(`glob error (rg exit ${code}): ${(stderr || stdout).trim()}`);
+      throw new Error(
+        `glob error (rg exit ${code}): ${(stderr || stdout).trim()}`,
+      );
     }
     return stdout.trimEnd();
   },

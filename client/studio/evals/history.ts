@@ -20,7 +20,12 @@ export interface RunHistoryEntry {
   /** Honest model turn count — assistant messages only, excludes injected nudges. */
   assistantTurns?: number;
   /** Token usage when the session store captured it (input/output/cache). */
-  tokens?: { input: number; output: number; cacheRead: number; cacheCreate: number };
+  tokens?: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheCreate: number;
+  };
   /** Wall-clock of the run in ms (session updated − created). */
   durationMs?: number;
   /** True when the provider produced zero assistant turns (outage), not a real 0-score. */
@@ -29,7 +34,9 @@ export interface RunHistoryEntry {
 }
 
 export function historyPath(): string {
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+  const env =
+    (globalThis as { process?: { env?: Record<string, string | undefined> } })
+      .process?.env ?? {};
   const home = env.HOME ?? env.USERPROFILE ?? '.';
   return `${home}/.ugly-code/eval-history.jsonl`;
 }
@@ -37,7 +44,10 @@ export function historyPath(): string {
 async function readAll(): Promise<RunHistoryEntry[]> {
   try {
     const raw = await native.fs.readFile(historyPath());
-    return raw.split('\n').filter(Boolean).map((l) => JSON.parse(l) as RunHistoryEntry);
+    return raw
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as RunHistoryEntry);
   } catch {
     return [];
   }
@@ -53,7 +63,10 @@ export function appendRunHistory(entry: RunHistoryEntry): Promise<void> {
     await native.fs.mkdir(path.slice(0, path.lastIndexOf('/')), true);
     const rows = await readAll();
     rows.push(entry);
-    await native.fs.writeFile(path, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+    await native.fs.writeFile(
+      path,
+      rows.map((r) => JSON.stringify(r)).join('\n') + '\n',
+    );
   };
   chain = chain.then(op, op);
   return chain.then(() => undefined);
@@ -64,10 +77,15 @@ export async function listRunHistory(): Promise<{ runs: RunHistoryEntry[] }> {
   return { runs: (await readAll()).reverse() };
 }
 
-export function deleteRunFromHistory(projectName: string): Promise<{ ok: boolean }> {
+export function deleteRunFromHistory(
+  projectName: string,
+): Promise<{ ok: boolean }> {
   const op = async (): Promise<{ ok: boolean }> => {
     const kept = (await readAll()).filter((e) => e.projectName !== projectName);
-    await native.fs.writeFile(historyPath(), kept.length ? kept.map((r) => JSON.stringify(r)).join('\n') + '\n' : '');
+    await native.fs.writeFile(
+      historyPath(),
+      kept.length ? kept.map((r) => JSON.stringify(r)).join('\n') + '\n' : '',
+    );
     return { ok: true };
   };
   const next = chain.then(op, op);

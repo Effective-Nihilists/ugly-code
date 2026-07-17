@@ -4,7 +4,10 @@
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
 
-interface Note { message: string; tag?: string }
+interface Note {
+  message: string;
+  tag?: string;
+}
 const boards = new Map<string, Note[]>();
 
 /** Read all notes posted for a session (used by sub-agents / tests). */
@@ -34,10 +37,17 @@ export const blackboardPostTool: ToolModule = {
   // eslint-disable-next-line @typescript-eslint/require-await
   async run(input, ctx) {
     const sid = ctx?.sessionId ?? 'default';
-    const message = (typeof input.message === 'string' ? input.message : '').trim();
+    const message = (
+      typeof input.message === 'string' ? input.message : ''
+    ).trim();
     if (!message) return 'blackboard_post: `message` is required';
     const notes = boards.get(sid) ?? [];
-    notes.push({ message, ...(input.tag ? { tag: (typeof input.tag === 'string' ? input.tag : '') } : {}) });
+    notes.push({
+      message,
+      ...(input.tag
+        ? { tag: typeof input.tag === 'string' ? input.tag : '' }
+        : {}),
+    });
     boards.set(sid, notes);
     return `posted to blackboard (${notes.length} note(s))`;
   },

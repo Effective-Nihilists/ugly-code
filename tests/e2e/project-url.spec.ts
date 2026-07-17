@@ -10,15 +10,21 @@ const auth = loadDevAuth();
 const PROJECT = '/tmp/demo-project';
 
 test.describe('project URL (?path=)', () => {
-  test('opening a project reflects its local path in the URL', async ({ page }) => {
+  test('opening a project reflects its local path in the URL', async ({
+    page,
+  }) => {
     await enterStudioShell(page, auth);
     expect(new URL(page.url()).searchParams.get('path')).toBeNull(); // picker has no path
 
     await openProject(page, PROJECT);
-    await expect.poll(() => new URL(page.url()).searchParams.get('path')).toBe(PROJECT);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('path'))
+      .toBe(PROJECT);
   });
 
-  test('a ?path= URL deep-links straight into the workspace', async ({ page }) => {
+  test('a ?path= URL deep-links straight into the workspace', async ({
+    page,
+  }) => {
     await enterStudioShell(page, auth); // lands on the picker at /
     await page.goto(`/?path=${PROJECT}`);
 
@@ -27,18 +33,25 @@ test.describe('project URL (?path=)', () => {
     expect(new URL(page.url()).searchParams.get('path')).toBe(PROJECT);
   });
 
-  test('Back from an open project returns to the picker and clears the path', async ({ page }) => {
+  test('Back from an open project returns to the picker and clears the path', async ({
+    page,
+  }) => {
     await enterStudioShell(page, auth);
     await openProject(page, PROJECT);
 
     await page.goBack();
-    await page.getByRole('button', { name: /Open Folder/ }).first().waitFor();
+    await page
+      .getByRole('button', { name: /Open Folder/ })
+      .first()
+      .waitFor();
     expect(new URL(page.url()).searchParams.get('path')).toBeNull();
   });
 });
 
 test.describe('workspace URL (?tab= / ?session=)', () => {
-  test('the workspace tab is restored from the URL (survives reload)', async ({ page }) => {
+  test('the workspace tab is restored from the URL (survives reload)', async ({
+    page,
+  }) => {
     await enterStudioShell(page, auth);
     // Deep-link straight to the Git view of a project.
     await page.goto(`/?path=${PROJECT}&tab=git`);
@@ -52,6 +65,8 @@ test.describe('workspace URL (?tab= / ?session=)', () => {
     // Target the session tab picker specifically (Database also appears as a
     // prod view in the sidebar footer).
     await page.locator('[data-id=tab-database]').click();
-    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('database');
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('tab'))
+      .toBe('database');
   });
 });

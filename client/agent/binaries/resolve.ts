@@ -12,11 +12,15 @@ export interface BinariesIo {
 }
 
 function home(): string {
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+  const env =
+    (globalThis as { process?: { env?: Record<string, string | undefined> } })
+      .process?.env ?? {};
   return env.HOME ?? env.USERPROFILE ?? '.';
 }
 function platformTag(): string {
-  const p = (globalThis as { process?: { platform?: string; arch?: string } }).process ?? {};
+  const p =
+    (globalThis as { process?: { platform?: string; arch?: string } })
+      .process ?? {};
   return `${p.platform ?? 'unknown'}-${p.arch ?? 'unknown'}`;
 }
 
@@ -54,43 +58,79 @@ export async function ensureBinary(
     await installer(destDir);
     const manifestPath = `${binariesRoot()}/manifest.json`;
     let manifest: Record<string, { installedAt: number }> = {};
-    try { manifest = JSON.parse(await io.readFile(manifestPath)) as Record<string, { installedAt: number }>; } catch { /* first write */ }
+    try {
+      manifest = JSON.parse(await io.readFile(manifestPath)) as Record<
+        string,
+        { installedAt: number }
+      >;
+    } catch {
+      /* first write */
+    }
     manifest[name] = { installedAt: io.now() };
     await io.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
     return destDir;
   })();
   inflight.set(destDir, task);
-  try { return await task; } finally { inflight.delete(destDir); }
+  try {
+    return await task;
+  } finally {
+    inflight.delete(destDir);
+  }
 }
 
 let uvIo: BinariesIo | undefined;
 /** Test seam: override the IO used by ensureUv. */
-export function __setUvIo(io: BinariesIo): void { uvIo = io; }
+export function __setUvIo(io: BinariesIo): void {
+  uvIo = io;
+}
 
 /** Resolve a `uv` executable — PATH first, else install into the shared binaries root. */
-export async function ensureUv(io: BinariesIo = uvIo ?? nativeIo): Promise<string> {
+export async function ensureUv(
+  io: BinariesIo = uvIo ?? nativeIo,
+): Promise<string> {
   const probe = await spawnCollect('uv', ['--version'], {});
   if (probe.code === 0) return 'uv';
-  const dir = await ensureBinary('uv', async (destDir) => {
-    // Astral installer honors UV_INSTALL_DIR; INSTALLER_NO_MODIFY_PATH keeps it self-contained.
-    const script = `curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="${destDir}" INSTALLER_NO_MODIFY_PATH=1 sh`;
-    const res = await spawnCollect('sh', ['-c', script], {});
-    if (res.code !== 0 && res.code !== null) throw new Error(`uv install failed (exit ${res.code}): ${res.stderr.slice(0, 400)}`);
-  }, io);
+  const dir = await ensureBinary(
+    'uv',
+    async (destDir) => {
+      // Astral installer honors UV_INSTALL_DIR; INSTALLER_NO_MODIFY_PATH keeps it self-contained.
+      const script = `curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="${destDir}" INSTALLER_NO_MODIFY_PATH=1 sh`;
+      const res = await spawnCollect('sh', ['-c', script], {});
+      if (res.code !== 0 && res.code !== null)
+        throw new Error(
+          `uv install failed (exit ${res.code}): ${res.stderr.slice(0, 400)}`,
+        );
+    },
+    io,
+  );
   return `${dir}/uv`;
 }
 
 let pythonIo: BinariesIo | undefined;
 /** Test seam: override the IO used by ensurePython. */
-export function __setPythonIo(io: BinariesIo): void { pythonIo = io; }
+export function __setPythonIo(io: BinariesIo): void {
+  pythonIo = io;
+}
 
 /** Resolve a python3 executable, installing a uv-managed runtime on first use. */
-export async function ensurePython(io: BinariesIo = pythonIo ?? nativeIo): Promise<string> {
-  const dir = await ensureBinary('python', async (destDir) => {
-    const res = await spawnCollect('uv', ['python', 'install', '--install-dir', destDir], {});
-    if (res.code !== 0 && res.code !== null) {
-      throw new Error(`uv python install failed (exit ${res.code}): ${res.stderr.slice(0, 400)}`);
-    }
-  }, io);
+export async function ensurePython(
+  io: BinariesIo = pythonIo ?? nativeIo,
+): Promise<string> {
+  const dir = await ensureBinary(
+    'python',
+    async (destDir) => {
+      const res = await spawnCollect(
+        'uv',
+        ['python', 'install', '--install-dir', destDir],
+        {},
+      );
+      if (res.code !== 0 && res.code !== null) {
+        throw new Error(
+          `uv python install failed (exit ${res.code}): ${res.stderr.slice(0, 400)}`,
+        );
+      }
+    },
+    io,
+  );
   return `${dir}/bin/python3`;
 }

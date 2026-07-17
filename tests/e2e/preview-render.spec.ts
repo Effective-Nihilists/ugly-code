@@ -27,13 +27,16 @@ const RUN = process.env['RUN_REAL_PREVIEW'] === '1';
 const PREVIEW_URL = process.env['PREVIEW_URL'] ?? 'http://localhost:4321';
 
 // The panel's iframe, verbatim (client/studio/panels/PreviewPanel.tsx).
-const IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups';
+const IFRAME_SANDBOX =
+  'allow-scripts allow-same-origin allow-forms allow-popups';
 
 test.describe('Preview panel renders a real dev server (not stranded on auth)', () => {
   test.skip(!RUN, 'set RUN_REAL_PREVIEW=1 + PREVIEW_URL=<running dev server>');
   test.setTimeout(60_000);
 
-  test('the app mounts inside the panel iframe and does not redirect to /oauth/silent', async ({ page }) => {
+  test('the app mounts inside the panel iframe and does not redirect to /oauth/silent', async ({
+    page,
+  }) => {
     const wrapper = `<!doctype html><meta charset=utf8><body style="margin:0">
       <iframe id="pv" src="${PREVIEW_URL}" style="width:100vw;height:100vh;border:none"
               sandbox="${IFRAME_SANDBOX}"></iframe></body>`;
@@ -46,7 +49,9 @@ test.describe('Preview panel renders a real dev server (not stranded on auth)', 
       // The specific failure: the app did a top-level bounce to ugly.bot's
       // silent-SSO endpoint (which 400s "Invalid origin" for a dev origin), so
       // the iframe navigated AWAY from the dev server. Surface it clearly.
-      const stranded = page.frames().find((f) => f.url().includes('/oauth/silent'));
+      const stranded = page
+        .frames()
+        .find((f) => f.url().includes('/oauth/silent'));
       expect(
         stranded?.url(),
         'preview stranded: the app redirected to ugly.bot/oauth/silent instead of rendering',
@@ -61,10 +66,16 @@ test.describe('Preview panel renders a real dev server (not stranded on auth)', 
       .locator('#root')
       .evaluate((el) => el.innerHTML.length)
       .catch(() => -1);
-    expect(rootLen, 'app #root should have rendered content').toBeGreaterThan(200);
+    expect(rootLen, 'app #root should have rendered content').toBeGreaterThan(
+      200,
+    );
 
     // And we must not be sitting on the "Invalid origin" error text.
-    const bodyText = (await frame!.locator('body').innerText().catch(() => '')) || '';
+    const bodyText =
+      (await frame!
+        .locator('body')
+        .innerText()
+        .catch(() => '')) || '';
     expect(bodyText).not.toContain('Invalid origin');
   });
 });

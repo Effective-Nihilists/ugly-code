@@ -9,7 +9,10 @@ vi.mock('../../../client/studio/hooks/useSocket', () => ({
   getActiveProjectPath: () => '/proj',
 }));
 
-import { projectRoot, lspForProject } from '../../../client/agent/tools/lspForProject';
+import {
+  projectRoot,
+  lspForProject,
+} from '../../../client/agent/tools/lspForProject';
 import { getEditorLspClient } from '../../../client/studio/agent/lsp/registry';
 
 describe('projectRoot', () => {

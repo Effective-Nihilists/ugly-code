@@ -109,7 +109,9 @@ export function SessionRow({
       inputRef.current?.select();
     }
   }, [editing]);
-  useEffect(() => { if (!editing) setDraft(session.title); }, [session.title, editing]);
+  useEffect(() => {
+    if (!editing) setDraft(session.title);
+  }, [session.title, editing]);
   const commitRename = (): void => {
     const next = draft.trim();
     setEditing(false);
@@ -202,14 +204,23 @@ export function SessionRow({
               ref={inputRef}
               data-id="session-row-rename"
               value={draft}
-              onChange={(e) => { setDraft(e.target.value); }}
-              onClick={(e) => { e.stopPropagation(); }}
-              onDoubleClick={(e) => { e.stopPropagation(); }}
+              onChange={(e) => {
+                setDraft(e.target.value);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+              }}
               onBlur={commitRename}
               onKeyDown={(e) => {
                 e.stopPropagation();
-                if (e.key === 'Enter') { commitRename(); }
-                else if (e.key === 'Escape') { setEditing(false); }
+                if (e.key === 'Enter') {
+                  commitRename();
+                } else if (e.key === 'Escape') {
+                  setEditing(false);
+                }
               }}
               style={{
                 fontFamily: 'inherit',
@@ -254,7 +265,10 @@ export function SessionRow({
               fontSize: 9.5,
               fontWeight: 600,
               letterSpacing: '0.04em',
-              color: session.branch === 'main' ? 'var(--text-muted)' : 'var(--text-secondary)',
+              color:
+                session.branch === 'main'
+                  ? 'var(--text-muted)'
+                  : 'var(--text-secondary)',
               background: 'var(--bg-secondary)',
               border: '1px solid var(--border)',
               borderRadius: 3,

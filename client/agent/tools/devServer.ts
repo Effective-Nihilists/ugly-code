@@ -26,13 +26,24 @@ const START_SPEC: TextGenTool = {
     'Start (or restart) the project dev server (`pnpm dev`) via the Preview ' +
     'panel. Returns immediately; use dev_server_logs / dev_server_errors to check ' +
     'boot progress. Requires an open project with the Preview panel mounted.',
-  parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+  parameters: {
+    type: 'object',
+    properties: {},
+    required: [],
+    additionalProperties: false,
+  },
 };
 
 const STOP_SPEC: TextGenTool = {
   name: 'dev_server_stop',
-  description: 'Stop the project dev server (`pnpm dev`) via the Preview panel.',
-  parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+  description:
+    'Stop the project dev server (`pnpm dev`) via the Preview panel.',
+  parameters: {
+    type: 'object',
+    properties: {},
+    required: [],
+    additionalProperties: false,
+  },
 };
 
 const ERRORS_SPEC: TextGenTool = {
@@ -44,14 +55,18 @@ const ERRORS_SPEC: TextGenTool = {
   parameters: {
     type: 'object',
     properties: {
-      lines: { type: 'number', description: 'Max trailing error lines to return (default 100).' },
+      lines: {
+        type: 'number',
+        description: 'Max trailing error lines to return (default 100).',
+      },
     },
     required: [],
     additionalProperties: false,
   },
 };
 
-const ERROR_RE = /error|err!|failed|✗|exception|cannot find|is not defined|unexpected|\[error:|exited [1-9]/i;
+const ERROR_RE =
+  /error|err!|failed|✗|exception|cannot find|is not defined|unexpected|\[error:|exited [1-9]/i;
 
 export const devServerStartTool: ToolModule = {
   name: 'dev_server_start',
@@ -63,7 +78,14 @@ export const devServerStartTool: ToolModule = {
       await writeDevControl(root, 'start', nextNonce());
       return 'Requested dev server start (Preview panel is booting `pnpm dev`). Check dev_server_logs for progress.';
     } catch (e) {
-      console.error('[devServerStartTool:writeDevControl]', JSON.stringify({ root, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[devServerStartTool:writeDevControl]',
+        JSON.stringify({
+          root,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       return `dev_server_start failed: ${(e as Error).message}`;
     }
   },
@@ -79,7 +101,14 @@ export const devServerStopTool: ToolModule = {
       await writeDevControl(root, 'stop', nextNonce());
       return 'Requested dev server stop.';
     } catch (e) {
-      console.error('[devServerStopTool:writeDevControl]', JSON.stringify({ root, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[devServerStopTool:writeDevControl]',
+        JSON.stringify({
+          root,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       return `dev_server_stop failed: ${(e as Error).message}`;
     }
   },
@@ -95,8 +124,14 @@ export const devServerErrorsTool: ToolModule = {
     if (!raw.trim()) {
       return '(no dev-server log — the dev server may not be running; start it with dev_server_start)';
     }
-    const n = typeof input.lines === 'number' && input.lines > 0 ? Math.floor(input.lines) : 100;
-    const errs = raw.replace(/\n+$/, '').split('\n').filter((l) => ERROR_RE.test(l));
+    const n =
+      typeof input.lines === 'number' && input.lines > 0
+        ? Math.floor(input.lines)
+        : 100;
+    const errs = raw
+      .replace(/\n+$/, '')
+      .split('\n')
+      .filter((l) => ERROR_RE.test(l));
     if (!errs.length) return '(no errors in the dev server log)';
     return errs.slice(-n).join('\n');
   },

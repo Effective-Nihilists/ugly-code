@@ -26,20 +26,29 @@ describe('read', () => {
 
   it('supports offset/limit', async () => {
     resetMock({ files: { 'a.txt': 'L1\nL2\nL3\nL4\n' } });
-    const out = await dispatchTool('read', { path: 'a.txt', offset: 1, limit: 2 });
+    const out = await dispatchTool('read', {
+      path: 'a.txt',
+      offset: 1,
+      limit: 2,
+    });
     expect(out).toMatch(/2:[0-9a-f]{2}\|L2/);
     expect(out).toMatch(/3:[0-9a-f]{2}\|L3/);
     expect(out).not.toMatch(/\|L1/);
   });
 
   it('rejects on a missing file', async () => {
-    await expect(dispatchTool('read', { path: 'missing.txt' })).rejects.toThrow(/ENOENT/);
+    await expect(dispatchTool('read', { path: 'missing.txt' })).rejects.toThrow(
+      /ENOENT/,
+    );
   });
 });
 
 describe('write', () => {
   it('writes content and reports the path', async () => {
-    const out = await dispatchTool('write', { path: 'deep/nested/file.txt', content: 'x' });
+    const out = await dispatchTool('write', {
+      path: 'deep/nested/file.txt',
+      content: 'x',
+    });
     expect(out).toBe('Wrote deep/nested/file.txt');
     expect(mockFiles().get('deep/nested/file.txt')).toBe('x');
   });
@@ -54,7 +63,11 @@ describe('write', () => {
 describe('edit', () => {
   it('replaces a unique substring and reports the real line delta', async () => {
     resetMock({ files: { 'x.ts': 'const x = 1;\n' } });
-    const out = await dispatchTool('edit', { path: 'x.ts', old: '1', new: '2' });
+    const out = await dispatchTool('edit', {
+      path: 'x.ts',
+      old: '1',
+      new: '2',
+    });
     // The delta is part of the contract: the transcript card can't derive it (anchor
     // edits carry no old_string) and used to badge every replacement as "+1 −0".
     expect(out).toBe('Edited x.ts (+1 −1)');
@@ -63,44 +76,69 @@ describe('edit', () => {
 
   it('reports a pure insertion as +1 −0', async () => {
     resetMock({ files: { 'x.ts': 'a\n' } });
-    const out = await dispatchTool('edit', { path: 'x.ts', old: 'a\n', new: 'a\nb\n' });
+    const out = await dispatchTool('edit', {
+      path: 'x.ts',
+      old: 'a\n',
+      new: 'a\nb\n',
+    });
     expect(out).toBe('Edited x.ts (+1 −0)');
   });
 
   it('reports when the old text is not found', async () => {
     resetMock({ files: { 'x.ts': 'const x = 1;\n' } });
-    expect(await dispatchTool('edit', { path: 'x.ts', old: 'nope', new: 'y' })).toMatch(/not found/);
+    expect(
+      await dispatchTool('edit', { path: 'x.ts', old: 'nope', new: 'y' }),
+    ).toMatch(/not found/);
   });
 
   it('reports when the old text is not unique', async () => {
     resetMock({ files: { 'y.ts': 'a;\na;\n' } });
-    expect(await dispatchTool('edit', { path: 'y.ts', old: 'a;', new: 'b;' })).toMatch(/not unique/);
+    expect(
+      await dispatchTool('edit', { path: 'y.ts', old: 'a;', new: 'b;' }),
+    ).toMatch(/not unique/);
     // unchanged
     expect(mockFiles().get('y.ts')).toBe('a;\na;\n');
   });
 
   it('replace_all replaces every occurrence', async () => {
     resetMock({ files: { 'y.ts': 'a;\na;\n' } });
-    await dispatchTool('edit', { path: 'y.ts', old_string: 'a;', new_string: 'b;', replace_all: true });
+    await dispatchTool('edit', {
+      path: 'y.ts',
+      old_string: 'a;',
+      new_string: 'b;',
+      replace_all: true,
+    });
     expect(mockFiles().get('y.ts')).toBe('b;\nb;\n');
   });
 
   it('anchor mode replaces a single line (bare line number)', async () => {
     resetMock({ files: { 'a.ts': 'l1\nl2\nl3\n' } });
-    const out = await dispatchTool('edit', { path: 'a.ts', anchor: '2', new_content: 'L2' });
+    const out = await dispatchTool('edit', {
+      path: 'a.ts',
+      anchor: '2',
+      new_content: 'L2',
+    });
     expect(out).toMatch(/Edited/);
     expect(mockFiles().get('a.ts')).toBe('l1\nL2\nl3\n');
   });
 
   it('insert_after inserts a line', async () => {
     resetMock({ files: { 'a.ts': 'l1\nl2\n' } });
-    await dispatchTool('edit', { path: 'a.ts', insert_after: '1', new_content: 'X' });
+    await dispatchTool('edit', {
+      path: 'a.ts',
+      insert_after: '1',
+      new_content: 'X',
+    });
     expect(mockFiles().get('a.ts')).toBe('l1\nX\nl2\n');
   });
 
   it('range mode replaces a range; empty new_content deletes', async () => {
     resetMock({ files: { 'a.ts': 'l1\nl2\nl3\n' } });
-    await dispatchTool('edit', { path: 'a.ts', range: '1..2', new_content: 'Z' });
+    await dispatchTool('edit', {
+      path: 'a.ts',
+      range: '1..2',
+      new_content: 'Z',
+    });
     expect(mockFiles().get('a.ts')).toBe('Z\nl3\n');
     resetMock({ files: { 'b.ts': 'l1\nl2\nl3\n' } });
     await dispatchTool('edit', { path: 'b.ts', range: '2..2' });
@@ -110,7 +148,11 @@ describe('edit', () => {
   it('a stale-hash anchor returns a diagnostic and leaves the file unchanged', async () => {
     resetMock({ files: { 'a.ts': 'l1\nl2\n' } });
     const wrong = annotateLines('l1\nl2\n')[1].hash === '00' ? '01' : '00';
-    const out = await dispatchTool('edit', { path: 'a.ts', anchor: `2:${wrong}`, new_content: 'X' });
+    const out = await dispatchTool('edit', {
+      path: 'a.ts',
+      anchor: `2:${wrong}`,
+      new_content: 'X',
+    });
     expect(out).toMatch(/stale hash|failed/i);
     expect(mockFiles().get('a.ts')).toBe('l1\nl2\n');
   });
@@ -119,58 +161,110 @@ describe('edit', () => {
 describe('bash', () => {
   it('streams stdout and appends the exit code', async () => {
     resetMock({ proc: () => ({ stdout: 'hello\n', code: 0 }) });
-    const out = await dispatchTool('bash', { command: 'echo hello', description: 'echo' });
+    const out = await dispatchTool('bash', {
+      command: 'echo hello',
+      description: 'echo',
+    });
     expect(out).toContain('hello');
     expect(out).toContain('[exit 0]');
   });
 
   it('surfaces a non-zero exit code', async () => {
     resetMock({ proc: () => ({ stderr: 'boom\n', code: 1 }) });
-    const out = await dispatchTool('bash', { command: 'git nope', description: 'fail' });
+    const out = await dispatchTool('bash', {
+      command: 'git nope',
+      description: 'fail',
+    });
     expect(out).toContain('boom');
     expect(out).toContain('[exit 1]');
   });
 
   it('runs the command via `sh -c` through native.process.spawn', async () => {
-    await dispatchTool('bash', { command: 'git status --short', description: 'status' });
+    await dispatchTool('bash', {
+      command: 'git status --short',
+      description: 'status',
+    });
     const spawn = mockCalls().find((c) => c.channel === 'process.spawn');
-    expect(spawn?.payload).toMatchObject({ cmd: 'sh', args: ['-c', 'git status --short'] });
+    expect(spawn?.payload).toMatchObject({
+      cmd: 'sh',
+      args: ['-c', 'git status --short'],
+    });
   });
 });
 
 describe('bash dev-server guard', () => {
   // Each case uses a distinct projectDir — isUglyAppProject caches per dir.
-  const blocked = ['npx ugly-app dev', 'pnpm dlx ugly-app dev', 'pnpm dev', 'pnpm run dev', 'npm run dev', 'ugly-app dev --watch'];
+  const blocked = [
+    'npx ugly-app dev',
+    'pnpm dlx ugly-app dev',
+    'pnpm dev',
+    'pnpm run dev',
+    'npm run dev',
+    'ugly-app dev --watch',
+  ];
   blocked.forEach((command, i) => {
     it(`redirects \`${command}\` to dev_server_start in an ugly-app project`, async () => {
       const dir = `/guard-block-${i}`;
       resetMock({ files: { [`${dir}/.uglyapp`]: '{"projectId":"p"}' } });
-      const out = await dispatchTool('bash', { command, description: 'run dev' }, { projectDir: dir });
+      const out = await dispatchTool(
+        'bash',
+        { command, description: 'run dev' },
+        { projectDir: dir },
+      );
       expect(out).toMatch(/dev_server_start/);
       // The blocking command must NOT have been spawned.
-      expect(mockCalls().find((c) => c.channel === 'process.spawn')).toBeUndefined();
+      expect(
+        mockCalls().find((c) => c.channel === 'process.spawn'),
+      ).toBeUndefined();
     });
   });
 
   it('does not block non-dev commands (e.g. `pnpm dlx ugly-app doctor`)', async () => {
     const dir = '/guard-allow-doctor';
-    resetMock({ files: { [`${dir}/.uglyapp`]: '{"projectId":"p"}' }, proc: () => ({ stdout: 'ok\n', code: 0 }) });
-    await dispatchTool('bash', { command: 'pnpm dlx ugly-app doctor', description: 'doctor' }, { projectDir: dir });
-    expect(mockCalls().find((c) => c.channel === 'process.spawn')).toBeDefined();
+    resetMock({
+      files: { [`${dir}/.uglyapp`]: '{"projectId":"p"}' },
+      proc: () => ({ stdout: 'ok\n', code: 0 }),
+    });
+    await dispatchTool(
+      'bash',
+      { command: 'pnpm dlx ugly-app doctor', description: 'doctor' },
+      { projectDir: dir },
+    );
+    expect(
+      mockCalls().find((c) => c.channel === 'process.spawn'),
+    ).toBeDefined();
   });
 
   it('does not block `pnpm run dev-check` (only exact `dev`)', async () => {
     const dir = '/guard-allow-devcheck';
-    resetMock({ files: { [`${dir}/.uglyapp`]: '{"projectId":"p"}' }, proc: () => ({ stdout: 'ok\n', code: 0 }) });
-    await dispatchTool('bash', { command: 'pnpm run dev-check', description: 'dev-check' }, { projectDir: dir });
-    expect(mockCalls().find((c) => c.channel === 'process.spawn')).toBeDefined();
+    resetMock({
+      files: { [`${dir}/.uglyapp`]: '{"projectId":"p"}' },
+      proc: () => ({ stdout: 'ok\n', code: 0 }),
+    });
+    await dispatchTool(
+      'bash',
+      { command: 'pnpm run dev-check', description: 'dev-check' },
+      { projectDir: dir },
+    );
+    expect(
+      mockCalls().find((c) => c.channel === 'process.spawn'),
+    ).toBeDefined();
   });
 
   it('does not block dev-server commands in a non-ugly-app project', async () => {
     const dir = '/guard-plain-project';
-    resetMock({ files: { [`${dir}/package.json`]: '{}' }, proc: () => ({ stdout: 'ok\n', code: 0 }) });
-    await dispatchTool('bash', { command: 'pnpm dev', description: 'run dev' }, { projectDir: dir });
-    expect(mockCalls().find((c) => c.channel === 'process.spawn')).toBeDefined();
+    resetMock({
+      files: { [`${dir}/package.json`]: '{}' },
+      proc: () => ({ stdout: 'ok\n', code: 0 }),
+    });
+    await dispatchTool(
+      'bash',
+      { command: 'pnpm dev', description: 'run dev' },
+      { projectDir: dir },
+    );
+    expect(
+      mockCalls().find((c) => c.channel === 'process.spawn'),
+    ).toBeDefined();
   });
 });
 
@@ -194,8 +288,14 @@ describe('bash timeout + stop', () => {
   it('killSessionBashProcs ends a running bash for that session', async () => {
     resetMock({ proc: () => ({ hang: true }) });
     let done = false;
-    const p = dispatchTool('bash', { command: 'sleep 999', description: 'hang' }, { sessionId: 'kill-s2' })
-      .then((r) => { done = true; return r; });
+    const p = dispatchTool(
+      'bash',
+      { command: 'sleep 999', description: 'hang' },
+      { sessionId: 'kill-s2' },
+    ).then((r) => {
+      done = true;
+      return r;
+    });
     await new Promise((r) => setTimeout(r, 5)); // let the spawn register
     expect(done).toBe(false);
     expect(killSessionBashProcs('kill-s2')).toBe(1);
@@ -229,16 +329,25 @@ describe('full agent loop over the UglyNative mock', () => {
     let i = 0;
     const step: StepFn = () => Promise.resolve({ message: turns[i++]! });
     const events: string[] = [];
-    const history: AgentMessage[] = [{ role: 'user', content: 'make hello.txt' }];
+    const history: AgentMessage[] = [
+      { role: 'user', content: 'make hello.txt' },
+    ];
 
-    await runAgent({ history, step, dispatch: dispatchTool, onEvent: (e) => events.push(e.type) });
+    await runAgent({
+      history,
+      step,
+      dispatch: dispatchTool,
+      onEvent: (e) => events.push(e.type),
+    });
 
     // The tool ran for real against the mock fs.
     expect(mockFiles().get('hello.txt')).toBe('from the agent');
     // The loop fed a tool_result back as a user turn, then finished.
     expect(history[2]).toMatchObject({
       role: 'user',
-      content: [{ type: 'tool_result', tool_use_id: 'w1', content: 'Wrote hello.txt' }],
+      content: [
+        { type: 'tool_result', tool_use_id: 'w1', content: 'Wrote hello.txt' },
+      ],
     });
     expect(events).toContain('done');
   });

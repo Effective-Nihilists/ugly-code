@@ -78,7 +78,11 @@ async function runIndexSearch(
   const dirtyFiles = ctx?.sessionId ? drainDirty(ctx.sessionId) : [];
   if (dirtyFiles.length) {
     try {
-      await codebaseProvider().update(projectPath, dirtyFiles, ctx?.workspaceDir ?? undefined);
+      await codebaseProvider().update(
+        projectPath,
+        dirtyFiles,
+        ctx?.workspaceDir ?? undefined,
+      );
     } catch {
       /* best-effort freshness — search proceeds on the current index */
     }
@@ -123,15 +127,22 @@ export function buildRgArgs(args: GrepArgs): string[] {
 }
 
 /** The exact ripgrep pass. Defaults head_limit to 200 to prevent runaway scans. */
-async function runExact(args: GrepArgs, ctx: ToolContext | undefined): Promise<string> {
+async function runExact(
+  args: GrepArgs,
+  ctx: ToolContext | undefined,
+): Promise<string> {
   const root = projectRoot(ctx) ?? undefined;
   // Default head_limit caps matches to prevent grep from running forever on huge repos.
   const effectiveArgs = { ...args, head_limit: args.head_limit ?? 200 };
-  const { stdout, stderr, code } = await spawnCollect('rg', buildRgArgs(effectiveArgs), {
-    ...(root ? { cwd: root } : {}),
-    // Agent can override via timeout_ms arg; default 30s for ripgrep
-    timeoutMs: typeof args.timeout_ms === 'number' ? args.timeout_ms : 30_000,
-  });
+  const { stdout, stderr, code } = await spawnCollect(
+    'rg',
+    buildRgArgs(effectiveArgs),
+    {
+      ...(root ? { cwd: root } : {}),
+      // Agent can override via timeout_ms arg; default 30s for ripgrep
+      timeoutMs: typeof args.timeout_ms === 'number' ? args.timeout_ms : 30_000,
+    },
+  );
   // code === null means the spawn never ran (rg not on PATH) or we killed it on timeout —
   // NOT "no matches". THROW, don't return a string: the framework turns a thrown tool
   // error into `Error: …` content with is_error=true (runAgent.ts), which is what paints
@@ -139,17 +150,25 @@ async function runExact(args: GrepArgs, ctx: ToolContext | undefined): Promise<s
   // polite string here made a dead search render as a green "0 matches" — an affirmative
   // claim about the codebase that nothing had checked.
   if (code === null) {
-    throw new Error(`grep failed — the search did not run: ${stderr.trim() || 'could not start ripgrep (rg)'}`);
+    throw new Error(
+      `grep failed — the search did not run: ${stderr.trim() || 'could not start ripgrep (rg)'}`,
+    );
   }
   // ripgrep: 0 = matches, 1 = no matches, 2 = error.
   if (code === 1) return `(no matches for ${JSON.stringify(args.pattern)})`;
   if (code !== 0) {
-    throw new Error(`grep error (rg exit ${code}): ${(stderr || stdout).trim()}`);
+    throw new Error(
+      `grep error (rg exit ${code}): ${(stderr || stdout).trim()}`,
+    );
   }
   return stdout.trimEnd() || `(no matches for ${JSON.stringify(args.pattern)})`;
 }
 
-interface LspHit { uri: string; line: number; character: number }
+interface LspHit {
+  uri: string;
+  line: number;
+  character: number;
+}
 
 const BARE_IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const LSP_SUPPLEMENT_MAX = 20;
@@ -229,16 +248,24 @@ function formatLspHits(
  *  authoritative for "does this compile". With a file (via `path`, or a
  *  path-like `pattern`) returns that file's diagnostics; otherwise a
  *  project-wide summary. Merged in from the former standalone lsp_diagnostics. */
-async function runDiagnostics(args: GrepArgs, ctx: ToolContext | undefined): Promise<string> {
+async function runDiagnostics(
+  args: GrepArgs,
+  ctx: ToolContext | undefined,
+): Promise<string> {
   const lsp = await lspForProject(ctx);
-  if (!lsp) return '(lsp not available — no project open or the TypeScript server failed to start)';
+  if (!lsp)
+    return '(lsp not available — no project open or the TypeScript server failed to start)';
   await lsp.ensureProjectLoaded();
-  const file = args.path ?? (/[/.]/.test(args.pattern) ? args.pattern : undefined);
+  const file =
+    args.path ?? (/[/.]/.test(args.pattern) ? args.pattern : undefined);
   if (file) {
     const diags = lsp.getDiagnostics(file);
     if (diags.length === 0) return `(no diagnostics for ${file})`;
     return diags
-      .map((d) => `${file}:${d.line}:${d.column} ${d.severity}: ${d.message}${d.code !== undefined ? ` [${d.code}]` : ''}`)
+      .map(
+        (d) =>
+          `${file}:${d.line}:${d.column} ${d.severity}: ${d.message}${d.code !== undefined ? ` [${d.code}]` : ''}`,
+      )
       .join('\n');
   }
   return lsp.formatSummary() || '(no diagnostics)';
@@ -273,7 +300,11 @@ export async function runLspMode(
     return formatLspHits(
       mode,
       symbol,
-      symbols.map((s) => ({ uri: s.uri, line: s.line, character: s.character })),
+      symbols.map((s) => ({
+        uri: s.uri,
+        line: s.line,
+        character: s.character,
+      })),
       cwd,
     );
   }
@@ -323,19 +354,69 @@ const SPEC: TextGenTool = {
   parameters: {
     type: 'object',
     properties: {
-      pattern: { type: 'string', description: 'Regex (exact/auto), natural language (semantic), symbol name (lsp-defs/refs/impls), or an optional file for lsp-diagnostics.' },
-      path: { type: 'string', description: 'Optional file or directory to scope the search (or the file for lsp-diagnostics).' },
+      pattern: {
+        type: 'string',
+        description:
+          'Regex (exact/auto), natural language (semantic), symbol name (lsp-defs/refs/impls), or an optional file for lsp-diagnostics.',
+      },
+      path: {
+        type: 'string',
+        description:
+          'Optional file or directory to scope the search (or the file for lsp-diagnostics).',
+      },
       include: { type: 'string', description: 'Glob filter, e.g. "*.ts".' },
-      literal_text: { type: 'boolean', description: 'Treat pattern as a literal string, not a regex.' },
-      caseInsensitive: { type: 'boolean', description: 'Case-insensitive match.' },
-      include_ignored: { type: 'boolean', description: 'Also search .gitignore-d files.' },
-      mode: { type: 'string', enum: ['auto', 'exact', 'fts', 'semantic', 'mixed', 'lsp-defs', 'lsp-refs', 'lsp-impls', 'lsp-diagnostics'] },
-      output_mode: { type: 'string', enum: ['content', 'files_with_matches', 'count'] },
-      head_limit: { type: 'number', description: 'Cap the number of exact-pass matches.' },
-      before_lines: { type: 'number', description: 'Context lines before each match (content mode).' },
-      after_lines: { type: 'number', description: 'Context lines after each match (content mode).' },
-      limit: { type: 'number', description: 'Cap the semantic-pass results (mode="semantic"). Default 10.' },
-      timeout_ms: { type: 'number', description: 'Max wall-clock ms for ripgrep (mode="exact"/"auto"). Default 30000.' },
+      literal_text: {
+        type: 'boolean',
+        description: 'Treat pattern as a literal string, not a regex.',
+      },
+      caseInsensitive: {
+        type: 'boolean',
+        description: 'Case-insensitive match.',
+      },
+      include_ignored: {
+        type: 'boolean',
+        description: 'Also search .gitignore-d files.',
+      },
+      mode: {
+        type: 'string',
+        enum: [
+          'auto',
+          'exact',
+          'fts',
+          'semantic',
+          'mixed',
+          'lsp-defs',
+          'lsp-refs',
+          'lsp-impls',
+          'lsp-diagnostics',
+        ],
+      },
+      output_mode: {
+        type: 'string',
+        enum: ['content', 'files_with_matches', 'count'],
+      },
+      head_limit: {
+        type: 'number',
+        description: 'Cap the number of exact-pass matches.',
+      },
+      before_lines: {
+        type: 'number',
+        description: 'Context lines before each match (content mode).',
+      },
+      after_lines: {
+        type: 'number',
+        description: 'Context lines after each match (content mode).',
+      },
+      limit: {
+        type: 'number',
+        description:
+          'Cap the semantic-pass results (mode="semantic"). Default 10.',
+      },
+      timeout_ms: {
+        type: 'number',
+        description:
+          'Max wall-clock ms for ripgrep (mode="exact"/"auto"). Default 30000.',
+      },
     },
     required: ['pattern'],
     additionalProperties: false,
@@ -347,7 +428,11 @@ export const grepTool: ToolModule = {
   spec: SPEC,
   async run(input, ctx) {
     const args = input as unknown as GrepArgs;
-    if (args.mode === 'fts' || args.mode === 'semantic' || args.mode === 'mixed') {
+    if (
+      args.mode === 'fts' ||
+      args.mode === 'semantic' ||
+      args.mode === 'mixed'
+    ) {
       return runIndexSearch(args.mode, args, ctx);
     }
     if (args.mode === 'lsp-diagnostics') {
@@ -366,10 +451,15 @@ export const grepTool: ToolModule = {
     // declaration site(s) as an `LSP DEFINITIONS` section when LSP is ready.
     const modeOk = args.mode === undefined || args.mode === 'auto';
     const symbols =
-      modeOk && args.literal_text !== true ? extractIdentSymbols(args.pattern) : [];
+      modeOk && args.literal_text !== true
+        ? extractIdentSymbols(args.pattern)
+        : [];
     if (symbols.length === 0) return runExact(args, ctx);
 
-    const [exact, lsp] = await Promise.all([runExact(args, ctx), lspForProject(ctx)]);
+    const [exact, lsp] = await Promise.all([
+      runExact(args, ctx),
+      lspForProject(ctx),
+    ]);
     if (lsp?.getState() !== 'ready') return exact;
     const defs = await lspSupplementDefs(lsp, symbols);
     if (defs.length === 0) return exact;

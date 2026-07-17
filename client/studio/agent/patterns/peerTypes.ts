@@ -76,7 +76,11 @@ export interface MaxModeCallbacks {
     },
   ): Promise<MaxModePeer[]>;
   /** Deliver one synthetic user message to a peer and await turn settle. */
-  sendToPeerAndSettle(peer: MaxModePeer, text: string, policy?: PeerStepToolPolicy): Promise<void>;
+  sendToPeerAndSettle(
+    peer: MaxModePeer,
+    text: string,
+    policy?: PeerStepToolPolicy,
+  ): Promise<void>;
   /** Best-effort teardown (dispose controller + remove worktree). */
   tearDownPeer(peer: MaxModePeer): Promise<void>;
   /** The peer's uncommitted diff vs its baseline (for artifact extraction / grading). */

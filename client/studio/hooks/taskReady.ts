@@ -10,15 +10,21 @@
 export async function waitForTaskRunning(
   id: string,
   enumTasks: () => Promise<{ id: string; status: string }[]>,
-  opts: { tries?: number; sleepMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+  opts: {
+    tries?: number;
+    sleepMs?: number;
+    sleep?: (ms: number) => Promise<void>;
+  } = {},
 ): Promise<void> {
   const tries = opts.tries ?? 200;
   const sleepMs = opts.sleepMs ?? 100;
-  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const sleep =
+    opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   for (let i = 0; i < tries; i++) {
     const t = (await enumTasks()).find((x) => x.id === id);
     if (t?.status === 'running') return;
-    if (t && (t.status === 'error' || t.status === 'exited')) throw new Error('coding task failed to start: ' + t.status);
+    if (t && (t.status === 'error' || t.status === 'exited'))
+      throw new Error('coding task failed to start: ' + t.status);
     await sleep(sleepMs);
   }
   throw new Error('coding task did not become ready in time');

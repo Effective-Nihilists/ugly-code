@@ -26,7 +26,12 @@ import {
   readDaemonLogTail,
 } from './daemon.js';
 import type { SearchMode, SearchResponse } from './client.js';
-import type { CodebaseProvider, IndexerReadiness, CodebaseDiagnostics, SearchOpts } from './provider.js';
+import type {
+  CodebaseProvider,
+  IndexerReadiness,
+  CodebaseDiagnostics,
+  SearchOpts,
+} from './provider.js';
 
 /** Kick indexing for this project (fire-and-forget; spawns the daemon). */
 export function ensureIndex(projectPath: string): void {
@@ -56,9 +61,15 @@ export async function indexerReadiness(
         totalFiles: idx.total_files,
         indexedFiles: idx.indexed_files,
         ...(idx.phase ? { phase: idx.phase } : {}),
-        ...(idx.elapsed_seconds != null ? { elapsedSeconds: idx.elapsed_seconds } : {}),
-        ...(idx.chunks_per_sec != null ? { chunksPerSec: idx.chunks_per_sec } : {}),
-        ...(idx.files_per_sec != null ? { filesPerSec: idx.files_per_sec } : {}),
+        ...(idx.elapsed_seconds != null
+          ? { elapsedSeconds: idx.elapsed_seconds }
+          : {}),
+        ...(idx.chunks_per_sec != null
+          ? { chunksPerSec: idx.chunks_per_sec }
+          : {}),
+        ...(idx.files_per_sec != null
+          ? { filesPerSec: idx.files_per_sec }
+          : {}),
         ...(idx.eta_seconds != null ? { etaSeconds: idx.eta_seconds } : {}),
         ...(idx.error ? { error: idx.error } : {}),
       }

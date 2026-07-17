@@ -22,7 +22,9 @@ test.describe('App startup', () => {
 });
 
 test.describe('Auth flow', () => {
-  test('auth-demo page shows login prompt when unauthenticated', async ({ page }) => {
+  test('auth-demo page shows login prompt when unauthenticated', async ({
+    page,
+  }) => {
     await page.goto('/auth-demo');
     await expect(page.getByText('You are not logged in.')).toBeVisible();
     // The login CTA label is experiment-driven (cta-test → "Get started" |

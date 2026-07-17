@@ -15,7 +15,11 @@ const SPEC: TextGenTool = {
     type: 'object',
     properties: {
       question: { type: 'string', description: 'The question to ask.' },
-      options: { type: 'array', items: { type: 'string' }, description: 'Optional choices to offer.' },
+      options: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Optional choices to offer.',
+      },
     },
     required: ['question'],
     additionalProperties: false,
@@ -27,7 +31,9 @@ export const askUserTool: ToolModule = {
   spec: SPEC,
   // eslint-disable-next-line @typescript-eslint/require-await
   async run(input) {
-    const question = (typeof input.question === 'string' ? input.question : '').trim();
+    const question = (
+      typeof input.question === 'string' ? input.question : ''
+    ).trim();
     if (!question) return 'ask_user: `question` is required';
     const options = Array.isArray(input.options)
       ? (input.options as unknown[]).map((o) => String(o))

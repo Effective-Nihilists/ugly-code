@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { markDirty, drainDirty } from '../../../client/agent/tools/codebaseDirty';
+import {
+  markDirty,
+  drainDirty,
+} from '../../../client/agent/tools/codebaseDirty';
 
 describe('codebaseDirty', () => {
   it('accumulates unique paths and drains once', () => {

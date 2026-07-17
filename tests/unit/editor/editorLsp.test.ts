@@ -3,15 +3,31 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../../client/studio/agent/lsp/handlers', () => ({
   lspDefinition: vi.fn(async () => ({
-    results: [{ path: '/p/a.ts', line: 3, character: 5, preview: 'export function foo' }],
+    results: [
+      {
+        path: '/p/a.ts',
+        line: 3,
+        character: 5,
+        preview: 'export function foo',
+      },
+    ],
   })),
   lspImplementation: vi.fn(async () => ({ results: [] })),
-  lspReferences: vi.fn(async () => ({ results: [{ path: '/p/b.ts', line: 9, character: 2 }] })),
+  lspReferences: vi.fn(async () => ({
+    results: [{ path: '/p/b.ts', line: 9, character: 2 }],
+  })),
   lspHover: vi.fn(async () => ({ contents: '```ts\nfoo\n```' })),
 }));
 
-import { languageForPath, runDefinition, runHover } from '../../../client/studio/components/editorLsp';
-import { lspDefinition, lspHover } from '../../../client/studio/agent/lsp/handlers';
+import {
+  languageForPath,
+  runDefinition,
+  runHover,
+} from '../../../client/studio/components/editorLsp';
+import {
+  lspDefinition,
+  lspHover,
+} from '../../../client/studio/agent/lsp/handlers';
 
 describe('languageForPath', () => {
   it('maps extensions to CM languages', () => {
@@ -26,7 +42,12 @@ describe('languageForPath', () => {
 
 describe('editorLsp glue', () => {
   it('runDefinition passes content + cwd and returns results', async () => {
-    const out = await runDefinition('/p/x.ts', { line: 3, character: 9 }, 'BUF', '/p');
+    const out = await runDefinition(
+      '/p/x.ts',
+      { line: 3, character: 9 },
+      'BUF',
+      '/p',
+    );
     expect(lspDefinition).toHaveBeenCalledWith(
       { path: '/p/x.ts', line: 3, character: 9, cwd: '/p', content: 'BUF' },
       '/p',

@@ -51,8 +51,8 @@ export function EvalScorecard({
           result.skipped
             ? 'var(--border)'
             : (result.score ?? 0) >= (result.scoreMax ?? 0)
-            ? '#3a8c4a'
-            : 'var(--accent)'
+              ? '#3a8c4a'
+              : 'var(--accent)'
         }`,
         background: 'var(--bg-secondary)',
         padding: 16,
@@ -131,8 +131,8 @@ export function EvalScorecard({
                   j.pointsAwarded === j.points
                     ? '#3a8c4a'
                     : j.pointsAwarded === 0
-                    ? '#FF5500'
-                    : 'var(--text-secondary)'
+                      ? '#FF5500'
+                      : 'var(--text-secondary)'
                 }`,
               }}
             >

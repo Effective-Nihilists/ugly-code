@@ -22,5 +22,14 @@ export function TerminalPanel(): React.ReactElement {
 
 const S = {
   root: { height: '100%', minHeight: 0 },
-  empty: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--bg-primary)' },
+  empty: {
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'var(--text-muted)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+    background: 'var(--bg-primary)',
+  },
 } satisfies Record<string, React.CSSProperties>;

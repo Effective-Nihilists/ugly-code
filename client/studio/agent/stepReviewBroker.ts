@@ -21,7 +21,10 @@ interface PendingEntry {
 const pending = new Map<string, PendingEntry>();
 
 /** Register a parked step-review gate and await the user's approve/iterate reply. */
-export function awaitStepReview(id: string, sessionId: string): Promise<StepReviewReply> {
+export function awaitStepReview(
+  id: string,
+  sessionId: string,
+): Promise<StepReviewReply> {
   return new Promise<StepReviewReply>((resolve) => {
     pending.set(id, { sessionId, resolve });
   });

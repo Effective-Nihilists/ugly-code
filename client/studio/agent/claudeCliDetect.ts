@@ -23,15 +23,21 @@ function runCapture(cmd: string, args: string[]): Promise<string> {
       let out = '';
       const proc = native.process.spawn(cmd, args);
       proc.onStdout((c) => (out += c));
-      proc.onError(() => { resolve(''); });
-      proc.onExit(() => { resolve(out.trim()); });
+      proc.onError(() => {
+        resolve('');
+      });
+      proc.onExit(() => {
+        resolve(out.trim());
+      });
     } catch {
       resolve('');
     }
   });
 }
 
-export async function detectClaudeCli(projectPath: string | null): Promise<string | null> {
+export async function detectClaudeCli(
+  projectPath: string | null,
+): Promise<string | null> {
   if (cached !== undefined) return cached;
   if (inflight) return inflight;
   inflight = (async () => {
@@ -52,8 +58,13 @@ export async function detectClaudeCli(projectPath: string | null): Promise<strin
     for (const candidate of candidates) {
       try {
         const st = await native.fs.stat(candidate);
-        if (st.isFile) { cached = candidate; return candidate; }
-      } catch { /* not there */ }
+        if (st.isFile) {
+          cached = candidate;
+          return candidate;
+        }
+      } catch {
+        /* not there */
+      }
     }
     // 2) PATH lookup via a login shell. Prepend the common install dirs so the
     //    lookup still resolves under a GUI app's stripped PATH; `$HOME` is set on
@@ -61,10 +72,13 @@ export async function detectClaudeCli(projectPath: string | null): Promise<strin
     //    covered here regardless of `home` above.
     const lookup =
       'PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH" command -v claude';
-    const found = (await runCapture('bash', ['-lc', lookup])).split('\n')[0] ?? '';
+    const found =
+      (await runCapture('bash', ['-lc', lookup])).split('\n')[0] ?? '';
     cached = found.startsWith('/') ? found : null;
     return cached;
-  })().finally(() => { inflight = null; });
+  })().finally(() => {
+    inflight = null;
+  });
   return inflight;
 }
 

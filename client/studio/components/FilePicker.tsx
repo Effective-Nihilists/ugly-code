@@ -7,7 +7,14 @@ import { native } from 'ugly-app/native';
 import type { HostDirent } from 'ugly-app/native';
 import { Folder, FileText, ArrowUp, Check } from 'lucide-react';
 import { Modal } from '../system/modal/Modal';
-import { filterEntries, joinPath, parentPath, basename, resolveStart, type PickMode } from './filePickerUtils';
+import {
+  filterEntries,
+  joinPath,
+  parentPath,
+  basename,
+  resolveStart,
+  type PickMode,
+} from './filePickerUtils';
 
 export interface FilePickerProps {
   /** What's selectable. Folders are always navigable regardless. */
@@ -21,7 +28,13 @@ export interface FilePickerProps {
   onResult: (path: string | null) => void;
 }
 
-export function FilePicker({ mode, extensions, startPath, title, onResult }: FilePickerProps) {
+export function FilePicker({
+  mode,
+  extensions,
+  startPath,
+  title,
+  onResult,
+}: FilePickerProps) {
   const [path, setPath] = useState(() => resolveStart(startPath));
   const [raw, setRaw] = useState<HostDirent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +55,10 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
       // console.error is captured to the project's server error_log (ugly-app Logger),
       // so proxied readdir failures are diagnosable without the webview console.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a thrown value can be null/undefined despite the `as Error` cast
-      console.error('[FilePicker] readdir failed', { dir, message: (e as Error)?.message });
+      console.error('[FilePicker] readdir failed', {
+        dir,
+        message: (e as Error)?.message,
+      });
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a thrown value can be null/undefined despite the `as Error` cast
       setError((e as Error)?.message || 'Could not open this folder');
       return false;
@@ -74,27 +90,80 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
       ? 'Use this folder'
       : 'Select';
   const primaryDisabled = selectedFile ? false : !canSelectFolder;
-  const confirm = (): void => { onResult(selectedFile ?? (canSelectFolder ? path : null)); };
+  const confirm = (): void => {
+    onResult(selectedFile ?? (canSelectFolder ? path : null));
+  };
 
   return (
-    <Modal open onClose={() => { onResult(null); }} size={560} ariaLabel="File picker" cardStyle={{ padding: 0, gap: 0 }}>
-      <div style={{ padding: '16px 18px 10px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontFamily: 'var(--font-label)', fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
+    <Modal
+      open
+      onClose={() => {
+        onResult(null);
+      }}
+      size={560}
+      ariaLabel="File picker"
+      cardStyle={{ padding: 0, gap: 0 }}
+    >
+      <div
+        style={{
+          padding: '16px 18px 10px',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--font-label)',
+            fontSize: 16,
+            fontWeight: 800,
+            color: 'var(--text-primary)',
+            marginBottom: 8,
+          }}
+        >
           {title ?? (mode === 'file' ? 'Select a file' : 'Select a folder')}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button data-id="file-picker-up" onClick={() => void load(parentPath(path))} disabled={loading} aria-label="Up one folder" style={iconBtn}>
+          <button
+            data-id="file-picker-up"
+            onClick={() => void load(parentPath(path))}
+            disabled={loading}
+            aria-label="Up one folder"
+            style={iconBtn}
+          >
             <ArrowUp size={15} />
           </button>
           {/* direction:rtl keeps the END of long paths visible (ellipsis on the left);
               <bdi> isolates the path as LTR so segments don't reorder (e.g. the leading ~/). */}
-          <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: 'rtl', textAlign: 'left' }}>
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 12,
+              color: 'var(--text-secondary)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              direction: 'rtl',
+              textAlign: 'left',
+            }}
+          >
             <bdi>{path}</bdi>
           </div>
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 120, maxHeight: '60vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', touchAction: 'pan-y', padding: 6 }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 120,
+          maxHeight: '60vh',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
+          padding: 6,
+        }}
+      >
         {loading ? (
           <div style={muted}>Loading…</div>
         ) : error ? (
@@ -113,26 +182,96 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
                   if (e.isDirectory) void load(full);
                   else if (mode !== 'folder') setSelectedFile(full);
                 }}
-                style={{ ...row, background: isSel ? 'var(--accent-dim)' : 'transparent', color: e.isDirectory ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+                style={{
+                  ...row,
+                  background: isSel ? 'var(--accent-dim)' : 'transparent',
+                  color: e.isDirectory
+                    ? 'var(--text-primary)'
+                    : 'var(--text-secondary)',
+                }}
               >
-                {e.isDirectory
-                  ? <Folder size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  : <FileText size={15} style={{ flexShrink: 0 }} />}
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
-                {isSel && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--accent)', flexShrink: 0 }} />}
+                {e.isDirectory ? (
+                  <Folder
+                    size={15}
+                    style={{ color: 'var(--accent)', flexShrink: 0 }}
+                  />
+                ) : (
+                  <FileText size={15} style={{ flexShrink: 0 }} />
+                )}
+                <span
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {e.name}
+                </span>
+                {isSel && (
+                  <Check
+                    size={14}
+                    style={{
+                      marginLeft: 'auto',
+                      color: 'var(--accent)',
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
               </button>
             );
           })
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', marginRight: 'auto' }}>
-          <input data-id="file-picker-hidden" type="checkbox" checked={showHidden} onChange={(ev) => { setShowHidden(ev.target.checked); }} />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '12px 16px',
+          borderTop: '1px solid var(--border)',
+        }}
+      >
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            marginRight: 'auto',
+          }}
+        >
+          <input
+            data-id="file-picker-hidden"
+            type="checkbox"
+            checked={showHidden}
+            onChange={(ev) => {
+              setShowHidden(ev.target.checked);
+            }}
+          />
           Hidden
         </label>
-        <button data-id="file-picker-cancel" onClick={() => { onResult(null); }} style={btnSecondary}>Cancel</button>
-        <button data-id="file-picker-confirm" onClick={confirm} disabled={primaryDisabled} style={{ ...btnPrimary, opacity: primaryDisabled ? 0.5 : 1, cursor: primaryDisabled ? 'default' : 'pointer' }}>
+        <button
+          data-id="file-picker-cancel"
+          onClick={() => {
+            onResult(null);
+          }}
+          style={btnSecondary}
+        >
+          Cancel
+        </button>
+        <button
+          data-id="file-picker-confirm"
+          onClick={confirm}
+          disabled={primaryDisabled}
+          style={{
+            ...btnPrimary,
+            opacity: primaryDisabled ? 0.5 : 1,
+            cursor: primaryDisabled ? 'default' : 'pointer',
+          }}
+        >
           {primaryLabel}
         </button>
       </div>
@@ -140,8 +279,53 @@ export function FilePicker({ mode, extensions, startPath, title, onResult }: Fil
   );
 }
 
-const iconBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 };
-const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px', border: 'none', borderRadius: 6, textAlign: 'left', fontSize: 13, fontFamily: 'var(--font-mono)', cursor: 'pointer' };
-const muted: React.CSSProperties = { padding: 16, fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' };
-const btnSecondary: React.CSSProperties = { padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' };
-const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: 'var(--bg-primary)', fontSize: 13, fontWeight: 700 };
+const iconBtn: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 28,
+  height: 28,
+  borderRadius: 6,
+  border: '1px solid var(--border)',
+  background: 'var(--bg-secondary)',
+  color: 'var(--text-secondary)',
+  cursor: 'pointer',
+  flexShrink: 0,
+};
+const row: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  width: '100%',
+  padding: '8px 10px',
+  border: 'none',
+  borderRadius: 6,
+  textAlign: 'left',
+  fontSize: 13,
+  fontFamily: 'var(--font-mono)',
+  cursor: 'pointer',
+};
+const muted: React.CSSProperties = {
+  padding: 16,
+  fontSize: 13,
+  color: 'var(--text-muted)',
+  textAlign: 'center',
+};
+const btnSecondary: React.CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 8,
+  border: '1px solid var(--border)',
+  background: 'var(--bg-secondary)',
+  color: 'var(--text-secondary)',
+  fontSize: 13,
+  cursor: 'pointer',
+};
+const btnPrimary: React.CSSProperties = {
+  padding: '8px 16px',
+  borderRadius: 8,
+  border: 'none',
+  background: 'var(--accent)',
+  color: 'var(--bg-primary)',
+  fontSize: 13,
+  fontWeight: 700,
+};

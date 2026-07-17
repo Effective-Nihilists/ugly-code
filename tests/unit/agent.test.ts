@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { runAgent, type StepFn } from '../../client/agent/engine';
-import { AGENT_TOOLS, agentMessageSchema, type AgentMessage } from '../../shared/agent';
+import {
+  AGENT_TOOLS,
+  agentMessageSchema,
+  type AgentMessage,
+} from '../../shared/agent';
 
 describe('agent tool specs', () => {
   it('exposes the expected tools with valid JSON-schema parameters', () => {
@@ -59,7 +63,12 @@ describe('agent engine loop', () => {
     const events: string[] = [];
     const history: AgentMessage[] = [{ role: 'user', content: 'read x.txt' }];
 
-    await runAgent({ history, step, dispatch, onEvent: (e) => events.push(e.type) });
+    await runAgent({
+      history,
+      step,
+      dispatch,
+      onEvent: (e) => events.push(e.type),
+    });
 
     expect(dispatched).toEqual(['read']);
     // user → assistant(tool_use) → user(tool_result) → assistant(final)
@@ -73,7 +82,10 @@ describe('agent engine loop', () => {
 
   it('feeds a tool error back as tool_result and keeps going', async () => {
     const turns: AgentMessage[] = [
-      { role: 'assistant', content: [{ type: 'tool_use', id: 'b', name: 'read', input: {} }] },
+      {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'b', name: 'read', input: {} }],
+      },
       { role: 'assistant', content: 'Recovered.' },
     ];
     let i = 0;
@@ -85,21 +97,35 @@ describe('agent engine loop', () => {
 
     expect(history[2]).toMatchObject({
       role: 'user',
-      content: [{ type: 'tool_result', tool_use_id: 'b', content: 'Error: boom' }],
+      content: [
+        { type: 'tool_result', tool_use_id: 'b', content: 'Error: boom' },
+      ],
     });
-    expect(history[3]).toMatchObject({ role: 'assistant', content: 'Recovered.' });
+    expect(history[3]).toMatchObject({
+      role: 'assistant',
+      content: 'Recovered.',
+    });
   });
 
   it('stops at maxSteps when the model never finishes', async () => {
     const step: StepFn = () =>
       Promise.resolve({
-        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'x', name: 'read', input: {} }] },
+        message: {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'x', name: 'read', input: {} }],
+        },
       });
     const dispatch = (): Promise<string> => Promise.resolve('ok');
     const events: string[] = [];
     const history: AgentMessage[] = [{ role: 'user', content: 'loop' }];
 
-    await runAgent({ history, step, dispatch, maxSteps: 3, onEvent: (e) => events.push(e.type) });
+    await runAgent({
+      history,
+      step,
+      dispatch,
+      maxSteps: 3,
+      onEvent: (e) => events.push(e.type),
+    });
 
     expect(events.filter((e) => e === 'tool_call')).toHaveLength(3);
     expect(events).toContain('error');

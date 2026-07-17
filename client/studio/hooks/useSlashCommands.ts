@@ -74,7 +74,11 @@ async function fetchSkills(): Promise<Skill[]> {
       cachedSkills = skills;
       return skills;
     } catch (e) {
-      console.error('[useSlashCommands:discoverSkills]', JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[useSlashCommands:discoverSkills]',
+        JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
+        e instanceof Error ? e.stack : undefined,
+      );
       cachedSkills = [];
       return [];
     } finally {
@@ -229,7 +233,9 @@ export function useSlashCommands(opts: {
     [popupOpen, filtered, selectedIdx, applySelection],
   );
 
-  const close = useCallback(() => { setPopupOpen(false); }, []);
+  const close = useCallback(() => {
+    setPopupOpen(false);
+  }, []);
 
   return {
     popupOpen: popupOpen && (filtered.length > 0 || query !== null),

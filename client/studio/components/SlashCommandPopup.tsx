@@ -59,7 +59,11 @@ export function SlashCommandPopup({
         zIndex: 20,
         transformOrigin: 'bottom center',
       }}
-      onMouseDown={(e) => { e.preventDefault(); } /* keep textarea focus */}
+      onMouseDown={
+        (e) => {
+          e.preventDefault();
+        } /* keep textarea focus */
+      }
     >
       {items.map((skill, idx) => {
         const selected = idx === selectedIdx;
@@ -68,8 +72,12 @@ export function SlashCommandPopup({
             key={`${skill.scope}:${skill.name}`}
             data-id={`slash-command-${skill.scope}-${skill.name}`}
             className="us-interactive"
-            onMouseEnter={() => { onHover(idx); }}
-            onClick={() => { onSelect(skill); }}
+            onMouseEnter={() => {
+              onHover(idx);
+            }}
+            onClick={() => {
+              onSelect(skill);
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',

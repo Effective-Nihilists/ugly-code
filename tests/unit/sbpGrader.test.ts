@@ -2,14 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { gradeSbp } from '../../client/studio/evals/sbpGrader';
 import type { GradeDeps } from '../../client/studio/evals/grader';
 
-const RUN_TOTALS = { durationMs: 0, turns: 1, cost: { total: 0, input: 0, output: 0, cacheRead: 0 }, tokens: { input: 0, output: 0, cacheRead: 0, cacheCreate: 0 } };
-const F2P = 'test/units/modules/test_async_wrapper.py::TestAsyncWrapper::test_run_module';
+const RUN_TOTALS = {
+  durationMs: 0,
+  turns: 1,
+  cost: { total: 0, input: 0, output: 0, cacheRead: 0 },
+  tokens: { input: 0, output: 0, cacheRead: 0, cacheCreate: 0 },
+};
+const F2P =
+  'test/units/modules/test_async_wrapper.py::TestAsyncWrapper::test_run_module';
 
 /** deps that return a canned pytest output + git-apply exit code. */
 function deps(pytestOut: string, gitApplyCode = 0): GradeDeps {
   return {
     run: async (cmd, args) => {
-      if (cmd === 'git' && args.includes('apply')) return { out: '', code: gitApplyCode };
+      if (cmd === 'git' && args.includes('apply'))
+        return { out: '', code: gitApplyCode };
       if (args.join(' ').includes('pytest')) return { out: pytestOut, code: 0 };
       return { out: '', code: 0 }; // the cat-heredoc write
     },
@@ -17,7 +24,11 @@ function deps(pytestOut: string, gitApplyCode = 0): GradeDeps {
     exists: async () => false,
   };
 }
-const input = { taskName: 'sbpro-ansible-ansible-39bd8b99', projectPath: '/p', runTotals: RUN_TOTALS };
+const input = {
+  taskName: 'sbpro-ansible-ansible-39bd8b99',
+  projectPath: '/p',
+  runTotals: RUN_TOTALS,
+};
 
 describe('gradeSbp (Docker-free SBP grader)', () => {
   it('scores 5 when patch applies + fail_to_pass passes (empty pass_to_pass = free point)', async () => {
@@ -34,6 +45,9 @@ describe('gradeSbp (Docker-free SBP grader)', () => {
   it('scores 0 when the test_patch does not apply', async () => {
     const r = await gradeSbp(input, deps('', 1));
     expect(r.score).toBe(0);
-    expect(r.checks?.[0]).toMatchObject({ name: 'test_patch applies', passed: false });
+    expect(r.checks?.[0]).toMatchObject({
+      name: 'test_patch applies',
+      passed: false,
+    });
   });
 });

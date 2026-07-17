@@ -15,7 +15,10 @@ export function devServerLogPath(projectPath: string): string {
 const lastWrite = new Map<string, number>();
 
 /** Best-effort persist of the current log for a project (throttled ~1/sec). */
-export async function persistDevLog(projectPath: string, text: string): Promise<void> {
+export async function persistDevLog(
+  projectPath: string,
+  text: string,
+): Promise<void> {
   // A cheap monotonic clock without Date/performance (kept side-effect-free for
   // tests): count calls; persist at most every ~40 updates. PreviewPanel calls
   // this on every stdout chunk, so this bounds write frequency.
@@ -24,7 +27,10 @@ export async function persistDevLog(projectPath: string, text: string): Promise<
   lastWrite.set(key, n);
   if (n % 40 !== 1) return;
   try {
-    await native.fs.mkdir(`${projectPath.replace(/\/+$/, '')}/.ugly-studio`, true);
+    await native.fs.mkdir(
+      `${projectPath.replace(/\/+$/, '')}/.ugly-studio`,
+      true,
+    );
     await native.fs.writeFile(devServerLogPath(projectPath), text);
   } catch {
     /* best-effort */
@@ -32,9 +38,15 @@ export async function persistDevLog(projectPath: string, text: string): Promise<
 }
 
 /** Force a persist regardless of throttle (call on server start/stop/exit). */
-export async function flushDevLog(projectPath: string, text: string): Promise<void> {
+export async function flushDevLog(
+  projectPath: string,
+  text: string,
+): Promise<void> {
   try {
-    await native.fs.mkdir(`${projectPath.replace(/\/+$/, '')}/.ugly-studio`, true);
+    await native.fs.mkdir(
+      `${projectPath.replace(/\/+$/, '')}/.ugly-studio`,
+      true,
+    );
     await native.fs.writeFile(devServerLogPath(projectPath), text);
   } catch {
     /* best-effort */

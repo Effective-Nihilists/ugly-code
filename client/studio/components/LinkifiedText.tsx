@@ -12,9 +12,9 @@ import {
  * browser. Optional — when absent, MdastViewer falls back to its
  * default `window.open` behavior.
  */
-export const OpenUriContext = createContext<((uri: string) => void) | undefined>(
-  undefined,
-);
+export const OpenUriContext = createContext<
+  ((uri: string) => void) | undefined
+>(undefined);
 
 export const ChatOpenUriProvider = OpenUriContext.Provider;
 

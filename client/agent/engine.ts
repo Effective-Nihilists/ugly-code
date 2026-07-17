@@ -17,7 +17,13 @@ export type StepFn = (input: {
 export type AgentEvent =
   | { type: 'assistant'; text: string }
   | { type: 'tool_call'; id: string; name: string; input: unknown }
-  | { type: 'tool_result'; id: string; name: string; result: string; ok: boolean }
+  | {
+      type: 'tool_result';
+      id: string;
+      name: string;
+      result: string;
+      ok: boolean;
+    }
   | { type: 'done' }
   | { type: 'error'; message: string };
 
@@ -42,18 +48,25 @@ export async function runAgent(opts: RunAgentOpts): Promise<AgentMessage[]> {
       return history;
     }
 
-    const { message } = await step({ messages: history, ...(model ? { model } : {}) });
+    const { message } = await step({
+      messages: history,
+      ...(model ? { model } : {}),
+    });
     history.push(message);
 
     const parts = normalizeParts(message.content);
     const text = parts
-      .filter((p): p is Extract<AgentContentPart, { type: 'text' }> => p.type === 'text')
+      .filter(
+        (p): p is Extract<AgentContentPart, { type: 'text' }> =>
+          p.type === 'text',
+      )
       .map((p) => p.text ?? '')
       .join('');
     if (text.trim()) emit({ type: 'assistant', text });
 
     const toolUses = parts.filter(
-      (p): p is Extract<AgentContentPart, { type: 'tool_use' }> => p.type === 'tool_use',
+      (p): p is Extract<AgentContentPart, { type: 'tool_use' }> =>
+        p.type === 'tool_use',
     );
     if (toolUses.length === 0) {
       emit({ type: 'done' });
@@ -65,12 +78,32 @@ export async function runAgent(opts: RunAgentOpts): Promise<AgentMessage[]> {
       emit({ type: 'tool_call', id: tu.id, name: tu.name, input: tu.input });
       try {
         const result = await dispatch(tu.name, tu.input);
-        emit({ type: 'tool_result', id: tu.id, name: tu.name, result, ok: true });
-        results.push({ type: 'tool_result', tool_use_id: tu.id, content: truncate(result) });
+        emit({
+          type: 'tool_result',
+          id: tu.id,
+          name: tu.name,
+          result,
+          ok: true,
+        });
+        results.push({
+          type: 'tool_result',
+          tool_use_id: tu.id,
+          content: truncate(result),
+        });
       } catch (e) {
         const msg = (e as Error).message;
-        emit({ type: 'tool_result', id: tu.id, name: tu.name, result: msg, ok: false });
-        results.push({ type: 'tool_result', tool_use_id: tu.id, content: `Error: ${msg}` });
+        emit({
+          type: 'tool_result',
+          id: tu.id,
+          name: tu.name,
+          result: msg,
+          ok: false,
+        });
+        results.push({
+          type: 'tool_result',
+          tool_use_id: tu.id,
+          content: `Error: ${msg}`,
+        });
       }
     }
     history.push({ role: 'user', content: results });
@@ -80,10 +113,16 @@ export async function runAgent(opts: RunAgentOpts): Promise<AgentMessage[]> {
   return history;
 }
 
-function normalizeParts(content: string | AgentContentPart[]): AgentContentPart[] {
-  return typeof content === 'string' ? [{ type: 'text', text: content }] : content;
+function normalizeParts(
+  content: string | AgentContentPart[],
+): AgentContentPart[] {
+  return typeof content === 'string'
+    ? [{ type: 'text', text: content }]
+    : content;
 }
 
 function truncate(s: string, max = 30_000): string {
-  return s.length > max ? `${s.slice(0, max)}\n…[truncated ${s.length - max} chars]` : s;
+  return s.length > max
+    ? `${s.slice(0, max)}\n…[truncated ${s.length - max} chars]`
+    : s;
 }

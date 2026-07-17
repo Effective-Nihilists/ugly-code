@@ -32,14 +32,19 @@ function finalText(history: AgentMessage[]): string {
   );
 }
 
-export async function runSubAgent(task: string, opts: SubAgentOpts): Promise<string> {
+export async function runSubAgent(
+  task: string,
+  opts: SubAgentOpts,
+): Promise<string> {
   const history: AgentMessage[] = [];
   if (opts.system) history.push({ role: 'system', content: opts.system });
   history.push({ role: 'user', content: task });
   const allow = opts.allowedTools ? new Set(opts.allowedTools) : null;
   const dispatch = (name: string, input: unknown): Promise<string> => {
-    if (NO_RECURSE.has(name)) return Promise.resolve(`(nested delegation is disabled)`);
-    if (allow && !allow.has(name)) return Promise.resolve(`(tool ${name} not available to this subagent)`);
+    if (NO_RECURSE.has(name))
+      return Promise.resolve(`(nested delegation is disabled)`);
+    if (allow && !allow.has(name))
+      return Promise.resolve(`(tool ${name} not available to this subagent)`);
     return dispatchTool(name, input, opts.ctx);
   };
   const out = await runAgent({

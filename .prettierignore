@@ -1,0 +1,28 @@
+build/
+dist/
+out/
+node_modules/
+.vscode/
+.wrangler/
+.vite/
+coverage/
+.ugly-studio/
+android/
+ios/
+
+# Lockfiles
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Auto-generated / managed
+.uglyapp
+**/Build.ts
+src/cli/version.ts
+
+# Not formatted by convention (docs, data, config, minified)
+*.min.js
+*.min.css
+*.json
+*.md
+*.html

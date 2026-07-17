@@ -85,8 +85,8 @@ export function ErrorsPanel({
   const mode: 'dev' | 'prod' = forceProd
     ? 'prod'
     : forceDev
-    ? 'dev'
-    : storedMode;
+      ? 'dev'
+      : storedMode;
   const setMode = setStoredMode;
   const modePinned = Boolean(forceProd) || Boolean(forceDev);
   const [summary, setSummary] = useState<ErrorSummary[]>([]);
@@ -104,7 +104,10 @@ export function ErrorsPanel({
   };
 
   useEffect(() => {
-    if (gated) { setLoading(false); return; }
+    if (gated) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     // When the panel is rendered inside a session, scope the list
     // query to that session's compositeId via studioSessionId.
@@ -120,8 +123,12 @@ export function ErrorsPanel({
         setSummary(sRes.aggregations);
         setErrors(lRes.errors);
       })
-      .catch((e: unknown) => { console.error('[ErrorsPanel]', e); })
-      .finally(() => { setLoading(false); });
+      .catch((e: unknown) => {
+        console.error('[ErrorsPanel]', e);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [mode, studioSessionId, gated]);
 
   if (mode === 'prod' && prodDeploy === 'undeployed') {
@@ -224,9 +231,9 @@ export function ErrorsPanel({
                     key={e.id}
                     data-id="error-item"
                     style={card}
-                    onClick={() =>
-                      { setExpandedId(expandedId === e.id ? null : e.id); }
-                    }
+                    onClick={() => {
+                      setExpandedId(expandedId === e.id ? null : e.id);
+                    }}
                   >
                     <div
                       style={{
@@ -242,8 +249,8 @@ export function ErrorsPanel({
                           e.level === 'error'
                             ? 'var(--error, #dc2626)'
                             : e.level === 'warn'
-                            ? 'var(--warning, #d97706)'
-                            : 'var(--accent-primary, #3b82f6)'
+                              ? 'var(--warning, #d97706)'
+                              : 'var(--accent-primary, #3b82f6)'
                         }
                       />
                       <Badge text={e.source} color="var(--bg-tertiary, #333)" />

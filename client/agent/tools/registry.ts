@@ -12,7 +12,11 @@ import { multieditTool } from './multiedit';
 import { pythonExecTool } from './pythonExec';
 import { pythonLibrariesTool } from './pythonLibraries';
 import { devServerLogsTool } from './devServerLogs';
-import { devServerStartTool, devServerStopTool, devServerErrorsTool } from './devServer';
+import {
+  devServerStartTool,
+  devServerStopTool,
+  devServerErrorsTool,
+} from './devServer';
 import { webFetchTool } from './webFetch';
 import { webSearchTool } from './webSearch';
 import { depDocsTool } from './depDocs';
@@ -44,7 +48,33 @@ export interface ToolModule {
   ): Promise<string>;
 }
 
-export const TOOL_REGISTRY: ToolModule[] = [grepTool, globTool, multieditTool, pythonExecTool, pythonLibrariesTool, devServerLogsTool, devServerStartTool, devServerStopTool, devServerErrorsTool, webFetchTool, webSearchTool, depDocsTool, todosTool, scratchpadTool, memoryAddTool, askUserTool, delegateTool, delegateParallelTool, blackboardPostTool, toolSearchTool, toolRequestTool, specReadTool, specWriteTool, analyzeImageTool, inspectUxTool];
+export const TOOL_REGISTRY: ToolModule[] = [
+  grepTool,
+  globTool,
+  multieditTool,
+  pythonExecTool,
+  pythonLibrariesTool,
+  devServerLogsTool,
+  devServerStartTool,
+  devServerStopTool,
+  devServerErrorsTool,
+  webFetchTool,
+  webSearchTool,
+  depDocsTool,
+  todosTool,
+  scratchpadTool,
+  memoryAddTool,
+  askUserTool,
+  delegateTool,
+  delegateParallelTool,
+  blackboardPostTool,
+  toolSearchTool,
+  toolRequestTool,
+  specReadTool,
+  specWriteTool,
+  analyzeImageTool,
+  inspectUxTool,
+];
 
 /** Model-facing specs for every registered tool (appended to AGENT_TOOLS when
  *  assembling the per-turn tool list). */

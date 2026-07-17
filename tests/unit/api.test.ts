@@ -18,7 +18,12 @@ describe('API requests', () => {
   it('recordRecentProject requires a deviceId and path to stamp the host', () => {
     const schema = requests.recordRecentProject.inputSchema!;
     expect(
-      schema.safeParse({ deviceId: 'd1', deviceLabel: 'Mac', path: '/p', name: 'p' }).success,
+      schema.safeParse({
+        deviceId: 'd1',
+        deviceLabel: 'Mac',
+        path: '/p',
+        name: 'p',
+      }).success,
     ).toBe(true);
     // deviceId is what lets a phone reconnect to the right desktop — it's required.
     expect(schema.safeParse({ deviceId: '', path: '/p' }).success).toBe(false);
@@ -39,7 +44,10 @@ describe('API requests', () => {
 
   it('captureEvent accepts a valid event', () => {
     const schema = frameworkRequests.captureEvent.inputSchema!;
-    const result = schema.safeParse({ eventName: 'CTA_CLICK', sessionId: 'abc123' });
+    const result = schema.safeParse({
+      eventName: 'CTA_CLICK',
+      sessionId: 'abc123',
+    });
     expect(result.success).toBe(true);
   });
 });

@@ -113,14 +113,20 @@ function normalizePath(p: string, sep: '\\' | '/'): string {
  *  worktree (if any) else the project dir, and follow the base's separator
  *  style. When no base is known, the path passes through so the daemon can
  *  resolve it. */
-export function resolvePath(ctx: ToolContext | undefined, path: string): string {
+export function resolvePath(
+  ctx: ToolContext | undefined,
+  path: string,
+): string {
   if (isWindowsAbsolute(path)) return normalizePath(path, '\\');
   if (path.startsWith('/')) return normalizePath(path, '/');
   if (path === '~' || path.startsWith('~/') || path.startsWith('~\\')) {
     const home = deriveHome(ctx);
     if (!home) return path;
     const sep = sepFor(home);
-    return normalizePath(home + sep + path.slice(1).replace(/^[\\/]+/, ''), sep);
+    return normalizePath(
+      home + sep + path.slice(1).replace(/^[\\/]+/, ''),
+      sep,
+    );
   }
   const base = resolutionBase(ctx);
   if (!base) return path;
@@ -132,7 +138,10 @@ export function resolvePath(ctx: ToolContext | undefined, path: string): string 
  *  returned to the model must be relative — see TOOLS.md "Path handling"). Paths
  *  outside the base, or when no base is known, are returned unchanged. Windows
  *  comparison is separator- and case-insensitive. */
-export function relativizePath(ctx: ToolContext | undefined, absPath: string): string {
+export function relativizePath(
+  ctx: ToolContext | undefined,
+  absPath: string,
+): string {
   const base = resolutionBase(ctx);
   if (!base) return absPath;
   const root = base.replace(/[\\/]+$/, '');
@@ -144,10 +153,16 @@ export function relativizePath(ctx: ToolContext | undefined, absPath: string): s
     return a.startsWith(r + '\\') ? absPath.slice(root.length + 1) : absPath;
   }
   if (absPath === root) return '.';
-  return absPath.startsWith(root + '/') ? absPath.slice(root.length + 1) : absPath;
+  return absPath.startsWith(root + '/')
+    ? absPath.slice(root.length + 1)
+    : absPath;
 }
 
-export type ToolDispatch = (name: string, input: unknown, ctx?: ToolContext) => Promise<string>;
+export type ToolDispatch = (
+  name: string,
+  input: unknown,
+  ctx?: ToolContext,
+) => Promise<string>;
 
 export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
   const p = (input ?? {}) as Record<string, unknown>;
@@ -158,7 +173,8 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
   switch (name as AgentToolName) {
     case 'read': {
       const rawPath = String(p.path);
-      if (!rawPath || rawPath === 'undefined') return 'read: `path` is required';
+      if (!rawPath || rawPath === 'undefined')
+        return 'read: `path` is required';
       const raw = await native.fs.readFile(resolvePath(ctx, rawPath));
       return formatHashlineRead(
         rawPath,
@@ -169,7 +185,8 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
     }
     case 'write': {
       const rawPath = String(p.path);
-      if (!rawPath || rawPath === 'undefined') return 'write: `path` is required';
+      if (!rawPath || rawPath === 'undefined')
+        return 'write: `path` is required';
       const abs = resolvePath(ctx, rawPath);
       await native.fs.writeFile(abs, str(p.content ?? ''));
       if (ctx?.sessionId) markDirty(ctx.sessionId, abs);
@@ -177,7 +194,8 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
     }
     case 'edit': {
       const rawPath = String(p.path);
-      if (!rawPath || rawPath === 'undefined') return 'edit: `path` is required';
+      if (!rawPath || rawPath === 'undefined')
+        return 'edit: `path` is required';
       const path = resolvePath(ctx, rawPath);
       const cur = await native.fs.readFile(path);
       // Accept `old`/`new` as aliases for old_string/new_string (legacy callers).
@@ -189,7 +207,8 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
           : {}),
       };
       const r = applyEdit(cur, op);
-      if (!r.ok) return `edit failed in ${relativizePath(ctx, path)}: ${r.error}`;
+      if (!r.ok)
+        return `edit failed in ${relativizePath(ctx, path)}: ${r.error}`;
       await native.fs.writeFile(path, r.body!);
       if (ctx?.sessionId) markDirty(ctx.sessionId, path);
       // Report the REAL line delta. Anchor edits carry no old_string, so the transcript
@@ -201,8 +220,17 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       const command = str(p.command ?? '');
       const guard = await devServerBashGuard(command, ctx);
       if (guard) return guard;
-      const timeoutMs = typeof p.timeout_ms === 'number' && p.timeout_ms > 0 ? p.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;
-      return runBash(command, await sandboxOptFor(ctx), ctx, p.working_dir != null ? str(p.working_dir) : undefined, timeoutMs);
+      const timeoutMs =
+        typeof p.timeout_ms === 'number' && p.timeout_ms > 0
+          ? p.timeout_ms
+          : DEFAULT_BASH_TIMEOUT_MS;
+      return runBash(
+        command,
+        await sandboxOptFor(ctx),
+        ctx,
+        p.working_dir != null ? str(p.working_dir) : undefined,
+        timeoutMs,
+      );
     }
     case 'database':
       return runDb(ctx, 'getQuery', {
@@ -229,27 +257,54 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
  *  subprocess — same plumbing the Database panel uses. Returns a JSON string the
  *  agent reads as the tool_result. The dev DB is the bundled local postgres
  *  (p_<projectId>), so this is the same data the app's dev server sees. */
-function runDb(ctx: ToolContext | undefined, op: string, input: Record<string, unknown>): Promise<string> {
+function runDb(
+  ctx: ToolContext | undefined,
+  op: string,
+  input: Record<string, unknown>,
+): Promise<string> {
   const projectDir = ctx?.projectDir;
-  if (!projectDir) return Promise.resolve('[error: no open project — db tools need a project]');
+  if (!projectDir)
+    return Promise.resolve(
+      '[error: no open project — db tools need a project]',
+    );
   return new Promise((resolve) => {
     let out = '';
     try {
-      const proc = native.process.spawn('node', ['--input-type=module', '-e', DB_SCRIPT], {
-        cwd: projectDir,
-        env: {
-          UGLY_DB_MODE: 'dev',
-          UGLY_DB_PROJECT: projectDir,
-          UGLY_DB_OP: op,
-          UGLY_DB_INPUT: JSON.stringify(input),
+      const proc = native.process.spawn(
+        'node',
+        ['--input-type=module', '-e', DB_SCRIPT],
+        {
+          cwd: projectDir,
+          env: {
+            UGLY_DB_MODE: 'dev',
+            UGLY_DB_PROJECT: projectDir,
+            UGLY_DB_OP: op,
+            UGLY_DB_INPUT: JSON.stringify(input),
+          },
         },
-      });
+      );
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (out += c));
-      proc.onError((e) => { resolve(`[error: ${e}]`); });
-      proc.onExit((code) => { resolve(code === 0 ? truncate(out.trim()) : `[error: ${out.trim().slice(-400) || 'node exited ' + String(code)}]`); });
+      proc.onError((e) => {
+        resolve(`[error: ${e}]`);
+      });
+      proc.onExit((code) => {
+        resolve(
+          code === 0
+            ? truncate(out.trim())
+            : `[error: ${out.trim().slice(-400) || 'node exited ' + String(code)}]`,
+        );
+      });
     } catch (e) {
-      console.error('[agentTools:runDbScript]', JSON.stringify({ op, projectDir, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[agentTools:runDbScript]',
+        JSON.stringify({
+          op,
+          projectDir,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       resolve(`[error: ${(e as Error).message}]`);
     }
   });
@@ -273,7 +328,12 @@ async function readProjectId(projectDir: string): Promise<string | null> {
   if (cached !== undefined) return cached;
   let pid: string | null = null;
   try {
-    pid = (JSON.parse(await native.fs.readFile(projectDir + '/.uglyapp')) as { projectId?: string }).projectId ?? null;
+    pid =
+      (
+        JSON.parse(await native.fs.readFile(projectDir + '/.uglyapp')) as {
+          projectId?: string;
+        }
+      ).projectId ?? null;
   } catch {
     pid = null;
   }
@@ -294,11 +354,15 @@ export async function isUglyAppProject(projectDir: string): Promise<boolean> {
     res = true;
   } catch {
     try {
-      const pkg = JSON.parse(await native.fs.readFile(projectDir + '/package.json')) as {
+      const pkg = JSON.parse(
+        await native.fs.readFile(projectDir + '/package.json'),
+      ) as {
         dependencies?: Record<string, unknown>;
         devDependencies?: Record<string, unknown>;
       };
-      res = pkg.dependencies?.['ugly-app'] !== undefined || pkg.devDependencies?.['ugly-app'] !== undefined;
+      res =
+        pkg.dependencies?.['ugly-app'] !== undefined ||
+        pkg.devDependencies?.['ugly-app'] !== undefined;
     } catch {
       res = false;
     }
@@ -311,7 +375,9 @@ export async function isUglyAppProject(projectDir: string): Promise<boolean> {
  *  there's no project / projectId → spawn runs unsandboxed). */
 async function sandboxOptFor(
   ctx?: ToolContext,
-): Promise<{ projectId: string; mode: SandboxMode; projectDir: string } | undefined> {
+): Promise<
+  { projectId: string; mode: SandboxMode; projectDir: string } | undefined
+> {
   const mode = ctx?.mode ?? 'edit';
   const projectDir = ctx?.projectDir;
   if (!projectDir) return undefined;
@@ -334,7 +400,10 @@ const DEV_SERVER_CMD_RE =
  *  path — non-blocking, and boots via the Preview panel with the right env. Only
  *  fires for ugly-app projects (where `dev_server_start` exists); returns null
  *  otherwise so the command runs normally. */
-async function devServerBashGuard(command: string, ctx?: ToolContext): Promise<string | null> {
+async function devServerBashGuard(
+  command: string,
+  ctx?: ToolContext,
+): Promise<string | null> {
   if (!DEV_SERVER_CMD_RE.test(command)) return null;
   const dir = ctx?.projectDir;
   if (!dir || !(await isUglyAppProject(dir))) return null;
@@ -365,17 +434,28 @@ export function killSessionBashProcs(sessionId: string): number {
   if (!set || set.size === 0) return 0;
   let n = 0;
   for (const proc of set) {
-    try { proc.kill(); n += 1; } catch { /* already exited */ }
+    try {
+      proc.kill();
+      n += 1;
+    } catch {
+      /* already exited */
+    }
   }
   set.clear();
   runningBashProcs.delete(sessionId);
   return n;
 }
 
-function trackBashProc(sessionId: string | undefined, proc: UglyProcess): () => void {
+function trackBashProc(
+  sessionId: string | undefined,
+  proc: UglyProcess,
+): () => void {
   if (!sessionId) return () => undefined;
   let set = runningBashProcs.get(sessionId);
-  if (!set) { set = new Set(); runningBashProcs.set(sessionId, set); }
+  if (!set) {
+    set = new Set();
+    runningBashProcs.set(sessionId, set);
+  }
   set.add(proc);
   return () => {
     const s = runningBashProcs.get(sessionId);
@@ -393,7 +473,8 @@ function trackBashProc(sessionId: string | undefined, proc: UglyProcess): () => 
  *  `timeoutMs` kills the proc after that wall-clock (default DEFAULT_BASH_TIMEOUT_MS). */
 function runBash(
   command: string,
-  sandbox: { projectId: string; mode: SandboxMode; projectDir: string } | undefined,
+  sandbox:
+    { projectId: string; mode: SandboxMode; projectDir: string } | undefined,
   ctx: ToolContext | undefined,
   workingDir?: string,
   timeoutMs: number = DEFAULT_BASH_TIMEOUT_MS,
@@ -403,7 +484,7 @@ function runBash(
     try {
       const cwd = workingDir
         ? resolvePath(ctx, workingDir)
-        : ctx?.workspaceDir ?? ctx?.projectDir ?? undefined;
+        : (ctx?.workspaceDir ?? ctx?.projectDir ?? undefined);
       const env: Record<string, string> = {
         ...(ctx?.port ? { PORT: String(ctx.port) } : {}),
         ...(ctx?.databaseUrl ? { DATABASE_URL: ctx.databaseUrl } : {}),
@@ -428,15 +509,34 @@ function runBash(
         resolve(text);
       };
       timer = setTimeout(() => {
-        try { proc.kill(); } catch { /* already gone */ }
-        settle(`${out.trimEnd()}\n[timed out after ${Math.round(timeoutMs / 1000)}s — process killed. For a long-running dev server use the dev_server_start tool; otherwise pass a larger timeout_ms.]`);
+        try {
+          proc.kill();
+        } catch {
+          /* already gone */
+        }
+        settle(
+          `${out.trimEnd()}\n[timed out after ${Math.round(timeoutMs / 1000)}s — process killed. For a long-running dev server use the dev_server_start tool; otherwise pass a larger timeout_ms.]`,
+        );
       }, timeoutMs);
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (out += c));
-      proc.onError((e) => { settle(`${out}\n[error: ${e}]`); });
-      proc.onExit((code) => { settle(truncate(`${out.trimEnd()}\n[exit ${code ?? 'null'}]`)); });
+      proc.onError((e) => {
+        settle(`${out}\n[error: ${e}]`);
+      });
+      proc.onExit((code) => {
+        settle(truncate(`${out.trimEnd()}\n[exit ${code ?? 'null'}]`));
+      });
     } catch (e) {
-      console.error('[agentTools:runBash]', JSON.stringify({ command, workingDir, projectDir: ctx?.projectDir, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[agentTools:runBash]',
+        JSON.stringify({
+          command,
+          workingDir,
+          projectDir: ctx?.projectDir,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       resolve(`[error: ${(e as Error).message}]`);
     }
   });

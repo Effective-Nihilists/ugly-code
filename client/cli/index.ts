@@ -4,5 +4,10 @@ import { main } from './evalCli';
 
 main(process.argv.slice(2)).then(
   (code) => process.exit(code),
-  (e: unknown) => { process.stderr.write(`${e instanceof Error ? e.stack ?? e.message : String(e)}\n`); process.exit(1); },
+  (e: unknown) => {
+    process.stderr.write(
+      `${e instanceof Error ? (e.stack ?? e.message) : String(e)}\n`,
+    );
+    process.exit(1);
+  },
 );

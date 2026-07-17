@@ -4,7 +4,10 @@
  * `pnpm dev` runs the project's dev script (`ugly-app dev --watch`); PORT makes it bind the
  * session's preview port. NO_COLOR/FORCE_COLOR keep the captured boot log free of ANSI.
  */
-export function devServerSpawn(port: number, databaseUrl?: string): { cmd: string; args: string[]; env: Record<string, string> } {
+export function devServerSpawn(
+  port: number,
+  databaseUrl?: string,
+): { cmd: string; args: string[]; env: Record<string, string> } {
   const p = String(port);
   // Install deps first when the project was never set up (node_modules missing),
   // THEN run the dev script — otherwise `pnpm dev` → `ugly-app dev` fails with

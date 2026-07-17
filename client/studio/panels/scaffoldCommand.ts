@@ -3,14 +3,17 @@
  *  ProjectCreationProgress so it can be unit-tested (vitest env is `node`). */
 
 export type ScaffoldResult =
-  | { ok: true; path: string }
-  | { ok: false; code: number | null };
+  { ok: true; path: string } | { ok: false; code: number | null };
 
 /** Build the `bash -lc` scaffold command. A leading `~` is NOT expanded inside
  *  double quotes, so map it to `$HOME`. The command mkdir+cd's into the parent
  *  itself (it may not exist yet), runs `ugly-app init`, cd's into the project,
  *  and prints its absolute path via `pwd` (parsed by parseScaffoldResult). */
-export function buildScaffoldCommand(name: string, parentDir: string, features: string[] = []): string {
+export function buildScaffoldCommand(
+  name: string,
+  parentDir: string,
+  features: string[] = [],
+): string {
   const parent = (parentDir.trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
   const q = (s: string): string => s.replace(/"/g, '\\"');
   // Only pass `--with` when features are chosen, so the command still works
@@ -27,9 +30,16 @@ export function buildScaffoldCommand(name: string, parentDir: string, features: 
  *  project path; non-zero → failure. `path` may be '' if there was no output
  *  (the caller supplies a fallback). The caller passes the raw path through
  *  `normalizeScaffoldPath` (Windows fix) before storing/opening it. */
-export function parseScaffoldResult(output: string, code: number | null): ScaffoldResult {
+export function parseScaffoldResult(
+  output: string,
+  code: number | null,
+): ScaffoldResult {
   if (code !== 0) return { ok: false, code };
-  const lines = output.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = output
+    .trim()
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   return { ok: true, path: lines[lines.length - 1] ?? '' };
 }
 

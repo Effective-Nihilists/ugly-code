@@ -8,11 +8,28 @@
 // best-effort: a failure degrades to "no criteria / no REVISE pressure".
 
 /** No-tools LLM completion. Returns the raw model text. */
-export type Judge = (system: string, user: string, maxTokens?: number) => Promise<string>;
+export type Judge = (
+  system: string,
+  user: string,
+  maxTokens?: number,
+) => Promise<string>;
 
-export interface AcceptanceCriterion { id: string; statement: string; rationale: string }
-export interface CriterionVerdict { id: string; pass: boolean; reason: string; evidence?: string }
-export interface GradeResult { verdicts: CriterionVerdict[]; parsed: boolean; failing: CriterionVerdict[] }
+export interface AcceptanceCriterion {
+  id: string;
+  statement: string;
+  rationale: string;
+}
+export interface CriterionVerdict {
+  id: string;
+  pass: boolean;
+  reason: string;
+  evidence?: string;
+}
+export interface GradeResult {
+  verdicts: CriterionVerdict[];
+  parsed: boolean;
+  failing: CriterionVerdict[];
+}
 
 const MAX_CRITERIA = 12;
 const MIN_CRITERIA = 2;
@@ -65,11 +82,17 @@ function extractJsonArray(text: string): unknown[] | null {
 }
 
 function clampDiff(s: string): string {
-  return s.length <= MAX_DIFF_CHARS ? s : `${s.slice(0, MAX_DIFF_CHARS)}\n... [truncated ${s.length - MAX_DIFF_CHARS} chars]`;
+  return s.length <= MAX_DIFF_CHARS
+    ? s
+    : `${s.slice(0, MAX_DIFF_CHARS)}\n... [truncated ${s.length - MAX_DIFF_CHARS} chars]`;
 }
 
 /** Derive an acceptance rubric from the request (+ optional spec text). */
-export async function deriveCriteria(userRequest: string, spec: string, judge: Judge): Promise<AcceptanceCriterion[]> {
+export async function deriveCriteria(
+  userRequest: string,
+  spec: string,
+  judge: Judge,
+): Promise<AcceptanceCriterion[]> {
   const user = [
     `USER REQUEST:\n${userRequest.slice(0, 2000)}`,
     ...(spec.trim() ? ['', `SPEC:\n${spec.slice(0, 4000)}`] : []),
@@ -77,7 +100,11 @@ export async function deriveCriteria(userRequest: string, spec: string, judge: J
     'Return the JSON array of criteria. No preamble, no fences.',
   ].join('\n');
   let raw: string;
-  try { raw = await judge(DERIVE_SYSTEM, user, 4000); } catch { return []; }
+  try {
+    raw = await judge(DERIVE_SYSTEM, user, 4000);
+  } catch {
+    return [];
+  }
   const arr = extractJsonArray(raw);
   if (!arr) return [];
   const criteria: AcceptanceCriterion[] = [];
@@ -87,16 +114,28 @@ export async function deriveCriteria(userRequest: string, spec: string, judge: J
     const id = typeof r.id === 'string' ? r.id.trim() : '';
     const statement = typeof r.statement === 'string' ? r.statement.trim() : '';
     if (!id || !statement) continue;
-    criteria.push({ id, statement, rationale: typeof r.rationale === 'string' ? r.rationale.trim() : '' });
+    criteria.push({
+      id,
+      statement,
+      rationale: typeof r.rationale === 'string' ? r.rationale.trim() : '',
+    });
     if (criteria.length >= MAX_CRITERIA) break;
   }
   return criteria.length >= MIN_CRITERIA ? criteria : [];
 }
 
 /** Grade a diff against acceptance criteria; reconcile missing verdicts as fail. */
-export async function gradeAgainstCriteria(userRequest: string, criteria: AcceptanceCriterion[], diff: string, judge: Judge): Promise<GradeResult> {
-  if (criteria.length === 0) return { verdicts: [], parsed: false, failing: [] };
-  const criteriaBlock = criteria.map((c) => `${c.id}. ${c.statement}\n   Rationale: ${c.rationale}`).join('\n\n');
+export async function gradeAgainstCriteria(
+  userRequest: string,
+  criteria: AcceptanceCriterion[],
+  diff: string,
+  judge: Judge,
+): Promise<GradeResult> {
+  if (criteria.length === 0)
+    return { verdicts: [], parsed: false, failing: [] };
+  const criteriaBlock = criteria
+    .map((c) => `${c.id}. ${c.statement}\n   Rationale: ${c.rationale}`)
+    .join('\n\n');
   const diffBlock = clampDiff(diff.trim());
   const user = [
     'Grade the diff below against the acceptance criteria. Emit one verdict per criterion.',
@@ -112,7 +151,11 @@ export async function gradeAgainstCriteria(userRequest: string, criteria: Accept
     'Return the JSON array of verdicts. One per criterion, ids matching exactly. No preamble, no fences.',
   ].join('\n');
   let raw: string;
-  try { raw = await judge(GRADE_SYSTEM, user, 4000); } catch { return { verdicts: [], parsed: false, failing: [] }; }
+  try {
+    raw = await judge(GRADE_SYSTEM, user, 4000);
+  } catch {
+    return { verdicts: [], parsed: false, failing: [] };
+  }
   const arr = extractJsonArray(raw);
   if (!arr) return { verdicts: [], parsed: false, failing: [] };
   const byId = new Map<string, CriterionVerdict>();
@@ -121,11 +164,26 @@ export async function gradeAgainstCriteria(userRequest: string, criteria: Accept
     const r = item as Record<string, unknown>;
     const id = typeof r.id === 'string' ? r.id.trim() : '';
     if (!id) continue;
-    const evidence = typeof r.evidence === 'string' && r.evidence.trim() ? r.evidence.trim() : undefined;
-    byId.set(id, { id, pass: r.pass === true, reason: typeof r.reason === 'string' ? r.reason.trim() : '', ...(evidence ? { evidence } : {}) });
+    const evidence =
+      typeof r.evidence === 'string' && r.evidence.trim()
+        ? r.evidence.trim()
+        : undefined;
+    byId.set(id, {
+      id,
+      pass: r.pass === true,
+      reason: typeof r.reason === 'string' ? r.reason.trim() : '',
+      ...(evidence ? { evidence } : {}),
+    });
   }
   // Reconcile to the ordered criteria list — missing → fail (keeps REVISE deterministic).
-  const verdicts: CriterionVerdict[] = criteria.map((c) => byId.get(c.id) ?? { id: c.id, pass: false, reason: '(grader did not return a verdict for this criterion)' });
+  const verdicts: CriterionVerdict[] = criteria.map(
+    (c) =>
+      byId.get(c.id) ?? {
+        id: c.id,
+        pass: false,
+        reason: '(grader did not return a verdict for this criterion)',
+      },
+  );
   return { verdicts, parsed: true, failing: verdicts.filter((v) => !v.pass) };
 }
 
@@ -134,8 +192,14 @@ function isRemovalCriterion(statement: string, reason: string): boolean {
   const text = `${statement} ${reason}`.toLowerCase();
   return (
     /\b(remove|removed|removal|delete|deleted|deletion|drop)\b/.test(text) ||
-    /\bno longer\b/.test(text) || /\bnot present\b/.test(text) || /\bnot allowed\b/.test(text) || /\bmust not\b/.test(text) ||
-    /\breplaced (?:by|with)\b/.test(text) || /\binstead of\b/.test(text) || /\brather than\b/.test(text) || /\bin place of\b/.test(text)
+    /\bno longer\b/.test(text) ||
+    /\bnot present\b/.test(text) ||
+    /\bnot allowed\b/.test(text) ||
+    /\bmust not\b/.test(text) ||
+    /\breplaced (?:by|with)\b/.test(text) ||
+    /\binstead of\b/.test(text) ||
+    /\brather than\b/.test(text) ||
+    /\bin place of\b/.test(text)
   );
 }
 

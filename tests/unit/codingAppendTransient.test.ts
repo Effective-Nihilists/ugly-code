@@ -27,11 +27,32 @@ describe('codingSessionAppendMessage transient streaming', () => {
   it('passes {transient:true} for a streaming write and {} for the durable commit', async () => {
     const fake = capturingDb();
     const append = appendOf(fake);
-    await append('u1', { sessionId: 's1', seq: 3, role: 'assistant', content: 'hel', transient: true });
-    await append('u1', { sessionId: 's1', seq: 3, role: 'assistant', content: 'hello', transient: true });
-    await append('u1', { sessionId: 's1', seq: 3, role: 'assistant', content: 'hello world' }); // commit
+    await append('u1', {
+      sessionId: 's1',
+      seq: 3,
+      role: 'assistant',
+      content: 'hel',
+      transient: true,
+    });
+    await append('u1', {
+      sessionId: 's1',
+      seq: 3,
+      role: 'assistant',
+      content: 'hello',
+      transient: true,
+    });
+    await append('u1', {
+      sessionId: 's1',
+      seq: 3,
+      role: 'assistant',
+      content: 'hello world',
+    }); // commit
 
-    expect(fake.calls.map((c) => c.options)).toEqual([{ transient: true }, { transient: true }, {}]);
+    expect(fake.calls.map((c) => c.options)).toEqual([
+      { transient: true },
+      { transient: true },
+      {},
+    ]);
     // All three target the SAME row id, so streaming frames + commit merge into one doc.
     expect(fake.calls.every((c) => c.id === 's1:3')).toBe(true);
   });

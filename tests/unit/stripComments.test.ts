@@ -39,21 +39,27 @@ export const cronTasks = defineWorkers({
 
 describe('stripComments — literals must survive', () => {
   it('does not treat // inside a string as a comment', () => {
-    expect(stripComments(`const u = 'https://x.dev/y'; // drop me`).trim())
-      .toBe(`const u = 'https://x.dev/y';`);
+    expect(
+      stripComments(`const u = 'https://x.dev/y'; // drop me`).trim(),
+    ).toBe(`const u = 'https://x.dev/y';`);
   });
 
   it('handles escaped quotes', () => {
-    expect(stripComments(`const s = 'it\\'s // fine'; // gone`).trim())
-      .toBe(`const s = 'it\\'s // fine';`);
+    expect(stripComments(`const s = 'it\\'s // fine'; // gone`).trim()).toBe(
+      `const s = 'it\\'s // fine';`,
+    );
   });
 
   it('handles template literals', () => {
-    expect(stripComments('const t = `a // b`; // gone').trim()).toBe('const t = `a // b`;');
+    expect(stripComments('const t = `a // b`; // gone').trim()).toBe(
+      'const t = `a // b`;',
+    );
   });
 
   it('keeps double-quoted url-ish content', () => {
-    expect(stripComments(`const u = "//cdn.example.com";`).trim()).toBe(`const u = "//cdn.example.com";`);
+    expect(stripComments(`const u = "//cdn.example.com";`).trim()).toBe(
+      `const u = "//cdn.example.com";`,
+    );
   });
 
   it('preserves line structure', () => {

@@ -12,7 +12,11 @@
  */
 import React from 'react';
 import { getActiveProjectPath, setActiveRepoPath } from '../projectPath';
-import { findAndCacheGitRepos, getCachedRepos, type GitRepo } from './findGitRepos';
+import {
+  findAndCacheGitRepos,
+  getCachedRepos,
+  type GitRepo,
+} from './findGitRepos';
 
 // ── Module-level pub/sub for cross-instance sync ──────────────────────
 // Replaces the fragile `window.dispatchEvent(new PopStateEvent('popstate'))`
@@ -35,7 +39,10 @@ function subscribe(key: string, cb: (v: string | null) => void): () => void {
     subscribers.set(key, set);
   }
   set.add(cb);
-  return () => { set.delete(cb); if (set.size === 0) subscribers.delete(key); };
+  return () => {
+    set.delete(cb);
+    if (set.size === 0) subscribers.delete(key);
+  };
 }
 
 function notifySubscribers(key: string, value: string | null): void {
@@ -60,15 +67,22 @@ function writeQueryParam(key: string, value: string | null): void {
 
 // ── React hook to read/write a query param ──────────────────────────
 
-export function useQueryParam(key: string, defaultValue: string | null = null): [string | null, (v: string | null) => void] {
+export function useQueryParam(
+  key: string,
+  defaultValue: string | null = null,
+): [string | null, (v: string | null) => void] {
   // Seed from the module-level cache first (fast path), falling back to URL.
-  const [val, setVal] = React.useState<string | null>(
-    () => latestValue.has(key) ? latestValue.get(key)! : (readQueryParam(key) ?? defaultValue),
+  const [val, setVal] = React.useState<string | null>(() =>
+    latestValue.has(key)
+      ? latestValue.get(key)!
+      : (readQueryParam(key) ?? defaultValue),
   );
 
   // Subscribe to cross-instance notifications + browser back/forward.
   React.useEffect(() => {
-    const unsub = subscribe(key, (v) => { setVal(v); });
+    const unsub = subscribe(key, (v) => {
+      setVal(v);
+    });
     const onPop = (): void => {
       const qv = readQueryParam(key);
       // Only react when the value actually changed (avoids re-render on
@@ -79,16 +93,22 @@ export function useQueryParam(key: string, defaultValue: string | null = null): 
       }
     };
     window.addEventListener('popstate', onPop);
-    return () => { unsub(); window.removeEventListener('popstate', onPop); };
+    return () => {
+      unsub();
+      window.removeEventListener('popstate', onPop);
+    };
   }, [key, defaultValue]);
 
-  const set = React.useCallback((v: string | null) => {
-    writeQueryParam(key, v);
-    latestValue.set(key, v);
-    setVal(v);
-    // Notify other useQueryParam instances for the same key.
-    notifySubscribers(key, v);
-  }, [key]);
+  const set = React.useCallback(
+    (v: string | null) => {
+      writeQueryParam(key, v);
+      latestValue.set(key, v);
+      setVal(v);
+      // Notify other useQueryParam instances for the same key.
+      notifySubscribers(key, v);
+    },
+    [key],
+  );
 
   return [val, set];
 }
@@ -121,7 +141,9 @@ export interface GitRepoSelectorProps {
   projectPath?: string;
 }
 
-export function GitRepoSelector({ projectPath }: GitRepoSelectorProps): React.ReactElement {
+export function GitRepoSelector({
+  projectPath,
+}: GitRepoSelectorProps): React.ReactElement {
   const [repos, setRepos] = React.useState<GitRepo[]>(() => getCachedRepos());
   const [busy, setBusy] = React.useState(() => getCachedRepos().length === 0);
   const [repoValue, setRepoValue] = useQueryParam(REPO_PARAM);
@@ -142,9 +164,19 @@ export function GitRepoSelector({ projectPath }: GitRepoSelectorProps): React.Re
       return;
     }
     const root = rootPathRef.current;
-    if (!root) { setBusy(false); return; }
+    if (!root) {
+      setBusy(false);
+      return;
+    }
     setBusy(true);
-    void findAndCacheGitRepos(root).then((r) => { setRepos(r); setBusy(false); }).catch(() => { setBusy(false); });
+    void findAndCacheGitRepos(root)
+      .then((r) => {
+        setRepos(r);
+        setBusy(false);
+      })
+      .catch(() => {
+        setBusy(false);
+      });
   }, []);
 
   // Default to the first repo if nothing selected yet.
@@ -168,15 +200,24 @@ export function GitRepoSelector({ projectPath }: GitRepoSelectorProps): React.Re
 
   // Restore the original root on unmount.
   React.useEffect(() => {
-    return () => { setActiveRepoPath(rootPathRef.current); };
+    return () => {
+      setActiveRepoPath(rootPathRef.current);
+    };
   }, []);
 
   if (repos.length < 2) {
     if (busy) {
-      return <span style={{ ...selectStyle, opacity: 0.5, cursor: 'default' }}>Scanning…</span>;
+      return (
+        <span style={{ ...selectStyle, opacity: 0.5, cursor: 'default' }}>
+          Scanning…
+        </span>
+      );
     }
     return (
-      <span title={repos[0]?.path ?? ''} style={{ ...selectStyle, opacity: 0.5, cursor: 'default' }}>
+      <span
+        title={repos[0]?.path ?? ''}
+        style={{ ...selectStyle, opacity: 0.5, cursor: 'default' }}
+      >
         {repos[0]?.name ?? '(no repos)'}
       </span>
     );
@@ -187,12 +228,15 @@ export function GitRepoSelector({ projectPath }: GitRepoSelectorProps): React.Re
       data-id="git-repo-select"
       style={selectStyle}
       value={repoValue ?? ''}
-      onChange={(e) => { setRepoValue(e.target.value || null); }}
+      onChange={(e) => {
+        setRepoValue(e.target.value || null);
+      }}
       title="Select a git repo within the project folder"
     >
       {repos.map((r) => (
         <option key={r.path} value={r.path}>
-          {r.isUglyApp ? '★ ' : ''}{r.name}
+          {r.isUglyApp ? '★ ' : ''}
+          {r.name}
         </option>
       ))}
     </select>

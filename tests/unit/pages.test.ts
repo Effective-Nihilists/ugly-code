@@ -16,6 +16,9 @@ describe('Page definitions', () => {
 
   it('authenticated pages require auth', () => {
     // user/:userId is the authed route (definePage defaults to auth: true).
-    expect(pages['user/:userId'].auth, 'user/:userId should require auth').not.toBe(false);
+    expect(
+      pages['user/:userId'].auth,
+      'user/:userId should require auth',
+    ).not.toBe(false);
   });
 });

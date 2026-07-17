@@ -31,7 +31,13 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const assetDir = join(repoRoot, 'client', 'public', 'coding-agent', 'indexer');
-const versionFile = join(repoRoot, 'client', 'agent', 'indexer', 'indexerVersion.ts');
+const versionFile = join(
+  repoRoot,
+  'client',
+  'agent',
+  'indexer',
+  'indexerVersion.ts',
+);
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 
@@ -52,7 +58,9 @@ const files = names.map((name) => {
 
 // Version = hash of the per-file hashes (not of the concatenated bytes, so a
 // rename alone also changes it).
-const version = sha256(files.map((f) => `${f.path}:${f.sha256}`).join('\n')).slice(0, 16);
+const version = sha256(
+  files.map((f) => `${f.path}:${f.sha256}`).join('\n'),
+).slice(0, 16);
 
 writeFileSync(
   join(assetDir, 'manifest.json'),

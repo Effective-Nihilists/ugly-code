@@ -9,7 +9,12 @@ describe('analyzeTranscript', () => {
   it('counts tools, errors, reads/edits, first-edit, narration, compactions', () => {
     const rows = [
       row(0, 'user', 'do it'),
-      row(1, 'assistant', { content: [{ type: 'tool_use', name: 'read' }, { type: 'tool_use', name: 'grep' }] }),
+      row(1, 'assistant', {
+        content: [
+          { type: 'tool_use', name: 'read' },
+          { type: 'tool_use', name: 'grep' },
+        ],
+      }),
       row(2, 'tool', { results: [{ is_error: false }, { is_error: true }] }),
       row(3, 'assistant', { content: [{ type: 'text', text: 'thinking...' }] }), // narration-only
       row(4, 'assistant', { content: [{ type: 'tool_use', name: 'edit' }] }),
@@ -30,7 +35,9 @@ describe('analyzeTranscript', () => {
   });
 
   it('handles a run with no edits', () => {
-    const a = analyzeTranscript([row(1, 'assistant', { content: [{ type: 'tool_use', name: 'read' }] })]);
+    const a = analyzeTranscript([
+      row(1, 'assistant', { content: [{ type: 'tool_use', name: 'read' }] }),
+    ]);
     expect(a.turnsToFirstEdit).toBeNull();
     expect(a.readToEditRatio).toBe(1); // reads with no edit → the read count
   });

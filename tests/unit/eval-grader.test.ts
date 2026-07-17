@@ -27,12 +27,18 @@ function deps(over: {
 }
 
 function grade(gates: EvalGate[], d: GradeDeps) {
-  return gradeProject({ taskName: 't', projectPath: '/proj', gates, runTotals: RUN_TOTALS }, d);
+  return gradeProject(
+    { taskName: 't', projectPath: '/proj', gates, runTotals: RUN_TOTALS },
+    d,
+  );
 }
 
 describe('eval grader — deterministic gates', () => {
   it('tsc gate passes on a clean compile, contributes its points', async () => {
-    const r = await grade([{ name: 'tsc clean', points: 2, kind: 'tsc' }], deps({ run: () => ({ out: 'ok', code: 0 }) }));
+    const r = await grade(
+      [{ name: 'tsc clean', points: 2, kind: 'tsc' }],
+      deps({ run: () => ({ out: 'ok', code: 0 }) }),
+    );
     expect(r.checks?.[0]).toMatchObject({ name: 'tsc clean', passed: true });
     expect(r.tscErrors).toBe(0);
     expect(r.score).toBe(2);
@@ -40,8 +46,12 @@ describe('eval grader — deterministic gates', () => {
   });
 
   it('tsc gate fails + counts errors + samples output', async () => {
-    const out = "src/a.ts(1,1): error TS2322: bad\nsrc/b.ts(2,2): error TS1005: bad";
-    const r = await grade([{ name: 'tsc clean', points: 2, kind: 'tsc' }], deps({ run: () => ({ out, code: 1 }) }));
+    const out =
+      'src/a.ts(1,1): error TS2322: bad\nsrc/b.ts(2,2): error TS1005: bad';
+    const r = await grade(
+      [{ name: 'tsc clean', points: 2, kind: 'tsc' }],
+      deps({ run: () => ({ out, code: 1 }) }),
+    );
     expect(r.checks?.[0]?.passed).toBe(false);
     expect(r.tscErrors).toBe(2);
     expect(r.tscErrorSample).toContain('error TS2322');
@@ -56,17 +66,29 @@ describe('eval grader — deterministic gates', () => {
         return { out: '', code: 0 };
       },
     });
-    const r = await grade([{ name: 'tests', points: 3, kind: 'vitest:src/x.test.ts' }], d);
+    const r = await grade(
+      [{ name: 'tests', points: 3, kind: 'vitest:src/x.test.ts' }],
+      d,
+    );
     expect(seen[0]).toEqual(['vitest', 'run', 'src/x.test.ts']);
     expect(r.score).toBe(3);
   });
 
   it('fileExists + fileMatches evaluate against the project files', async () => {
-    const d = deps({ files: { 'package.json': '{"dependencies":{"drizzle-orm":"^1"}}', 'DECISION.md': '# decision' } });
+    const d = deps({
+      files: {
+        'package.json': '{"dependencies":{"drizzle-orm":"^1"}}',
+        'DECISION.md': '# decision',
+      },
+    });
     const r = await grade(
       [
         { name: 'decision present', points: 1, kind: 'fileExists:DECISION.md' },
-        { name: 'drizzle in deps', points: 1, kind: 'fileMatches:package.json:drizzle' },
+        {
+          name: 'drizzle in deps',
+          points: 1,
+          kind: 'fileMatches:package.json:drizzle',
+        },
         { name: 'missing', points: 1, kind: 'fileExists:NOPE.md' },
       ],
       d,
@@ -77,8 +99,16 @@ describe('eval grader — deterministic gates', () => {
   });
 
   it('judge gates are pending when no judge dep is available', async () => {
-    const r = await grade([{ name: 'rubric', points: 4, kind: 'judge:decision-rubric' }], deps({}));
-    expect(r.judgeResults?.[0]).toMatchObject({ gateName: 'rubric', points: 4, pointsAwarded: 0, rubricKey: 'decision-rubric' });
+    const r = await grade(
+      [{ name: 'rubric', points: 4, kind: 'judge:decision-rubric' }],
+      deps({}),
+    );
+    expect(r.judgeResults?.[0]).toMatchObject({
+      gateName: 'rubric',
+      points: 4,
+      pointsAwarded: 0,
+      rubricKey: 'decision-rubric',
+    });
     expect(r.score).toBe(0);
     expect(r.scoreMax).toBe(4);
     expect(r.summary).toMatch(/judge/i);
@@ -106,7 +136,10 @@ describe('eval grader — deterministic gates', () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]?.user).toContain('Do the thing well.'); // criteria fed to the judge
     expect(seen[0]?.user).toContain('diff --git'); // diff evidence fed in
-    expect(r.judgeResults?.[0]).toMatchObject({ pointsAwarded: 3, verdict: 'covers most criteria' });
+    expect(r.judgeResults?.[0]).toMatchObject({
+      pointsAwarded: 3,
+      verdict: 'covers most criteria',
+    });
     expect(r.score).toBe(3);
     expect(r.scoreMax).toBe(4);
   });
@@ -120,8 +153,15 @@ describe('eval grader — deterministic gates', () => {
           calls.push([cmd, ...args]);
           // Plain `git diff` sees nothing (new file is untracked); only the staged
           // diff reveals it — proving the grader stages before diffing.
-          if (cmd === 'git' && args[0] === 'diff' && args.includes('--cached')) {
-            return { out: 'diff --git a/DESIGN.md b/DESIGN.md\n+++ b/DESIGN.md\n+my design', code: 0 };
+          if (
+            cmd === 'git' &&
+            args[0] === 'diff' &&
+            args.includes('--cached')
+          ) {
+            return {
+              out: 'diff --git a/DESIGN.md b/DESIGN.md\n+++ b/DESIGN.md\n+my design',
+              code: 0,
+            };
           }
           return { out: '', code: 0 };
         },
@@ -141,16 +181,26 @@ describe('eval grader — deterministic gates', () => {
       },
       d,
     );
-    expect(calls.some((c) => c[0] === 'git' && c[1] === 'add' && c.includes('-A'))).toBe(true); // staged before diffing
+    expect(
+      calls.some((c) => c[0] === 'git' && c[1] === 'add' && c.includes('-A')),
+    ).toBe(true); // staged before diffing
     expect(calls.some((c) => c.includes(':(exclude)node_modules'))).toBe(true); // junk excluded from evidence
     expect(seen[0]).toContain('my design'); // new-file content reached the judge
     expect(r.score).toBe(5);
   });
 
   it('judge points are clamped to the gate max', async () => {
-    const d: GradeDeps = { ...deps({}), judge: async () => '{"points": 99, "verdict": "great"}' };
+    const d: GradeDeps = {
+      ...deps({}),
+      judge: async () => '{"points": 99, "verdict": "great"}',
+    };
     const r = await gradeProject(
-      { taskName: 't', projectPath: '/p', gates: [{ name: 'g', points: 2, kind: 'judge:x' }], runTotals: RUN_TOTALS },
+      {
+        taskName: 't',
+        projectPath: '/p',
+        gates: [{ name: 'g', points: 2, kind: 'judge:x' }],
+        runTotals: RUN_TOTALS,
+      },
       d,
     );
     expect(r.judgeResults?.[0]?.pointsAwarded).toBe(2);
@@ -160,13 +210,18 @@ describe('eval grader — deterministic gates', () => {
   it('a judge gate that THROWS is excluded from the score max (ungraded, not a 0 that docks the cell)', async () => {
     const d: GradeDeps = {
       ...deps({}), // default run → code 0, so the vitest gate passes
-      judge: async () => { throw new Error('judge unreachable'); },
+      judge: async () => {
+        throw new Error('judge unreachable');
+      },
     };
     const r = await gradeProject(
       {
         taskName: 't',
         projectPath: '/p',
-        gates: [{ name: 'tests', points: 4, kind: 'vitest' }, { name: 'quality', points: 1, kind: 'judge:x' }],
+        gates: [
+          { name: 'tests', points: 4, kind: 'vitest' },
+          { name: 'quality', points: 1, kind: 'judge:x' },
+        ],
         successCriteria: 'do it well',
         runTotals: RUN_TOTALS,
       },
@@ -180,7 +235,10 @@ describe('eval grader — deterministic gates', () => {
   });
 
   it('custom gates become manual checks', async () => {
-    const r = await grade([{ name: 'seed runs', points: 2, kind: 'custom:seed' }], deps({}));
+    const r = await grade(
+      [{ name: 'seed runs', points: 2, kind: 'custom:seed' }],
+      deps({}),
+    );
     expect(r.checks?.[0]).toMatchObject({ name: 'seed runs', passed: false });
     expect(r.checks?.[0]?.detail).toMatch(/manual/i);
   });
@@ -221,13 +279,23 @@ describe('eval grader — deterministic gates', () => {
       system.includes('code-review judge')
         ? '[{"id":"C1","pass":true,"reason":"ok","evidence":"f:1"},{"id":"C2","pass":true,"reason":"ok"},{"id":"C3","pass":true,"reason":"ok"},{"id":"C4","pass":false,"reason":"missing"}]'
         : '[{"id":"C1","statement":"a","rationale":"x"},{"id":"C2","statement":"b","rationale":"y"},{"id":"C3","statement":"c","rationale":"z"},{"id":"C4","statement":"d","rationale":"w"}]';
-    const d: GradeDeps = { ...deps({ run: () => ({ out: '', code: 0 }) }), judge };
+    const d: GradeDeps = {
+      ...deps({ run: () => ({ out: '', code: 0 }) }),
+      judge,
+    };
     const r = await gradeProject(
-      { taskName: 't', projectPath: '/p', successCriteria: 'do the thing with A, B, C, and D', runTotals: RUN_TOTALS },
+      {
+        taskName: 't',
+        projectPath: '/p',
+        successCriteria: 'do the thing with A, B, C, and D',
+        runTotals: RUN_TOTALS,
+      },
       d,
     );
     expect(r.scoreMax).toBe(5);
     expect(r.score).toBe(4); // 3/4 pass → round(3.75) = 4
-    expect(r.checks?.some((c) => c.name.includes('C4') && !c.passed)).toBe(true);
+    expect(r.checks?.some((c) => c.name.includes('C4') && !c.passed)).toBe(
+      true,
+    );
   });
 });

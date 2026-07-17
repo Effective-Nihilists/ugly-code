@@ -24,33 +24,44 @@ describe('glob — rg spawn failure', () => {
   // string — however honest its wording — gets success chrome.
   it('THROWS instead of returning a polite "no files match"', async () => {
     resetMock({ proc: () => ({ error: ENOENT, code: null }) });
-    await expect(globTool.run({ pattern: '**/*.ts' }, { projectDir: '/proj' })).rejects.toThrow(/failed|did not run/i);
+    await expect(
+      globTool.run({ pattern: '**/*.ts' }, { projectDir: '/proj' }),
+    ).rejects.toThrow(/failed|did not run/i);
   });
 
   it('names ripgrep so the cause is actionable even when stderr is blank', async () => {
     // Whitespace-only: the mock needs a truthy `error` to emit process.error at all,
     // and it trims to nothing — which is what exercises the fallback wording.
     resetMock({ proc: () => ({ error: '   ', code: null }) });
-    await expect(globTool.run({ pattern: '**/*.ts' }, { projectDir: '/proj' })).rejects.toThrow(/ripgrep|rg/i);
+    await expect(
+      globTool.run({ pattern: '**/*.ts' }, { projectDir: '/proj' }),
+    ).rejects.toThrow(/ripgrep|rg/i);
   });
 
   it('a genuine empty result still reads as "no files match"', async () => {
     resetMock({ proc: () => ({ stdout: '', code: 1 }) });
-    const out = await globTool.run({ pattern: '**/*.nope' }, { projectDir: '/proj' });
+    const out = await globTool.run(
+      { pattern: '**/*.nope' },
+      { projectDir: '/proj' },
+    );
     expect(out).toMatch(/no files match/i);
     expect(out).not.toMatch(/failed/i);
   });
 
   it('a real rg error (exit 2) throws with the cause', async () => {
     resetMock({ proc: () => ({ stderr: 'regex parse error', code: 2 }) });
-    await expect(globTool.run({ pattern: '[' }, { projectDir: '/proj' })).rejects.toThrow(/exit 2[\s\S]*regex parse error|regex parse error/);
+    await expect(
+      globTool.run({ pattern: '[' }, { projectDir: '/proj' }),
+    ).rejects.toThrow(/exit 2[\s\S]*regex parse error|regex parse error/);
   });
 });
 
 describe('grep — rg spawn failure', () => {
   it('THROWS instead of returning a polite "no matches"', async () => {
     resetMock({ proc: () => ({ error: ENOENT, code: null }) });
-    await expect(grepTool.run({ pattern: 'qty' }, { projectDir: '/proj' })).rejects.toThrow(/failed|did not run/i);
+    await expect(
+      grepTool.run({ pattern: 'qty' }, { projectDir: '/proj' }),
+    ).rejects.toThrow(/failed|did not run/i);
   });
 
   it('a genuine empty result still reads as "no matches"', async () => {
@@ -62,6 +73,8 @@ describe('grep — rg spawn failure', () => {
 
   it('a real rg error (exit 2) throws with the cause', async () => {
     resetMock({ proc: () => ({ stderr: 'regex parse error', code: 2 }) });
-    await expect(grepTool.run({ pattern: '[' }, { projectDir: '/proj' })).rejects.toThrow(/exit 2|regex parse error/);
+    await expect(
+      grepTool.run({ pattern: '[' }, { projectDir: '/proj' }),
+    ).rejects.toThrow(/exit 2|regex parse error/);
   });
 });

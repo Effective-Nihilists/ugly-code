@@ -18,7 +18,13 @@ export interface GitRepo {
 }
 
 const MAX_DEPTH = 4;
-const SKIP_DIRS = new Set(['node_modules', '.pnpm', '.git', 'dist', '.ugly-studio']);
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.pnpm',
+  '.git',
+  'dist',
+  '.ugly-studio',
+]);
 
 async function walk(dir: string, depth: number, out: GitRepo[]): Promise<void> {
   if (depth > MAX_DEPTH) return;
@@ -26,7 +32,10 @@ async function walk(dir: string, depth: number, out: GitRepo[]): Promise<void> {
   try {
     entries = await native.fs.readdir(dir);
   } catch (e) {
-    console.log('[findGitRepos:walk] readdir failed', JSON.stringify({ dir, err: (e as Error).message }));
+    console.log(
+      '[findGitRepos:walk] readdir failed',
+      JSON.stringify({ dir, err: (e as Error).message }),
+    );
     return;
   }
   const subdirs: string[] = [];
@@ -55,11 +64,21 @@ async function checkIsUglyApp(repoPath: string): Promise<boolean> {
     if (entries.some((e) => e.name === 'package.json')) {
       const pkg = await native.fs.readFile(`${repoPath}/package.json`);
       try {
-        const parsed = JSON.parse(pkg) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-        return !!(parsed.dependencies?.['ugly-app'] ?? parsed.devDependencies?.['ugly-app']);
-      } catch { /* invalid JSON */ }
+        const parsed = JSON.parse(pkg) as {
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+        };
+        return !!(
+          parsed.dependencies?.['ugly-app'] ??
+          parsed.devDependencies?.['ugly-app']
+        );
+      } catch {
+        /* invalid JSON */
+      }
     }
-  } catch { /* read error — not accessible */ }
+  } catch {
+    /* read error — not accessible */
+  }
   return false;
 }
 
@@ -80,10 +99,18 @@ async function resolveTilde(root: string): Promise<string> {
   // Fast path: Node-like runtime with HOME env var (no process spawn needed)
   try {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (typeof process !== 'undefined' && (process as { env?: Record<string, string> }).env?.HOME) {
-      return root.replace(/^~/, (process as { env: Record<string, string> }).env.HOME);
+    if (
+      typeof process !== 'undefined' &&
+      (process as { env?: Record<string, string> }).env?.HOME
+    ) {
+      return root.replace(
+        /^~/,
+        (process as { env: Record<string, string> }).env.HOME,
+      );
     }
-  } catch { /* not a Node runtime */ }
+  } catch {
+    /* not a Node runtime */
+  }
 
   // Slow path: ask the host shell (needed in webview sandboxes)
   return new Promise<string>((resolve) => {
@@ -91,10 +118,14 @@ async function resolveTilde(root: string): Promise<string> {
     try {
       const p = native.process.spawn('bash', ['-lc', 'echo "$HOME"']);
       p.onStdout((c) => (out += c));
-      p.onError(() => { resolve(root); });
+      p.onError(() => {
+        resolve(root);
+      });
       p.onExit((code) => {
         const home = out.trim();
-        resolve(code === 0 && home.length > 0 ? root.replace(/^~/, home) : root);
+        resolve(
+          code === 0 && home.length > 0 ? root.replace(/^~/, home) : root,
+        );
       });
     } catch {
       resolve(root);
@@ -106,7 +137,10 @@ async function resolveTilde(root: string): Promise<string> {
 export async function findGitRepos(root: string): Promise<GitRepo[]> {
   if (!root) return [];
   const expanded = await resolveTilde(root);
-  console.log('[findGitRepos] scanning', JSON.stringify({ original: root, expanded }));
+  console.log(
+    '[findGitRepos] scanning',
+    JSON.stringify({ original: root, expanded }),
+  );
   const repos: GitRepo[] = [];
   try {
     await walk(expanded, 0, repos);
@@ -116,7 +150,14 @@ export async function findGitRepos(root: string): Promise<GitRepo[]> {
   repos.sort((a, b) => a.path.length - b.path.length);
   // Annotate with ugly-app flags
   await annotateUglyApp(repos);
-  console.log('[findGitRepos] found', repos.length, 'repos', JSON.stringify(repos.map((r) => ({ path: r.path, isUglyApp: r.isUglyApp }))));
+  console.log(
+    '[findGitRepos] found',
+    repos.length,
+    'repos',
+    JSON.stringify(
+      repos.map((r) => ({ path: r.path, isUglyApp: r.isUglyApp })),
+    ),
+  );
   return repos;
 }
 
@@ -159,6 +200,13 @@ let scanPromise: Promise<GitRepo[]> | null = null;
 
 export async function findAndCacheGitRepos(root: string): Promise<GitRepo[]> {
   // Deduplicate concurrent calls — only one scan runs at a time.
-  scanPromise ??= findGitRepos(root).then((r) => { cachedRepos = r; return r; }).finally(() => { scanPromise = null; });
+  scanPromise ??= findGitRepos(root)
+    .then((r) => {
+      cachedRepos = r;
+      return r;
+    })
+    .finally(() => {
+      scanPromise = null;
+    });
   return scanPromise;
 }

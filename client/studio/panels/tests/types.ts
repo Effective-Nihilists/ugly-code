@@ -2,15 +2,14 @@
 
 export type TestRunner = 'vitest' | 'pytest' | 'playwright';
 
-export const TEST_RUNNERS: readonly TestRunner[] = ['vitest', 'pytest', 'playwright'];
+export const TEST_RUNNERS: readonly TestRunner[] = [
+  'vitest',
+  'pytest',
+  'playwright',
+];
 
 export type TestStatus =
-  | 'idle'
-  | 'queued'
-  | 'running'
-  | 'passed'
-  | 'failed'
-  | 'skipped';
+  'idle' | 'queued' | 'running' | 'passed' | 'failed' | 'skipped';
 
 /** Whether a runner can be driven in the selected repo at all. */
 export type RunnerAvailability =
@@ -32,7 +31,13 @@ export type TestSelector =
   /** pytest nodeids are exact and unique. */
   | { runner: 'pytest'; nodeId: string }
   /** playwright: `file:line` pins the spec; `-g` disambiguates; project collapses the N× fan-out. */
-  | { runner: 'playwright'; file: string; line: number; title: string; project?: string };
+  | {
+      runner: 'playwright';
+      file: string;
+      line: number;
+      title: string;
+      project?: string;
+    };
 
 export interface TestCase {
   /** `<runner>::<relFile>::<ident>` — React key AND stream-match key. */

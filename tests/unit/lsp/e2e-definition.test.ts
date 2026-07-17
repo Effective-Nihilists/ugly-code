@@ -17,7 +17,10 @@ import { createNodeUglyNative } from 'ugly-app/native';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { LspClient, fileUriToPath } from '../../../client/studio/agent/lsp/client';
+import {
+  LspClient,
+  fileUriToPath,
+} from '../../../client/studio/agent/lsp/client';
 
 const BIN = path.resolve(
   process.cwd(),
@@ -40,7 +43,8 @@ suite('LSP e2e (real typescript-language-server)', () => {
 
   beforeAll(() => {
     savedNative = (globalThis as { UglyNative?: unknown }).UglyNative;
-    (globalThis as { UglyNative?: unknown }).UglyNative = createNodeUglyNative();
+    (globalThis as { UglyNative?: unknown }).UglyNative =
+      createNodeUglyNative();
 
     fs.rmSync(fixtureDir, { recursive: true, force: true });
     fs.mkdirSync(fixtureDir, { recursive: true });
@@ -73,28 +77,24 @@ suite('LSP e2e (real typescript-language-server)', () => {
     fs.rmSync(fixtureDir, { recursive: true, force: true });
   });
 
-  it(
-    'resolves a cross-file definition (b.ts `foo()` → a.ts export)',
-    async () => {
-      client = new LspClient({
-        workspaceRoot: fixtureDir,
-        language: 'typescript',
-        binaryPath: BIN,
-      });
-      await client.start();
-      expect(client.getState()).toBe('ready');
+  it('resolves a cross-file definition (b.ts `foo()` → a.ts export)', async () => {
+    client = new LspClient({
+      workspaceRoot: fixtureDir,
+      language: 'typescript',
+      binaryPath: BIN,
+    });
+    await client.start();
+    expect(client.getState()).toBe('ready');
 
-      // The whole project graph must be loaded for cross-file resolution.
-      await client.ensureProjectLoaded();
-      await client.openFile(bPath);
+    // The whole project graph must be loaded for cross-file resolution.
+    await client.ensureProjectLoaded();
+    await client.openFile(bPath);
 
-      // `  return foo();` — 0-indexed line 3, `foo` identifier at character 9.
-      const defs = await client.findDefinition(bPath, 3, 9);
-      const paths = defs.map((d) => fileUriToPath(d.uri));
+    // `  return foo();` — 0-indexed line 3, `foo` identifier at character 9.
+    const defs = await client.findDefinition(bPath, 3, 9);
+    const paths = defs.map((d) => fileUriToPath(d.uri));
 
-      expect(defs.length).toBeGreaterThan(0);
-      expect(paths.some((p) => p.endsWith('a.ts'))).toBe(true);
-    },
-    60_000,
-  );
+    expect(defs.length).toBeGreaterThan(0);
+    expect(paths.some((p) => p.endsWith('a.ts'))).toBe(true);
+  }, 60_000);
 });

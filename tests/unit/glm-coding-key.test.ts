@@ -12,7 +12,10 @@ import {
 
 const withKey = {
   ...DEFAULT_USER_SETTINGS,
-  codingAgent: { ...DEFAULT_USER_SETTINGS.codingAgent, glmCodingKey: 'zai-secret' },
+  codingAgent: {
+    ...DEFAULT_USER_SETTINGS.codingAgent,
+    glmCodingKey: 'zai-secret',
+  },
 };
 
 describe('glmCodingKey merge semantics', () => {
@@ -29,24 +32,32 @@ describe('glmCodingKey merge semantics', () => {
 
   it('KEEPS the key when an unrelated toggle is patched', () => {
     // The trap: a patch that omits glmCodingKey must not drop it.
-    const next = mergeUserSettings(withKey, { codingAgent: { autoLint: true } });
+    const next = mergeUserSettings(withKey, {
+      codingAgent: { autoLint: true },
+    });
     expect(next.codingAgent.glmCodingKey).toBe('zai-secret');
     expect(next.codingAgent.autoLint).toBe(true);
   });
 
   it('clears the key on an explicit null (the Remove button)', () => {
-    const next = mergeUserSettings(withKey, { codingAgent: { glmCodingKey: null } });
+    const next = mergeUserSettings(withKey, {
+      codingAgent: { glmCodingKey: null },
+    });
     expect(next.codingAgent.glmCodingKey).toBeUndefined();
   });
 
   it('accepts null in the patch schema', () => {
-    const r = userSettingsPatchSchema.safeParse({ codingAgent: { glmCodingKey: null } });
+    const r = userSettingsPatchSchema.safeParse({
+      codingAgent: { glmCodingKey: null },
+    });
     expect(r.success).toBe(true);
   });
 
   it('round-trips through the stored JSON blob', () => {
     const stored = JSON.stringify(withKey);
-    expect(parseStoredUserSettings(stored).codingAgent.glmCodingKey).toBe('zai-secret');
+    expect(parseStoredUserSettings(stored).codingAgent.glmCodingKey).toBe(
+      'zai-secret',
+    );
   });
 
   it('survives a stored doc that predates the field', () => {
@@ -54,7 +65,9 @@ describe('glmCodingKey merge semantics', () => {
       ...DEFAULT_USER_SETTINGS,
       codingAgent: { ...DEFAULT_USER_SETTINGS.codingAgent },
     });
-    expect(parseStoredUserSettings(legacy).codingAgent.glmCodingKey).toBeUndefined();
+    expect(
+      parseStoredUserSettings(legacy).codingAgent.glmCodingKey,
+    ).toBeUndefined();
   });
 });
 
@@ -65,8 +78,12 @@ describe('glmCodingKey merge semantics', () => {
 describe('parseStoredUserSettings salvages the key past a bad neighbor field', () => {
   it('keeps the key when the codingAgent block is missing required toggles', () => {
     // An old/partial blob: key present, but the required feature toggles absent.
-    const partial = JSON.stringify({ codingAgent: { glmCodingKey: 'zai-secret' } });
-    expect(parseStoredUserSettings(partial).codingAgent.glmCodingKey).toBe('zai-secret');
+    const partial = JSON.stringify({
+      codingAgent: { glmCodingKey: 'zai-secret' },
+    });
+    expect(parseStoredUserSettings(partial).codingAgent.glmCodingKey).toBe(
+      'zai-secret',
+    );
   });
 
   it('keeps the key when a NEIGHBOR field has a bad type (stale enum)', () => {
@@ -80,11 +97,17 @@ describe('parseStoredUserSettings salvages the key past a bad neighbor field', (
         sessionDefaults: { pattern: 'not-a-real-pattern' },
       },
     });
-    expect(parseStoredUserSettings(poisoned).codingAgent.glmCodingKey).toBe('zai-secret');
+    expect(parseStoredUserSettings(poisoned).codingAgent.glmCodingKey).toBe(
+      'zai-secret',
+    );
   });
 
   it('still returns defaults (no key) for a truly empty blob', () => {
-    expect(parseStoredUserSettings('{}').codingAgent.glmCodingKey).toBeUndefined();
-    expect(parseStoredUserSettings('not json').codingAgent.glmCodingKey).toBeUndefined();
+    expect(
+      parseStoredUserSettings('{}').codingAgent.glmCodingKey,
+    ).toBeUndefined();
+    expect(
+      parseStoredUserSettings('not json').codingAgent.glmCodingKey,
+    ).toBeUndefined();
   });
 });

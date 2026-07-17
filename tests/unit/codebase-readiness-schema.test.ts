@@ -36,7 +36,12 @@ describe('CodebaseReadinessSchema', () => {
     // The whole point of making them .optional(): a Studio build predating the
     // status work must still drive the pill rather than failing the parse.
     const r = CodebaseReadinessSchema.safeParse({
-      indexer: { status: 'ready', indexedChunks: 40, totalChunks: 40, totalFiles: 40 },
+      indexer: {
+        status: 'ready',
+        indexedChunks: 40,
+        totalChunks: 40,
+        totalFiles: 40,
+      },
       architecture: { status: 'ready' },
     });
     expect(r.success).toBe(true);
@@ -51,7 +56,10 @@ describe('CodebaseReadinessSchema', () => {
     const r = CodebaseReadinessSchema.safeParse({
       indexer: { status: 'indexing' },
       architecture: { status: 'idle' },
-      diagnostics: { lastError: 'uv pip install failed', logTail: 'Traceback...\nOSError' },
+      diagnostics: {
+        lastError: 'uv pip install failed',
+        logTail: 'Traceback...\nOSError',
+      },
     });
     expect(r.success).toBe(true);
     if (!r.success) return;
@@ -60,7 +68,10 @@ describe('CodebaseReadinessSchema', () => {
   });
 
   it('rejects an unknown indexer phase rather than silently coercing it', () => {
-    const bad = { ...indexing, indexer: { ...indexing.indexer, phase: 'reticulating' } };
+    const bad = {
+      ...indexing,
+      indexer: { ...indexing.indexer, phase: 'reticulating' },
+    };
     expect(CodebaseReadinessSchema.safeParse(bad).success).toBe(false);
   });
 
@@ -101,7 +112,12 @@ describe('daemon-down payload (the real bug)', () => {
 
   it('is distinguishable from a healthy daemon that is genuinely indexing', () => {
     const healthy = CodebaseReadinessSchema.parse({
-      indexer: { status: 'indexing', phase: 'embedding', indexedChunks: 10, totalChunks: 100 },
+      indexer: {
+        status: 'indexing',
+        phase: 'embedding',
+        indexedChunks: 10,
+        totalChunks: 100,
+      },
       architecture: { status: 'building' },
     });
     const down = CodebaseReadinessSchema.parse(daemonDown);

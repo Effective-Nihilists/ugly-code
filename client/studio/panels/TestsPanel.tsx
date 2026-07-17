@@ -15,7 +15,11 @@ import React from 'react';
 import { native } from 'ugly-app/native';
 import { ansiToNodes } from './ansi';
 import { GitRepoSelector, useActiveRepoPath } from './GitRepoSelector';
-import { collectTests, groupByFile, type CollectResult } from './tests/discovery';
+import {
+  collectTests,
+  groupByFile,
+  type CollectResult,
+} from './tests/discovery';
 import {
   matchPlaywrightEvent,
   parsePlaywrightListLine,
@@ -139,7 +143,10 @@ async function refresh(repo: string): Promise<void> {
 
 const REPORT_DIR = '.ugly-studio/tests';
 
-async function reportPathFor(repo: string, runner: TestRunner): Promise<string> {
+async function reportPathFor(
+  repo: string,
+  runner: TestRunner,
+): Promise<string> {
   const dir = `${repo}/${REPORT_DIR}`;
   try {
     await native.fs.mkdir(dir, true);
@@ -150,7 +157,11 @@ async function reportPathFor(repo: string, runner: TestRunner): Promise<string> 
 }
 
 /** Apply a streamed line to the live status map. */
-function applyStreamLine(s: RunState, runner: TestRunner, line: string): boolean {
+function applyStreamLine(
+  s: RunState,
+  runner: TestRunner,
+  line: string,
+): boolean {
   if (runner === 'vitest') {
     const ev = parseVitestTapLine(line);
     if (!ev) return false;
@@ -327,27 +338,52 @@ async function runAll(repo: string, runner: TestRunner): Promise<void> {
   const report = { path: await reportPathFor(repo, runner) };
   const argv =
     runner === 'vitest'
-      ? { cmd: 'npx', args: ['--no-install', 'vitest', 'run', '--reporter=tap-flat', '--reporter=json', `--outputFile.json=${report.path}`] }
+      ? {
+          cmd: 'npx',
+          args: [
+            '--no-install',
+            'vitest',
+            'run',
+            '--reporter=tap-flat',
+            '--reporter=json',
+            `--outputFile.json=${report.path}`,
+          ],
+        }
       : runner === 'pytest'
         ? pytestRunArgv(report, s.useUv)
         : {
             cmd: 'npx',
-            args: ['--no-install', 'playwright', 'test', '--project', PLAYWRIGHT_DEFAULT_PROJECT, '--reporter=list,json'],
+            args: [
+              '--no-install',
+              'playwright',
+              'test',
+              '--project',
+              PLAYWRIGHT_DEFAULT_PROJECT,
+              '--reporter=list,json',
+            ],
             env: { PLAYWRIGHT_JSON_OUTPUT_NAME: report.path },
           };
   await startRun(repo, { runner, argv, scope });
 }
 
-async function runFile(repo: string, runner: TestRunner, file: string): Promise<void> {
+async function runFile(
+  repo: string,
+  runner: TestRunner,
+  file: string,
+): Promise<void> {
   const s = getRun(repo);
-  const scope = s.tree.byRunner[runner].filter((c) => c.file === file).map((c) => c.id);
+  const scope = s.tree.byRunner[runner]
+    .filter((c) => c.file === file)
+    .map((c) => c.id);
   const report = { path: await reportPathFor(repo, runner) };
   const argv =
     runner === 'vitest'
       ? vitestRunFileArgv(report, file)
       : runner === 'pytest'
         ? pytestRunArgv(report, s.useUv, file)
-        : playwrightRunFileArgv(report, file, { singleProject: PLAYWRIGHT_DEFAULT_PROJECT });
+        : playwrightRunFileArgv(report, file, {
+            singleProject: PLAYWRIGHT_DEFAULT_PROJECT,
+          });
   await startRun(repo, { runner, argv, scope });
 }
 
@@ -356,7 +392,10 @@ async function runOne(repo: string, tc: TestCase): Promise<void> {
   const report = { path: await reportPathFor(repo, tc.runner) };
   const selector =
     tc.selector.runner === 'playwright'
-      ? { ...tc.selector, project: tc.selector.project ?? PLAYWRIGHT_DEFAULT_PROJECT }
+      ? {
+          ...tc.selector,
+          project: tc.selector.project ?? PLAYWRIGHT_DEFAULT_PROJECT,
+        }
       : tc.selector;
   const argv = runOneArgv(selector, report, { useUv: s.useUv });
   await startRun(repo, { runner: tc.runner, argv, scope: [tc.id] });
@@ -391,7 +430,9 @@ interface Counts {
 
 function Counters({ counts }: { counts: Counts }) {
   return (
-    <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+    <span
+      style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}
+    >
       <span style={{ color: '#4caf50' }}>{counts.passed} passed</span>
       {' · '}
       <span style={{ color: counts.failed ? '#e53935' : 'var(--text-muted)' }}>
@@ -462,7 +503,9 @@ export function TestsPanel(): React.ReactElement {
   const pct = counts.total ? (done / counts.total) * 100 : 0;
 
   const failures = cases.filter((c) => s.status.get(c.id) === 'failed');
-  const activeRunners = TEST_RUNNERS.filter((r) => s.availability[r] !== 'absent');
+  const activeRunners = TEST_RUNNERS.filter(
+    (r) => s.availability[r] !== 'absent',
+  );
 
   if (!repo) {
     return (
@@ -473,11 +516,23 @@ export function TestsPanel(): React.ReactElement {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        minWidth: 0,
+      }}
+    >
       {/* toolbar */}
       <div
         className="panel-toolbar"
-        style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
       >
         <GitRepoSelector />
         <button
@@ -486,13 +541,23 @@ export function TestsPanel(): React.ReactElement {
           style={btn(s.running || s.collectState === 'collecting')}
           disabled={s.running || s.collectState === 'collecting'}
           onClick={() => {
-            const first = activeRunners.find((r) => s.tree.byRunner[r].length > 0);
+            const first = activeRunners.find(
+              (r) => s.tree.byRunner[r].length > 0,
+            );
             if (first) void runAll(repo, first);
           }}
         >
           Run all
         </button>
-        <button data-id="tests-stop" type="button" style={btn(!s.running)} disabled={!s.running} onClick={() => { stopRun(repo); }}>
+        <button
+          data-id="tests-stop"
+          type="button"
+          style={btn(!s.running)}
+          disabled={!s.running}
+          onClick={() => {
+            stopRun(repo);
+          }}
+        >
           Stop
         </button>
         <button
@@ -500,25 +565,46 @@ export function TestsPanel(): React.ReactElement {
           type="button"
           style={btn(s.collectState === 'collecting')}
           disabled={s.collectState === 'collecting'}
-          onClick={() => { void refresh(repo); }}
+          onClick={() => {
+            void refresh(repo);
+          }}
         >
           {s.collectState === 'collecting' ? 'Collecting…' : 'Refresh'}
         </button>
-        <div style={{ flex: 1, minWidth: 80, height: 5, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent, #f0a000)', transition: 'width 200ms linear' }} />
+        <div
+          style={{
+            flex: 1,
+            minWidth: 80,
+            height: 5,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <div
+            style={{
+              width: `${pct}%`,
+              height: '100%',
+              background: 'var(--accent, #f0a000)',
+              transition: 'width 200ms linear',
+            }}
+          />
         </div>
         <Counters counts={counts} />
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '10px 12px', minWidth: 0 }}>
+      <div
+        style={{ flex: 1, overflow: 'auto', padding: '10px 12px', minWidth: 0 }}
+      >
         {s.collectState === 'error' && (
-          <p style={{ color: '#e53935', fontSize: 12 }}>Collection failed: {s.collectError}</p>
+          <p style={{ color: '#e53935', fontSize: 12 }}>
+            Collection failed: {s.collectError}
+          </p>
         )}
 
         {s.collectState === 'ready' && activeRunners.length === 0 && (
           <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-            No test runners detected in this repo. The panel looks for vitest, pytest, and
-            playwright.
+            No test runners detected in this repo. The panel looks for vitest,
+            pytest, and playwright.
           </p>
         )}
 
@@ -527,7 +613,14 @@ export function TestsPanel(): React.ReactElement {
           const runnerCases = s.tree.byRunner[runner];
           return (
             <div key={runner} style={{ marginBottom: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginBottom: 6,
+                }}
+              >
                 <span
                   style={{
                     fontFamily: 'var(--font-label)',
@@ -549,46 +642,122 @@ export function TestsPanel(): React.ReactElement {
                   </span>
                 )}
                 {runnerCases.length > 0 && (
-                  <button data-id={`tests-run-runner-${runner}`} type="button" style={btn(s.running)} disabled={s.running} onClick={() => { void runAll(repo, runner); }}>
+                  <button
+                    data-id={`tests-run-runner-${runner}`}
+                    type="button"
+                    style={btn(s.running)}
+                    disabled={s.running}
+                    onClick={() => {
+                      void runAll(repo, runner);
+                    }}
+                  >
                     Run
                   </button>
                 )}
               </div>
 
               {avail === 'not-installed' && (
-                <p style={{ fontSize: 12, color: '#f0a000', margin: '0 0 6px' }}>
-                  {s.notes[runner] ?? `${runner} is declared but not installed.`}
+                <p
+                  style={{ fontSize: 12, color: '#f0a000', margin: '0 0 6px' }}
+                >
+                  {s.notes[runner] ??
+                    `${runner} is declared but not installed.`}
                 </p>
               )}
               {avail === 'present' && s.notes[runner] && (
-                <p style={{ fontSize: 12, color: '#e53935', margin: '0 0 6px' }}>{s.notes[runner]}</p>
+                <p
+                  style={{ fontSize: 12, color: '#e53935', margin: '0 0 6px' }}
+                >
+                  {s.notes[runner]}
+                </p>
               )}
-              {avail === 'present' && runnerCases.length === 0 && !s.notes[runner] && (
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>No tests found.</p>
-              )}
+              {avail === 'present' &&
+                runnerCases.length === 0 &&
+                !s.notes[runner] && (
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                      margin: 0,
+                    }}
+                  >
+                    No tests found.
+                  </p>
+                )}
 
               {groupByFile(runnerCases).map(({ file, cases: fileCases }) => (
                 <div key={file} style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: 'var(--text-primary)',
+                        fontFamily: 'var(--font-mono, monospace)',
+                      }}
+                    >
                       {file}
                     </span>
-                    <button data-id="tests-run-file" type="button" style={btn(s.running)} disabled={s.running} onClick={() => { void runFile(repo, runner, file); }}>
+                    <button
+                      data-id="tests-run-file"
+                      type="button"
+                      style={btn(s.running)}
+                      disabled={s.running}
+                      onClick={() => {
+                        void runFile(repo, runner, file);
+                      }}
+                    >
                       Run file
                     </button>
                   </div>
-                  <ul style={{ listStyle: 'none', margin: '3px 0 0', padding: '0 0 0 14px' }}>
+                  <ul
+                    style={{
+                      listStyle: 'none',
+                      margin: '3px 0 0',
+                      padding: '0 0 0 14px',
+                    }}
+                  >
                     {fileCases.map((tc) => {
                       const st = s.status.get(tc.id) ?? 'idle';
                       return (
-                        <li key={tc.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
-                          <span aria-hidden style={{ color: STATUS_COLOR[st], width: 12 }}>
+                        <li
+                          key={tc.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '2px 0',
+                          }}
+                        >
+                          <span
+                            aria-hidden
+                            style={{ color: STATUS_COLOR[st], width: 12 }}
+                          >
                             {STATUS_ICON[st]}
                           </span>
-                          <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: 'var(--text-secondary)',
+                              flex: 1,
+                              minWidth: 0,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {tc.name}
                           </span>
-                          <button data-id="tests-run-one" type="button" style={btn(s.running)} disabled={s.running} onClick={() => { void runOne(repo, tc); }}>
+                          <button
+                            data-id="tests-run-one"
+                            type="button"
+                            style={btn(s.running)}
+                            disabled={s.running}
+                            onClick={() => {
+                              void runOne(repo, tc);
+                            }}
+                          >
                             Run
                           </button>
                         </li>
@@ -620,11 +789,26 @@ export function TestsPanel(): React.ReactElement {
               const d = s.detail.get(tc.id);
               return (
                 <details key={tc.id} style={{ marginBottom: 6 }}>
-                  <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-primary)' }}>
-                    <span style={{ fontFamily: 'var(--font-mono, monospace)', color: 'var(--text-muted)' }}>{tc.file}</span>{' '}
+                  <summary
+                    style={{
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono, monospace)',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      {tc.file}
+                    </span>{' '}
                     {tc.name}
                   </summary>
-                  <p style={{ fontSize: 12, color: '#e53935', margin: '4px 0' }}>
+                  <p
+                    style={{ fontSize: 12, color: '#e53935', margin: '4px 0' }}
+                  >
                     {d?.message ?? 'No failure detail was captured.'}
                   </p>
                   {d?.stack && (
@@ -653,7 +837,15 @@ export function TestsPanel(): React.ReactElement {
 
         {s.log && (
           <details style={{ marginTop: 14 }} open={s.running}>
-            <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)' }}>Raw output</summary>
+            <summary
+              style={{
+                cursor: 'pointer',
+                fontSize: 11,
+                color: 'var(--text-muted)',
+              }}
+            >
+              Raw output
+            </summary>
             <pre
               style={{
                 fontSize: 11,

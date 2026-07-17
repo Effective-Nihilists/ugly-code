@@ -67,11 +67,23 @@ export function ConfirmDialog({
     >
       <Modal.Header hideClose>{title}</Modal.Header>
       <Modal.Body style={{ padding: '18px 20px' }}>
-        <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--text-primary)' }}>{message}</div>
+        <div
+          style={{
+            fontSize: 14,
+            lineHeight: 1.5,
+            color: 'var(--text-primary)',
+          }}
+        >
+          {message}
+        </div>
         {error && (
           <div
             data-id="confirm-dialog-error"
-            style={{ marginTop: 12, fontSize: 12.5, color: 'var(--danger, #e5484d)' }}
+            style={{
+              marginTop: 12,
+              fontSize: 12.5,
+              color: 'var(--danger, #e5484d)',
+            }}
           >
             {error}
           </div>
@@ -111,7 +123,9 @@ export function ConfirmDialog({
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
             color: '#fff',
-            background: danger ? 'var(--danger, #e5484d)' : 'var(--accent, #FF5500)',
+            background: danger
+              ? 'var(--danger, #e5484d)'
+              : 'var(--accent, #FF5500)',
             border: 'none',
             padding: '8px 16px',
             cursor: busy ? 'default' : 'pointer',

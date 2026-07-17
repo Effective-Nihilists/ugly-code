@@ -37,7 +37,9 @@ export function ProdPanel(): React.ReactElement {
     const cwd = activeRepo;
     if (!cwd) return;
     try {
-      const ua = JSON.parse(await native.fs.readFile(`${cwd}/.uglyapp`)) as { deployTarget?: DeployTarget };
+      const ua = JSON.parse(await native.fs.readFile(`${cwd}/.uglyapp`)) as {
+        deployTarget?: DeployTarget;
+      };
       setTarget(ua.deployTarget ?? null);
     } catch {
       // Benign + expected: an unpublished project has no `.uglyapp` yet (ENOENT),
@@ -62,7 +64,12 @@ export function ProdPanel(): React.ReactElement {
     setError(null);
     setRunning(true);
     type GrantReq = Parameters<typeof permissions.request>[0];
-    await permissions.request({ fs: 'full', process: [...PUBLISH_TOOLS] } as unknown as GrantReq).catch(() => undefined);
+    await permissions
+      .request({
+        fs: 'full',
+        process: [...PUBLISH_TOOLS],
+      } as unknown as GrantReq)
+      .catch(() => undefined);
     let buf = '';
     const append = (chunk: string): void => {
       buf += chunk;
@@ -91,7 +98,10 @@ export function ProdPanel(): React.ReactElement {
         // Ship spawn failures to errorLog with the output tail — otherwise a failed
         // deploy is only visible in this panel, never in the logs (undebuggable from
         // another machine / after the fact).
-        console.error('[ProdPanel:deploy] spawn-error', JSON.stringify({ cwd, error: e, outputTail: buf.slice(-1500) }));
+        console.error(
+          '[ProdPanel:deploy] spawn-error',
+          JSON.stringify({ cwd, error: e, outputTail: buf.slice(-1500) }),
+        );
         append(`\n[error: ${e}]\n`);
         setError(e);
         setRunning(false);
@@ -103,12 +113,22 @@ export function ProdPanel(): React.ReactElement {
         else {
           // A non-zero publish exit is a real failure — capture it (with the log tail
           // carrying the orchestrator's actual error) to errorLog, not just the UI.
-          console.error('[ProdPanel:deploy] nonzero-exit', JSON.stringify({ cwd, code, outputTail: buf.slice(-2000) }));
+          console.error(
+            '[ProdPanel:deploy] nonzero-exit',
+            JSON.stringify({ cwd, code, outputTail: buf.slice(-2000) }),
+          );
           setError(`publish exited with code ${code ?? 'null'}`);
         }
       });
     } catch (e) {
-      console.error('[ProdPanel:deploy]', JSON.stringify({ cwd, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[ProdPanel:deploy]',
+        JSON.stringify({
+          cwd,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       setError((e as Error).message);
       setRunning(false);
     }
@@ -147,15 +167,31 @@ export function ProdPanel(): React.ReactElement {
         <div style={S.targetCol}>
           {liveUrl ? (
             <>
-              <a href={liveUrl} target="_blank" rel="noreferrer" data-id="prod-live-url" style={S.url} onClick={(e) => { e.preventDefault(); void native.system.openExternal({ url: liveUrl }); }}>
+              <a
+                href={liveUrl}
+                target="_blank"
+                rel="noreferrer"
+                data-id="prod-live-url"
+                style={S.url}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void native.system.openExternal({ url: liveUrl });
+                }}
+              >
                 {liveUrl}
               </a>
               {target?.lastDeployedAt && (
-                <span style={S.sub}>last deployed {new Date(target.lastDeployedAt).toLocaleString()}</span>
+                <span style={S.sub}>
+                  last deployed{' '}
+                  {new Date(target.lastDeployedAt).toLocaleString()}
+                </span>
               )}
             </>
           ) : (
-            <span style={S.sub}>Not deployed yet — deploy to provision your database + Cloudflare Workers and go live.</span>
+            <span style={S.sub}>
+              Not deployed yet — deploy to provision your database + Cloudflare
+              Workers and go live.
+            </span>
           )}
         </div>
         <span style={{ flex: 1 }} />
@@ -164,13 +200,25 @@ export function ProdPanel(): React.ReactElement {
             Cancel
           </button>
         ) : (
-          <button data-id="prod-deploy" onClick={() => void deploy()} style={S.deploy}>
+          <button
+            data-id="prod-deploy"
+            onClick={() => void deploy()}
+            style={S.deploy}
+          >
             {liveUrl ? 'Re-deploy' : 'Deploy'} →
           </button>
         )}
       </div>
       <div ref={scrollRef} data-id="prod-output" style={S.console}>
-        <ConsoleText text={output || (running ? 'Starting deploy…' : 'Press Deploy to run the ugly-app deploy pipeline (database + Cloudflare Workers + storage provisioning).')} TextComponent={LinkifiedText} />
+        <ConsoleText
+          text={
+            output ||
+            (running
+              ? 'Starting deploy…'
+              : 'Press Deploy to run the ugly-app deploy pipeline (database + Cloudflare Workers + storage provisioning).')
+          }
+          TextComponent={LinkifiedText}
+        />
       </div>
       {running && (
         <div style={S.inputRow}>
@@ -178,7 +226,9 @@ export function ProdPanel(): React.ReactElement {
           <input
             data-id="prod-stdin"
             value={stdin}
-            onChange={(e) => { setStdin(e.target.value); }}
+            onChange={(e) => {
+              setStdin(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') sendStdin();
             }}
@@ -196,16 +246,96 @@ export function ProdPanel(): React.ReactElement {
 }
 
 const S = {
-  root: { height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)', color: 'var(--text-primary)', minHeight: 0 },
-  header: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 },
+  root: {
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    background: 'var(--bg-primary)',
+    color: 'var(--text-primary)',
+    minHeight: 0,
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '12px 16px',
+    borderBottom: '1px solid var(--border)',
+    background: 'var(--bg-panel)',
+    flexShrink: 0,
+  },
   targetCol: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
-  url: { fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  sub: { fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' },
-  btn: { background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer' },
-  deploy: { background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  console: { flex: 1, overflow: 'auto', padding: 14, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap', background: 'var(--bg-panel)', minHeight: 0 },
-  inputRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 },
-  prompt: { fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 700 },
-  input: { flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' },
-  error: { padding: '8px 16px', borderTop: '1px solid var(--border)', color: 'var(--error)', fontSize: 12, fontFamily: 'var(--font-mono)' },
+  url: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 13,
+    color: 'var(--accent)',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  sub: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    color: 'var(--text-muted)',
+  },
+  btn: {
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    padding: '6px 14px',
+    fontSize: 12,
+    cursor: 'pointer',
+  },
+  deploy: {
+    background: 'var(--accent)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    padding: '6px 16px',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  console: {
+    flex: 1,
+    overflow: 'auto',
+    padding: 14,
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+    lineHeight: 1.5,
+    whiteSpace: 'pre-wrap',
+    background: 'var(--bg-panel)',
+    minHeight: 0,
+  },
+  inputRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '8px 16px',
+    borderTop: '1px solid var(--border)',
+    background: 'var(--bg-panel)',
+    flexShrink: 0,
+  },
+  prompt: {
+    fontFamily: 'var(--font-mono)',
+    color: 'var(--accent)',
+    fontWeight: 700,
+  },
+  input: {
+    flex: 1,
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+    color: 'var(--text-primary)',
+  },
+  error: {
+    padding: '8px 16px',
+    borderTop: '1px solid var(--border)',
+    color: 'var(--error)',
+    fontSize: 12,
+    fontFamily: 'var(--font-mono)',
+  },
 } satisfies Record<string, React.CSSProperties>;

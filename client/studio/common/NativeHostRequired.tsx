@@ -13,7 +13,11 @@ import { useAppOptional } from 'ugly-app/client';
  * We surface the SESSION's account so an account mismatch is obvious: if the
  * desktop app on the machine is signed in as someone else, that's the problem.
  */
-export function NativeHostRequired({ feature }: { feature: string }): React.ReactElement {
+export function NativeHostRequired({
+  feature,
+}: {
+  feature: string;
+}): React.ReactElement {
   const app = useAppOptional();
   const account =
     (app?.user as { email?: string } | undefined)?.email ?? app?.userId ?? null;
@@ -35,17 +39,22 @@ export function NativeHostRequired({ feature }: { feature: string }): React.Reac
       }}
     >
       <MonitorSmartphone size={30} style={{ opacity: 0.7 }} />
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+      <div
+        style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}
+      >
         {feature} needs a connected host
       </div>
       <div style={{ fontSize: 12.5, lineHeight: 1.5, maxWidth: 400 }}>
-        This runs on your machine, so it needs the <strong>Ugly Studio desktop app</strong> running
-        and signed into <strong>the same ugly.bot account</strong> as this session. A host signed
-        into a different account is invisible here — hosts are per-account.
+        This runs on your machine, so it needs the{' '}
+        <strong>Ugly Studio desktop app</strong> running and signed into{' '}
+        <strong>the same ugly.bot account</strong> as this session. A host
+        signed into a different account is invisible here — hosts are
+        per-account.
       </div>
       {account && (
         <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-          This session is signed in as <strong>{account}</strong> — the desktop host must match.
+          This session is signed in as <strong>{account}</strong> — the desktop
+          host must match.
         </div>
       )}
     </div>

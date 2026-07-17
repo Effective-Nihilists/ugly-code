@@ -13,8 +13,8 @@ import {
 
 const rgOutput = [
   'format.ts:3:export function formatSummary(tasks: Task[]): string {',
-  'report.ts:2:import { formatTask, formatSummary } from \'./format\';',
-  'report.ts:5:  return [...tasks.map(formatTask), \'\', formatSummary(tasks)].join(\'\\n\');',
+  "report.ts:2:import { formatTask, formatSummary } from './format';",
+  "report.ts:5:  return [...tasks.map(formatTask), '', formatSummary(tasks)].join('\\n');",
 ].join('\n');
 
 describe('parseGrepOutput — ripgrep format (the "0 matches" lie)', () => {
@@ -31,19 +31,31 @@ describe('parseGrepOutput — ripgrep format (the "0 matches" lie)', () => {
   });
 
   it('parses absolute paths (grep scoped to a worktree emits them)', () => {
-    const parsed = parseGrepOutput('/tmp/p/.ugly-studio/worktrees/cs_a/format.ts:3:export function f() {}');
-    expect(parsed?.hits[0]?.file).toBe('/tmp/p/.ugly-studio/worktrees/cs_a/format.ts');
+    const parsed = parseGrepOutput(
+      '/tmp/p/.ugly-studio/worktrees/cs_a/format.ts:3:export function f() {}',
+    );
+    expect(parsed?.hits[0]?.file).toBe(
+      '/tmp/p/.ugly-studio/worktrees/cs_a/format.ts',
+    );
     expect(parsed?.hits[0]?.line).toBe(3);
   });
 
   it('does not mistake a Windows drive letter for the line number', () => {
     const parsed = parseGrepOutput('C:\\src\\a.ts:12:const x = 1;');
-    expect(parsed?.hits[0]).toEqual({ file: 'C:\\src\\a.ts', line: 12, text: 'const x = 1;' });
+    expect(parsed?.hits[0]).toEqual({
+      file: 'C:\\src\\a.ts',
+      line: 12,
+      text: 'const x = 1;',
+    });
   });
 
   it('still parses the legacy header/"Line N:" transcripts', () => {
     const parsed = parseGrepOutput('src/a.ts:\n  Line 4: const x = 1;');
-    expect(parsed?.hits[0]).toEqual({ file: 'src/a.ts', line: 4, text: 'const x = 1;' });
+    expect(parsed?.hits[0]).toEqual({
+      file: 'src/a.ts',
+      line: 4,
+      text: 'const x = 1;',
+    });
   });
 
   it('returns null for the no-match sentinel (not a bogus hit)', () => {
@@ -66,13 +78,15 @@ describe('parseGlobFiles — the "1 file" lie', () => {
 });
 
 describe('isNoResultSentinel', () => {
-  it('recognizes both tools\' sentinels and blank', () => {
+  it("recognizes both tools' sentinels and blank", () => {
     expect(isNoResultSentinel('(no matches for "x")')).toBe(true);
     expect(isNoResultSentinel('(no files match "y")')).toBe(true);
     expect(isNoResultSentinel('   ')).toBe(true);
   });
   it('does not swallow real output that merely mentions no matches', () => {
-    expect(isNoResultSentinel('src/a.ts:1:// no matches for the regex here')).toBe(false);
+    expect(
+      isNoResultSentinel('src/a.ts:1:// no matches for the regex here'),
+    ).toBe(false);
   });
 });
 
@@ -81,7 +95,13 @@ describe('searchBadge — a failure is never a count', () => {
 
   it('errored call badges "failed", never a count (the green-check lie)', () => {
     // rg timed out; the body says so, but the badge used to read "0 matches ✓".
-    const badge = searchBadge('error', 'Error: grep failed — the search did not run', null, false, parse);
+    const badge = searchBadge(
+      'error',
+      'Error: grep failed — the search did not run',
+      null,
+      false,
+      parse,
+    );
     expect(badge.kind).toBe('failed');
     expect(badgeLabel(badge, 'match')).toBe('failed');
   });
@@ -91,7 +111,13 @@ describe('searchBadge — a failure is never a count', () => {
   });
 
   it('genuine empty result badges 0, not 1', () => {
-    const badge = searchBadge('done', '(no files match "**/*.test.*")', null, false, parse);
+    const badge = searchBadge(
+      'done',
+      '(no files match "**/*.test.*")',
+      null,
+      false,
+      parse,
+    );
     expect(badgeLabel(badge, 'file')).toBe('0 files');
   });
 
@@ -101,30 +127,45 @@ describe('searchBadge — a failure is never a count', () => {
   });
 
   it('truncation is marked', () => {
-    expect(badgeLabel(searchBadge('done', 'a\nb', null, true, parse), 'file')).toBe('2+ files');
+    expect(
+      badgeLabel(searchBadge('done', 'a\nb', null, true, parse), 'file'),
+    ).toBe('2+ files');
   });
 
   it('singular/plural', () => {
-    expect(badgeLabel(searchBadge('done', 'a', null, false, parse), 'file')).toBe('1 file');
-    expect(badgeLabel(searchBadge('done', 'a', null, false, parse), 'match')).toBe('1 match');
+    expect(
+      badgeLabel(searchBadge('done', 'a', null, false, parse), 'file'),
+    ).toBe('1 file');
+    expect(
+      badgeLabel(searchBadge('done', 'a', null, false, parse), 'match'),
+    ).toBe('1 match');
   });
 });
 
 describe('grepResultCount — modes the parser used to badge as 0', () => {
   it('files_with_matches: bare paths are FILES, not zero', () => {
     // The exact case: the search that found every file the agent edited badged "0 matches".
-    expect(grepResultCount('./report.ts\n./format.ts\n./store.ts', 'files_with_matches')).toBe(3);
+    expect(
+      grepResultCount(
+        './report.ts\n./format.ts\n./store.ts',
+        'files_with_matches',
+      ),
+    ).toBe(3);
     expect(grepBadgeNoun('files_with_matches')).toBe('file');
   });
   it('count mode sums per-file counts', () => {
     expect(grepResultCount('format.ts:2\nreport.ts:3', 'count')).toBe(5);
   });
   it('content mode still counts hits', () => {
-    expect(grepResultCount('format.ts:3:export function f() {}', 'content')).toBe(1);
+    expect(
+      grepResultCount('format.ts:3:export function f() {}', 'content'),
+    ).toBe(1);
     expect(grepBadgeNoun('content')).toBe('match');
   });
   it('sentinels are zero in every mode', () => {
-    expect(grepResultCount('(no matches for "x")', 'files_with_matches')).toBe(0);
+    expect(grepResultCount('(no matches for "x")', 'files_with_matches')).toBe(
+      0,
+    );
     expect(grepResultCount('(no matches for "x")', 'count')).toBe(0);
     expect(grepResultCount('(no matches for "x")', undefined)).toBe(0);
   });
@@ -136,13 +177,22 @@ describe('grepResultCount — modes the parser used to badge as 0', () => {
 describe('parseEditStat — the tool reports, the card stops guessing', () => {
   it('reads the real counts the edit tool appended', () => {
     // git said +1 −1; the card guessed "+1 −0" because anchor edits carry no old line.
-    expect(parseEditStat('Edited format.ts (+1 −1)')).toEqual({ added: 1, removed: 1 });
+    expect(parseEditStat('Edited format.ts (+1 −1)')).toEqual({
+      added: 1,
+      removed: 1,
+    });
   });
   it('reads multiedit results', () => {
-    expect(parseEditStat('Applied 3 edit(s) to store.ts (+4 −2)')).toEqual({ added: 4, removed: 2 });
+    expect(parseEditStat('Applied 3 edit(s) to store.ts (+4 −2)')).toEqual({
+      added: 4,
+      removed: 2,
+    });
   });
   it('accepts an ASCII hyphen as well as the minus sign', () => {
-    expect(parseEditStat('Edited a.ts (+2 -3)')).toEqual({ added: 2, removed: 3 });
+    expect(parseEditStat('Edited a.ts (+2 -3)')).toEqual({
+      added: 2,
+      removed: 3,
+    });
   });
   it('null when absent (old transcripts) so the card falls back', () => {
     expect(parseEditStat('Edited format.ts')).toBeNull();

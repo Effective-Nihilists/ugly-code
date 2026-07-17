@@ -14,7 +14,10 @@ import { installUglyNative } from 'ugly-app/native';
 
 function invoke(channel: string, payload?: unknown): Promise<unknown> {
   const native = installUglyNative();
-  return (native.invoke as (c: string, p?: unknown) => Promise<unknown>)(channel, payload);
+  return (native.invoke as (c: string, p?: unknown) => Promise<unknown>)(
+    channel,
+    payload,
+  );
 }
 
 /** Reveal a file (selected in its folder) or open a directory in the OS file manager. */

@@ -18,7 +18,9 @@ describe('coerceModelMode', () => {
   });
 
   it('passes through single with model', () => {
-    expect(coerceModelMode({ kind: 'single', model: 'deepseek_v4_pro' })).toEqual({
+    expect(
+      coerceModelMode({ kind: 'single', model: 'deepseek_v4_pro' }),
+    ).toEqual({
       kind: 'single',
       model: 'deepseek_v4_pro',
     });
@@ -32,7 +34,9 @@ describe('coerceModelMode', () => {
   });
 
   it('collapses deprecated mid to single with survivor', () => {
-    expect(coerceModelMode({ kind: 'mid', survivor: 'deepseek_v4_pro' })).toEqual({
+    expect(
+      coerceModelMode({ kind: 'mid', survivor: 'deepseek_v4_pro' }),
+    ).toEqual({
       kind: 'single',
       model: 'deepseek_v4_pro',
     });
@@ -114,7 +118,13 @@ describe('schema validation', () => {
   });
 
   it('rejects an invalid SessionConfig', () => {
-    const invalid = { model: 123, mode: 'bogus', perm: 'bogus', reasoning: 'bogus', pattern: 'bogus' };
+    const invalid = {
+      model: 123,
+      mode: 'bogus',
+      perm: 'bogus',
+      reasoning: 'bogus',
+      pattern: 'bogus',
+    };
     expect(sessionConfigSchema.safeParse(invalid).success).toBe(false);
   });
 

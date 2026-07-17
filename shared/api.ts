@@ -1,6 +1,17 @@
-import { authReq, defineMessages, defineRequests, frameworkMessages, frameworkRequests, reasoningEffortSchema, z } from 'ugly-app/shared';
+import {
+  authReq,
+  defineMessages,
+  defineRequests,
+  frameworkMessages,
+  frameworkRequests,
+  reasoningEffortSchema,
+  z,
+} from 'ugly-app/shared';
 import { agentMessageSchema } from './agent';
-import { agentTurnRequestSchema, agentTurnResponseSchema } from 'ugly-app/agent/shared';
+import {
+  agentTurnRequestSchema,
+  agentTurnResponseSchema,
+} from 'ugly-app/agent/shared';
 import { userSettingsSchema, userSettingsPatchSchema } from './userSettings';
 import { sessionConfigSchema } from './sessionConfig';
 
@@ -312,7 +323,10 @@ export const requests = defineRequests({
   codingSessionSetReadiness: authReq({
     input: z.object({
       sessionId: z.string(),
-      readiness: z.object({ indexer: z.unknown().optional(), diagnostics: z.unknown().optional() }),
+      readiness: z.object({
+        indexer: z.unknown().optional(),
+        diagnostics: z.unknown().optional(),
+      }),
     }),
     output: z.object({ ok: z.boolean() }),
     rateLimit: { max: 1200, window: 60 },
@@ -322,11 +336,13 @@ export const requests = defineRequests({
   // Returns null when the request doesn't exist / isn't the caller's.
   codingRunRequestGet: authReq({
     input: z.object({ id: z.string() }),
-    output: z.object({
-      status: z.enum(['pending', 'claimed', 'done', 'error']),
-      host: z.string().optional(),
-      error: z.string().optional(),
-    }).nullable(),
+    output: z
+      .object({
+        status: z.enum(['pending', 'claimed', 'done', 'error']),
+        host: z.string().optional(),
+        error: z.string().optional(),
+      })
+      .nullable(),
     rateLimit: { max: 1200, window: 60 },
   }),
 

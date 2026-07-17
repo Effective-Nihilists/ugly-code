@@ -10,7 +10,7 @@ describe('formatCurrency', () => {
 
   it('trims trailing zeros', () => {
     expect(formatCurrency(0.005)).toBe('$0.005');
-    expect(formatCurrency(0.0010)).toBe('$0.001');
+    expect(formatCurrency(0.001)).toBe('$0.001');
   });
 
   it('zero is still $0.00 (an honest zero, not a rounded one)', () => {

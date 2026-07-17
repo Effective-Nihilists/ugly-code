@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CodingSessionSchema, CodingSessionMessageSchema, codingCollections } from '../../shared/codingCollections';
+import {
+  CodingSessionSchema,
+  CodingSessionMessageSchema,
+  codingCollections,
+} from '../../shared/codingCollections';
 import { requests } from '../../shared/api';
 
 describe('CodingSessionSchema — branch field', () => {
@@ -55,7 +59,9 @@ describe('CodingSessionSchema — branch field', () => {
     expect(branchField).toBeDefined();
     expect(branchField!.safeParse(undefined).success).toBe(true);
     expect(branchField!.safeParse('main').success).toBe(true);
-    expect(branchField!.safeParse('ugly-studio/session/test').success).toBe(true);
+    expect(branchField!.safeParse('ugly-studio/session/test').success).toBe(
+      true,
+    );
   });
 
   it('codingCollections defines codingSession and codingSessionMessage', () => {
@@ -91,32 +97,36 @@ describe('API schemas — branch field', () => {
   it('codingSessionList output session includes branch', () => {
     const schema = requests.codingSessionList.outputSchema!;
     const r1 = schema.safeParse({
-      sessions: [{
-        sessionId: 'cs:abc',
-        title: 'Test',
-        model: 'claude-sonnet-4-20250514',
-        status: 'idle',
-        messageCount: 0,
-        costUsd: 0,
-        created: 1700000000000,
-        updated: 1700000000000,
-        branch: 'ugly-studio/session/test',
-      }],
+      sessions: [
+        {
+          sessionId: 'cs:abc',
+          title: 'Test',
+          model: 'claude-sonnet-4-20250514',
+          status: 'idle',
+          messageCount: 0,
+          costUsd: 0,
+          created: 1700000000000,
+          updated: 1700000000000,
+          branch: 'ugly-studio/session/test',
+        },
+      ],
     });
     expect(r1.success).toBe(true);
 
     // Without branch (backward compat)
     const r2 = schema.safeParse({
-      sessions: [{
-        sessionId: 'cs:abc',
-        title: 'Test',
-        model: 'auto',
-        status: 'idle',
-        messageCount: 0,
-        costUsd: 0,
-        created: 1700000000000,
-        updated: 1700000000000,
-      }],
+      sessions: [
+        {
+          sessionId: 'cs:abc',
+          title: 'Test',
+          model: 'auto',
+          status: 'idle',
+          messageCount: 0,
+          costUsd: 0,
+          created: 1700000000000,
+          updated: 1700000000000,
+        },
+      ],
     });
     expect(r2.success).toBe(true);
   });

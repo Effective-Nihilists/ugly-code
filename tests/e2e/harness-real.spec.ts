@@ -17,13 +17,21 @@ const auth = loadDevAuth();
 const REAL_AI = !!process.env['RUN_REAL_SMOKE'];
 
 test.describe('coding harness — real filesystem', () => {
-  test.skip(!auth || !REAL_AI, 'Set RUN_REAL_SMOKE=1, be logged in (~/.ugly-bot/auth.json), DB-backed dev server');
+  test.skip(
+    !auth || !REAL_AI,
+    'Set RUN_REAL_SMOKE=1, be logged in (~/.ugly-bot/auth.json), DB-backed dev server',
+  );
 
-  test('agent edits a real file on disk; every workspace tab renders', async ({ page }) => {
+  test('agent edits a real file on disk; every workspace tab renders', async ({
+    page,
+  }) => {
     // A real project on real disk.
     const root = fs.mkdtempSync(join(tmpdir(), 'uglycode-harness-'));
     fs.writeFileSync(join(root, 'hello.txt'), 'hello world\n');
-    fs.writeFileSync(join(root, '.uglyapp'), JSON.stringify({ projectId: 'harnesstest', title: 'Harness' }));
+    fs.writeFileSync(
+      join(root, '.uglyapp'),
+      JSON.stringify({ projectId: 'harnesstest', title: 'Harness' }),
+    );
     fs.writeFileSync(join(root, 'README.md'), '# Harness fixture\n');
 
     const errors: string[] = [];
@@ -35,7 +43,10 @@ test.describe('coding harness — real filesystem', () => {
       await page.goto('/');
 
       // Open the real project (openProject echoes the path → StudioProjectPage).
-      await page.getByRole('button', { name: /Open Folder/ }).first().click();
+      await page
+        .getByRole('button', { name: /Open Folder/ })
+        .first()
+        .click();
       await page.getByLabel('Path to existing folder').fill(root);
       await page.getByRole('button', { name: /Open Folder →/ }).click();
       await expect(page.locator('[data-id=home-prompt-input]')).toBeVisible();
@@ -62,14 +73,18 @@ test.describe('coding harness — real filesystem', () => {
       // (and also a prod sidebar view — hence the explicit tab data-id); Errors /
       // Events / Workers are prod-scoped sidebar views.
       await page.locator('[data-id=tab-database]').click();
-      await expect(page.locator('[data-id=database-panel]').first()).toBeVisible({ timeout: 10_000 });
+      await expect(
+        page.locator('[data-id=database-panel]').first(),
+      ).toBeVisible({ timeout: 10_000 });
       for (const [label, id] of [
         ['Errors', 'errors-panel'],
         ['Events', 'events-panel'],
         ['Workers', 'panel-workers'],
       ] as Array<[string, string]>) {
         await page.getByRole('button', { name: label, exact: true }).click();
-        await expect(page.locator(`[data-id=${id}]`).first()).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator(`[data-id=${id}]`).first()).toBeVisible({
+          timeout: 10_000,
+        });
       }
 
       expect(errors, `page crashed: ${errors.join('; ')}`).toEqual([]);
@@ -82,14 +97,21 @@ test.describe('coding harness — real filesystem', () => {
   // project itself); a SECOND, non-main session must run in its own git worktree
   // so its edits land under .ugly-studio/worktrees/<id> on a session branch,
   // leaving the project's own copy untouched.
-  test('a non-main session is isolated in its own git worktree', async ({ page }) => {
+  test('a non-main session is isolated in its own git worktree', async ({
+    page,
+  }) => {
     test.setTimeout(180_000); // two real AI turns + a worktree provision
     // A REAL git repo (worktrees need a committed HEAD). No package.json → no
     // pnpm install, so the test stays fast (we assert isolation, not deps).
     const root = fs.mkdtempSync(join(tmpdir(), 'uglycode-worktree-'));
-    const git = (...args: string[]): void => { execFileSync('git', ['-C', root, ...args], { stdio: 'ignore' }); };
+    const git = (...args: string[]): void => {
+      execFileSync('git', ['-C', root, ...args], { stdio: 'ignore' });
+    };
     fs.writeFileSync(join(root, 'isolated.txt'), 'original\n');
-    fs.writeFileSync(join(root, '.uglyapp'), JSON.stringify({ projectId: 'worktreetest', title: 'WT' }));
+    fs.writeFileSync(
+      join(root, '.uglyapp'),
+      JSON.stringify({ projectId: 'worktreetest', title: 'WT' }),
+    );
     git('init');
     git('config', 'user.email', 't@t.t');
     git('config', 'user.name', 'T');
@@ -103,7 +125,10 @@ test.describe('coding harness — real filesystem', () => {
       await installRealNative(page, root);
       await authenticate(page, auth!);
       await page.goto('/');
-      await page.getByRole('button', { name: /Open Folder/ }).first().click();
+      await page
+        .getByRole('button', { name: /Open Folder/ })
+        .first()
+        .click();
       await page.getByLabel('Path to existing folder').fill(root);
       await page.getByRole('button', { name: /Open Folder →/ }).click();
       await expect(page.locator('[data-id=home-prompt-input]')).toBeVisible();
@@ -112,48 +137,89 @@ test.describe('coding harness — real filesystem', () => {
       // Wait until its turn has produced an assistant reply (logged to disk) so
       // it's persisted as the project's `main` before session 2 decides on a
       // worktree; then a short settle for the metadata upsert to land.
-      await page.locator('[data-id=home-prompt-input]').fill('Reply with exactly: OK');
+      await page
+        .locator('[data-id=home-prompt-input]')
+        .fill('Reply with exactly: OK');
       await page.locator('[data-id=home-start-session]').click();
       const logHasAssistant = (): boolean => {
         const dir = join(root, '.ugly-studio', 'sessions');
         if (!fs.existsSync(dir)) return false;
-        return fs.readdirSync(dir).some((f) => f.endsWith('.jsonl') && fs.readFileSync(join(dir, f), 'utf8').includes('"type":"assistant"'));
+        return fs
+          .readdirSync(dir)
+          .some(
+            (f) =>
+              f.endsWith('.jsonl') &&
+              fs
+                .readFileSync(join(dir, f), 'utf8')
+                .includes('"type":"assistant"'),
+          );
       };
-      await expect.poll(logHasAssistant, { timeout: 90_000, message: 'session 1 should produce an assistant reply' }).toBeTruthy();
+      await expect
+        .poll(logHasAssistant, {
+          timeout: 90_000,
+          message: 'session 1 should produce an assistant reply',
+        })
+        .toBeTruthy();
       await page.waitForTimeout(2500);
 
       // Session 2 (NON-main) — edits isolated.txt; this must go to a worktree.
-      await page.getByRole('button', { name: /New session/ }).first().click();
+      await page
+        .getByRole('button', { name: /New session/ })
+        .first()
+        .click();
       await expect(page.locator('[data-id=home-prompt-input]')).toBeVisible();
-      await page.locator('[data-id=home-prompt-input]').fill(
-        'The file isolated.txt contains exactly: original. Use edit_file to change "original" to "WORKTREE-EDIT". Do it now.',
-      );
+      await page
+        .locator('[data-id=home-prompt-input]')
+        .fill(
+          'The file isolated.txt contains exactly: original. Use edit_file to change "original" to "WORKTREE-EDIT". Do it now.',
+        );
       await page.locator('[data-id=home-start-session]').click();
 
       // A worktree dir is created under .ugly-studio/worktrees, the edit lands
       // THERE, and the project's own copy is left untouched (isolation).
       const wtDir = join(root, '.ugly-studio', 'worktrees');
       await expect
-        .poll(() => {
-          if (!fs.existsSync(wtDir)) return '';
-          for (const d of fs.readdirSync(wtDir)) {
-            const f = join(wtDir, d, 'isolated.txt');
-            if (fs.existsSync(f)) return fs.readFileSync(f, 'utf8');
-          }
-          return '';
-        }, { timeout: 90_000, message: 'isolated.txt inside a worktree should be rewritten' })
+        .poll(
+          () => {
+            if (!fs.existsSync(wtDir)) return '';
+            for (const d of fs.readdirSync(wtDir)) {
+              const f = join(wtDir, d, 'isolated.txt');
+              if (fs.existsSync(f)) return fs.readFileSync(f, 'utf8');
+            }
+            return '';
+          },
+          {
+            timeout: 90_000,
+            message: 'isolated.txt inside a worktree should be rewritten',
+          },
+        )
         .toContain('WORKTREE-EDIT');
 
       // The project's own copy is unchanged — proof the second session was isolated.
-      expect(fs.readFileSync(join(root, 'isolated.txt'), 'utf8')).toContain('original');
+      expect(fs.readFileSync(join(root, 'isolated.txt'), 'utf8')).toContain(
+        'original',
+      );
       // A session branch exists.
-      const branches = execFileSync('git', ['-C', root, 'branch', '--list', 'ugly-studio/session/*'], { encoding: 'utf8' });
-      expect(branches.trim().length, 'a ugly-studio/session/* branch should exist').toBeGreaterThan(0);
+      const branches = execFileSync(
+        'git',
+        ['-C', root, 'branch', '--list', 'ugly-studio/session/*'],
+        { encoding: 'utf8' },
+      );
+      expect(
+        branches.trim().length,
+        'a ugly-studio/session/* branch should exist',
+      ).toBeGreaterThan(0);
 
       expect(errors, `page crashed: ${errors.join('; ')}`).toEqual([]);
     } finally {
       // Prune worktrees before removing the repo so git doesn't leave locks.
-      try { execFileSync('git', ['-C', root, 'worktree', 'prune'], { stdio: 'ignore' }); } catch { /* ignore */ }
+      try {
+        execFileSync('git', ['-C', root, 'worktree', 'prune'], {
+          stdio: 'ignore',
+        });
+      } catch {
+        /* ignore */
+      }
       fs.rmSync(root, { recursive: true, force: true });
     }
   });

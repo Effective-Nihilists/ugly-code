@@ -8,7 +8,11 @@
  */
 
 import type { ContentPart } from 'ugly-app/agent/client';
-import { decodeAssistantPayload, type StoredMessageRow, type ToolRowPayload } from './serverSessionApi';
+import {
+  decodeAssistantPayload,
+  type StoredMessageRow,
+  type ToolRowPayload,
+} from './serverSessionApi';
 
 export interface Part {
   type: 'text' | 'tool_call' | 'tool_result' | 'finish';
@@ -21,7 +25,11 @@ export interface Part {
  * tool_call so a running tool's duration timer survives a reload — the live emit
  * omits it (the tool_progress meta event supplies it while running).
  */
-export function assistantParts(content: ContentPart[], toolStartedAt?: Record<string, number>, pending?: boolean): Part[] {
+export function assistantParts(
+  content: ContentPart[],
+  toolStartedAt?: Record<string, number>,
+  pending?: boolean,
+): Part[] {
   const parts: Part[] = [];
   for (const blk of content) {
     if (blk.type === 'text' && blk.text) {
@@ -34,7 +42,10 @@ export function assistantParts(content: ContentPart[], toolStartedAt?: Record<st
         data: {
           id: blk.id,
           name: blk.name,
-          input: typeof blk.input === 'string' ? blk.input : JSON.stringify(blk.input ?? {}),
+          input:
+            typeof blk.input === 'string'
+              ? blk.input
+              : JSON.stringify(blk.input ?? {}),
           finished: true,
           ...(typeof startedAt === 'number' ? { started_at: startedAt } : {}),
         },
@@ -61,7 +72,10 @@ export interface DisplayMessage {
  * emit); a compaction `summary` row renders as an inline marker at its timeline
  * position. The content JSON is parsed per role/kind (see clientAgent persist).
  */
-export function rowsToDisplayMessages(sessionId: string, rows: StoredMessageRow[]): DisplayMessage[] {
+export function rowsToDisplayMessages(
+  sessionId: string,
+  rows: StoredMessageRow[],
+): DisplayMessage[] {
   const out: DisplayMessage[] = [];
   for (const r of rows) {
     const baseId = `${sessionId}:${r.kind === 'summary' ? 'summary:' : ''}${r.seq}`;
@@ -76,24 +90,48 @@ export function rowsToDisplayMessages(sessionId: string, rows: StoredMessageRow[
         id: baseId,
         role: 'assistant',
         parts: [
-          { type: 'text', data: { text: `↻ Compacted earlier messages to stay within the context window.\n\n${String(payload)}` } },
+          {
+            type: 'text',
+            data: {
+              text: `↻ Compacted earlier messages to stay within the context window.\n\n${String(payload)}`,
+            },
+          },
           { type: 'finish' },
         ],
       });
     } else if (r.role === 'assistant') {
-      const { content, model, toolStartedAt, pending } = decodeAssistantPayload(payload);
-      out.push({ id: baseId, role: 'assistant', parts: assistantParts(content, toolStartedAt, pending), ...(model ? { model } : {}) });
+      const { content, model, toolStartedAt, pending } =
+        decodeAssistantPayload(payload);
+      out.push({
+        id: baseId,
+        role: 'assistant',
+        parts: assistantParts(content, toolStartedAt, pending),
+        ...(model ? { model } : {}),
+      });
     } else if (r.role === 'tool') {
       const results = (payload as Partial<ToolRowPayload>).results ?? [];
       results.forEach((x, i) => {
         out.push({
           id: `${baseId}:${i}`,
           role: 'tool',
-          parts: [{ type: 'tool_result', data: { tool_call_id: x.tool_use_id, content: x.content, is_error: x.is_error } }],
+          parts: [
+            {
+              type: 'tool_result',
+              data: {
+                tool_call_id: x.tool_use_id,
+                content: x.content,
+                is_error: x.is_error,
+              },
+            },
+          ],
         });
       });
     } else {
-      out.push({ id: baseId, role: 'user', parts: [{ type: 'text', data: { text: String(payload) } }] });
+      out.push({
+        id: baseId,
+        role: 'user',
+        parts: [{ type: 'text', data: { text: String(payload) } }],
+      });
     }
   }
   return out;

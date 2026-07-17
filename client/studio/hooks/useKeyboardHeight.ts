@@ -22,7 +22,9 @@ interface VirtualKeyboardLike {
 export function useKeyboardHeight(): number {
   const [height, setHeight] = useState(0);
   useEffect(() => {
-    const nav = navigator as Navigator & { virtualKeyboard?: VirtualKeyboardLike };
+    const nav = navigator as Navigator & {
+      virtualKeyboard?: VirtualKeyboardLike;
+    };
     const vk = nav.virtualKeyboard;
     const vv = window.visualViewport;
     const compute = () => {
@@ -31,7 +33,10 @@ export function useKeyboardHeight(): number {
         kb = Math.round(vk.boundingRect.height) || 0;
       }
       if (vv) {
-        const occlusion = Math.max(0, Math.round(window.innerHeight - vv.height));
+        const occlusion = Math.max(
+          0,
+          Math.round(window.innerHeight - vv.height),
+        );
         if (occlusion > 100) {
           kb = Math.max(kb, occlusion);
         }

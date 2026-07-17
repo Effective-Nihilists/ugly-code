@@ -73,7 +73,9 @@ export const userSettingsPatchSchema = z.object({
   reinforcement: z.object({ enabled: z.boolean().optional() }).optional(),
   codingAgent: z
     .object({
-      memory: z.object({ read: z.boolean().optional(), write: z.boolean().optional() }).optional(),
+      memory: z
+        .object({ read: z.boolean().optional(), write: z.boolean().optional() })
+        .optional(),
       multiAgent: z.object({ enabled: z.boolean().optional() }).optional(),
       autoLint: z.boolean().optional(),
       checkpoints: z.boolean().optional(),
@@ -94,7 +96,10 @@ export const userSettingsPatchSchema = z.object({
       hangFallbackMs: z.number().nullable().optional(),
       superSpecModels: z.array(z.string()).optional(),
       superSynthesisModel: z.string().nullable().optional(),
-      superInjectionStyle: z.enum(['advisory', 'imperative']).nullable().optional(),
+      superInjectionStyle: z
+        .enum(['advisory', 'imperative'])
+        .nullable()
+        .optional(),
       // `null` clears the stored key (see mergeUserSettings).
       glmCodingKey: z.string().nullable().optional(),
       // Remembered defaults for new sessions (see CodingSession.config).
@@ -129,19 +134,29 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
  * field; `null` in the patch clears an optional field. Undefined patch fields are
  * ignored (keep the base value). Returns a fresh object — inputs are not mutated.
  */
-export function mergeUserSettings(base: UserSettings, patch: UserSettingsPatch): UserSettings {
+export function mergeUserSettings(
+  base: UserSettings,
+  patch: UserSettingsPatch,
+): UserSettings {
   const ca = base.codingAgent;
   const p = patch.codingAgent ?? {};
   return {
-    reinforcement: { enabled: patch.reinforcement?.enabled ?? base.reinforcement.enabled },
+    reinforcement: {
+      enabled: patch.reinforcement?.enabled ?? base.reinforcement.enabled,
+    },
     codingAgent: {
       ...ca,
-      memory: { read: p.memory?.read ?? ca.memory.read, write: p.memory?.write ?? ca.memory.write },
+      memory: {
+        read: p.memory?.read ?? ca.memory.read,
+        write: p.memory?.write ?? ca.memory.write,
+      },
       multiAgent: { enabled: p.multiAgent?.enabled ?? ca.multiAgent.enabled },
       autoLint: p.autoLint ?? ca.autoLint,
       checkpoints: p.checkpoints ?? ca.checkpoints,
       specs: { enabled: p.specs?.enabled ?? ca.specs.enabled },
-      systemSkills: { enabled: p.systemSkills?.enabled ?? ca.systemSkills.enabled },
+      systemSkills: {
+        enabled: p.systemSkills?.enabled ?? ca.systemSkills.enabled,
+      },
       autoTsc: { enabled: p.autoTsc?.enabled ?? ca.autoTsc.enabled },
       codebaseIndex: p.codebaseIndex ?? ca.codebaseIndex,
       autoAllowlist: p.autoAllowlist ?? ca.autoAllowlist,
@@ -165,20 +180,33 @@ function mergeOptional(
   p: NonNullable<UserSettingsPatch['codingAgent']>,
 ): Partial<CodingAgentSettings> {
   const out: Partial<CodingAgentSettings> = {};
-  const num = (v: number | null | undefined, base: number | undefined): number | undefined =>
-    v === null ? undefined : v ?? base;
-  const numN = (v: number | null | undefined, base: number | null | undefined): number | null | undefined =>
-    v === undefined ? base : v;
-  const strN = (v: string | null | undefined, base: string | null | undefined): string | null | undefined =>
-    v === undefined ? base : v;
+  const num = (
+    v: number | null | undefined,
+    base: number | undefined,
+  ): number | undefined => (v === null ? undefined : (v ?? base));
+  const numN = (
+    v: number | null | undefined,
+    base: number | null | undefined,
+  ): number | null | undefined => (v === undefined ? base : v);
+  const strN = (
+    v: string | null | undefined,
+    base: string | null | undefined,
+  ): string | null | undefined => (v === undefined ? base : v);
 
-  const temperatureOverride = num(p.temperatureOverride, ca.temperatureOverride);
-  if (temperatureOverride !== undefined) out.temperatureOverride = temperatureOverride;
-  const auxModel = p.auxModel === undefined ? ca.auxModel : p.auxModel ?? undefined;
+  const temperatureOverride = num(
+    p.temperatureOverride,
+    ca.temperatureOverride,
+  );
+  if (temperatureOverride !== undefined)
+    out.temperatureOverride = temperatureOverride;
+  const auxModel =
+    p.auxModel === undefined ? ca.auxModel : (p.auxModel ?? undefined);
   if (auxModel !== undefined) out.auxModel = auxModel;
-  const judgeModel = p.judgeModel === undefined ? ca.judgeModel : p.judgeModel ?? undefined;
+  const judgeModel =
+    p.judgeModel === undefined ? ca.judgeModel : (p.judgeModel ?? undefined);
   if (judgeModel !== undefined) out.judgeModel = judgeModel;
-  const pickerModel = p.pickerModel === undefined ? ca.pickerModel : p.pickerModel ?? undefined;
+  const pickerModel =
+    p.pickerModel === undefined ? ca.pickerModel : (p.pickerModel ?? undefined);
   if (pickerModel !== undefined) out.pickerModel = pickerModel;
   // `null` clears the stored key (the Settings "Remove" action). Note the
   // asymmetry with the knobs above: `out` is spread AFTER `...ca`, so simply
@@ -189,20 +217,29 @@ function mergeOptional(
   else if (ca.glmCodingKey !== undefined) out.glmCodingKey = ca.glmCodingKey;
   const pollinator = strN(p.pollinator, ca.pollinator);
   if (pollinator !== undefined) out.pollinator = pollinator;
-  if (p.pollinatorEnabled !== undefined) out.pollinatorEnabled = p.pollinatorEnabled;
-  else if (ca.pollinatorEnabled !== undefined) out.pollinatorEnabled = ca.pollinatorEnabled;
+  if (p.pollinatorEnabled !== undefined)
+    out.pollinatorEnabled = p.pollinatorEnabled;
+  else if (ca.pollinatorEnabled !== undefined)
+    out.pollinatorEnabled = ca.pollinatorEnabled;
   const phaseTimeoutMs = numN(p.phaseTimeoutMs, ca.phaseTimeoutMs);
   if (phaseTimeoutMs !== undefined) out.phaseTimeoutMs = phaseTimeoutMs;
   const hangFallbackMs = numN(p.hangFallbackMs, ca.hangFallbackMs);
   if (hangFallbackMs !== undefined) out.hangFallbackMs = hangFallbackMs;
   if (p.superSpecModels !== undefined) out.superSpecModels = p.superSpecModels;
-  else if (ca.superSpecModels !== undefined) out.superSpecModels = ca.superSpecModels;
+  else if (ca.superSpecModels !== undefined)
+    out.superSpecModels = ca.superSpecModels;
   const superSynthesisModel =
-    p.superSynthesisModel === undefined ? ca.superSynthesisModel : p.superSynthesisModel ?? undefined;
-  if (superSynthesisModel !== undefined) out.superSynthesisModel = superSynthesisModel;
+    p.superSynthesisModel === undefined
+      ? ca.superSynthesisModel
+      : (p.superSynthesisModel ?? undefined);
+  if (superSynthesisModel !== undefined)
+    out.superSynthesisModel = superSynthesisModel;
   const superInjectionStyle =
-    p.superInjectionStyle === undefined ? ca.superInjectionStyle : p.superInjectionStyle ?? undefined;
-  if (superInjectionStyle !== undefined) out.superInjectionStyle = superInjectionStyle;
+    p.superInjectionStyle === undefined
+      ? ca.superInjectionStyle
+      : (p.superInjectionStyle ?? undefined);
+  if (superInjectionStyle !== undefined)
+    out.superInjectionStyle = superInjectionStyle;
   return out;
 }
 
@@ -224,7 +261,9 @@ function mergeOptional(
  *      client), the patch parse still fails — so salvage the one field that must
  *      never be lost, the provider credential, before falling back to defaults.
  */
-export function parseStoredUserSettings(raw: string | null | undefined): UserSettings {
+export function parseStoredUserSettings(
+  raw: string | null | undefined,
+): UserSettings {
   if (!raw) return DEFAULT_USER_SETTINGS;
   let parsed: unknown;
   try {
@@ -233,11 +272,14 @@ export function parseStoredUserSettings(raw: string | null | undefined): UserSet
     return DEFAULT_USER_SETTINGS;
   }
   const lenient = userSettingsPatchSchema.safeParse(parsed);
-  if (lenient.success) return mergeUserSettings(DEFAULT_USER_SETTINGS, lenient.data);
+  if (lenient.success)
+    return mergeUserSettings(DEFAULT_USER_SETTINGS, lenient.data);
   const key = extractGlmCodingKey(parsed);
   return key === undefined
     ? DEFAULT_USER_SETTINGS
-    : mergeUserSettings(DEFAULT_USER_SETTINGS, { codingAgent: { glmCodingKey: key } });
+    : mergeUserSettings(DEFAULT_USER_SETTINGS, {
+        codingAgent: { glmCodingKey: key },
+      });
 }
 
 /** Pull a well-typed, non-empty glmCodingKey straight out of a raw parsed blob. */

@@ -63,7 +63,9 @@ function useCountUp(target: number, durationMs: number): number {
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); };
+    return () => {
+      cancelAnimationFrame(raf);
+    };
   }, [target, durationMs]);
   return value;
 }
@@ -91,10 +93,26 @@ const DEFAULT_PARENT_DIR = '~/Documents/Ugly Studio';
 // Optional ugly-app scaffold features. Empty selection → a minimal app (fewer DB
 // migrations); each ticked box maps to `ugly-app init --with <id>`.
 const FEATURE_OPTIONS: { id: string; label: string; desc: string }[] = [
-  { id: 'todo', label: 'Todo list', desc: 'Collection + CRUD demo + nightly cleanup cron' },
-  { id: 'chat', label: 'AI chat', desc: 'Conversation/message collections + streaming replies' },
-  { id: 'collab', label: 'Collaborative editing', desc: 'Yjs CRDT document sync' },
-  { id: 'tests', label: 'Test / demo pages', desc: 'Auth, push, email, upload, audio, 3D, … examples' },
+  {
+    id: 'todo',
+    label: 'Todo list',
+    desc: 'Collection + CRUD demo + nightly cleanup cron',
+  },
+  {
+    id: 'chat',
+    label: 'AI chat',
+    desc: 'Conversation/message collections + streaming replies',
+  },
+  {
+    id: 'collab',
+    label: 'Collaborative editing',
+    desc: 'Yjs CRDT document sync',
+  },
+  {
+    id: 'tests',
+    label: 'Test / demo pages',
+    desc: 'Auth, push, email, upload, audio, 3D, … examples',
+  },
 ];
 
 interface ProjectOnboardingProps {
@@ -176,8 +194,14 @@ export function ProjectOnboarding({
   const selfDeviceId = useSelfDeviceId();
   const app = useAppOptional();
   // Per-row "⋯" menu + delete confirmation (Open in Finder / Remove / Delete).
-  const [menuFor, setMenuFor] = useState<{ project: RecentProject; x: number; y: number } | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<RecentProject | null>(null);
+  const [menuFor, setMenuFor] = useState<{
+    project: RecentProject;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<RecentProject | null>(
+    null,
+  );
   // Start with all three collapsed so New / Open / Clone are visible at equal weight — a
   // newcomer sees every entry path at a glance. (Auto-expanding New pushed Open + Git-clone
   // below the fold, so opening an existing folder looked impossible without scrolling.)
@@ -190,14 +214,18 @@ export function ProjectOnboarding({
   const toggleFeature = useCallback((id: string) => {
     setNewFeatures((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }, []);
   const [openPath, setOpenPath] = useState('');
   const [cloneUrl, setCloneUrl] = useState('');
   const [cloneDir, setCloneDir] = useState(DEFAULT_PARENT_DIR);
-  const [picker, setPicker] = useState<{ startPath: string; onPick: (p: string) => void } | null>(null);
+  const [picker, setPicker] = useState<{
+    startPath: string;
+    onPick: (p: string) => void;
+  } | null>(null);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -244,7 +272,15 @@ export function ProjectOnboarding({
         setShowEvalPicker(false);
         onProjectOpen(created.projectName, created.projectPath);
       } catch (err) {
-        console.error('[ProjectOnboarding:evalCreateProject]', JSON.stringify({ taskName, taskId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          '[ProjectOnboarding:evalCreateProject]',
+          JSON.stringify({
+            taskName,
+            taskId,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setEvalError((err as Error).message);
       } finally {
         setEvalSubmitting(false);
@@ -267,7 +303,16 @@ export function ProjectOnboarding({
         setShowEvalPicker(false);
         onProjectOpen(result.name, result.path);
       } catch (err) {
-        console.error('[ProjectOnboarding:openProject:evalRun]', JSON.stringify({ projectName, projectPath, sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          '[ProjectOnboarding:openProject:evalRun]',
+          JSON.stringify({
+            projectName,
+            projectPath,
+            sessionId,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setEvalError(`Failed to open prior run: ${(err as Error).message}`);
       } finally {
         setEvalSubmitting(false);
@@ -286,7 +331,9 @@ export function ProjectOnboarding({
     // `signal.aborted` (which the type system can't prove constant) gates the
     // post-await setState so we never touch state after unmount.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => { controller.abort(); }, 5000);
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 5000);
     void (async () => {
       try {
         const res = await fetch('/', { signal: controller.signal });
@@ -327,7 +374,9 @@ export function ProjectOnboarding({
   useEffect(() => {
     if (keyboardHeight <= 0) return;
     const id = setTimeout(scrollActiveFieldIntoView, 60);
-    return () => { clearTimeout(id); };
+    return () => {
+      clearTimeout(id);
+    };
   }, [keyboardHeight, scrollActiveFieldIntoView]);
   useEffect(() => {
     const onFocusIn = (e: FocusEvent) => {
@@ -337,19 +386,29 @@ export function ProjectOnboarding({
         t instanceof HTMLElement &&
         (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')
       ) {
-        setTimeout(() => { t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 60);
+        setTimeout(() => {
+          t.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 60);
       }
     };
     document.addEventListener('focusin', onFocusIn);
-    return () => { document.removeEventListener('focusin', onFocusIn); };
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+    };
   }, []);
 
-  const handleBrowse = useCallback((setter: (val: string) => void, current: string) => {
-    // Custom in-app folder picker — works over the Ugly Proxy (it navigates via
-    // native.fs.readdir), unlike the native fs.pickDirectory dialog which would open on
-    // the desktop and be invisible on a phone. '~' resolves to home on the host.
-    setPicker({ startPath: current.trim() || DEFAULT_PARENT_DIR, onPick: setter });
-  }, []);
+  const handleBrowse = useCallback(
+    (setter: (val: string) => void, current: string) => {
+      // Custom in-app folder picker — works over the Ugly Proxy (it navigates via
+      // native.fs.readdir), unlike the native fs.pickDirectory dialog which would open on
+      // the desktop and be invisible on a phone. '~' resolves to home on the host.
+      setPicker({
+        startPath: current.trim() || DEFAULT_PARENT_DIR,
+        onPick: setter,
+      });
+    },
+    [],
+  );
 
   const handleOpenRecent = useCallback(
     async (project: RecentProject) => {
@@ -368,7 +427,15 @@ export function ProjectOnboarding({
         onProjectOpen(result.name, result.path);
       } catch (err) {
         const msg = (err as Error).message;
-        console.error('[ProjectOnboarding:openProject:recent]', JSON.stringify({ path: project.path, deviceId: project.deviceId, error: msg }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          '[ProjectOnboarding:openProject:recent]',
+          JSON.stringify({
+            path: project.path,
+            deviceId: project.deviceId,
+            error: msg,
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         if (
           msg.includes('ENOENT') ||
           msg.includes('no such file') ||
@@ -425,7 +492,14 @@ export function ProjectOnboarding({
       });
       onProjectOpen(result.name, result.path);
     } catch (err) {
-      console.error('[ProjectOnboarding:openProject:folder]', JSON.stringify({ path: openPath.trim(), error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        '[ProjectOnboarding:openProject:folder]',
+        JSON.stringify({
+          path: openPath.trim(),
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setError(`Failed to open project: ${(err as Error).message}`);
     } finally {
       setLoading(false);
@@ -444,7 +518,15 @@ export function ProjectOnboarding({
       const result = await apiRequest<OpenedProject>('cloneProject', input);
       onProjectOpen(result.name, result.path);
     } catch (err) {
-      console.error('[ProjectOnboarding:cloneProject]', JSON.stringify({ url: cloneUrl.trim(), parentDir: cloneDir.trim() || undefined, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        '[ProjectOnboarding:cloneProject]',
+        JSON.stringify({
+          url: cloneUrl.trim(),
+          parentDir: cloneDir.trim() || undefined,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setError(`Failed to clone repository: ${(err as Error).message}`);
     } finally {
       setLoading(false);
@@ -500,7 +582,9 @@ export function ProjectOnboarding({
             <button
               type="button"
               data-id="onboarding-retry-connection"
-              onClick={() => { window.location.reload(); }}
+              onClick={() => {
+                window.location.reload();
+              }}
               style={primaryButtonStyle}
             >
               Retry connection
@@ -528,7 +612,8 @@ export function ProjectOnboarding({
         // subtracting the measured keyboard height keeps the scrollable form within
         // the visible region (and the focus effect above scrolls the field into it).
         // 0 when closed / on desktop → plain 100dvh.
-        height: keyboardHeight > 0 ? `calc(100dvh - ${keyboardHeight}px)` : '100dvh',
+        height:
+          keyboardHeight > 0 ? `calc(100dvh - ${keyboardHeight}px)` : '100dvh',
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--bg-primary)',
@@ -692,7 +777,9 @@ export function ProjectOnboarding({
                 kind="new"
                 data-id="onboarding-action-new"
                 active={activeAction === 'new'}
-                onClick={() => { setActiveAction('new'); }}
+                onClick={() => {
+                  setActiveAction('new');
+                }}
                 delayMs={760}
               />
               {activeAction === 'new' && (
@@ -709,17 +796,26 @@ export function ProjectOnboarding({
                     value={newParentDir}
                     onChange={setNewParentDir}
                     browsable={hasElectronAPI}
-                    onBrowse={() => { handleBrowse(setNewParentDir, newParentDir); }}
+                    onBrowse={() => {
+                      handleBrowse(setNewParentDir, newParentDir);
+                    }}
                   />
                   <div data-id="onboarding-features" style={featuresBoxStyle}>
                     <div style={featuresLabelStyle}>Optional features</div>
                     {FEATURE_OPTIONS.map((f) => (
-                      <label key={f.id} data-id={`onboarding-feature-${f.id}`} style={featureRowStyle}>
+                      <label
+                        key={f.id}
+                        data-id={`onboarding-feature-${f.id}`}
+                        style={featureRowStyle}
+                      >
                         <input
                           type="checkbox"
                           checked={newFeatures.has(f.id)}
-                          onChange={() => { toggleFeature(f.id); }}
-                          style={{ marginTop: 3, cursor: 'pointer' }} data-id="input"
+                          onChange={() => {
+                            toggleFeature(f.id);
+                          }}
+                          style={{ marginTop: 3, cursor: 'pointer' }}
+                          data-id="input"
                         />
                         <span>
                           <span style={featureNameStyle}>{f.label}</span>
@@ -736,7 +832,9 @@ export function ProjectOnboarding({
                   <button
                     type="button"
                     data-id="onboarding-create-project"
-                    onClick={() => { handleNewProject(); }}
+                    onClick={() => {
+                      handleNewProject();
+                    }}
                     disabled={loading || !newName.trim()}
                     style={primaryButtonStyle}
                   >
@@ -749,7 +847,9 @@ export function ProjectOnboarding({
                 kind="open"
                 data-id="onboarding-action-open"
                 active={activeAction === 'open'}
-                onClick={() => { setActiveAction('open'); }}
+                onClick={() => {
+                  setActiveAction('open');
+                }}
                 delayMs={860}
               />
               {activeAction === 'open' && (
@@ -764,7 +864,9 @@ export function ProjectOnboarding({
                         : '/path/to/project'
                     }
                     browsable={hasElectronAPI}
-                    onBrowse={() => { handleBrowse(setOpenPath, openPath); }}
+                    onBrowse={() => {
+                      handleBrowse(setOpenPath, openPath);
+                    }}
                     autoFocus
                   />
                   <button
@@ -783,7 +885,9 @@ export function ProjectOnboarding({
                 kind="clone"
                 data-id="onboarding-action-clone"
                 active={activeAction === 'clone'}
-                onClick={() => { setActiveAction('clone'); }}
+                onClick={() => {
+                  setActiveAction('clone');
+                }}
                 delayMs={960}
               />
               {activeAction === 'clone' && (
@@ -801,7 +905,9 @@ export function ProjectOnboarding({
                     onChange={setCloneDir}
                     placeholder={hasElectronAPI ? DEFAULT_PARENT_DIR : ''}
                     browsable={hasElectronAPI}
-                    onBrowse={() => { handleBrowse(setCloneDir, cloneDir); }}
+                    onBrowse={() => {
+                      handleBrowse(setCloneDir, cloneDir);
+                    }}
                   />
                   <button
                     type="button"
@@ -919,7 +1025,9 @@ export function ProjectOnboarding({
                 <input
                   data-id="onboarding-recents-filter"
                   value={search}
-                  onChange={(e) => { setSearch(e.currentTarget.value); }}
+                  onChange={(e) => {
+                    setSearch(e.currentTarget.value);
+                  }}
                   placeholder="Filter by name or path…"
                   style={{
                     flex: 1,
@@ -984,7 +1092,9 @@ export function ProjectOnboarding({
                     project={p}
                     isThisDevice={!!selfDeviceId && p.deviceId === selfDeviceId}
                     onOpen={() => void handleOpenRecent(p)}
-                    onMenu={(x, y) => { setMenuFor({ project: p, x, y }); }}
+                    onMenu={(x, y) => {
+                      setMenuFor({ project: p, x, y });
+                    }}
                     delayMs={1100 + i * 70}
                   />
                 ))
@@ -1010,7 +1120,9 @@ export function ProjectOnboarding({
         chat with the prompt pre-filled. */}
       <button
         type="button"
-        onClick={() => { setShowEvalPicker(true); }}
+        onClick={() => {
+          setShowEvalPicker(true);
+        }}
         data-id="run-eval-button"
         disabled={evalSubmitting}
         title="Run an eval task interactively (pick → seed → watch → grade)"
@@ -1048,7 +1160,9 @@ export function ProjectOnboarding({
 
       {showEvalPicker && (
         <EvalPickerModal
-          onCancel={() => { setShowEvalPicker(false); }}
+          onCancel={() => {
+            setShowEvalPicker(false);
+          }}
           onPick={(name) => void handlePickEvalTask(name)}
           onOpenRun={(projectName, projectPath, sessionId) =>
             void handleOpenEvalRun(projectName, projectPath, sessionId)
@@ -1080,7 +1194,9 @@ export function ProjectOnboarding({
           <button
             type="button"
             data-id="onboarding-eval-error-dismiss"
-            onClick={() => { setEvalError(null); }}
+            onClick={() => {
+              setEvalError(null);
+            }}
             style={{
               marginTop: 6,
               fontFamily: 'var(--font-label)',
@@ -1106,7 +1222,9 @@ export function ProjectOnboarding({
       {menuFor && (
         <ContextMenu
           anchor={{ x: menuFor.x, y: menuFor.y }}
-          onClose={() => { setMenuFor(null); }}
+          onClose={() => {
+            setMenuFor(null);
+          }}
           items={((): ContextMenuItem[] => {
             const p = menuFor.project;
             const onThisDevice = !!selfDeviceId && p.deviceId === selfDeviceId;
@@ -1114,16 +1232,22 @@ export function ProjectOnboarding({
               {
                 label: `Open in ${fileManagerName}`,
                 hidden: !onThisDevice,
-                onClick: () => { void revealInFinder(p.path); },
+                onClick: () => {
+                  void revealInFinder(p.path);
+                },
               },
               {
                 label: 'Remove from recents',
-                onClick: () => { void removeRecentProject(app?.socket, p._id); },
+                onClick: () => {
+                  void removeRecentProject(app?.socket, p._id);
+                },
               },
               {
                 label: 'Delete',
                 danger: true,
-                onClick: () => { setPendingDelete(p); },
+                onClick: () => {
+                  setPendingDelete(p);
+                },
               },
             ];
           })()}
@@ -1141,8 +1265,12 @@ export function ProjectOnboarding({
               } and removes it from recents.`
             : ''
         }
-        onConfirm={() => (pendingDelete ? handleDeleteProject(pendingDelete) : Promise.resolve())}
-        onClose={() => { setPendingDelete(null); }}
+        onConfirm={() =>
+          pendingDelete ? handleDeleteProject(pendingDelete) : Promise.resolve()
+        }
+        onClose={() => {
+          setPendingDelete(null);
+        }}
       />
     </div>
   );
@@ -1242,10 +1370,10 @@ function ActionRow({
   delayMs,
   'data-id': dataId,
 }: {
-  kind: ActionTab;
-  active: boolean;
-  onClick: () => void;
-  delayMs?: number;
+  'kind': ActionTab;
+  'active': boolean;
+  'onClick': () => void;
+  'delayMs'?: number;
   'data-id'?: string;
 }): React.ReactElement {
   const meta = ACTION_META[kind];
@@ -1265,8 +1393,8 @@ function ActionRow({
           active && isPrimary
             ? 'linear-gradient(90deg, var(--accent-dim) 0%, var(--bg-panel) 80%)'
             : active
-            ? 'var(--bg-secondary)'
-            : 'var(--bg-panel)',
+              ? 'var(--bg-secondary)'
+              : 'var(--bg-panel)',
         border: 'none',
         borderBottom: '1px solid var(--border)',
         textAlign: 'left',
@@ -1422,7 +1550,9 @@ function LabelInput({
         <input
           data-id={`onboarding-input-${label}`}
           value={value}
-          onChange={(e) => { onChange(e.currentTarget.value); }}
+          onChange={(e) => {
+            onChange(e.currentTarget.value);
+          }}
           placeholder={placeholder}
           autoFocus={autoFocus}
           style={{
@@ -1482,7 +1612,9 @@ function ProjectRow({
   const indexDelay = delayMs != null ? delayMs + 100 : undefined;
   // Shown so the user knows which machine each project lives on — and, for a
   // remote project, which desktop the open will reconnect to.
-  const deviceText = isThisDevice ? 'This device' : project.deviceLabel || 'Another device';
+  const deviceText = isThisDevice
+    ? 'This device'
+    : project.deviceLabel || 'Another device';
   return (
     <div
       role="button"
@@ -1575,7 +1707,9 @@ function ProjectRow({
             gap: 5,
             fontFamily: 'var(--font-label)',
             fontSize: 10,
-            color: isThisDevice ? 'var(--text-secondary)' : 'var(--accent, #FF5500)',
+            color: isThisDevice
+              ? 'var(--text-secondary)'
+              : 'var(--accent, #FF5500)',
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
             fontWeight: 700,
@@ -1596,7 +1730,13 @@ function ProjectRow({
             <rect x={2} y={3} width={20} height={14} rx={2} />
             <path d="M8 21h8M12 17v4" />
           </svg>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {deviceText}
           </span>
         </span>
@@ -1613,7 +1753,14 @@ function ProjectRow({
       >
         {timeAgoShort(project.lastOpened)}
       </span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+      <span
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          flexShrink: 0,
+        }}
+      >
         <button
           type="button"
           aria-label="Project actions"
@@ -1673,20 +1820,44 @@ function ProjectRow({
 // ──────────────────────────────────────────────────────────────────
 
 const featuresBoxStyle: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4,
-  padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  marginTop: 4,
+  padding: '10px 12px',
+  border: '1px solid var(--border)',
+  borderRadius: 8,
   background: 'var(--bg-secondary)',
 };
 const featuresLabelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
   color: 'var(--text-muted)',
 };
 const featureRowStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 13,
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+  cursor: 'pointer',
+  fontSize: 13,
 };
-const featureNameStyle: React.CSSProperties = { display: 'block', color: 'var(--text-primary)', fontWeight: 600 };
-const featureDescStyle: React.CSSProperties = { display: 'block', color: 'var(--text-muted)', fontSize: 11.5 };
-const featureHintStyle: React.CSSProperties = { fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic' };
+const featureNameStyle: React.CSSProperties = {
+  display: 'block',
+  color: 'var(--text-primary)',
+  fontWeight: 600,
+};
+const featureDescStyle: React.CSSProperties = {
+  display: 'block',
+  color: 'var(--text-muted)',
+  fontSize: 11.5,
+};
+const featureHintStyle: React.CSSProperties = {
+  fontSize: 11.5,
+  color: 'var(--text-muted)',
+  fontStyle: 'italic',
+};
 const primaryButtonStyle: React.CSSProperties = {
   alignSelf: 'flex-start',
   padding: '12px 20px',

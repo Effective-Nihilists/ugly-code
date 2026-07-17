@@ -24,7 +24,10 @@ describe('resolveLspSpawn', () => {
 
 describe('LspClient construction', () => {
   it('a typescript client has a spawn spec and is not disabled', () => {
-    const c = new LspClient({ workspaceRoot: '/tmp/proj', language: 'typescript' });
+    const c = new LspClient({
+      workspaceRoot: '/tmp/proj',
+      language: 'typescript',
+    });
     expect(c.getState()).toBe('initializing');
   });
 

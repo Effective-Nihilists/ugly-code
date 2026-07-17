@@ -97,7 +97,9 @@ export function ContextMenu({
         padding: 4,
         fontFamily: 'var(--font-label)',
       }}
-      onClick={(e) => { e.stopPropagation(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
     >
       {visible.map((item, i) => {
         // Divider before the first danger item that follows a non-danger one.
@@ -105,7 +107,13 @@ export function ContextMenu({
         return (
           <React.Fragment key={`${item.label}-${i}`}>
             {showDivider && (
-              <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+              <div
+                style={{
+                  height: 1,
+                  background: 'var(--border)',
+                  margin: '4px 0',
+                }}
+              />
             )}
             <button
               type="button"
@@ -136,7 +144,9 @@ export function ContextMenu({
                 opacity: item.disabled ? 0.5 : 1,
               }}
               onMouseEnter={(e) => {
-                if (!item.disabled) e.currentTarget.style.background = 'var(--bg-hover, rgba(127,127,127,0.12))';
+                if (!item.disabled)
+                  e.currentTarget.style.background =
+                    'var(--bg-hover, rgba(127,127,127,0.12))';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';

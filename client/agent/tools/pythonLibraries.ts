@@ -14,7 +14,10 @@ const SPEC: TextGenTool = {
   parameters: {
     type: 'object',
     properties: {
-      filter: { type: 'string', description: 'Case-insensitive substring to filter package names.' },
+      filter: {
+        type: 'string',
+        description: 'Case-insensitive substring to filter package names.',
+      },
     },
     required: [],
     additionalProperties: false,
@@ -32,13 +35,16 @@ export const pythonLibrariesTool: ToolModule = {
     if (res.code !== 0 && res.code !== null) {
       res = await spawnCollect('python', ['-m', 'pip', 'list'], opts);
     }
-    const filter = typeof input.filter === 'string' ? input.filter.toLowerCase() : '';
+    const filter =
+      typeof input.filter === 'string' ? input.filter.toLowerCase() : '';
     const lines = res.stdout
       .split('\n')
       .filter((l) => l.trim())
       .filter((l) => !filter || l.toLowerCase().includes(filter));
     if (lines.length === 0) {
-      return filter ? `(no installed packages match ${JSON.stringify(filter)})` : '(no packages found)';
+      return filter
+        ? `(no installed packages match ${JSON.stringify(filter)})`
+        : '(no packages found)';
     }
     return lines.join('\n');
   },

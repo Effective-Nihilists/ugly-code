@@ -25,7 +25,9 @@ test('drives a tool round-trip: tool_use → native fs → tool_result → final
   // Scripted model: first turn reads package.json, second turn answers.
   await page.addInitScript(() => {
     let n = 0;
-    (window as unknown as { __uglyCodeAgentStep: unknown }).__uglyCodeAgentStep = () => {
+    (
+      window as unknown as { __uglyCodeAgentStep: unknown }
+    ).__uglyCodeAgentStep = () => {
       n += 1;
       if (n === 1) {
         return Promise.resolve({
@@ -33,13 +35,21 @@ test('drives a tool round-trip: tool_use → native fs → tool_result → final
             role: 'assistant',
             content: [
               { type: 'text', text: 'Let me read the manifest.' },
-              { type: 'tool_use', id: 't1', name: 'read_file', input: { path: 'package.json' } },
+              {
+                type: 'tool_use',
+                id: 't1',
+                name: 'read_file',
+                input: { path: 'package.json' },
+              },
             ],
           },
         });
       }
       return Promise.resolve({
-        message: { role: 'assistant', content: 'This project is named ugly-code.' },
+        message: {
+          role: 'assistant',
+          content: 'This project is named ugly-code.',
+        },
       });
     };
   });
@@ -49,7 +59,9 @@ test('drives a tool round-trip: tool_use → native fs → tool_result → final
   // The agent pane is part of the IDE chrome (native available).
   await expect(page.locator('[data-id="agent-panel"]')).toBeVisible();
 
-  await page.locator('[data-id="agent-input"]').fill('What is this project called?');
+  await page
+    .locator('[data-id="agent-input"]')
+    .fill('What is this project called?');
   await page.locator('[data-id="agent-send"]').click();
 
   // Auto-waiting assertions: these only resolve AFTER the loop has dispatched the
@@ -57,13 +69,15 @@ test('drives a tool round-trip: tool_use → native fs → tool_result → final
   await expect(page.locator('[data-id="agent-user"]')).toContainText(
     'What is this project called?',
   );
-  await expect(page.locator('[data-id="agent-assistant"]').first()).toContainText(
-    'Let me read the manifest',
-  );
-  await expect(page.locator('[data-id="agent-tool"][data-tool="read_file"]')).toHaveCount(2); // call + result
-  await expect(page.locator('[data-id="agent-assistant"]').last()).toContainText(
-    'named ugly-code',
-  );
+  await expect(
+    page.locator('[data-id="agent-assistant"]').first(),
+  ).toContainText('Let me read the manifest');
+  await expect(
+    page.locator('[data-id="agent-tool"][data-tool="read_file"]'),
+  ).toHaveCount(2); // call + result
+  await expect(
+    page.locator('[data-id="agent-assistant"]').last(),
+  ).toContainText('named ugly-code');
 
   // The read_file tool bottomed out at the real native fs.readFile invoke.
   await mock.expectInvoked('fs.readFile', { path: 'package.json' });

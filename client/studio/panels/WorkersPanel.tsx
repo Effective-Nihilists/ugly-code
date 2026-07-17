@@ -120,7 +120,13 @@ export function WorkersPanel({
         setSelectedName(res.workers[0].name);
       }
     } catch (err) {
-      console.error('[WorkersPanel:workersGetManifest]', JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        '[WorkersPanel:workersGetManifest]',
+        JSON.stringify({
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setUnavailableReason(
         err instanceof Error ? err.message : 'Failed to load workers',
       );
@@ -137,7 +143,15 @@ export function WorkersPanel({
       });
       setRuns(res.runs);
     } catch (err) {
-      console.error('[WorkersPanel:workersListRuns]', JSON.stringify({ mode, name: selectedName === '' ? undefined : selectedName, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        '[WorkersPanel:workersListRuns]',
+        JSON.stringify({
+          mode,
+          name: selectedName === '' ? undefined : selectedName,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setRuns([]);
     }
   }, [socket, mode, selectedName, unavailableReason]);
@@ -196,11 +210,23 @@ export function WorkersPanel({
       // ENQUEUED (runs async on the server), so poll a few times to surface the run moving
       // queued → running → completed without a manual Refresh.
       void loadRuns();
-      if (mode === 'prod' && (res.status === 'queued' || res.status === 'running')) {
-        for (let i = 1; i <= 6; i++) setTimeout(() => void loadRuns(), i * 2000);
+      if (
+        mode === 'prod' &&
+        (res.status === 'queued' || res.status === 'running')
+      ) {
+        for (let i = 1; i <= 6; i++)
+          setTimeout(() => void loadRuns(), i * 2000);
       }
     } catch (err) {
-      console.error('[WorkersPanel:workersRun]', JSON.stringify({ name: selected.name, mode, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        '[WorkersPanel:workersRun]',
+        JSON.stringify({
+          name: selected.name,
+          mode,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setLastResult({
         status: 'failed',
         error: err instanceof Error ? err.message : String(err),
@@ -219,7 +245,15 @@ export function WorkersPanel({
       const res = await socket.request('workersGetRun', { runId, mode });
       setExpandedRun(res.run as WorkerRunDetail | null);
     } catch (err) {
-      console.error('[WorkersPanel:workersGetRun]', JSON.stringify({ runId, mode, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        '[WorkersPanel:workersGetRun]',
+        JSON.stringify({
+          runId,
+          mode,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setExpandedRun(null);
     }
   };
@@ -323,7 +357,9 @@ export function WorkersPanel({
             workers.map((w) => (
               <button
                 key={w.name}
-                onClick={() => { setSelectedName(w.name); }}
+                onClick={() => {
+                  setSelectedName(w.name);
+                }}
                 data-id={`worker-item-${w.name}`}
                 style={{
                   width: '100%',
@@ -502,8 +538,8 @@ export function WorkersPanel({
                     {running
                       ? 'Running…'
                       : mode === 'prod'
-                      ? 'Enqueue on Prod'
-                      : 'Run on Dev'}
+                        ? 'Enqueue on Prod'
+                        : 'Run on Dev'}
                   </button>
                 </div>
               </div>
@@ -544,10 +580,17 @@ export function WorkersPanel({
                     )}
                   </div>
                   {lastResult.status === 'queued' && (
-                    <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>
-                      Enqueued on production — it runs on the server queue. Watch it move to
-                      <b> running → completed</b> in <b>Recent runs</b> below (auto-refreshing),
-                      then click the run for its result + logs.
+                    <div
+                      style={{
+                        color: 'var(--text-secondary)',
+                        marginBottom: 4,
+                      }}
+                    >
+                      Enqueued on production — it runs on the server queue.
+                      Watch it move to
+                      <b> running → completed</b> in <b>Recent runs</b> below
+                      (auto-refreshing), then click the run for its result +
+                      logs.
                     </div>
                   )}
                   {lastResult.error && (

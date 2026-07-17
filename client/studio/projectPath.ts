@@ -25,7 +25,9 @@ export function getActiveProjectPath(): string | null {
     try {
       const p = new URLSearchParams(window.location.search).get('path');
       if (p) return p;
-    } catch { /* malformed URL — fall through to null */ }
+    } catch {
+      /* malformed URL — fall through to null */
+    }
   }
   return null;
 }

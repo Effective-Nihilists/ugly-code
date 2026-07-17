@@ -15,13 +15,17 @@ describe('resolveAuth', () => {
   });
   it('reads ~/.ugly-bot/auth.json when no flag', async () => {
     readFile.mockImplementation((p: string) =>
-      p === `${HOME}/.ugly-bot/auth.json` ? Promise.resolve(JSON.stringify({ token: 'STORED' })) : Promise.reject(new Error('ENOENT')),
+      p === `${HOME}/.ugly-bot/auth.json`
+        ? Promise.resolve(JSON.stringify({ token: 'STORED' }))
+        : Promise.reject(new Error('ENOENT')),
     );
     const r = await resolveAuth({ origin: 'https://x' });
     expect(r.token).toBe('STORED');
   });
   it('throws a login hint when nothing resolves', async () => {
     readFile.mockRejectedValue(new Error('ENOENT'));
-    await expect(resolveAuth({ origin: 'https://x' })).rejects.toThrow(/ugly-code --login/);
+    await expect(resolveAuth({ origin: 'https://x' })).rejects.toThrow(
+      /ugly-code --login/,
+    );
   });
 });

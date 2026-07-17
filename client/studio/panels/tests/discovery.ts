@@ -17,7 +17,13 @@ import {
   pytestCollectArgv,
   vitestCollectArgv,
 } from './runners';
-import { emptyTree, type RunnerAvailability, type TestCase, type TestRunner, type TestTree } from './types';
+import {
+  emptyTree,
+  type RunnerAvailability,
+  type TestCase,
+  type TestRunner,
+  type TestTree,
+} from './types';
 
 const COLLECT_TIMEOUT_MS = 90_000;
 
@@ -70,7 +76,9 @@ function hasDep(pkg: PackageJsonShape | null, name: string): boolean {
 // ── detection (config-file reads only) ───────────────────────────────────────
 
 /** Does this repo DECLARE the runner? (Says nothing about whether it's installed.) */
-export async function detectRunners(cwd: string): Promise<Record<TestRunner, boolean>> {
+export async function detectRunners(
+  cwd: string,
+): Promise<Record<TestRunner, boolean>> {
   const pkg = await readPackageJson(cwd);
 
   const vitest =
@@ -106,7 +114,8 @@ export function playwrightRootDirRel(listJson: string, cwd: string): string {
     const doc = JSON.parse(listJson) as { config?: { rootDir?: string } };
     const rootDir = doc.config?.rootDir;
     if (!rootDir) return '';
-    const norm = (s: string): string => s.replace(/\\/g, '/').replace(/\/+$/, '');
+    const norm = (s: string): string =>
+      s.replace(/\\/g, '/').replace(/\/+$/, '');
     const r = norm(rootDir);
     const c = norm(cwd);
     return r.startsWith(c + '/') ? r.slice(c.length + 1) : '';
@@ -129,10 +138,17 @@ async function collectVitest(
   cwd: string,
 ): Promise<{ cases: TestCase[]; avail: RunnerAvailability; note?: string }> {
   const { cmd, args } = vitestCollectArgv();
-  const r = await spawnCollect(cmd, args, { cwd, timeoutMs: COLLECT_TIMEOUT_MS });
+  const r = await spawnCollect(cmd, args, {
+    cwd,
+    timeoutMs: COLLECT_TIMEOUT_MS,
+  });
   if (r.code !== 0) {
     return looksNotInstalled(r.stderr, r.code)
-      ? { cases: [], avail: 'not-installed', note: 'vitest is not installed — run your package manager’s install.' }
+      ? {
+          cases: [],
+          avail: 'not-installed',
+          note: 'vitest is not installed — run your package manager’s install.',
+        }
       : { cases: [], avail: 'present', note: firstLine(r.stderr) };
   }
   return { cases: parseVitestList(r.stdout, cwd), avail: 'present' };
@@ -143,11 +159,18 @@ async function collectPytest(
   useUv: boolean,
 ): Promise<{ cases: TestCase[]; avail: RunnerAvailability; note?: string }> {
   const { cmd, args } = pytestCollectArgv(useUv);
-  const r = await spawnCollect(cmd, args, { cwd, timeoutMs: COLLECT_TIMEOUT_MS });
+  const r = await spawnCollect(cmd, args, {
+    cwd,
+    timeoutMs: COLLECT_TIMEOUT_MS,
+  });
   // pytest exits 5 when it collected nothing; that's "no tests", not a failure.
   if (r.code !== 0 && r.code !== 5) {
     return looksNotInstalled(r.stderr, r.code)
-      ? { cases: [], avail: 'not-installed', note: 'pytest is not installed — `pip install pytest` (or add uv).' }
+      ? {
+          cases: [],
+          avail: 'not-installed',
+          note: 'pytest is not installed — `pip install pytest` (or add uv).',
+        }
       : { cases: [], avail: 'present', note: firstLine(r.stderr || r.stdout) };
   }
   return { cases: parsePytestCollect(r.stdout), avail: 'present' };
@@ -157,10 +180,17 @@ async function collectPlaywright(
   cwd: string,
 ): Promise<{ cases: TestCase[]; avail: RunnerAvailability; note?: string }> {
   const { cmd, args } = playwrightCollectArgv();
-  const r = await spawnCollect(cmd, args, { cwd, timeoutMs: COLLECT_TIMEOUT_MS });
+  const r = await spawnCollect(cmd, args, {
+    cwd,
+    timeoutMs: COLLECT_TIMEOUT_MS,
+  });
   if (r.code !== 0) {
     return looksNotInstalled(r.stderr, r.code)
-      ? { cases: [], avail: 'not-installed', note: '@playwright/test is not installed.' }
+      ? {
+          cases: [],
+          avail: 'not-installed',
+          note: '@playwright/test is not installed.',
+        }
       : { cases: [], avail: 'present', note: firstLine(r.stderr) };
   }
   const rootDirRel = playwrightRootDirRel(r.stdout, cwd);
@@ -221,7 +251,9 @@ export async function collectTests(cwd: string): Promise<CollectResult> {
 }
 
 /** Group a runner's cases by file, preserving discovery order. */
-export function groupByFile(cases: TestCase[]): { file: string; cases: TestCase[] }[] {
+export function groupByFile(
+  cases: TestCase[],
+): { file: string; cases: TestCase[] }[] {
   const map = new Map<string, TestCase[]>();
   for (const c of cases) {
     const arr = map.get(c.file);

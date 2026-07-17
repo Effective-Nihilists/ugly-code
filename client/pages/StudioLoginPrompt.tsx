@@ -42,11 +42,17 @@ export default function StudioLoginPrompt(): React.ReactElement {
       }}
     >
       <div style={{ width: '100%', maxWidth: 360 }}>
-        <div style={{ fontWeight: 800, fontSize: 22, marginBottom: 8 }}>Ugly Code</div>
+        <div style={{ fontWeight: 800, fontSize: 22, marginBottom: 8 }}>
+          Ugly Code
+        </div>
         <p style={{ opacity: 0.7, maxWidth: 360, margin: '0 auto 16px' }}>
           Sign in with ugly.bot to open the IDE.
         </p>
-        <button data-id="studio-login-btn" onClick={openLogin} style={{ padding: '10px 18px' }}>
+        <button
+          data-id="studio-login-btn"
+          onClick={openLogin}
+          style={{ padding: '10px 18px' }}
+        >
           Sign in →
         </button>
       </div>

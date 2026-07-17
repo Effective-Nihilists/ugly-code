@@ -33,7 +33,10 @@ describe('composeSessionSnapshot (client-agent telemetry echo)', () => {
       patternMode: 'auto',
     });
     expect(snap.model).toBe('deepseek_v4_flash');
-    expect(snap.modelMode).toEqual({ kind: 'single', model: 'deepseek_v4_flash' });
+    expect(snap.modelMode).toEqual({
+      kind: 'single',
+      model: 'deepseek_v4_flash',
+    });
   });
 
   it('echoes a "none" pattern mode instead of resetting to "auto"', () => {

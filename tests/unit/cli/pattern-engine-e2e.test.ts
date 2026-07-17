@@ -42,34 +42,69 @@ interface CliJson {
   costUsd: number;
   turns: number;
   resolvedPattern: string | null;
-  config: { model: string | null; pattern: string | null; modelMode: unknown; toolset: string | null };
+  config: {
+    model: string | null;
+    pattern: string | null;
+    modelMode: unknown;
+    toolset: string | null;
+  };
 }
 
 /** Spawn the CLI as a subprocess with `--json` and parse the structured result. */
-async function runCli(extraArgs: string[]): Promise<{ code: number; json: CliJson | null; stdout: string; stderr: string }> {
+async function runCli(
+  extraArgs: string[],
+): Promise<{
+  code: number;
+  json: CliJson | null;
+  stdout: string;
+  stderr: string;
+}> {
   // Prefer the developer's real token (validated working); fall back to --test-user
   // when no auth.json is present. Real token bills AI to the logged-in user.
   const authArgs = AUTH?.token ? ['--token', AUTH.token] : ['--test-user'];
   const args = [
-    'exec', 'tsx', 'client/cli/index.ts',
-    '--eval', ...extraArgs,
-    '--model', CHEAP_MODEL,
+    'exec',
+    'tsx',
+    'client/cli/index.ts',
+    '--eval',
+    ...extraArgs,
+    '--model',
+    CHEAP_MODEL,
     '--json',
-    '--origin', ORIGIN,
+    '--origin',
+    ORIGIN,
     ...authArgs,
   ];
   try {
-    const { stdout, stderr } = await execFileP('pnpm', args, { cwd: process.cwd(), maxBuffer: 32 * 1024 * 1024, timeout: CASE_TIMEOUT_MS });
+    const { stdout, stderr } = await execFileP('pnpm', args, {
+      cwd: process.cwd(),
+      maxBuffer: 32 * 1024 * 1024,
+      timeout: CASE_TIMEOUT_MS,
+    });
     const line = stdout.trim().split('\n').filter(Boolean).pop() ?? '';
     let json: CliJson | null = null;
-    try { json = JSON.parse(line) as CliJson; } catch { /* non-JSON tail */ }
+    try {
+      json = JSON.parse(line) as CliJson;
+    } catch {
+      /* non-JSON tail */
+    }
     return { code: 0, json, stdout, stderr };
   } catch (e) {
     const err = e as { code?: number; stdout?: string; stderr?: string };
-    const line = (err.stdout ?? '').trim().split('\n').filter(Boolean).pop() ?? '';
+    const line =
+      (err.stdout ?? '').trim().split('\n').filter(Boolean).pop() ?? '';
     let json: CliJson | null = null;
-    try { json = JSON.parse(line) as CliJson; } catch { /* none */ }
-    return { code: typeof err.code === 'number' ? err.code : 1, json, stdout: err.stdout ?? '', stderr: err.stderr ?? '' };
+    try {
+      json = JSON.parse(line) as CliJson;
+    } catch {
+      /* none */
+    }
+    return {
+      code: typeof err.code === 'number' ? err.code : 1,
+      json,
+      stdout: err.stdout ?? '',
+      stderr: err.stderr ?? '',
+    };
   }
 }
 
@@ -81,74 +116,147 @@ function expectRan(json: CliJson | null): asserts json is CliJson {
   expect(json!.turns).toBeGreaterThan(0); // a real turn happened (not a silent auth/model failure)
 }
 
-describe.skipIf(!ENABLED)('CLI e2e — pattern engine (real models, deepseek_v4_flash)', () => {
-  // ── A. Classifier routing accuracy (--pattern auto) ────────────────────────
-  // Assert the router sends each task shape to the right pattern family. A miss
-  // here is the #1 harness-improvement signal (CODING.md §18.1 classifier eval).
-  describe('A. auto-classifier routing', () => {
-    const routing: Array<{ task: string; expectFamily: string[]; why: string }> = [
-      { task: 'bug-fix-null-check', expectFamily: ['investigate-fix', 'super-investigate-fix', 'quick-edit'], why: 'a bug repair → an investigate/fix family, never spec-build-verify' },
-      { task: 'feature-add-util', expectFamily: ['spec-build-verify', 'super-spec-build-verify'], why: 'a novel feature → spec-build-verify family' },
-      { task: 'todo-app-spec', expectFamily: ['spec-build-verify', 'super-spec-build-verify', 'chat-advisory'], why: 'a planning/spec task → spec or advisory' },
-    ];
-    for (const c of routing) {
-      it(`routes ${c.task} to ${c.expectFamily.join('|')} (${c.why})`, { timeout: CASE_TIMEOUT_MS }, async () => {
-        const { json } = await runCli([c.task, '--pattern', 'auto']);
-        expectRan(json);
-        // resolvedPattern may be null if the classifier wasn't confident (plain send);
-        // when set, it must be in the expected family. Record misroutes for tuning.
-        if (json.resolvedPattern) expect(c.expectFamily, `misroute: got ${json.resolvedPattern}`).toContain(json.resolvedPattern);
-      });
-    }
-  });
+describe.skipIf(!ENABLED)(
+  'CLI e2e — pattern engine (real models, deepseek_v4_flash)',
+  () => {
+    // ── A. Classifier routing accuracy (--pattern auto) ────────────────────────
+    // Assert the router sends each task shape to the right pattern family. A miss
+    // here is the #1 harness-improvement signal (CODING.md §18.1 classifier eval).
+    describe('A. auto-classifier routing', () => {
+      const routing: Array<{
+        task: string;
+        expectFamily: string[];
+        why: string;
+      }> = [
+        {
+          task: 'bug-fix-null-check',
+          expectFamily: [
+            'investigate-fix',
+            'super-investigate-fix',
+            'quick-edit',
+          ],
+          why: 'a bug repair → an investigate/fix family, never spec-build-verify',
+        },
+        {
+          task: 'feature-add-util',
+          expectFamily: ['spec-build-verify', 'super-spec-build-verify'],
+          why: 'a novel feature → spec-build-verify family',
+        },
+        {
+          task: 'todo-app-spec',
+          expectFamily: [
+            'spec-build-verify',
+            'super-spec-build-verify',
+            'chat-advisory',
+          ],
+          why: 'a planning/spec task → spec or advisory',
+        },
+      ];
+      for (const c of routing) {
+        it(
+          `routes ${c.task} to ${c.expectFamily.join('|')} (${c.why})`,
+          { timeout: CASE_TIMEOUT_MS },
+          async () => {
+            const { json } = await runCli([c.task, '--pattern', 'auto']);
+            expectRan(json);
+            // resolvedPattern may be null if the classifier wasn't confident (plain send);
+            // when set, it must be in the expected family. Record misroutes for tuning.
+            if (json.resolvedPattern)
+              expect(
+                c.expectFamily,
+                `misroute: got ${json.resolvedPattern}`,
+              ).toContain(json.resolvedPattern);
+          },
+        );
+      }
+    });
 
-  // ── B. Per-pattern step execution (pinned) ─────────────────────────────────
-  // Pin each pattern and assert it runs to a graded result within budget. Score
-  // is advisory (cheap models don't solve everything) — the assertion is that the
-  // engine EXECUTED and produced an objective grade, not that it always wins.
-  describe('B. per-pattern execution', () => {
-    const pinned: Array<{ task: string; pattern: string }> = [
-      { task: 'bug-fix-ts-error', pattern: 'quick-edit' },
-      { task: 'bug-fix-indirect-cause', pattern: 'investigate-fix' },
-      { task: 'feature-add-util', pattern: 'spec-build-verify' },
-    ];
-    for (const c of pinned) {
-      it(`runs ${c.pattern} on ${c.task} to a graded result within budget`, { timeout: CASE_TIMEOUT_MS }, async () => {
-        const { json } = await runCli([c.task, '--pattern', c.pattern]);
-        expectRan(json);
-        expect(json.score).toBeGreaterThanOrEqual(0);
-        expect(json.score).toBeLessThanOrEqual(json.scoreMax);
-        // Cost stays low on the cheap model — a blown budget is a harness signal.
-        expect(json.costUsd, `unexpectedly expensive: $${json.costUsd}`).toBeLessThan(1.0);
-      });
-    }
-  });
+    // ── B. Per-pattern step execution (pinned) ─────────────────────────────────
+    // Pin each pattern and assert it runs to a graded result within budget. Score
+    // is advisory (cheap models don't solve everything) — the assertion is that the
+    // engine EXECUTED and produced an objective grade, not that it always wins.
+    describe('B. per-pattern execution', () => {
+      const pinned: Array<{ task: string; pattern: string }> = [
+        { task: 'bug-fix-ts-error', pattern: 'quick-edit' },
+        { task: 'bug-fix-indirect-cause', pattern: 'investigate-fix' },
+        { task: 'feature-add-util', pattern: 'spec-build-verify' },
+      ];
+      for (const c of pinned) {
+        it(
+          `runs ${c.pattern} on ${c.task} to a graded result within budget`,
+          { timeout: CASE_TIMEOUT_MS },
+          async () => {
+            const { json } = await runCli([c.task, '--pattern', c.pattern]);
+            expectRan(json);
+            expect(json.score).toBeGreaterThanOrEqual(0);
+            expect(json.score).toBeLessThanOrEqual(json.scoreMax);
+            // Cost stays low on the cheap model — a blown budget is a harness signal.
+            expect(
+              json.costUsd,
+              `unexpectedly expensive: $${json.costUsd}`,
+            ).toBeLessThan(1.0);
+          },
+        );
+      }
+    });
 
-  // ── C. Model axis (single / max / group) ───────────────────────────────────
-  // One shared cheap task across the three peer modes. Assert each completes and
-  // produces a grade; max/group apply a winner's diff. Kept to one task to bound
-  // cost (max/group spawn N peers).
-  describe('C. model axis', () => {
-    const task = 'bug-fix-null-check';
-    it('single mode (baseline) runs', { timeout: CASE_TIMEOUT_MS }, async () => {
-      const { json } = await runCli([task, '--model-mode', `single:${CHEAP_MODEL}`]);
-      expectRan(json);
+    // ── C. Model axis (single / max / group) ───────────────────────────────────
+    // One shared cheap task across the three peer modes. Assert each completes and
+    // produces a grade; max/group apply a winner's diff. Kept to one task to bound
+    // cost (max/group spawn N peers).
+    describe('C. model axis', () => {
+      const task = 'bug-fix-null-check';
+      it(
+        'single mode (baseline) runs',
+        { timeout: CASE_TIMEOUT_MS },
+        async () => {
+          const { json } = await runCli([
+            task,
+            '--model-mode',
+            `single:${CHEAP_MODEL}`,
+          ]);
+          expectRan(json);
+        },
+      );
+      it(
+        'max mode spawns peers + picks a winner',
+        { timeout: CASE_TIMEOUT_MS },
+        async () => {
+          const { json } = await runCli([
+            task,
+            '--pattern',
+            'quick-edit',
+            '--model-mode',
+            'max',
+          ]);
+          expectRan(json);
+        },
+      );
+      it(
+        'group mode (explicit peer pool) runs personas + picker',
+        { timeout: CASE_TIMEOUT_MS },
+        async () => {
+          const { json } = await runCli([
+            task,
+            '--group-models',
+            `${CHEAP_MODEL},${CHEAP_MODEL}`,
+          ]);
+          expectRan(json);
+        },
+      );
     });
-    it('max mode spawns peers + picks a winner', { timeout: CASE_TIMEOUT_MS }, async () => {
-      const { json } = await runCli([task, '--pattern', 'quick-edit', '--model-mode', 'max']);
-      expectRan(json);
-    });
-    it('group mode (explicit peer pool) runs personas + picker', { timeout: CASE_TIMEOUT_MS }, async () => {
-      const { json } = await runCli([task, '--group-models', `${CHEAP_MODEL},${CHEAP_MODEL}`]);
-      expectRan(json);
-    });
-  });
-});
+  },
+);
 
 // A trivial always-on assertion so the file isn't "empty" when the suite is skipped
 // (documents the gate for anyone running the default unit suite).
 describe('CLI e2e gating', () => {
-  it(ENABLED ? 'is ENABLED (real-smoke)' : 'is skipped (set RUN_REAL_SMOKE=1 + UGLY_CODE_ORIGIN)', () => {
-    expect(typeof ENABLED).toBe('boolean');
-  });
+  it(
+    ENABLED
+      ? 'is ENABLED (real-smoke)'
+      : 'is skipped (set RUN_REAL_SMOKE=1 + UGLY_CODE_ORIGIN)',
+    () => {
+      expect(typeof ENABLED).toBe('boolean');
+    },
+  );
 });

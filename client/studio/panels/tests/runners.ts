@@ -32,12 +32,28 @@ export function vitestCollectArgv(): Argv {
 
 export function pytestCollectArgv(useUv: boolean): Argv {
   return useUv
-    ? { cmd: 'uv', args: ['run', 'pytest', '--collect-only', '-q', '-p', 'no:cacheprovider'] }
-    : { cmd: 'pytest', args: ['--collect-only', '-q', '-p', 'no:cacheprovider'] };
+    ? {
+        cmd: 'uv',
+        args: [
+          'run',
+          'pytest',
+          '--collect-only',
+          '-q',
+          '-p',
+          'no:cacheprovider',
+        ],
+      }
+    : {
+        cmd: 'pytest',
+        args: ['--collect-only', '-q', '-p', 'no:cacheprovider'],
+      };
 }
 
 export function playwrightCollectArgv(): Argv {
-  return { cmd: 'npx', args: ['--no-install', 'playwright', 'test', '--list', '--reporter=json'] };
+  return {
+    cmd: 'npx',
+    args: ['--no-install', 'playwright', 'test', '--list', '--reporter=json'],
+  };
 }
 
 // ── run ──────────────────────────────────────────────────────────────────────
@@ -47,7 +63,10 @@ export function playwrightCollectArgv(): Argv {
  * `report.path` on exit. vitest accepts repeated `--reporter` flags plus a
  * per-reporter `--outputFile.json`.
  */
-export function vitestRunArgv(report: ReportTarget, selector?: TestSelector): Argv {
+export function vitestRunArgv(
+  report: ReportTarget,
+  selector?: TestSelector,
+): Argv {
   const args = ['--no-install', 'vitest', 'run'];
   if (selector?.runner === 'vitest') {
     args.push(selector.file);
@@ -61,7 +80,11 @@ export function vitestRunArgv(report: ReportTarget, selector?: TestSelector): Ar
   } else if (selector) {
     throw new Error(`vitestRunArgv got a ${selector.runner} selector`);
   }
-  args.push('--reporter=tap-flat', '--reporter=json', `--outputFile.json=${report.path}`);
+  args.push(
+    '--reporter=tap-flat',
+    '--reporter=json',
+    `--outputFile.json=${report.path}`,
+  );
   return { cmd: 'npx', args };
 }
 
@@ -91,7 +114,12 @@ export function pytestRunArgv(
   useUv: boolean,
   target?: string,
 ): Argv {
-  const pytestArgs = ['-v', '-p', 'no:cacheprovider', `--junit-xml=${report.path}`];
+  const pytestArgs = [
+    '-v',
+    '-p',
+    'no:cacheprovider',
+    `--junit-xml=${report.path}`,
+  ];
   // pytest nodeids are exact and unique — no regex, no escaping. Passed as a
   // single argv element, so brackets in `test_param[1]` are safe.
   if (target) pytestArgs.push(target);
@@ -121,7 +149,8 @@ export function playwrightRunArgv(
   }
   // A run-all across chromium+firefox+webkit is a 3x blow-up and minutes long.
   // The panel defaults to one project and says so.
-  if (!selector?.project && opts?.singleProject) args.push('--project', opts.singleProject);
+  if (!selector?.project && opts?.singleProject)
+    args.push('--project', opts.singleProject);
   args.push('--reporter=list,json');
   return {
     cmd: 'npx',
@@ -138,7 +167,11 @@ export function playwrightRunFileArgv(
   const args = ['--no-install', 'playwright', 'test', file];
   if (opts?.singleProject) args.push('--project', opts.singleProject);
   args.push('--reporter=list,json');
-  return { cmd: 'npx', args, env: { PLAYWRIGHT_JSON_OUTPUT_NAME: report.path } };
+  return {
+    cmd: 'npx',
+    args,
+    env: { PLAYWRIGHT_JSON_OUTPUT_NAME: report.path },
+  };
 }
 
 /** Build the run argv for a single test, from its selector alone. */
@@ -158,7 +191,10 @@ export function runOneArgv(
 }
 
 /** Signature of a "command not found / package missing" collect failure. */
-export function looksNotInstalled(stderr: string, code: number | null): boolean {
+export function looksNotInstalled(
+  stderr: string,
+  code: number | null,
+): boolean {
   const s = stderr.toLowerCase();
   return (
     code === 127 ||

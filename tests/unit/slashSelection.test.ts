@@ -10,19 +10,28 @@ import { resolveSlashSelection } from '../../client/studio/hooks/useSlashCommand
 describe('resolveSlashSelection', () => {
   it('resolves a built-in command (kind) to a run-command action', () => {
     expect(
-      resolveSlashSelection({ name: 'clear', kind: 'command', scope: 'command' }),
+      resolveSlashSelection({
+        name: 'clear',
+        kind: 'command',
+        scope: 'command',
+      }),
     ).toEqual({ type: 'run-command', name: 'clear' });
   });
 
   it('treats scope:"command" as a command even without an explicit kind', () => {
-    expect(
-      resolveSlashSelection({ name: 'clear', scope: 'command' }),
-    ).toEqual({ type: 'run-command', name: 'clear' });
+    expect(resolveSlashSelection({ name: 'clear', scope: 'command' })).toEqual({
+      type: 'run-command',
+      name: 'clear',
+    });
   });
 
   it('resolves a disk skill to an insert-skill action', () => {
     expect(
-      resolveSlashSelection({ name: 'fix-code', kind: 'skill', scope: 'project' }),
+      resolveSlashSelection({
+        name: 'fix-code',
+        kind: 'skill',
+        scope: 'project',
+      }),
     ).toEqual({ type: 'insert-skill', name: 'fix-code' });
   });
 });

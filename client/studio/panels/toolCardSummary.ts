@@ -68,7 +68,11 @@ export function parseGrepOutput(
     // … followed by "  Line N[, Char M]: text"
     const hitMatch = /^\s+Line (\d+)(?:, Char \d+)?:\s?(.*)$/.exec(line);
     if (hitMatch && currentFile) {
-      hits.push({ file: currentFile, line: parseInt(hitMatch[1], 10), text: hitMatch[2] });
+      hits.push({
+        file: currentFile,
+        line: parseInt(hitMatch[1], 10),
+        text: hitMatch[2],
+      });
     }
   }
   if (hits.length === 0) return null;
@@ -81,11 +85,17 @@ export function parseGrepOutput(
  * parses as a hit, so a grep that matched 3 files badged "0 matches" while its own body
  * listed them. Count what the mode actually returns.
  */
-export function grepResultCount(text: string, mode: string | undefined): number {
+export function grepResultCount(
+  text: string,
+  mode: string | undefined,
+): number {
   if (isNoResultSentinel(text)) return 0;
   if (mode === 'files_with_matches') {
     // rg -l: one path per line.
-    return text.split('\n').map((l) => l.trim()).filter(Boolean).length;
+    return text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean).length;
   }
   if (mode === 'count') {
     // rg -c: "path:N" per line — the badge means total matches, so sum them.
@@ -129,7 +139,8 @@ export function searchBadge(
   parse: (text: string) => number,
 ): CardBadge {
   if (status === 'error') return { kind: 'failed' };
-  if (status === 'running' || status === 'executing') return { kind: 'running' };
+  if (status === 'running' || status === 'executing')
+    return { kind: 'running' };
   const text = result ?? '';
   const count = metaCount ?? parse(text);
   return { kind: 'count', count, truncated };
@@ -149,7 +160,9 @@ export function badgeLabel(badge: CardBadge, noun: 'match' | 'file'): string {
  * tool diffed the real file bodies, whereas the card can only guess (anchor edits carry
  * no old_string, so a guess reports every replacement as a pure addition).
  */
-export function parseEditStat(result: string | undefined): { added: number; removed: number } | null {
+export function parseEditStat(
+  result: string | undefined,
+): { added: number; removed: number } | null {
   const m = /\(\+(\d+)\s*[−-](\d+)\)\s*$/.exec((result ?? '').trim());
   return m ? { added: parseInt(m[1], 10), removed: parseInt(m[2], 10) } : null;
 }
@@ -163,14 +176,22 @@ export function parseEditStat(result: string | undefined): { added: number; remo
  */
 export function grepOperationName(mode: string | undefined): string {
   switch (mode) {
-    case 'lsp-diagnostics': return 'typecheck';
-    case 'lsp-defs': return 'find definition';
-    case 'lsp-refs': return 'find references';
-    case 'lsp-impls': return 'find implementations';
-    case 'semantic': return 'semantic search';
-    case 'fts': return 'text search';
-    case 'mixed': return 'hybrid search';
-    default: return 'grep';
+    case 'lsp-diagnostics':
+      return 'typecheck';
+    case 'lsp-defs':
+      return 'find definition';
+    case 'lsp-refs':
+      return 'find references';
+    case 'lsp-impls':
+      return 'find implementations';
+    case 'semantic':
+      return 'semantic search';
+    case 'fts':
+      return 'text search';
+    case 'mixed':
+      return 'hybrid search';
+    default:
+      return 'grep';
   }
 }
 

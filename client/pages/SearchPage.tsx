@@ -16,7 +16,9 @@ export default function SearchPage(): React.ReactElement {
     <PageLayout
       header={
         <div>
-          <a href="/" data-id="search-home">← Home</a>
+          <a href="/" data-id="search-home">
+            ← Home
+          </a>
         </div>
       }
     >

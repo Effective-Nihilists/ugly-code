@@ -19,7 +19,11 @@ const SPEC: TextGenTool = {
   parameters: {
     type: 'object',
     properties: {
-      name: { type: 'string', description: 'Exact tool name, or a short description of the capability.' },
+      name: {
+        type: 'string',
+        description:
+          'Exact tool name, or a short description of the capability.',
+      },
       purpose: { type: 'string', description: 'Why you need it.' },
     },
     required: ['name'],

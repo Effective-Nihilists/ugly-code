@@ -15,12 +15,7 @@ import {
 } from './daemon.js';
 
 export type IndexerState =
-  | 'idle'
-  | 'starting'
-  | 'indexing'
-  | 'ready'
-  | 'error'
-  | 'closed';
+  'idle' | 'starting' | 'indexing' | 'ready' | 'error' | 'closed';
 
 export type IndexerPhase = 'scanning' | 'chunking' | 'embedding' | 'committing';
 
@@ -103,7 +98,10 @@ function httpJson(
         path: endpoint,
         method,
         headers: payload
-          ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+          ? {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(payload),
+            }
           : {},
       },
       (res) => {
@@ -119,7 +117,9 @@ function httpJson(
     // Our ONLY deadline. Fires on socket inactivity, so a daemon that is
     // actively streaming a response keeps the request alive.
     req.setTimeout(timeoutMs, () => {
-      req.destroy(new Error(`indexer ${endpoint}: timed out after ${timeoutMs}ms`));
+      req.destroy(
+        new Error(`indexer ${endpoint}: timed out after ${timeoutMs}ms`),
+      );
     });
     req.on('error', reject);
     if (payload) req.write(payload);
@@ -158,7 +158,9 @@ export class IndexerClient {
         try {
           data = JSON.parse(res.text);
         } catch {
-          throw new Error(`invalid JSON from indexer: ${res.text.slice(0, 200)}`);
+          throw new Error(
+            `invalid JSON from indexer: ${res.text.slice(0, 200)}`,
+          );
         }
         if (!res.ok) {
           const errVal = (data as Record<string, unknown>).error;
@@ -174,7 +176,8 @@ export class IndexerClient {
           ((err as { code?: string }).code === 'ECONNREFUSED' ||
             err.message.includes('ECONNREFUSED') ||
             err.message.includes('fetch failed') ||
-            (err as { cause?: { code?: string } }).cause?.code === 'ECONNREFUSED');
+            (err as { cause?: { code?: string } }).cause?.code ===
+              'ECONNREFUSED');
         if (!transient || attempted >= 1 || Date.now() >= deadline) throw err;
         attempted += 1;
         invalidateDaemonCache();

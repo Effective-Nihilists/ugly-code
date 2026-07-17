@@ -204,7 +204,10 @@ export function applyHashlineOp(body: string, op: HashlineOp): ApplyResult {
       ...op.newContent.split('\n'),
       ...lines.slice(op.anchor.lineNumber),
     ];
-    return { ok: true, newBody: out.join('\n') + (trailingNewline ? '\n' : '') };
+    return {
+      ok: true,
+      newBody: out.join('\n') + (trailingNewline ? '\n' : ''),
+    };
   }
 
   if (op.kind === 'replace_range') {
@@ -217,7 +220,10 @@ export function applyHashlineOp(body: string, op: HashlineOp): ApplyResult {
       ...op.newContent.split('\n'),
       ...lines.slice(op.range.end.lineNumber),
     ];
-    return { ok: true, newBody: out.join('\n') + (trailingNewline ? '\n' : '') };
+    return {
+      ok: true,
+      newBody: out.join('\n') + (trailingNewline ? '\n' : ''),
+    };
   }
 
   if (op.kind === 'insert_after') {
@@ -228,7 +234,10 @@ export function applyHashlineOp(body: string, op: HashlineOp): ApplyResult {
       ...op.newContent.split('\n'),
       ...lines.slice(op.anchor.lineNumber),
     ];
-    return { ok: true, newBody: out.join('\n') + (trailingNewline ? '\n' : '') };
+    return {
+      ok: true,
+      newBody: out.join('\n') + (trailingNewline ? '\n' : ''),
+    };
   }
 
   // op.kind is type-narrowed to 'delete_range' here; keep the explicit guard +
@@ -243,7 +252,10 @@ export function applyHashlineOp(body: string, op: HashlineOp): ApplyResult {
       ...lines.slice(0, op.range.start.lineNumber - 1),
       ...lines.slice(op.range.end.lineNumber),
     ];
-    return { ok: true, newBody: out.join('\n') + (trailingNewline ? '\n' : '') };
+    return {
+      ok: true,
+      newBody: out.join('\n') + (trailingNewline ? '\n' : ''),
+    };
   }
 
   return diag('unknown hashline op');

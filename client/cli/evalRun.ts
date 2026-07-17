@@ -14,7 +14,11 @@ import type { EvalGradeResult, SessionSnapshot } from '../studio/shared/api';
 import { spawnCollect } from '../agent/tools/spawn';
 import { bootDriver, runTurn } from './taskDriver';
 import { isClaudeCliModel } from '../studio/agent/claudeCliAgent';
-import { setSessionToolset, setSessionEval, setSessionMaxTurns } from '../studio/agent/clientAgent';
+import {
+  setSessionToolset,
+  setSessionEval,
+  setSessionMaxTurns,
+} from '../studio/agent/clientAgent';
 import { isToolset } from '../studio/agent/toolsets';
 import { appendRunHistory } from '../studio/evals/history';
 
@@ -28,7 +32,11 @@ const ZERO_TOTALS: EvalGradeResult['runTotals'] = {
 };
 
 /** Clone the task's fixture repo into ~/.ugly-code/eval-projects/<task>-<stamp> and re-init git. */
-async function cloneFixture(taskName: string, repoUrl: string | undefined, label?: string): Promise<string> {
+async function cloneFixture(
+  taskName: string,
+  repoUrl: string | undefined,
+  label?: string,
+): Promise<string> {
   const safe = taskName.replace(/[^a-zA-Z0-9_.-]/g, '_');
   // Include the model/config label in the folder name so a 3-model compare leaves
   // three DISTINGUISHABLE workspaces (e.g. boss-chatgpt-clone__glm_5_2-<ts>) instead
@@ -60,7 +68,9 @@ async function cloneFixture(taskName: string, repoUrl: string | undefined, label
       `${seedGit} && pwd`;
   // Node child_process (not native.process) — this is CLI infra that runs before
   // the agent's UglyNative + permissions are installed.
-  const { stdout } = await execFileP('bash', ['-lc', cmd], { maxBuffer: 16 * 1024 * 1024 });
+  const { stdout } = await execFileP('bash', ['-lc', cmd], {
+    maxBuffer: 16 * 1024 * 1024,
+  });
   const path = stdout.trim().split('\n').pop() ?? '';
   if (!path) throw new Error('fixture clone failed (no path printed)');
   return path;
@@ -72,32 +82,61 @@ async function cloneFixture(taskName: string, repoUrl: string | undefined, label
  *  only the brief and declares `setup` = `npx ugly-app@latest init …`, so every run
  *  gets the current framework. Amending the baseline keeps the scaffold out of the
  *  agent's graded diff (only the agent's edits show). No-op when `setup` is absent. */
-async function runSetup(task: { setup?: unknown }, projectPath: string): Promise<void> {
+async function runSetup(
+  task: { setup?: unknown },
+  projectPath: string,
+): Promise<void> {
   const s = task.setup as { command?: string; args?: string[] } | undefined;
   if (!s?.command || !Array.isArray(s.args)) return;
-  process.stderr.write(`[setup] ${s.command} ${s.args.join(' ').slice(0, 100)}\n`);
+  process.stderr.write(
+    `[setup] ${s.command} ${s.args.join(' ').slice(0, 100)}\n`,
+  );
   const r = await spawnCollect(s.command, s.args, { cwd: projectPath });
-  if (r.code !== 0 && r.code !== null) process.stderr.write(`[setup] exit ${r.code}: ${r.stderr.slice(-500)}\n`);
+  if (r.code !== 0 && r.code !== null)
+    process.stderr.write(`[setup] exit ${r.code}: ${r.stderr.slice(-500)}\n`);
   // Fold the scaffold into the baseline seed so `git diff HEAD` = the agent's edits only.
-  await spawnCollect('bash', ['-lc', `cd ${JSON.stringify(projectPath)} && git add -A && git -c user.email=eval@ugly.bot -c user.name=eval commit -q --amend --no-edit || true`], {});
+  await spawnCollect(
+    'bash',
+    [
+      '-lc',
+      `cd ${JSON.stringify(projectPath)} && git add -A && git -c user.email=eval@ugly.bot -c user.name=eval commit -q --amend --no-edit || true`,
+    ],
+    {},
+  );
 }
 
 /** Run a task's reproSetup (SBP: uv venv + pip install) so the agent + grader can
  *  run the repo's tests. `uv` is resolved via ~/.ugly-bot/binaries and put on PATH. */
-async function runReproSetup(task: { reproSetup?: { commands: string[] } }, projectPath: string): Promise<void> {
+async function runReproSetup(
+  task: { reproSetup?: { commands: string[] } },
+  projectPath: string,
+): Promise<void> {
   const cmds = task.reproSetup?.commands;
   if (!cmds?.length) return;
   const uv = await ensureUv();
   const uvDir = uv.slice(0, uv.lastIndexOf('/'));
   for (const cmd of cmds) {
-    const r = await spawnCollect('bash', ['-lc', `cd ${JSON.stringify(projectPath)} && export PATH=${JSON.stringify(uvDir)}:"$PATH" && ${cmd}`], {});
-    if (r.code !== 0 && r.code !== null) process.stderr.write(`[reproSetup] '${cmd.slice(0, 60)}' exit ${r.code}: ${r.stderr.slice(-300)}\n`);
+    const r = await spawnCollect(
+      'bash',
+      [
+        '-lc',
+        `cd ${JSON.stringify(projectPath)} && export PATH=${JSON.stringify(uvDir)}:"$PATH" && ${cmd}`,
+      ],
+      {},
+    );
+    if (r.code !== 0 && r.code !== null)
+      process.stderr.write(
+        `[reproSetup] '${cmd.slice(0, 60)}' exit ${r.code}: ${r.stderr.slice(-300)}\n`,
+      );
   }
 }
 
 const cliGradeDeps: GradeDeps = {
   run: async (cmd, args, cwd, timeoutMs) => {
-    const r = await spawnCollect(cmd, args, { cwd, ...(timeoutMs ? { timeoutMs } : {}) });
+    const r = await spawnCollect(cmd, args, {
+      cwd,
+      ...(timeoutMs ? { timeoutMs } : {}),
+    });
     return { out: r.stdout + r.stderr, code: r.code };
   },
   readFile: async (p) => {
@@ -133,7 +172,14 @@ async function claudeJudge(system: string, user: string): Promise<string> {
     try {
       const { stdout } = await execFileP(
         'claude',
-        ['--print', '--output-format', 'json', '--model', GRADER_JUDGE_MODEL, prompt],
+        [
+          '--print',
+          '--output-format',
+          'json',
+          '--model',
+          GRADER_JUDGE_MODEL,
+          prompt,
+        ],
         { maxBuffer: 32 * 1024 * 1024, timeout: 180_000 },
       );
       const result = (JSON.parse(stdout) as { result?: string }).result ?? '';
@@ -142,7 +188,9 @@ async function claudeJudge(system: string, user: string): Promise<string> {
     } catch (e) {
       lastErr = e;
     }
-    process.stderr.write(`[claudeJudge] attempt ${attempt}/3 failed (${GRADER_JUDGE_MODEL}): ${lastErr instanceof Error ? lastErr.message : String(lastErr)}\n`);
+    process.stderr.write(
+      `[claudeJudge] attempt ${attempt}/3 failed (${GRADER_JUDGE_MODEL}): ${lastErr instanceof Error ? lastErr.message : String(lastErr)}\n`,
+    );
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
@@ -171,7 +219,18 @@ async function readTranscriptRows(
   const dir = sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_');
   try {
     const raw = await readFile(`${storeRoot}/${dir}/messages.jsonl`, 'utf8');
-    return raw.split('\n').filter(Boolean).map((l) => JSON.parse(l) as { seq: number; role: string; kind: string; content: string });
+    return raw
+      .split('\n')
+      .filter(Boolean)
+      .map(
+        (l) =>
+          JSON.parse(l) as {
+            seq: number;
+            role: string;
+            kind: string;
+            content: string;
+          },
+      );
   } catch {
     return [];
   }
@@ -179,40 +238,96 @@ async function readTranscriptRows(
 
 /** The agent's last assistant message text — evidence for judge grading of
  *  planning / write-to-spec tasks whose output isn't a code diff. */
-async function readFinalText(storeRoot: string, sessionId: string): Promise<string | undefined> {
+async function readFinalText(
+  storeRoot: string,
+  sessionId: string,
+): Promise<string | undefined> {
   const dir = sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_');
   try {
     const raw = await readFile(`${storeRoot}/${dir}/messages.jsonl`, 'utf8');
-    const rows = raw.split('\n').filter(Boolean).map((l) => JSON.parse(l) as { role: string; content: string });
+    const rows = raw
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { role: string; content: string });
     for (let i = rows.length - 1; i >= 0; i--) {
       if (rows[i].role !== 'assistant') continue;
-      const parsed = JSON.parse(rows[i].content) as { content?: { type?: string; text?: string }[] };
-      const text = (parsed.content ?? []).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('\n').trim();
+      const parsed = JSON.parse(rows[i].content) as {
+        content?: { type?: string; text?: string }[];
+      };
+      const text = (parsed.content ?? [])
+        .filter((b) => b.type === 'text')
+        .map((b) => b.text ?? '')
+        .join('\n')
+        .trim();
       if (text) return text;
     }
-  } catch { /* none */ }
+  } catch {
+    /* none */
+  }
   return undefined;
 }
 
-export interface EvalRunResult { score: number; scoreMax: number; costUsd: number; turns: number; resolvedPattern: string | null }
+export interface EvalRunResult {
+  score: number;
+  scoreMax: number;
+  costUsd: number;
+  turns: number;
+  resolvedPattern: string | null;
+}
 
 /** Follow-up sent to resume a session that crashed mid-run (status:error). */
 const RESUME_NUDGE = 'Continue where you left off and complete the task.';
 
 /** Read the run's cost + turn count from the fs session store's metadata. */
-async function readRunTotals(storeRoot: string, sessionId: string): Promise<{ costUsd: number; turns: number; durationMs: number; tokens?: { input: number; output: number; cacheRead: number; cacheCreate: number } }> {
+async function readRunTotals(
+  storeRoot: string,
+  sessionId: string,
+): Promise<{
+  costUsd: number;
+  turns: number;
+  durationMs: number;
+  tokens?: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheCreate: number;
+  };
+}> {
   const dir = sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_');
   try {
-    const m = JSON.parse(await readFile(`${storeRoot}/${dir}/metadata.json`, 'utf8')) as {
-      costUsd?: number; messageCount?: number; created?: number; updated?: number;
-      promptTokens?: number; completionTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number;
+    const m = JSON.parse(
+      await readFile(`${storeRoot}/${dir}/metadata.json`, 'utf8'),
+    ) as {
+      costUsd?: number;
+      messageCount?: number;
+      created?: number;
+      updated?: number;
+      promptTokens?: number;
+      completionTokens?: number;
+      cacheReadTokens?: number;
+      cacheCreationTokens?: number;
     };
-    const hasTokens = m.promptTokens != null || m.completionTokens != null || m.cacheReadTokens != null;
+    const hasTokens =
+      m.promptTokens != null ||
+      m.completionTokens != null ||
+      m.cacheReadTokens != null;
     return {
       costUsd: m.costUsd ?? 0,
       turns: m.messageCount ?? 0,
-      durationMs: m.created != null && m.updated != null ? Math.max(0, m.updated - m.created) : 0,
-      ...(hasTokens ? { tokens: { input: m.promptTokens ?? 0, output: m.completionTokens ?? 0, cacheRead: m.cacheReadTokens ?? 0, cacheCreate: m.cacheCreationTokens ?? 0 } } : {}),
+      durationMs:
+        m.created != null && m.updated != null
+          ? Math.max(0, m.updated - m.created)
+          : 0,
+      ...(hasTokens
+        ? {
+            tokens: {
+              input: m.promptTokens ?? 0,
+              output: m.completionTokens ?? 0,
+              cacheRead: m.cacheReadTokens ?? 0,
+              cacheCreate: m.cacheCreationTokens ?? 0,
+            },
+          }
+        : {}),
     };
   } catch {
     return { costUsd: 0, turns: 0, durationMs: 0 };
@@ -230,11 +345,23 @@ export async function runEval(cfg: {
 }): Promise<EvalRunResult> {
   const task = getEvalTask(cfg.taskName);
   if (!task) throw new Error(`Unknown eval task: ${cfg.taskName}`);
-  const projectPath = await cloneFixture(task.name, task.repoUrl, cfg.model ?? cfg.pattern);
-  process.stderr.write(`[eval] ${task.name} (${cfg.model ?? cfg.pattern ?? 'default'}) → ${projectPath}\n`);
+  const projectPath = await cloneFixture(
+    task.name,
+    task.repoUrl,
+    cfg.model ?? cfg.pattern,
+  );
+  process.stderr.write(
+    `[eval] ${task.name} (${cfg.model ?? cfg.pattern ?? 'default'}) → ${projectPath}\n`,
+  );
   const sessionId = `cli:${task.name}:${Date.now()}`;
   const storeRoot = `${process.env.HOME ?? '.'}/.ugly-code/session`;
-  await bootDriver({ projectPath, sessionId, origin: cfg.origin, token: cfg.token, storeRoot });
+  await bootDriver({
+    projectPath,
+    sessionId,
+    origin: cfg.origin,
+    token: cfg.token,
+    storeRoot,
+  });
   await runSetup(task, projectPath); // scaffold-based tasks: materialise a FRESH template (never stale)
   await runReproSetup(task, projectPath); // SBP tasks: uv venv + pip install before the agent
   setSessionEval(sessionId, true); // every CLI run is an eval → criteria judge active under SBV
@@ -243,7 +370,8 @@ export async function runEval(cfg: {
   // turn 12 for the client agent (deepseek/glm) while claude-cli runs its own loop,
   // making the comparison unfair. The runner's own maxTurns nudge/resume still bound total work.
   setSessionMaxTurns(sessionId, task.budget.maxTurns);
-  if (cfg.toolset && isToolset(cfg.toolset)) setSessionToolset(sessionId, cfg.toolset);
+  if (cfg.toolset && isToolset(cfg.toolset))
+    setSessionToolset(sessionId, cfg.toolset);
   // branchMode 'main': every eval run operates directly on the cloned project dir
   // (which the grader inspects). Without this the client agent (glm/deepseek) works
   // in an isolated .ugly-studio/worktrees/<session> worktree, edits it, passes its
@@ -264,7 +392,18 @@ export async function runEval(cfg: {
   // the intervening runTurn() calls isn't narrowed.
   const turnState = { errored: false };
   const onMsg = (msg: unknown): void => {
-    const m = msg as { event?: { type?: string; payload?: { payload?: { resolvedPattern?: string | null; type?: string; reason?: string } } } };
+    const m = msg as {
+      event?: {
+        type?: string;
+        payload?: {
+          payload?: {
+            resolvedPattern?: string | null;
+            type?: string;
+            reason?: string;
+          };
+        };
+      };
+    };
     const inner = m.event?.payload?.payload;
     if (m.event?.type === 'session_state') {
       const rp = inner?.resolvedPattern;
@@ -275,7 +414,10 @@ export async function runEval(cfg: {
     // the async metadata flush.
     if (inner?.type === 'agent_finished') {
       turnState.errored = inner.reason === 'error';
-      if (turnState.errored) process.stderr.write(`[eval:error] ${cfg.taskName}: agent turn ended in error\n`);
+      if (turnState.errored)
+        process.stderr.write(
+          `[eval:error] ${cfg.taskName}: agent turn ended in error\n`,
+        );
     }
   };
   const turns = [firstTurnPrompt(task), ...task.turns.slice(1)];
@@ -293,10 +435,22 @@ export async function runEval(cfg: {
   // no-op turns against a dead endpoint (an outage batch fired 15–18 pointless
   // resumes). Detect zero-assistant-turns and skip both recovery paths; the cell
   // is flagged transportFailure in history so it can be filtered/re-queued.
-  const transportDead = !usingClaudeCli && analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).assistantTurns === 0;
-  if (transportDead) process.stderr.write(`[eval] ${task.name}: transport failure (0 assistant turns) — skipping resume/nudge\n`);
-  for (let attempt = 1; !usingClaudeCli && !transportDead && attempt <= 3 && turnState.errored; attempt++) {
-    process.stderr.write(`[eval] ${task.name}: turn crashed — resume attempt ${attempt}/3\n`);
+  const transportDead =
+    !usingClaudeCli &&
+    analyzeTranscript(await readTranscriptRows(storeRoot, sessionId))
+      .assistantTurns === 0;
+  if (transportDead)
+    process.stderr.write(
+      `[eval] ${task.name}: transport failure (0 assistant turns) — skipping resume/nudge\n`,
+    );
+  for (
+    let attempt = 1;
+    !usingClaudeCli && !transportDead && attempt <= 3 && turnState.errored;
+    attempt++
+  ) {
+    process.stderr.write(
+      `[eval] ${task.name}: turn crashed — resume attempt ${attempt}/3\n`,
+    );
     turnState.errored = false;
     await runTurn(sessionId, RESUME_NUDGE, onMsg, selection);
   }
@@ -308,8 +462,17 @@ export async function runEval(cfg: {
   // the CLI persists its transcript after returning, so an edit-count check here races
   // the flush and always reads 0 → a spurious extra invocation that inflates cost/turns.
   // claude-cli (the Opus baseline) reliably edits and never needs the nudge anyway.
-  if (!usingClaudeCli && !transportDead && shouldNudgeForNoEdit(task.kind, analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).edits)) {
-    process.stderr.write(`[eval] ${task.name}: 0 edits after turns — sending no-edit nudge\n`);
+  if (
+    !usingClaudeCli &&
+    !transportDead &&
+    shouldNudgeForNoEdit(
+      task.kind,
+      analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).edits,
+    )
+  ) {
+    process.stderr.write(
+      `[eval] ${task.name}: 0 edits after turns — sending no-edit nudge\n`,
+    );
     await runTurn(sessionId, NO_EDIT_NUDGE, onMsg, selection);
   }
   const finalText = await readFinalText(storeRoot, sessionId);
@@ -326,7 +489,9 @@ export async function runEval(cfg: {
     ? await gradeSbp(gradeInput, cliGradeDeps)
     : await gradeProject(gradeInput, cliGradeDeps);
   const totals = await readRunTotals(storeRoot, sessionId);
-  const assistantTurns = analyzeTranscript(await readTranscriptRows(storeRoot, sessionId)).assistantTurns;
+  const assistantTurns = analyzeTranscript(
+    await readTranscriptRows(storeRoot, sessionId),
+  ).assistantTurns;
   const nowIso = new Date().toISOString();
   await appendRunHistory({
     taskName: task.name,
@@ -343,7 +508,16 @@ export async function runEval(cfg: {
     ...(totals.tokens ? { tokens: totals.tokens } : {}),
     durationMs: totals.durationMs,
     ...(transportDead ? { transportFailure: true } : {}),
-    config: [cfg.model, cfg.pattern, cfg.modelMode?.kind, cfg.toolset].filter(Boolean).join('/') || 'default',
+    config:
+      [cfg.model, cfg.pattern, cfg.modelMode?.kind, cfg.toolset]
+        .filter(Boolean)
+        .join('/') || 'default',
   }).catch(() => undefined);
-  return { score: result.score ?? 0, scoreMax: result.scoreMax ?? 0, costUsd: totals.costUsd, turns: totals.turns, resolvedPattern };
+  return {
+    score: result.score ?? 0,
+    scoreMax: result.scoreMax ?? 0,
+    costUsd: totals.costUsd,
+    turns: totals.turns,
+    resolvedPattern,
+  };
 }

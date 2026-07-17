@@ -70,7 +70,9 @@ function AuthDemoAuthenticated(): React.ReactElement {
     <PageLayout
       header={
         <div>
-          <a href="/" data-id="auth-demo-home-authed">← Home</a>
+          <a href="/" data-id="auth-demo-home-authed">
+            ← Home
+          </a>
         </div>
       }
     >
@@ -89,7 +91,13 @@ function AuthDemoAuthenticated(): React.ReactElement {
               2,
             )}
           </pre>
-          <Button variant="secondary" data-id="auth-demo-logout" onClick={() => { void handleLogout(); }}>
+          <Button
+            variant="secondary"
+            data-id="auth-demo-logout"
+            onClick={() => {
+              void handleLogout();
+            }}
+          >
             Logout
           </Button>
         </Card>
@@ -108,7 +116,9 @@ function AuthDemoUnauthenticated(): React.ReactElement {
     rpc<{ branches: Record<string, string> }>('initSession', {
       sessionId: sessionId.current,
     })
-      .then(({ branches: b }) => { setBranches(b); })
+      .then(({ branches: b }) => {
+        setBranches(b);
+      })
       .catch(() => {
         // Default branch values stay in place
       });
@@ -130,7 +140,9 @@ function AuthDemoUnauthenticated(): React.ReactElement {
     <PageLayout
       header={
         <div>
-          <a href="/" data-id="auth-demo-home-loggedout">← Home</a>
+          <a href="/" data-id="auth-demo-home-loggedout">
+            ← Home
+          </a>
         </div>
       }
     >
@@ -138,13 +150,17 @@ function AuthDemoUnauthenticated(): React.ReactElement {
         <h1>Auth Demo</h1>
         <Text style={{ display: 'block', marginBottom: 12 }}>
           Demonstrates ugly.bot OAuth login + session-scoped experiment
-          analytics. The button label is driven by the <code>cta-test</code>
-          {' '}experiment in <code>shared/experiments.ts</code>.
+          analytics. The button label is driven by the <code>cta-test</code>{' '}
+          experiment in <code>shared/experiments.ts</code>.
         </Text>
         <Card>
           <Text>You are not logged in.</Text>
           <div style={{ marginTop: 12 }}>
-            <Button variant="primary" data-id="auth-demo-cta" onClick={handleCtaClick}>
+            <Button
+              variant="primary"
+              data-id="auth-demo-cta"
+              onClick={handleCtaClick}
+            >
               {ctaLabel}
             </Button>
           </div>

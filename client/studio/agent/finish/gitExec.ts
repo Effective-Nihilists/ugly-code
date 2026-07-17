@@ -43,8 +43,12 @@ function spawnCollect(
       });
       proc.onStdout((c) => (stdout += c));
       proc.onStderr((c) => (stderr += c));
-      proc.onError((e) => { resolve({ code: -1, stdout, stderr: `${stderr}\n${e}` }); });
-      proc.onExit((code) => { resolve({ code: code ?? -1, stdout, stderr }); });
+      proc.onError((e) => {
+        resolve({ code: -1, stdout, stderr: `${stderr}\n${e}` });
+      });
+      proc.onExit((code) => {
+        resolve({ code: code ?? -1, stdout, stderr });
+      });
     } catch (e) {
       resolve({ code: -1, stdout, stderr: String(e) });
     }
@@ -106,7 +110,9 @@ export async function gitMergeSquash(
 }
 
 /** True when the worktree is mid-merge (user left unresolved conflicts). */
-export async function gitHasInProgressMerge(projectPath: string): Promise<boolean> {
+export async function gitHasInProgressMerge(
+  projectPath: string,
+): Promise<boolean> {
   try {
     const out = await runGitCommand(
       projectPath,
@@ -120,7 +126,9 @@ export async function gitHasInProgressMerge(projectPath: string): Promise<boolea
 }
 
 /** Conflicted file paths from `git status --porcelain=v1`. */
-export async function gitStatusConflicts(projectPath: string): Promise<string[]> {
+export async function gitStatusConflicts(
+  projectPath: string,
+): Promise<string[]> {
   let output = '';
   try {
     output = await runGitCommand(projectPath, ['status', '--porcelain=v1']);
@@ -217,12 +225,24 @@ export function runGateStreaming(args: {
       proc.onStdout((c) => {
         const text = stripAnsi(c);
         stdout += text;
-        emit({ session_id: sessionId, kind: 'stage_output', stage, stream: 'stdout', chunk: text });
+        emit({
+          session_id: sessionId,
+          kind: 'stage_output',
+          stage,
+          stream: 'stdout',
+          chunk: text,
+        });
       });
       proc.onStderr((c) => {
         const text = stripAnsi(c);
         stderr += text;
-        emit({ session_id: sessionId, kind: 'stage_output', stage, stream: 'stderr', chunk: text });
+        emit({
+          session_id: sessionId,
+          kind: 'stage_output',
+          stage,
+          stream: 'stderr',
+          chunk: text,
+        });
       });
       proc.onError((e) => {
         if (sigkillTimer) clearTimeout(sigkillTimer);

@@ -4,11 +4,25 @@
 // The session runs here — outliving the window and reachable from any device over the
 // Ugly Proxy — instead of in the renderer. Drives the SAME agent loop (runClientAgentTurn);
 // its emitCustom-style events become task events (task.event:<id>) via uglyTask.emit.
-import { defineTask, taskContext, createNodeUglyNative, native } from 'ugly-app/native';
+import {
+  defineTask,
+  taskContext,
+  createNodeUglyNative,
+  native,
+} from 'ugly-app/native';
 import { setActiveProjectPath } from '../projectPath';
-import { runClientAgentTurn, abortClientAgent, clearClientAgentSession, ensureCodebaseAnalysis, type AgentSelection } from './clientAgent';
+import {
+  runClientAgentTurn,
+  abortClientAgent,
+  clearClientAgentSession,
+  ensureCodebaseAnalysis,
+  type AgentSelection,
+} from './clientAgent';
 import { killSessionBashProcs } from '../../agent/tools';
-import { setCodebaseProvider, codebaseProvider } from '../../agent/indexer/provider';
+import {
+  setCodebaseProvider,
+  codebaseProvider,
+} from '../../agent/indexer/provider';
 import { localCodebaseProvider } from '../../agent/indexer/codebase';
 import { installTaskErrorLog } from './taskErrorLog';
 import {
@@ -25,7 +39,10 @@ import {
 import { answerPendingAskUser } from './askUserBroker';
 import { answerPendingStepReview } from './stepReviewBroker';
 
-const g = globalThis as typeof globalThis & { UglyNative?: unknown; localStorage?: unknown };
+const g = globalThis as typeof globalThis & {
+  UglyNative?: unknown;
+  localStorage?: unknown;
+};
 
 // Node-backed window.UglyNative so the agent's tools (native.fs / native.process) resolve to
 // node:fs / child_process. ugly-app's permissions read platform lazily, so this body-level
@@ -42,16 +59,29 @@ setCodebaseProvider(localCodebaseProvider);
 if (!g.localStorage) {
   const mem = new Map<string, string>();
   g.localStorage = {
-    getItem: (k: string) => (mem.has(k) ? (mem.get(k)!) : null),
-    setItem: (k: string, v: string) => { mem.set(k, v); },
-    removeItem: (k: string) => { mem.delete(k); },
-    clear: () => { mem.clear(); },
+    getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
+    setItem: (k: string, v: string) => {
+      mem.set(k, v);
+    },
+    removeItem: (k: string) => {
+      mem.delete(k);
+    },
+    clear: () => {
+      mem.clear();
+    },
     key: (i: number) => [...mem.keys()][i] ?? null,
-    get length() { return mem.size; },
+    get length() {
+      return mem.size;
+    },
   };
 }
 
-const t = taskContext<{ projectPath?: string; sessionId?: string; origin?: string; authToken?: string }>();
+const t = taskContext<{
+  projectPath?: string;
+  sessionId?: string;
+  origin?: string;
+  authToken?: string;
+}>();
 setActiveProjectPath(t.params.projectPath ?? null);
 const sessionId = t.params.sessionId ?? t.id ?? 'cs:task';
 
@@ -61,18 +91,25 @@ const sessionId = t.params.sessionId ?? t.id ?? 'cs:task';
 //    (UGLY_AUTH_TOKEN — read from the cookie host-side, works even when HttpOnly + over the
 //    mobile proxy); fall back to the token the renderer forwarded in params.
 const origin = t.params.origin ?? '';
-const authToken = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.UGLY_AUTH_TOKEN
-  ?? t.params.authToken ?? '';
+const authToken =
+  (globalThis as { process?: { env?: Record<string, string | undefined> } })
+    .process?.env?.UGLY_AUTH_TOKEN ??
+  t.params.authToken ??
+  '';
 if (origin) {
   const realFetch = globalThis.fetch.bind(globalThis);
-  (globalThis as { fetch: typeof fetch }).fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+  (globalThis as { fetch: typeof fetch }).fetch = (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ) => {
     if (typeof input === 'string' && input.startsWith('/')) {
       const headers = new Headers(init?.headers);
-      if (authToken && !headers.has('Cookie')) headers.set('Cookie', `auth_token=${authToken}`);
+      if (authToken && !headers.has('Cookie'))
+        headers.set('Cookie', `auth_token=${authToken}`);
       return realFetch(origin + input, { ...init, headers });
     }
     return realFetch(input, init);
-  });
+  };
 }
 
 // Route this background task's console.error/warn to the app's own errorLog
@@ -90,27 +127,47 @@ defineTask({
     // as an error (see codingAgentChatSend), so a long turn is fine — the frames stream
     // via task.listen independently of when/if this RPC's response is still awaited.
     send: async (p: { text: string; selection?: AgentSelection }) => {
-      await runClientAgentTurn(sessionId, p.text, (msg) => { t.emit('msg', msg); }, p.selection);
+      await runClientAgentTurn(
+        sessionId,
+        p.text,
+        (msg) => {
+          t.emit('msg', msg);
+        },
+        p.selection,
+      );
       return { ok: true };
     },
     // Interrupt the running turn (chatStop → task.call('interrupt')). Kill any
     // live bash first — aborting the model loop alone leaves the spawned shell
     // running on the host ("clicked stop, bash still running").
     // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
-    interrupt: async () => { killSessionBashProcs(sessionId); abortClientAgent(sessionId); return { ok: true }; },
+    interrupt: async () => {
+      killSessionBashProcs(sessionId);
+      abortClientAgent(sessionId);
+      return { ok: true };
+    },
     // Stop a single running tool (a bash card's Stop button → task.call('toolStop')).
     // Tools run sequentially within a turn, so at most one bash proc is live per
     // session — killing the session's bash procs stops exactly the one shown.
     // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
-    toolStop: async () => { const killed = killSessionBashProcs(sessionId); return { ok: true, killed }; },
+    toolStop: async () => {
+      const killed = killSessionBashProcs(sessionId);
+      return { ok: true, killed };
+    },
     // `/clear`: drop the in-memory agent context (keeps the worktree); the renderer
     // wipes the persisted transcript separately so the next turn starts empty.
     // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
-    clear: async () => { clearClientAgentSession(sessionId); return { ok: true }; },
+    clear: async () => {
+      clearClientAgentSession(sessionId);
+      return { ok: true };
+    },
     // Identity/state for a freshly-attached UI (history itself is read from the server
     // via codingSessionListMessages, same as before).
     // eslint-disable-next-line @typescript-eslint/require-await -- defineTask onCall handlers must return a Promise (RPC contract)
-    getState: async () => ({ sessionId, projectPath: t.params.projectPath ?? null }),
+    getState: async () => ({
+      sessionId,
+      projectPath: t.params.projectPath ?? null,
+    }),
 
     // ── Codebase indexer, exposed to the RENDERER ──────────────────────────
     // The indexer runs here (the task's Node child), so renderer-side callers —
@@ -153,7 +210,9 @@ defineTask({
           runTypecheck: !!p.runTypecheck,
           runLint: !!p.runLint,
           runTests: !!p.runTests,
-          ...(p.commitDirtyMainBeforeMerge ? { commitDirtyMainBeforeMerge: true } : {}),
+          ...(p.commitDirtyMainBeforeMerge
+            ? { commitDirtyMainBeforeMerge: true }
+            : {}),
           ...(p.pauseBeforeSquash ? { pauseBeforeSquash: true } : {}),
         },
         sessionTitle: null,
@@ -170,14 +229,21 @@ defineTask({
       }),
     // Stop an in-flight validation gate (tsc/lint/tests).
     // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
-    finishStop: async (p: { stage?: FinishStage }) => ({ ok: stopFinish(sessionId, p.stage ?? 'tsc') }),
+    finishStop: async (p: { stage?: FinishStage }) => ({
+      ok: stopFinish(sessionId, p.stage ?? 'tsc'),
+    }),
     // Discard the worktree + branch without merging.
     abandon: () => abandonSession(sessionId, t.params.projectPath ?? null),
     // Pull from parent: merge the parent branch into the worktree.
-    refreshWorktree: () => refreshSession(sessionId, t.params.projectPath ?? null),
+    refreshWorktree: () =>
+      refreshSession(sessionId, t.params.projectPath ?? null),
     // Commit counts for the chat header's ahead/behind badges.
-    worktreeAhead: async () => ({ ahead: await aheadCount(sessionId, t.params.projectPath ?? null) }),
-    worktreeBehind: async () => ({ behind: await behindCount(sessionId, t.params.projectPath ?? null) }),
+    worktreeAhead: async () => ({
+      ahead: await aheadCount(sessionId, t.params.projectPath ?? null),
+    }),
+    worktreeBehind: async () => ({
+      behind: await behindCount(sessionId, t.params.projectPath ?? null),
+    }),
 
     // ── Interactive turn controls (C1) ─────────────────────────────────
     // The `ask_user` tool pauses the turn and shows the AskUserCard; the user
@@ -200,8 +266,16 @@ defineTask({
     // step with feedback (iterate). Returns `already_answered` for a duplicate
     // click (benign — no banner).
     // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
-    answerStepReview: async (p: { id?: string; action?: 'continue' | 'iterate'; feedback?: string }) => {
-      const outcome = answerPendingStepReview(p.id ?? '', p.action ?? 'continue', p.feedback);
+    answerStepReview: async (p: {
+      id?: string;
+      action?: 'continue' | 'iterate';
+      feedback?: string;
+    }) => {
+      const outcome = answerPendingStepReview(
+        p.id ?? '',
+        p.action ?? 'continue',
+        p.feedback,
+      );
       return { ok: outcome === 'ok', outcome };
     },
     // eslint-disable-next-line @typescript-eslint/require-await -- onCall handlers return a Promise (RPC contract)
@@ -218,7 +292,10 @@ function emitFinish(e: FinishEventPayload): void {
   t.emit('msg', {
     type: 'codingAgent:event',
     sessionId,
-    event: { type: 'finish_event', payload: { type: 'updated', payload: { ...e, session_id: sessionId } } },
+    event: {
+      type: 'finish_event',
+      payload: { type: 'updated', payload: { ...e, session_id: sessionId } },
+    },
   });
 }
 
@@ -235,7 +312,11 @@ async function ensureUglyStudioExcluded(projectPath: string): Promise<void> {
     if (!(await native.fs.exists(`${projectPath}/.git`))) return; // not a git repo
     const excludePath = `${projectPath}/.git/info/exclude`;
     let current = '';
-    try { current = await native.fs.readFile(excludePath); } catch { /* file may not exist yet */ }
+    try {
+      current = await native.fs.readFile(excludePath);
+    } catch {
+      /* file may not exist yet */
+    }
     if (/^\s*\.ugly-studio\/?\s*$/m.test(current)) return; // already excluded
     await native.fs.mkdir(`${projectPath}/.git/info`, true);
     const sep = current && !current.endsWith('\n') ? '\n' : '';
@@ -243,7 +324,9 @@ async function ensureUglyStudioExcluded(projectPath: string): Promise<void> {
       excludePath,
       `${current}${sep}# ugly-code local IDE state (codebase index, sessions, worktrees)\n.ugly-studio/\n`,
     );
-  } catch { /* best-effort — never block a turn */ }
+  } catch {
+    /* best-effort — never block a turn */
+  }
 }
 
 // Kick the host's semantic index + architecture analysis at BOOT (not on the first turn) so the

@@ -3,16 +3,37 @@
 // cell. This is the machinery that produces the episodes' pro/con numbers.
 import { runEval, type EvalRunResult } from './evalRun';
 
-export interface CompareConfig { label: string; model?: string; pattern?: string; toolset?: string }
-export interface CompareSpec { tasks: string[]; configs: CompareConfig[] }
-export interface Cell extends EvalRunResult { task: string; config: string }
-export interface ComparisonResult { cells: Cell[]; ranAt: number }
+export interface CompareConfig {
+  label: string;
+  model?: string;
+  pattern?: string;
+  toolset?: string;
+}
+export interface CompareSpec {
+  tasks: string[];
+  configs: CompareConfig[];
+}
+export interface Cell extends EvalRunResult {
+  task: string;
+  config: string;
+}
+export interface ComparisonResult {
+  cells: Cell[];
+  ranAt: number;
+}
 
 /** Run every (task × config) cell sequentially. `runOne` is injected for tests. */
 export async function runComparison(
   spec: CompareSpec,
   ctx: { origin: string; token: string; ranAt: number },
-  runOne: (cfg: { taskName: string; origin: string; token: string; model?: string; pattern?: string; toolset?: string }) => Promise<EvalRunResult> = runEval,
+  runOne: (cfg: {
+    taskName: string;
+    origin: string;
+    token: string;
+    model?: string;
+    pattern?: string;
+    toolset?: string;
+  }) => Promise<EvalRunResult> = runEval,
 ): Promise<ComparisonResult> {
   const cells: Cell[] = [];
   for (const task of spec.tasks) {
@@ -28,8 +49,18 @@ export async function runComparison(
         });
         cells.push({ task, config: config.label, ...r });
       } catch (e) {
-        cells.push({ task, config: config.label, score: 0, scoreMax: 0, costUsd: 0, turns: 0, resolvedPattern: null });
-        process.stderr.write(`[compare] ${task} / ${config.label} failed: ${e instanceof Error ? e.message : String(e)}\n`);
+        cells.push({
+          task,
+          config: config.label,
+          score: 0,
+          scoreMax: 0,
+          costUsd: 0,
+          turns: 0,
+          resolvedPattern: null,
+        });
+        process.stderr.write(
+          `[compare] ${task} / ${config.label} failed: ${e instanceof Error ? e.message : String(e)}\n`,
+        );
       }
     }
   }
@@ -47,10 +78,17 @@ export function renderScoreboard(result: ComparisonResult): string {
     return `${c.score}/${c.scoreMax} $${c.costUsd.toFixed(4)} ${c.turns}t`;
   };
   const taskW = Math.max(4, ...tasks.map((t) => t.length));
-  const colW = Math.max(...configs.map((cfg) => cfg.length), ...tasks.flatMap((t) => configs.map((cfg) => cell(t, cfg).length)));
-  const pad = (s: string, w: number): string => s + ' '.repeat(Math.max(0, w - s.length));
+  const colW = Math.max(
+    ...configs.map((cfg) => cfg.length),
+    ...tasks.flatMap((t) => configs.map((cfg) => cell(t, cfg).length)),
+  );
+  const pad = (s: string, w: number): string =>
+    s + ' '.repeat(Math.max(0, w - s.length));
   const header = `${pad('task', taskW)} | ${configs.map((cfg) => pad(cfg, colW)).join(' | ')}`;
   const sep = '-'.repeat(header.length);
-  const rows = tasks.map((t) => `${pad(t, taskW)} | ${configs.map((cfg) => pad(cell(t, cfg), colW)).join(' | ')}`);
+  const rows = tasks.map(
+    (t) =>
+      `${pad(t, taskW)} | ${configs.map((cfg) => pad(cell(t, cfg), colW)).join(' | ')}`,
+  );
   return [header, sep, ...rows].join('\n');
 }

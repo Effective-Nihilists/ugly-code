@@ -20,12 +20,20 @@ const chains = new Map<string, Promise<unknown>>();
  * key. Never throws (a failed write must not break the chain or the turn); `onError`
  * gets the failure so it isn't silent.
  */
-export function queueWrite(key: string, write: Writer, onError?: (e: unknown) => void): Promise<void> {
+export function queueWrite(
+  key: string,
+  write: Writer,
+  onError?: (e: unknown) => void,
+): Promise<void> {
   const prev = chains.get(key) ?? Promise.resolve();
   const next: Promise<void> = prev
     .catch(() => undefined) // a prior failure must not poison later writes
-    .then(async () => { await write(); })
-    .catch((e: unknown) => { onError?.(e); });
+    .then(async () => {
+      await write();
+    })
+    .catch((e: unknown) => {
+      onError?.(e);
+    });
   chains.set(key, next);
   // Drop the chain once it's fully drained so the map doesn't grow per session forever.
   void next.finally(() => {

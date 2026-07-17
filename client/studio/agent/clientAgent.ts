@@ -21,11 +21,19 @@ import {
   type MsgTelemetry,
   type RunAgentSocket,
 } from 'ugly-app/agent/client';
-import { dispatchTool, isUglyAppProject, killSessionBashProcs } from '../../agent/tools';
+import {
+  dispatchTool,
+  isUglyAppProject,
+  killSessionBashProcs,
+} from '../../agent/tools';
 import { setMemoryWriteHook } from '../../agent/tools/memory';
 import { registeredToolSpecs } from '../../agent/tools/registry';
 import { sessionToolSpecs } from '../../agent/tools/gating';
-import { awaitAskUser, answerPendingAskUser, rejectAllAskUser } from './askUserBroker';
+import {
+  awaitAskUser,
+  answerPendingAskUser,
+  rejectAllAskUser,
+} from './askUserBroker';
 import { discoverSkills, formatAvailableSkills } from '../hooks/skillDiscovery';
 import type { StepFn } from '../../agent/engine';
 import {
@@ -51,19 +59,46 @@ import {
   type ToolRowPayload,
 } from './serverSessionApi';
 import { assistantParts, type Part } from './sessionDisplay';
-import { ensureSessionWorkspace, getSessionWorkspace, removeSessionWorkspace } from './sessionWorkspace';
+import {
+  ensureSessionWorkspace,
+  getSessionWorkspace,
+  removeSessionWorkspace,
+} from './sessionWorkspace';
 import { queueWrite } from './metaWriteQueue';
 import type { ToolName } from '../../../shared/agent';
 import { axesToConfig, coerceModelMode } from '../../../shared/sessionConfig';
 import { getPattern } from './patterns/registry';
-import { decorateForStep, decorateForNonePattern, renderStepDecoration, filterToolsForStep } from './patterns/decorate';
-import { type Step, type Pattern, type PatternId, isPatternId, isSuperPattern, superToBasePattern } from './patterns/types';
-import { deriveCriteria, gradeAgainstCriteria, buildRevisePrompt, type Judge } from './patterns/judge';
-import { classifyForAuto, isClassificationConfident } from './patterns/classify';
+import {
+  decorateForStep,
+  decorateForNonePattern,
+  renderStepDecoration,
+  filterToolsForStep,
+} from './patterns/decorate';
+import {
+  type Step,
+  type Pattern,
+  type PatternId,
+  isPatternId,
+  isSuperPattern,
+  superToBasePattern,
+} from './patterns/types';
+import {
+  deriveCriteria,
+  gradeAgainstCriteria,
+  buildRevisePrompt,
+  type Judge,
+} from './patterns/judge';
+import {
+  classifyForAuto,
+  isClassificationConfident,
+} from './patterns/classify';
 import { runMidFanout } from './patterns/mid-mode-host';
 import { runMaxMode } from './patterns/max-mode-host';
 import { runGroupMode } from './patterns/group-mode-host';
-import { awaitStepReview, rejectStepReviewsForSession } from './stepReviewBroker';
+import {
+  awaitStepReview,
+  rejectStepReviewsForSession,
+} from './stepReviewBroker';
 import { native } from 'ugly-app/native';
 import { getCodingAgentModels } from 'ugly-app/shared';
 import { filterToolsByToolset, type Toolset } from './toolsets';
@@ -85,7 +120,8 @@ export function setSessionToolset(sessionId: string, toolset: Toolset): void {
 // stop with no grader. Mirrors the monolith's eval-session gate (SessionSnapshot.eval).
 const evalSessions = new Set<string>();
 export function setSessionEval(sessionId: string, isEval: boolean): void {
-  if (isEval) evalSessions.add(sessionId); else evalSessions.delete(sessionId);
+  if (isEval) evalSessions.add(sessionId);
+  else evalSessions.delete(sessionId);
 }
 
 /**
@@ -103,7 +139,6 @@ export function setSessionTitle(sessionId: string, title: string): void {
   s.titleGenerated = true;
 }
 
-
 // Per-session agent-step budget override. The interactive default is 12 (a
 // per-message cap so a chat turn can't run away), but an eval must honor the
 // TASK's declared budget.maxTurns — a long-horizon task (e.g. the 80-turn ORM
@@ -111,7 +146,8 @@ export function setSessionTitle(sessionId: string, title: string): void {
 // claude-cli (its own loop) ran freely. Set before the first turn; default 12.
 const maxTurnsBySession = new Map<string, number>();
 export function setSessionMaxTurns(sessionId: string, maxTurns: number): void {
-  if (Number.isFinite(maxTurns) && maxTurns > 0) maxTurnsBySession.set(sessionId, Math.floor(maxTurns));
+  if (Number.isFinite(maxTurns) && maxTurns > 0)
+    maxTurnsBySession.set(sessionId, Math.floor(maxTurns));
 }
 
 // ── Turn-end execution feedback loop ─────────────────────────────────────────
@@ -138,22 +174,55 @@ async function verifyOnSettle(sessionId: string): Promise<string | null> {
   if (!editedSinceVerifyBySession.get(sessionId)) return null; // no edits since last check
   editedSinceVerifyBySession.set(sessionId, false); // consume; a new edit re-arms it
   const continues = verifyContinuesBySession.get(sessionId) ?? 0;
-  if (continues >= MAX_VERIFY_CONTINUES) { debugLog(sessionId, 'verify_skip', { reason: 'cap' }); return null; }
+  if (continues >= MAX_VERIFY_CONTINUES) {
+    debugLog(sessionId, 'verify_skip', { reason: 'cap' });
+    return null;
+  }
   const ws = getSessionWorkspace(sessionId);
   const cwd = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? '';
-  if (!cwd) { debugLog(sessionId, 'verify_skip', { reason: 'no_cwd' }); return null; }
+  if (!cwd) {
+    debugLog(sessionId, 'verify_skip', { reason: 'no_cwd' });
+    return null;
+  }
   let gate: Awaited<ReturnType<typeof resolveVerifyGate>>;
-  try { gate = await resolveVerifyGate(cwd); } catch (e) { debugLog(sessionId, 'verify_skip', { reason: 'resolve_error', cwd, err: String(e) }); return null; }
-  if (!gate) { debugLog(sessionId, 'verify_skip', { reason: 'no_gate', cwd }); return null; }
+  try {
+    gate = await resolveVerifyGate(cwd);
+  } catch (e) {
+    debugLog(sessionId, 'verify_skip', {
+      reason: 'resolve_error',
+      cwd,
+      err: String(e),
+    });
+    return null;
+  }
+  if (!gate) {
+    debugLog(sessionId, 'verify_skip', { reason: 'no_gate', cwd });
+    return null;
+  }
   let out = '';
   let code: number | null = 0;
   try {
     const r = await spawnCollect(gate.command, gate.args, { cwd });
     out = `${r.stdout}\n${r.stderr}`.trim();
     code = r.code;
-  } catch (e) { debugLog(sessionId, 'verify_skip', { reason: 'spawn_error', gate: gate.label, err: String(e) }); return null; }
-  debugLog(sessionId, 'verify', { gate: gate.label, code, ok: code === 0, attempt: continues + 1 });
-  if (code === 0) { verifyContinuesBySession.set(sessionId, 0); return null; } // clean → finish
+  } catch (e) {
+    debugLog(sessionId, 'verify_skip', {
+      reason: 'spawn_error',
+      gate: gate.label,
+      err: String(e),
+    });
+    return null;
+  }
+  debugLog(sessionId, 'verify', {
+    gate: gate.label,
+    code,
+    ok: code === 0,
+    attempt: continues + 1,
+  });
+  if (code === 0) {
+    verifyContinuesBySession.set(sessionId, 0);
+    return null;
+  } // clean → finish
   verifyContinuesBySession.set(sessionId, continues + 1);
   return `[automated verification] Your edits do not pass \`${gate.label}\` — do not end your turn with a broken build. Fix the errors below, then finish:\n\n${headTail(out)}`;
 }
@@ -177,7 +246,10 @@ const agentStepJudge = async (
     // with reasoning 'off' instead of the reasoning-heavy default.
     body: JSON.stringify({
       input: {
-        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
         noTools: true,
         maxTokens,
         ...(opts?.model ? { model: opts.model } : {}),
@@ -185,11 +257,15 @@ const agentStepJudge = async (
       },
     }),
   });
-  const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
+  const json = (await res.json()) as {
+    result?: { message?: { content?: unknown } };
+    error?: string;
+  };
   if (json.error) throw new Error(json.error);
   const content = json.result?.message?.content;
   if (typeof content === 'string') return content;
-  if (Array.isArray(content)) return content.map((b) => (b as { text?: string }).text ?? '').join('');
+  if (Array.isArray(content))
+    return content.map((b) => (b as { text?: string }).text ?? '').join('');
   return '';
 };
 
@@ -208,7 +284,10 @@ const agentStepJudge = async (
  * is actually about, not just the raw (often command-prefixed) prompt. The
  * result overwrites the truncated-prompt placeholder set on send.
  */
-async function deriveSessionTitle(userText: string, assistantText: string): Promise<string | null> {
+async function deriveSessionTitle(
+  userText: string,
+  assistantText: string,
+): Promise<string | null> {
   const system =
     'You write a 3-6 word title summarizing what the user asked the coding agent to do. ' +
     'Reply with ONLY the title — no quotes, no punctuation at the end, no prefix like "Title:", no markdown. ' +
@@ -217,14 +296,21 @@ async function deriveSessionTitle(userText: string, assistantText: string): Prom
     `User asked:\n${userText.slice(0, 1500)}\n\n` +
     `Agent replied (first turn):\n${assistantText.slice(0, 1500)}\n\nTitle:`;
   try {
-    const raw = await agentStepJudge(system, user, 32, { model: 'deepseek_v4_flash', reasoning: 'off' });
-    const cleaned = raw.trim().split('\n')[0].trim().replace(/^["'`]|["'`.]$/g, '').slice(0, 60);
+    const raw = await agentStepJudge(system, user, 32, {
+      model: 'deepseek_v4_flash',
+      reasoning: 'off',
+    });
+    const cleaned = raw
+      .trim()
+      .split('\n')[0]
+      .trim()
+      .replace(/^["'`]|["'`.]$/g, '')
+      .slice(0, 60);
     return cleaned.length >= 2 ? cleaned : null;
   } catch {
     return null;
   }
 }
-
 
 // ── Always-on agent-loop debug telemetry ────────────────────────────────────
 // Every session streams a structured event log to
@@ -235,7 +321,10 @@ async function deriveSessionTitle(userText: string, assistantText: string): Prom
 // rather than reproduced. Extend `debugLog(...)` call sites as new questions arise.
 const debugEvents = new Map<string, Record<string, unknown>[]>();
 const debugClock = new Map<string, { start: number; last: number }>();
-function debugTick(sessionId: string): { sinceStartMs: number; sinceLastMs: number } {
+function debugTick(sessionId: string): {
+  sinceStartMs: number;
+  sinceLastMs: number;
+} {
   const now = Date.now();
   const c = debugClock.get(sessionId) ?? { start: now, last: now };
   const r = { sinceStartMs: now - c.start, sinceLastMs: now - c.last };
@@ -243,24 +332,43 @@ function debugTick(sessionId: string): { sinceStartMs: number; sinceLastMs: numb
   debugClock.set(sessionId, c);
   return r;
 }
-function debugLog(sessionId: string, kind: string, data: Record<string, unknown> = {}): void {
+function debugLog(
+  sessionId: string,
+  kind: string,
+  data: Record<string, unknown> = {},
+): void {
   try {
     const arr = debugEvents.get(sessionId) ?? [];
     arr.push({ ts: Date.now(), kind, ...data });
     debugEvents.set(sessionId, arr);
-    const home = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.HOME ?? '.';
+    const home =
+      (globalThis as { process?: { env?: Record<string, string | undefined> } })
+        .process?.env?.HOME ?? '.';
     const dir = `${home}/.ugly-code/session/${sessionId.replace(/[^a-zA-Z0-9_.:-]/g, '_')}`;
     void native.fs
       .mkdir(dir, true)
-      .then(() => native.fs.writeFile(`${dir}/debug.jsonl`, arr.map((e) => JSON.stringify(e)).join('\n') + '\n'))
-      .catch(() => { /* debug logging must never break a run */ });
-  } catch { /* never throw from telemetry */ }
+      .then(() =>
+        native.fs.writeFile(
+          `${dir}/debug.jsonl`,
+          arr.map((e) => JSON.stringify(e)).join('\n') + '\n',
+        ),
+      )
+      .catch(() => {
+        /* debug logging must never break a run */
+      });
+  } catch {
+    /* never throw from telemetry */
+  }
 }
 
 /** The session's uncommitted diff vs the baseline commit (the agent's edits). */
 async function sessionGitDiff(dir: string | null): Promise<string> {
   if (!dir) return '';
-  try { return (await spawnCollect('git', ['-C', dir, 'diff', 'HEAD'], {})).stdout; } catch { return ''; }
+  try {
+    return (await spawnCollect('git', ['-C', dir, 'diff', 'HEAD'], {})).stdout;
+  } catch {
+    return '';
+  }
 }
 
 const MAX_REVISE = 2;
@@ -312,14 +420,20 @@ const fetchSocket: RunAgentSocket = {
   async requestStream(name, input, onFrame, opts) {
     const res = await fetch('/api/' + name, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      },
       credentials: 'include',
       body: JSON.stringify({ input }),
       ...(opts?.signal ? { signal: opts.signal } : {}),
     });
     if (!res.ok || !res.body) {
       // Fall back to the buffered turn if streaming isn't available.
-      const json = (await res.json().catch(() => ({}))) as { result?: unknown; error?: string };
+      const json = (await res.json().catch(() => ({}))) as {
+        result?: unknown;
+        error?: string;
+      };
       if (json.error) throw new Error(json.error);
       return json.result;
     }
@@ -364,11 +478,15 @@ const fetchSocket: RunAgentSocket = {
     // `resp.content` → a cryptic "Cannot read properties of undefined". A clear
     // error routes through the normal error/retry path.
     if (!gotResult) {
-      throw new Error('agent stream ended without a result (connection cut mid-turn)');
+      throw new Error(
+        'agent stream ended without a result (connection cut mid-turn)',
+      );
     }
     return result;
   },
-  trackDocs: () => () => {/* noop */},
+  trackDocs: () => () => {
+    /* noop */
+  },
 };
 
 // Per-session tool handlers. They resolve the session's workspace at CALL time:
@@ -383,7 +501,10 @@ function makeToolHandlers(
   // Core tools (legacy inline switch) + every registered tool — both dispatch
   // through dispatchTool, which routes the registry first.  EXCEPT ask_user:
   // that tool pauses the turn and awaits a user answer via the broker card.
-  const names = [...AGENT_TOOL_NAMES, ...registeredToolSpecs().map((s) => s.name)];
+  const names = [
+    ...AGENT_TOOL_NAMES,
+    ...registeredToolSpecs().map((s) => s.name),
+  ];
   return Object.fromEntries(
     names.map((n) => {
       // ask_user: park the turn, show the AskUserCard, wait for the user's answer.
@@ -392,7 +513,9 @@ function makeToolHandlers(
           n,
           async (input: unknown) => {
             const p = (input ?? {}) as Record<string, unknown>;
-            const question = (typeof p.question === 'string' ? p.question : '').trim();
+            const question = (
+              typeof p.question === 'string' ? p.question : ''
+            ).trim();
             if (!question) return 'ask_user: `question` is required';
             const rawOpts = Array.isArray(p.options)
               ? (p.options as unknown[]).map((o) => String(o))
@@ -416,7 +539,13 @@ function makeToolHandlers(
             // the card via trackDocs + can answer it; the owning host forwards the answer
             // back to `awaitAskUser`. Best-effort — the local snapshot path still works.
             const interactionId = askInteractionId(sessionId, toolCallId);
-            void putInteraction({ id: interactionId, sessionId, kind: 'ask_user', toolCallId, question: JSON.stringify({ question, options: opts }) });
+            void putInteraction({
+              id: interactionId,
+              sessionId,
+              kind: 'ask_user',
+              toolCallId,
+              question: JSON.stringify({ question, options: opts }),
+            });
             try {
               const answer = await awaitAskUser(toolCallId);
               return answer;
@@ -544,7 +673,10 @@ interface SessionAgentState {
 // on the first turn (the old coupling left a freshly-opened session's pill stuck on "loading"
 // until the user sent a message, which never happens if they're waiting for it to be "ready").
 // Keyed by sessionId; lives for the task process. See `ensureCodebaseAnalysis`.
-const codebaseReadinessBySession = new Map<string, SessionSnapshot['codebaseReadiness']>();
+const codebaseReadinessBySession = new Map<
+  string,
+  SessionSnapshot['codebaseReadiness']
+>();
 // Cached MEMORY.md content per project path — read once at session start and
 // refreshed after every memory_add call. Read synchronously by the systemPrompt
 // getter (which can't await).
@@ -552,7 +684,10 @@ const memoryContentByProject = new Map<string, string>();
 
 export async function refreshMemoryContent(projectDir: string): Promise<void> {
   try {
-    memoryContentByProject.set(projectDir, await native.fs.readFile(projectDir + '/MEMORY.md'));
+    memoryContentByProject.set(
+      projectDir,
+      await native.fs.readFile(projectDir + '/MEMORY.md'),
+    );
   } catch {
     memoryContentByProject.set(projectDir, '(no memories yet)');
   }
@@ -560,7 +695,9 @@ export async function refreshMemoryContent(projectDir: string): Promise<void> {
 
 // Register the memory write hook so the MEMORY.md content cache is refreshed
 // automatically after every memory_add call.
-setMemoryWriteHook((projectDir) => { void refreshMemoryContent(projectDir); });
+setMemoryWriteHook((projectDir) => {
+  void refreshMemoryContent(projectDir);
+});
 
 // ...
 // Rendered <available_skills> block per session (discovered once, async, then
@@ -570,8 +707,12 @@ function ensureSkillsDiscovered(sessionId: string): void {
   if (skillsBlockBySession.has(sessionId)) return;
   skillsBlockBySession.set(sessionId, formatAvailableSkills([])); // seed so the getter never blocks
   void discoverSkills()
-    .then((skills) => skillsBlockBySession.set(sessionId, formatAvailableSkills(skills)))
-    .catch(() => { /* best-effort — keep the empty block */ });
+    .then((skills) =>
+      skillsBlockBySession.set(sessionId, formatAvailableSkills(skills)),
+    )
+    .catch(() => {
+      /* best-effort — keep the empty block */
+    });
 }
 
 // Is the open project an ugly-app project? Resolved once (async) per session,
@@ -586,7 +727,9 @@ function ensureUglyAppFlag(sessionId: string): void {
   uglyAppBySession.set(sessionId, false); // seed so the getter never blocks
   void isUglyAppProject(dir)
     .then((v) => uglyAppBySession.set(sessionId, v))
-    .catch(() => { /* best-effort — treat as not-ugly-app */ });
+    .catch(() => {
+      /* best-effort — treat as not-ugly-app */
+    });
 }
 
 /** Fold a (partial) user selection onto the session state. Called on create and
@@ -621,15 +764,22 @@ function mechanicalSummary(taskText: string, dropped: AgentMessage[]): string {
       } else if (b.type === 'tool_use') {
         const arg =
           typeof b.input === 'object' && b.input
-            ? (Object.values(b.input as Record<string, unknown>).find((v) => typeof v === 'string'))
+            ? Object.values(b.input as Record<string, unknown>).find(
+                (v) => typeof v === 'string',
+              )
             : undefined;
         trail.push(`• ran ${b.name}${arg ? `(${arg.slice(0, 80)})` : ''}`);
       }
     }
   }
-  const parts = ['[Earlier turns were compacted to stay within the context window.]'];
+  const parts = [
+    '[Earlier turns were compacted to stay within the context window.]',
+  ];
   if (taskText) parts.push(`\nOriginal task:\n${taskText.slice(0, 1000)}`);
-  if (trail.length) parts.push(`\nWork done so far (most recent last):\n${trail.slice(-50).join('\n')}`);
+  if (trail.length)
+    parts.push(
+      `\nWork done so far (most recent last):\n${trail.slice(-50).join('\n')}`,
+    );
   return parts.join('\n');
 }
 
@@ -641,17 +791,29 @@ function renderDropped(dropped: AgentMessage[]): string {
   const lines: string[] = [];
   for (const m of dropped) {
     if (!Array.isArray(m.content)) {
-      if (typeof m.content === 'string' && m.content.trim()) lines.push(`${m.role.toUpperCase()}: ${m.content.trim().slice(0, 600)}`);
+      if (typeof m.content === 'string' && m.content.trim())
+        lines.push(
+          `${m.role.toUpperCase()}: ${m.content.trim().slice(0, 600)}`,
+        );
       continue;
     }
     for (const b of m.content as Record<string, unknown>[]) {
       if (b.type === 'text' && typeof b.text === 'string' && b.text.trim()) {
-        lines.push(`${m.role === 'assistant' ? 'ASSISTANT' : 'NOTE'}: ${b.text.trim().slice(0, 600)}`);
+        lines.push(
+          `${m.role === 'assistant' ? 'ASSISTANT' : 'NOTE'}: ${b.text.trim().slice(0, 600)}`,
+        );
       } else if (b.type === 'tool_use') {
-        lines.push(`TOOL_CALL ${String(b.name)}: ${JSON.stringify(b.input ?? {}).slice(0, 300)}`);
+        lines.push(
+          `TOOL_CALL ${String(b.name)}: ${JSON.stringify(b.input ?? {}).slice(0, 300)}`,
+        );
       } else if (b.type === 'tool_result') {
         const c = b.content;
-        const s = typeof c === 'string' ? c : Array.isArray(c) ? c.map((x) => (x as { text?: string }).text ?? '').join('') : JSON.stringify(c ?? '');
+        const s =
+          typeof c === 'string'
+            ? c
+            : Array.isArray(c)
+              ? c.map((x) => (x as { text?: string }).text ?? '').join('')
+              : JSON.stringify(c ?? '');
         if (s.trim()) lines.push(`TOOL_RESULT: ${s.trim().slice(0, 900)}`);
       }
     }
@@ -667,7 +829,11 @@ function renderDropped(dropped: AgentMessage[]): string {
  *  that had read a library's source or gathered debug findings lost them on
  *  compaction (observed: glm re-reading its file in a stuck loop). Falls back to the
  *  mechanical trail if the summariser call fails. */
-async function buildCompactionSummary(taskText: string, dropped: AgentMessage[], judge: Judge): Promise<string> {
+async function buildCompactionSummary(
+  taskText: string,
+  dropped: AgentMessage[],
+  judge: Judge,
+): Promise<string> {
   const transcript = renderDropped(dropped);
   if (!transcript.trim()) return mechanicalSummary(taskText, dropped);
   const system =
@@ -680,9 +846,14 @@ async function buildCompactionSummary(taskText: string, dropped: AgentMessage[],
   const user = `## Original task\n${taskText.slice(0, 2000)}\n\n## Session so far (oldest first) — compress this:\n${transcript}`;
   try {
     const s = (await judge(system, user, 3000)).trim();
-    return s ? `[Earlier turns were compacted into this summary.]\n\n${s}` : mechanicalSummary(taskText, dropped);
+    return s
+      ? `[Earlier turns were compacted into this summary.]\n\n${s}`
+      : mechanicalSummary(taskText, dropped);
   } catch (e) {
-    console.error('[compaction] LLM summary failed; using mechanical fallback', e instanceof Error ? e.message : String(e));
+    console.error(
+      '[compaction] LLM summary failed; using mechanical fallback',
+      e instanceof Error ? e.message : String(e),
+    );
     return mechanicalSummary(taskText, dropped);
   }
 }
@@ -692,7 +863,12 @@ const modelCtxWindow = new Map<string, number>();
 function contextWindowFor(model: string | undefined): number {
   if (!model) return 128_000;
   if (modelCtxWindow.size === 0) {
-    try { for (const m of getCodingAgentModels()) modelCtxWindow.set(m.id, m.contextWindow); } catch { /* fall back to default */ }
+    try {
+      for (const m of getCodingAgentModels())
+        modelCtxWindow.set(m.id, m.contextWindow);
+    } catch {
+      /* fall back to default */
+    }
   }
   return modelCtxWindow.get(model) ?? 128_000;
 }
@@ -701,14 +877,21 @@ function contextWindowFor(model: string | undefined): number {
  *  have ~1M windows, but the old flat 120k compacted the VERBOSE one (glm) at ~11% of
  *  capacity, throwing away reference material + debug findings mid-task. */
 function compactionThreshold(model: string | undefined): number {
-  const RESPONSE_MARGIN = 48_000, FLOOR = 96_000;
+  const RESPONSE_MARGIN = 48_000,
+    FLOOR = 96_000;
   const CEILING = Number(process.env.UGLY_MAX_CONTEXT ?? 400_000);
-  return Math.max(FLOOR, Math.min(contextWindowFor(model) - RESPONSE_MARGIN, CEILING));
+  return Math.max(
+    FLOOR,
+    Math.min(contextWindowFor(model) - RESPONSE_MARGIN, CEILING),
+  );
 }
 
 const sessions = new Map<string, SessionAgentState>();
 
-function safeEmit(emit: Emit, msg: { type: string; [k: string]: unknown }): void {
+function safeEmit(
+  emit: Emit,
+  msg: { type: string; [k: string]: unknown },
+): void {
   try {
     emit(msg);
   } catch (e) {
@@ -743,7 +926,6 @@ function emitMessage(
   });
 }
 
-
 // ── Server persistence helpers (all best-effort; never break the loop) ───────
 
 // Max cadence for streaming transient writes (ms). ~12 writes/sec is plenty for smooth
@@ -760,8 +942,13 @@ function scheduleTransientFlush(s: SessionAgentState, sessionId: string): void {
     s.transientLastAt = Date.now();
     if (s.streamSeq === null) return;
     void sessionApi.appendMessage({
-      sessionId, seq: s.streamSeq, role: 'assistant',
-      content: JSON.stringify({ content: [{ type: 'text', text: s.streamText }], pending: true }),
+      sessionId,
+      seq: s.streamSeq,
+      role: 'assistant',
+      content: JSON.stringify({
+        content: [{ type: 'text', text: s.streamText }],
+        pending: true,
+      }),
       transient: true,
     });
   };
@@ -774,11 +961,22 @@ function scheduleTransientFlush(s: SessionAgentState, sessionId: string): void {
  *  `reservedSeq` is given (an assistant row whose seq was reserved at stream start),
  *  commit at that seq so it supersedes the transient streaming writes at the same
  *  `_id`; otherwise allocate the next seq. */
-function persistRow(s: SessionAgentState, sessionId: string, role: StoredRole, payload: unknown, reservedSeq?: number): string {
+function persistRow(
+  s: SessionAgentState,
+  sessionId: string,
+  role: StoredRole,
+  payload: unknown,
+  reservedSeq?: number,
+): string {
   const seq = reservedSeq ?? s.seq++;
   const id = `${sessionId}:${seq}`;
   s.activeRows.push({ seq, id });
-  void sessionApi.appendMessage({ sessionId, seq, role, content: JSON.stringify(payload) });
+  void sessionApi.appendMessage({
+    sessionId,
+    seq,
+    role,
+    content: JSON.stringify(payload),
+  });
   return id;
 }
 
@@ -789,7 +987,12 @@ function persistRow(s: SessionAgentState, sessionId: string, role: StoredRole, p
  * query == the model's post-compaction working context (no re-compaction on
  * reload). Summary `_id`/seq reuse the boundary seq → idempotent across reloads.
  */
-function persistCompaction(s: SessionAgentState, sessionId: string, droppedCount: number, summaryText: string): void {
+function persistCompaction(
+  s: SessionAgentState,
+  sessionId: string,
+  droppedCount: number,
+  summaryText: string,
+): void {
   const plan = planCompaction(s.activeRows, droppedCount, sessionId);
   if (!plan) return;
   s.activeRows = plan.newActiveRows;
@@ -826,34 +1029,49 @@ function persistMeta(
   // un-awaited they raced, and whenever the earlier 'running' landed AFTER the terminal
   // 'idle' it clobbered it: the session showed THINKING forever, with nothing left to
   // write again. Queueing makes them land in issue order, so the terminal status wins.
-  void queueWrite(sessionId, () => sessionApi.upsert({
+  void queueWrite(
     sessionId,
-    projectId: s.projectId,
-    title: s.title,
-    model: s.model,
-    status,
-    messageCount: s.messageCount,
-    costUsd: s.cost,
-    promptTokens: s.promptTokens,
-    completionTokens: s.completionTokens,
-    cacheReadTokens: s.cacheReadTokens,
-    cacheCreationTokens: s.cacheCreationTokens,
-    // Context-pressure meter, doc-driven so it renders for ANY session (not just the one
-    // this device is attached to): current fill, the raw window, and the pre-compaction
-    // budget. Only meaningful once a turn has run (contextTokens 0 before that).
-    contextTokens: s.contextTokens,
-    contextWindow: contextWindowFor(s.model),
-    contextBudget: compactionThreshold(s.model),
-    config,
-    // Record the failure text on the session (queryable by id) when the turn
-    // errored; clear it ('') on any non-error status so a recovered session
-    // stops reporting a stale error. The `⚠` chat bubble is renderer-only.
-    lastError: status === 'error' ? (errorMessage ?? 'Turn failed').slice(0, 2000) : '',
-  }), (e: unknown) => {
-    // Never silent: a dropped status write is exactly how a session gets stuck showing
-    // THINKING, and the old `void upsert(...)` swallowed the reason.
-    console.error('[clientAgent:persistMeta]', JSON.stringify({ sessionId, status, error: e instanceof Error ? e.message : String(e) }));
-  });
+    () =>
+      sessionApi.upsert({
+        sessionId,
+        projectId: s.projectId,
+        title: s.title,
+        model: s.model,
+        status,
+        messageCount: s.messageCount,
+        costUsd: s.cost,
+        promptTokens: s.promptTokens,
+        completionTokens: s.completionTokens,
+        cacheReadTokens: s.cacheReadTokens,
+        cacheCreationTokens: s.cacheCreationTokens,
+        // Context-pressure meter, doc-driven so it renders for ANY session (not just the one
+        // this device is attached to): current fill, the raw window, and the pre-compaction
+        // budget. Only meaningful once a turn has run (contextTokens 0 before that).
+        contextTokens: s.contextTokens,
+        contextWindow: contextWindowFor(s.model),
+        contextBudget: compactionThreshold(s.model),
+        config,
+        // Record the failure text on the session (queryable by id) when the turn
+        // errored; clear it ('') on any non-error status so a recovered session
+        // stops reporting a stale error. The `⚠` chat bubble is renderer-only.
+        lastError:
+          status === 'error'
+            ? (errorMessage ?? 'Turn failed').slice(0, 2000)
+            : '',
+      }),
+    (e: unknown) => {
+      // Never silent: a dropped status write is exactly how a session gets stuck showing
+      // THINKING, and the old `void upsert(...)` swallowed the reason.
+      console.error(
+        '[clientAgent:persistMeta]',
+        JSON.stringify({
+          sessionId,
+          status,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      );
+    },
+  );
 }
 
 /**
@@ -862,7 +1080,10 @@ function persistMeta(
  * exactly runAgent's post-compaction working context — and seeds it via
  * controller.resume so the next turn continues with full context, no recompaction.
  */
-async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<void> {
+async function ensureResumed(
+  s: SessionAgentState,
+  sessionId: string,
+): Promise<void> {
   if (s.resumed) return;
   s.resumed = true;
   s.projectId = await resolveProjectId(getActiveProjectPath());
@@ -881,7 +1102,10 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
       s.titleSet = true;
     }
   }
-  const { messages, activeRows, nextSeq } = reconstructResumeContext(rows, sessionId);
+  const { messages, activeRows, nextSeq } = reconstructResumeContext(
+    rows,
+    sessionId,
+  );
   s.activeRows = activeRows;
   s.seq = nextSeq;
   s.titleSet = true; // a resumed session already has its title
@@ -889,16 +1113,26 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
   // Restore the pinned task so post-reload compaction still preserves it: the
   // first user row, or (if already compacted) parsed back out of the summary.
   if (!s.taskText) {
-    const firstUser = rows.find((r) => r.role === 'user' && r.kind === 'message');
+    const firstUser = rows.find(
+      (r) => r.role === 'user' && r.kind === 'message',
+    );
     if (firstUser) {
-      try { s.taskText = String(JSON.parse(firstUser.content)); } catch { /* ignore */ }
+      try {
+        s.taskText = String(JSON.parse(firstUser.content));
+      } catch {
+        /* ignore */
+      }
     } else {
       const summaryRow = rows.find((r) => r.kind === 'summary');
       if (summaryRow) {
         try {
-          const m = /Original task:\n([\s\S]*?)(?:\n\n|$)/.exec(String(JSON.parse(summaryRow.content)));
+          const m = /Original task:\n([\s\S]*?)(?:\n\n|$)/.exec(
+            String(JSON.parse(summaryRow.content)),
+          );
           if (m) s.taskText = m[1];
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     }
   }
@@ -917,7 +1151,10 @@ async function ensureResumed(s: SessionAgentState, sessionId: string): Promise<v
   } catch (e) {
     // Resume is best-effort context seeding — a failure must NOT swallow the
     // user's turn. Log and continue; the send below still runs.
-    console.error('[clientAgent] resume failed (continuing without prior context)', e);
+    console.error(
+      '[clientAgent] resume failed (continuing without prior context)',
+      e,
+    );
   }
 }
 
@@ -938,7 +1175,13 @@ function accrue(s: SessionAgentState, t: MsgTelemetry): void {
   // cumulative. Overwritten each turn so the doc always carries the latest pressure.
   s.contextTokens = input + cacheRead + cacheCreation;
   const pm = s.perModel.get(model) ?? {
-    model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, cost: 0, turnCount: 0,
+    model,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    cost: 0,
+    turnCount: 0,
   };
   pm.inputTokens += input;
   pm.outputTokens += output;
@@ -1009,17 +1252,30 @@ export function ensureCodebaseAnalysis(sessionId: string): void {
   // Worktree-isolated sessions reconcile their overlay against disk once ready.
   const ws = getSessionWorkspace(sessionId);
   const worktreeRoot = ws?.isWorktree ? ws.dir : undefined;
-  startCodebasePoll(sessionId, cwd, (r) => {
-    codebaseReadinessBySession.set(sessionId, r as SessionSnapshot['codebaseReadiness']);
-    // Doc-driven delivery: stamp readiness onto the session doc so EVERY client's pill updates
-    // via trackDocs — not just the host-attached renderer that used to hear the `task.listen`
-    // `codebase_readiness` event. setDocFields touches only this field (never telemetry).
-    // Fire-and-forget; a tick that beats the session doc's creation no-ops (the next lands).
-    void setCodebaseReadiness(sessionId, r);
-  }, worktreeRoot);
+  startCodebasePoll(
+    sessionId,
+    cwd,
+    (r) => {
+      codebaseReadinessBySession.set(
+        sessionId,
+        r as SessionSnapshot['codebaseReadiness'],
+      );
+      // Doc-driven delivery: stamp readiness onto the session doc so EVERY client's pill updates
+      // via trackDocs — not just the host-attached renderer that used to hear the `task.listen`
+      // `codebase_readiness` event. setDocFields touches only this field (never telemetry).
+      // Fire-and-forget; a tick that beats the session doc's creation no-ops (the next lands).
+      void setCodebaseReadiness(sessionId, r);
+    },
+    worktreeRoot,
+  );
 }
 
-function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, opts?: { peer?: boolean }): SessionAgentState {
+function getOrCreate(
+  sessionId: string,
+  emit: Emit,
+  selection?: AgentSelection,
+  opts?: { peer?: boolean },
+): SessionAgentState {
   const existing = sessions.get(sessionId);
   if (existing) {
     existing.emitRef.current = emit;
@@ -1070,7 +1326,12 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     turnRunning: false,
   };
   applySelection(state, selection);
-  state.log.append({ ts: Date.now(), type: 'session_start', sessionId, model: state.model });
+  state.log.append({
+    ts: Date.now(),
+    type: 'session_start',
+    sessionId,
+    model: state.model,
+  });
 
   // Kick off (idempotently) the host's semantic index + architecture doc and stream readiness
   // to the header pill. Also runs at task boot (coding-task) so the pill fills in BEFORE the
@@ -1101,13 +1362,17 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       const base = AGENT_SYSTEM_PROMPT;
       // Real per-turn <env> (replaces the monolith's hardcoded sample block).
       const ws = getSessionWorkspace(sessionId);
-      const cwd = (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? '(no project open)';
+      const cwd =
+        (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ??
+        '(no project open)';
       const env = `<env>\nWorking directory: ${cwd}\nToday's date: ${new Date().toISOString().slice(0, 10)}\n</env>`;
       // Dynamic <available_skills> (discovered once per session; see below).
-      const skillsBlock = skillsBlockBySession.get(sessionId) ?? formatAvailableSkills([]);
+      const skillsBlock =
+        skillsBlockBySession.get(sessionId) ?? formatAvailableSkills([]);
       // Inject MEMORY.md into the system prompt from the cache (refreshed on
       // session start and after every memory_add call).
-      const memoryBlock = memoryContentByProject.get(cwd) ?? '(no memories yet)';
+      const memoryBlock =
+        memoryContentByProject.get(cwd) ?? '(no memories yet)';
       return `${base.replace('{{AVAILABLE_SKILLS}}', skillsBlock).replace('{{MEMORY}}', memoryBlock)}\n\n${env}`;
     },
     // Static per-session gating (read afresh each turn): COMMON + single/group
@@ -1118,7 +1383,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       const isUglyApp = uglyAppBySession.get(sessionId) ?? false;
       // Gate to the current SBV step's allow-list (no-op when no pattern step is
       // active), then apply any session toolset override (e.g. --toolset no-python).
-      const stepGated = filterToolsForStep(sessionToolSpecs({ mode, isUglyApp }), state.currentStep);
+      const stepGated = filterToolsForStep(
+        sessionToolSpecs({ mode, isUglyApp }),
+        state.currentStep,
+      );
       return filterToolsByToolset(stepGated, toolsetBySession.get(sessionId));
     },
     toolHandlers: makeToolHandlers(sessionId, state),
@@ -1143,7 +1411,8 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     compaction: {
       maxContextTokens: compactionThreshold(state.model),
       keepRecentTurns: 8,
-      summarize: (dropped) => buildCompactionSummary(state.taskText, dropped, agentStepJudge),
+      summarize: (dropped) =>
+        buildCompactionSummary(state.taskText, dropped, agentStepJudge),
     },
     // Turn-end execution feedback: when the model tries to finish after edits, run the
     // project's verify gate and, on failure, inject the errors to continue the turn so
@@ -1155,21 +1424,32 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
     // update it in place as text arrives (onTurn finalizes it authoritatively).
     onText: (_msgId, delta) => {
       state.streamText += delta;
-      const parts: Part[] = [{ type: 'text', data: { text: state.streamText } }];
+      const parts: Part[] = [
+        { type: 'text', data: { text: state.streamText } },
+      ];
       if (!state.streamMsgId) {
         state.streamMsgId = rid();
         // Reserve this row's transcript seq NOW so the transient streaming writes and
         // the final committed row (onTurn) share `_id = sessionId:streamSeq`.
         state.streamSeq = state.seq++;
-        emitMessage(emitRef.current, sessionId, 'assistant', parts, { id: state.streamMsgId, action: 'created' });
+        emitMessage(emitRef.current, sessionId, 'assistant', parts, {
+          id: state.streamMsgId,
+          action: 'created',
+        });
         // Cold-start catch-up: a trackDocs({includeTransient}) sub still warming up on a
         // fresh / just-switched-into session can miss the first transient frames (they're
         // relay-only, no refetch). Re-emit the cumulative row a beat later so a warming sub
         // gets the live tail. One-shot (no long-lived timer); guarded on the turn still
         // streaming. Later token frames are cumulative, so this only needs to fire once.
-        setTimeout(() => { if (state.streamSeq !== null) scheduleTransientFlush(state, sessionId); }, 500);
+        setTimeout(() => {
+          if (state.streamSeq !== null)
+            scheduleTransientFlush(state, sessionId);
+        }, 500);
       } else {
-        emitMessage(emitRef.current, sessionId, 'assistant', parts, { id: state.streamMsgId, action: 'updated' });
+        emitMessage(emitRef.current, sessionId, 'assistant', parts, {
+          id: state.streamMsgId,
+          action: 'updated',
+        });
       }
       // Stream the in-progress content to every client via trackDocs({includeTransient})
       // — a transient (non-persisted) write at the reserved seq, THROTTLED so a fast token
@@ -1187,23 +1467,43 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       // Finalize the streamed bubble in place (same id) when we streamed text;
       // otherwise (tool-only turn) emit a fresh bubble.
       if (state.streamMsgId) {
-        emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content), {
-          id: state.streamMsgId,
-          action: 'updated',
-          ...modelOpt,
-        });
+        emitMessage(
+          emitRef.current,
+          sessionId,
+          'assistant',
+          assistantParts(content),
+          {
+            id: state.streamMsgId,
+            action: 'updated',
+            ...modelOpt,
+          },
+        );
       } else {
-        emitMessage(emitRef.current, sessionId, 'assistant', assistantParts(content), modelOpt);
+        emitMessage(
+          emitRef.current,
+          sessionId,
+          'assistant',
+          assistantParts(content),
+          modelOpt,
+        );
       }
       const reservedSeq = state.streamSeq ?? undefined;
       // Cancel any pending throttled transient flush so it can't land AFTER the durable
       // commit below and revive the row's `pending`/streaming state.
-      if (state.transientTimer) { clearTimeout(state.transientTimer); state.transientTimer = null; }
+      if (state.transientTimer) {
+        clearTimeout(state.transientTimer);
+        state.transientTimer = null;
+      }
       state.streamMsgId = null;
       state.streamText = '';
       state.streamSeq = null;
       state.messageCount += 1;
-      state.log.append({ ts: Date.now(), type: 'assistant', content, ...(telemetry ? { telemetry } : {}) });
+      state.log.append({
+        ts: Date.now(),
+        type: 'assistant',
+        content,
+        ...(telemetry ? { telemetry } : {}),
+      });
       // Persist the assistant turn verbatim (one row, matches one working-context
       // message) — content + model so the badge survives reload. Stamp each
       // tool_use's start time (handoff clock, ~now) so a still-running tool's
@@ -1213,13 +1513,20 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
       const toolStartedAt: Record<string, number> = {};
       const stamp = Date.now();
       for (const blk of content) {
-        if (blk.type === 'tool_use' && typeof blk.id === 'string') toolStartedAt[blk.id] = stamp;
+        if (blk.type === 'tool_use' && typeof blk.id === 'string')
+          toolStartedAt[blk.id] = stamp;
       }
-      persistRow(state, sessionId, 'assistant', {
-        content,
-        ...modelOpt,
-        ...(Object.keys(toolStartedAt).length > 0 ? { toolStartedAt } : {}),
-      }, reservedSeq);
+      persistRow(
+        state,
+        sessionId,
+        'assistant',
+        {
+          content,
+          ...modelOpt,
+          ...(Object.keys(toolStartedAt).length > 0 ? { toolStartedAt } : {}),
+        },
+        reservedSeq,
+      );
       if (telemetry) {
         accrue(state, telemetry);
         state.log.append({ ts: Date.now(), type: 'telemetry', telemetry });
@@ -1238,22 +1545,24 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
           .join('\n')
           .trim();
         if (state.taskText && assistantText) {
-          void deriveSessionTitle(state.taskText, assistantText).then((title) => {
-            if (!title) return;
-            // The session may have been torn down while the completion was in
-            // flight; re-fetch live state rather than capturing a stale ref.
-            const live = sessions.get(sessionId);
-            if (!live) return; // session torn down while the completion was in flight
-            live.title = title;
-            live.titleSet = true;
-            persistMeta(live, sessionId, 'running');
-            safeEmit(emitRef.current, {
-              type: 'codingAgent:event',
-              sessionId,
-              title,
-              action: 'title',
-            });
-          });
+          void deriveSessionTitle(state.taskText, assistantText).then(
+            (title) => {
+              if (!title) return;
+              // The session may have been torn down while the completion was in
+              // flight; re-fetch live state rather than capturing a stale ref.
+              const live = sessions.get(sessionId);
+              if (!live) return; // session torn down while the completion was in flight
+              live.title = title;
+              live.titleSet = true;
+              persistMeta(live, sessionId, 'running');
+              safeEmit(emitRef.current, {
+                type: 'codingAgent:event',
+                sessionId,
+                title,
+                action: 'title',
+              });
+            },
+          );
         }
       }
 
@@ -1263,11 +1572,26 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         model: telemetry?.model ?? state.model,
         contentChars: JSON.stringify(content).length,
         toolCalls: content.filter((b) => b.type === 'tool_use').length,
-        ...(telemetry ? { inputTokens: telemetry.inputTokens, outputTokens: telemetry.outputTokens, cacheReadTokens: telemetry.cacheReadTokens, costUsd: telemetry.costUsd } : {}),
+        ...(telemetry
+          ? {
+              inputTokens: telemetry.inputTokens,
+              outputTokens: telemetry.outputTokens,
+              cacheReadTokens: telemetry.cacheReadTokens,
+              costUsd: telemetry.costUsd,
+            }
+          : {}),
         msgCount: state.messageCount,
       });
       // Arm the turn-end verify gate when this turn edited source (see verifyOnSettle).
-      if (content.some((b) => b.type === 'tool_use' && ['write', 'edit', 'multiedit'].includes((b as { name?: string }).name ?? ''))) {
+      if (
+        content.some(
+          (b) =>
+            b.type === 'tool_use' &&
+            ['write', 'edit', 'multiedit'].includes(
+              (b as { name?: string }).name ?? '',
+            ),
+        )
+      ) {
         editedSinceVerifyBySession.set(sessionId, true);
       }
     },
@@ -1289,35 +1613,74 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
           // found nothing. If you add a tool, throw on failure; don't return prose.
           const isError = content.startsWith('Error:');
           emitMessage(emitRef.current, sessionId, 'tool', [
-            { type: 'tool_result', data: { tool_call_id: r.tool_use_id, content, is_error: isError } },
+            {
+              type: 'tool_result',
+              data: { tool_call_id: r.tool_use_id, content, is_error: isError },
+            },
           ]);
           state.messageCount += 1;
-          state.log.append({ ts: Date.now(), type: 'tool_result', tool_use_id: r.tool_use_id, content, is_error: isError });
-          bundle.push({ tool_use_id: r.tool_use_id, content, is_error: isError });
+          state.log.append({
+            ts: Date.now(),
+            type: 'tool_result',
+            tool_use_id: r.tool_use_id,
+            content,
+            is_error: isError,
+          });
+          bundle.push({
+            tool_use_id: r.tool_use_id,
+            content,
+            is_error: isError,
+          });
         }
         if (bundle.length > 0) {
-          persistRow(state, sessionId, 'tool', { results: bundle } satisfies ToolRowPayload);
+          persistRow(state, sessionId, 'tool', {
+            results: bundle,
+          } satisfies ToolRowPayload);
         }
       } else if (e.type === 'compaction') {
-        state.log.append({ ts: Date.now(), type: 'compaction', droppedCount: e.droppedCount, ...(e.summary ? { summary: e.summary } : {}) });
-        debugLog(sessionId, 'compaction', { droppedCount: e.droppedCount, summaryChars: e.summary?.length ?? 0, promptTokens: state.promptTokens, cacheReadTokens: state.cacheReadTokens });
-        if (e.summary) persistCompaction(state, sessionId, e.droppedCount, e.summary);
+        state.log.append({
+          ts: Date.now(),
+          type: 'compaction',
+          droppedCount: e.droppedCount,
+          ...(e.summary ? { summary: e.summary } : {}),
+        });
+        debugLog(sessionId, 'compaction', {
+          droppedCount: e.droppedCount,
+          summaryChars: e.summary?.length ?? 0,
+          promptTokens: state.promptTokens,
+          cacheReadTokens: state.cacheReadTokens,
+        });
+        if (e.summary)
+          persistCompaction(state, sessionId, e.droppedCount, e.summary);
       } else if (e.type === 'error') {
         console.error('[clientAgent:error]', sessionId, e.message);
         // KEY diagnostic: how long the failing request ran before erroring
         // (sinceLastMs), the total session age, and the error text — this is what
         // distinguishes a fixed-duration timeout/abort from a transient blip.
         const clk = debugTick(sessionId);
-        debugLog(sessionId, 'error', { message: e.message, ranMsBeforeError: clk.sinceLastMs, sessionAgeMs: clk.sinceStartMs, model: state.model, msgCount: state.messageCount, promptTokens: state.promptTokens });
+        debugLog(sessionId, 'error', {
+          message: e.message,
+          ranMsBeforeError: clk.sinceLastMs,
+          sessionAgeMs: clk.sinceStartMs,
+          model: state.model,
+          msgCount: state.messageCount,
+          promptTokens: state.promptTokens,
+        });
         emitMessage(emitRef.current, sessionId, 'assistant', [
           { type: 'text', data: { text: '⚠ ' + e.message } },
           { type: 'finish' },
         ]);
         state.log.append({ ts: Date.now(), type: 'error', message: e.message });
       }
-      if (e.type === 'done' || e.type === 'error' || e.type === 'aborted' || e.type === 'budget_exceeded') {
+      if (
+        e.type === 'done' ||
+        e.type === 'error' ||
+        e.type === 'aborted' ||
+        e.type === 'budget_exceeded'
+      ) {
         const tick = debugTick(sessionId);
-        if (e.type !== 'error') debugLog(sessionId, 'finish', { reason: e.type, ...tick });
+        if (e.type !== 'error')
+          debugLog(sessionId, 'finish', { reason: e.type, ...tick });
         state.log.append({ ts: Date.now(), type: 'finish', reason: e.type });
         // Surface a visible note when the turn ended for a NON-error reason the
         // user would otherwise have NO way to see (the spinner just stops). A
@@ -1341,7 +1704,9 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
           state,
           sessionId,
           e.type === 'error' ? 'error' : 'idle',
-          e.type === 'error' && 'message' in e ? String((e as { message: unknown }).message) : undefined,
+          e.type === 'error' && 'message' in e
+            ? String((e as { message: unknown }).message)
+            : undefined,
         );
         safeEmit(emitRef.current, {
           type: 'codingAgent:event',
@@ -1351,14 +1716,32 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
           // turns ("I sent a message and nothing happened"): a tiny `ranMs` with
           // reason `done` means the model returned nothing; `budget_exceeded`/`aborted`
           // point at context size / a stale abort instead.
-          event: { type: 'agent_event', payload: { payload: {
-            type: 'agent_finished',
-            reason: e.type,
-            // For reason='error', carry the message into telemetry so a bug report
-            // captures the ACTUAL failure (e.g. a "tool use issue") — the ⚠ bubble
-            // text isn't recorded verbatim in the browser recentLogs.
-            diag: { ranMs: tick.sinceStartMs, msgCount: state.messageCount, promptTokens: state.promptTokens, cacheReadTokens: state.cacheReadTokens, model: state.model, ...(e.type === 'error' && 'message' in e ? { errMsg: String((e as { message: unknown }).message).slice(0, 400) } : {}) },
-          } } },
+          event: {
+            type: 'agent_event',
+            payload: {
+              payload: {
+                type: 'agent_finished',
+                reason: e.type,
+                // For reason='error', carry the message into telemetry so a bug report
+                // captures the ACTUAL failure (e.g. a "tool use issue") — the ⚠ bubble
+                // text isn't recorded verbatim in the browser recentLogs.
+                diag: {
+                  ranMs: tick.sinceStartMs,
+                  msgCount: state.messageCount,
+                  promptTokens: state.promptTokens,
+                  cacheReadTokens: state.cacheReadTokens,
+                  model: state.model,
+                  ...(e.type === 'error' && 'message' in e
+                    ? {
+                        errMsg: String(
+                          (e as { message: unknown }).message,
+                        ).slice(0, 400),
+                      }
+                    : {}),
+                },
+              },
+            },
+          },
         });
       }
     },
@@ -1373,7 +1756,10 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
  * worktree-create + dependency-install progress into the chat as one updating
  * bubble. Resolves immediately for the main session (no worktree) or once cached.
  */
-async function ensureWorkspaceStep(sessionId: string, emit: Emit): Promise<void> {
+async function ensureWorkspaceStep(
+  sessionId: string,
+  emit: Emit,
+): Promise<void> {
   if (getSessionWorkspace(sessionId)) return; // already provisioned
   const progressId = rid();
   let created = false;
@@ -1383,23 +1769,37 @@ async function ensureWorkspaceStep(sessionId: string, emit: Emit): Promise<void>
     ready: 'Workspace ready',
     error: 'Workspace',
   };
-  await ensureSessionWorkspace(sessionId, getActiveProjectPath(), (stage, text) => {
-    emitMessage(
-      emit,
-      sessionId,
-      'assistant',
-      [{ type: 'text', data: { text: `${label[stage] ?? 'Workspace'}\n\n${text}` } }, { type: 'finish' }],
-      { id: progressId, action: created ? 'updated' : 'created' },
-    );
-    created = true;
-  }, { branchMode: sessions.get(sessionId)?.branchMode });
+  await ensureSessionWorkspace(
+    sessionId,
+    getActiveProjectPath(),
+    (stage, text) => {
+      emitMessage(
+        emit,
+        sessionId,
+        'assistant',
+        [
+          {
+            type: 'text',
+            data: { text: `${label[stage] ?? 'Workspace'}\n\n${text}` },
+          },
+          { type: 'finish' },
+        ],
+        { id: progressId, action: created ? 'updated' : 'created' },
+      );
+      created = true;
+    },
+    { branchMode: sessions.get(sessionId)?.branchMode },
+  );
   // Persist branch info to the server session so every browser sees the pill.
   const ws = getSessionWorkspace(sessionId);
   const st = sessions.get(sessionId);
   const branch = ws?.branch ?? (st?.branchMode === 'main' ? 'main' : undefined);
   if (branch) {
-    const projectId = st?.projectId ?? await resolveProjectId(getActiveProjectPath());
-    void sessionApi.upsert({ sessionId, projectId, branch }).catch(() => undefined);
+    const projectId =
+      st?.projectId ?? (await resolveProjectId(getActiveProjectPath()));
+    void sessionApi
+      .upsert({ sessionId, projectId, branch })
+      .catch(() => undefined);
   }
 }
 
@@ -1425,7 +1825,13 @@ export async function runClientAgentTurn(
       return;
     }
     const steerMsgId = persistRow(state, sessionId, 'user', userText);
-    emitMessage(emit, sessionId, 'user', [{ type: 'text', data: { text: userText } }], { id: steerMsgId, action: 'created' });
+    emitMessage(
+      emit,
+      sessionId,
+      'user',
+      [{ type: 'text', data: { text: userText } }],
+      { id: steerMsgId, action: 'created' },
+    );
     state.controller.steer(userText);
     return;
   }
@@ -1452,7 +1858,13 @@ async function runOneClientAgentTurn(
   await ensureResumed(state, sessionId);
   state.messageCount += 1;
   state.log.append({ ts: Date.now(), type: 'user', text: userText });
-  debugLog(sessionId, 'send', { textChars: userText.length, model: state.model, msgCount: state.messageCount, maxContextTokens: compactionThreshold(state.model), ...debugTick(sessionId) });
+  debugLog(sessionId, 'send', {
+    textChars: userText.length,
+    model: state.model,
+    msgCount: state.messageCount,
+    maxContextTokens: compactionThreshold(state.model),
+    ...debugTick(sessionId),
+  });
   if (!state.taskText) state.taskText = userText; // pin the original task for summaries
   if (!state.titleSet) {
     state.title = userText.slice(0, 120);
@@ -1463,10 +1875,16 @@ async function runOneClientAgentTurn(
   // live. Only assistant + tool messages were emitted, so a remote viewer saw the replies
   // with no prompt above them. Uses the persisted row id, so a later history reload dedupes;
   // the sender already shows an optimistic bubble and its reconciliation adopts this id.
-  emitMessage(emit, sessionId, 'user', [{ type: 'text', data: { text: userText } }], {
-    id: userMsgId,
-    action: 'created',
-  });
+  emitMessage(
+    emit,
+    sessionId,
+    'user',
+    [{ type: 'text', data: { text: userText } }],
+    {
+      id: userMsgId,
+      action: 'created',
+    },
+  );
   persistMeta(state, sessionId, 'running');
   // Resolve the pattern axis: `none` → plain single-send; an explicit PatternId
   // pin runs that pattern; `auto` classifies and runs the routed pattern (or, when
@@ -1474,7 +1892,9 @@ async function runOneClientAgentTurn(
   // share their base pattern's steps; the super id is retained for the model axis.
   const resolvedId = await resolvePatternForTurn(state, userText);
   state.resolvedPattern = resolvedId;
-  const pattern = resolvedId ? getPattern(superToBasePattern(resolvedId)) : undefined;
+  const pattern = resolvedId
+    ? getPattern(superToBasePattern(resolvedId))
+    : undefined;
   const projectDir = mainProjectDir(sessionId);
   try {
     // Model axis dispatch. Priority: group (own peers, no steps) → max (peers run
@@ -1483,11 +1903,36 @@ async function runOneClientAgentTurn(
     if (state.modelMode.kind === 'group') {
       await runGroupModeTurn(state, sessionId, emit, userText, projectDir);
     } else if (state.modelMode.kind === 'max' && pattern) {
-      await runMaxModeTurn(state, sessionId, emit, userText, pattern, projectDir);
+      await runMaxModeTurn(
+        state,
+        sessionId,
+        emit,
+        userText,
+        pattern,
+        projectDir,
+      );
     } else if (pattern && isSuperPattern(resolvedId)) {
-      await runMidModeTurn(state, sessionId, emit, userText, pattern, resolvedId, projectDir);
+      await runMidModeTurn(
+        state,
+        sessionId,
+        emit,
+        userText,
+        pattern,
+        resolvedId,
+        projectDir,
+      );
     } else if (pattern) {
-      await runPatternStepsOnMain({ state, sessionId, emit, userText, pattern, resolvedId, startIdx: 0, injection: null, projectDir });
+      await runPatternStepsOnMain({
+        state,
+        sessionId,
+        emit,
+        userText,
+        pattern,
+        resolvedId,
+        startIdx: 0,
+        injection: null,
+        projectDir,
+      });
     } else {
       // Flat `none` loop: no step engine, so nothing counterbalances the base
       // prompt's edit-boldly rules. Decorate the turn to make the model surface
@@ -1495,7 +1940,9 @@ async function runOneClientAgentTurn(
       // ends the turn, so an eval that asks a question hangs forever.
       // (Peers/delegates never reach here; they call `controller.send` directly.)
       await state.controller.send(
-        evalSessions.has(sessionId) ? userText : decorateForNonePattern(userText),
+        evalSessions.has(sessionId)
+          ? userText
+          : decorateForNonePattern(userText),
       );
     }
   } finally {
@@ -1514,7 +1961,10 @@ function mainProjectDir(sessionId: string): string | null {
 
 /** Emit a one-off assistant progress bubble (model-axis narration). */
 function emitProgress(emit: Emit, sessionId: string, text: string): void {
-  emitMessage(emit, sessionId, 'assistant', [{ type: 'text', data: { text } }, { type: 'finish' }]);
+  emitMessage(emit, sessionId, 'assistant', [
+    { type: 'text', data: { text } },
+    { type: 'finish' },
+  ]);
 }
 
 /**
@@ -1534,7 +1984,17 @@ async function runPatternStepsOnMain(args: {
   injection: string | null;
   projectDir: string | null;
 }): Promise<void> {
-  const { state, sessionId, emit, userText, pattern, resolvedId, startIdx, injection, projectDir } = args;
+  const {
+    state,
+    sessionId,
+    emit,
+    userText,
+    pattern,
+    resolvedId,
+    startIdx,
+    injection,
+    projectDir,
+  } = args;
   // The criteria-grader runs ONLY for eval-flow sessions — it's a measurement +
   // REVISE-pressure mechanism, not a per-user-turn cost. Normal sessions leave
   // `criteria` empty → the write-step gate is a no-op.
@@ -1548,8 +2008,11 @@ async function runPatternStepsOnMain(args: {
     state.currentStepIter = 0;
     emitTelemetry(state, sessionId); // live PatternStrip: highlight this step
     const isFirstExecuted = i === Math.max(0, startIdx);
-    const base = isFirstExecuted ? decorateForStep(userText, step) : renderStepDecoration(step);
-    const withInjection = isFirstExecuted && injection ? `${base}\n\n${injection}` : base;
+    const base = isFirstExecuted
+      ? decorateForStep(userText, step)
+      : renderStepDecoration(step);
+    const withInjection =
+      isFirstExecuted && injection ? `${base}\n\n${injection}` : base;
     const msg = reviewFeedback
       ? `${withInjection}\n\n---\n\nUSER REVIEW FEEDBACK (revise this step accordingly):\n${reviewFeedback}`
       : withInjection;
@@ -1561,17 +2024,35 @@ async function runPatternStepsOnMain(args: {
     if (step.gradeAfter && step.loops !== 'one-shot' && criteria.length > 0) {
       for (let r = 0; r < MAX_REVISE; r++) {
         const diff = await sessionGitDiff(projectDir);
-        const grade = await gradeAgainstCriteria(userText, criteria, diff, agentStepJudge);
-        emit({ type: 'codingAgent:event', sessionId, event: { type: 'criteria_verdicts', payload: { verdicts: grade.verdicts, failing: grade.failing } } });
+        const grade = await gradeAgainstCriteria(
+          userText,
+          criteria,
+          diff,
+          agentStepJudge,
+        );
+        emit({
+          type: 'codingAgent:event',
+          sessionId,
+          event: {
+            type: 'criteria_verdicts',
+            payload: { verdicts: grade.verdicts, failing: grade.failing },
+          },
+        });
         if (!grade.parsed || grade.failing.length === 0) break;
         state.currentStepIter = r + 1;
         emitTelemetry(state, sessionId);
-        await state.controller.send(`${renderStepDecoration(step)}\n\n${buildRevisePrompt(grade.failing)}`);
+        await state.controller.send(
+          `${renderStepDecoration(step)}\n\n${buildRevisePrompt(grade.failing)}`,
+        );
       }
     }
     // Review gate: after a `pauseForUserReviewAfter` step (SPEC / DIAGNOSE), park
     // for the user's approve/iterate reply. Skipped on terminal + eval sessions.
-    if (step.pauseForUserReviewAfter && !step.isTerminal && !evalSessions.has(sessionId)) {
+    if (
+      step.pauseForUserReviewAfter &&
+      !step.isTerminal &&
+      !evalSessions.has(sessionId)
+    ) {
       const reply = await parkForStepReview(state, sessionId, step, resolvedId);
       if (reply.action === 'iterate') {
         reviewFeedback = reply.feedback ?? '(no specific feedback provided)';
@@ -1608,17 +2089,44 @@ async function runMidModeTurn(
       callbacks: makePeerCallbacks(sessionId),
       provider: makePeerProvider(),
       synthesisModel: SYNTHESIS_MODEL,
-      injectionStyle: resolvedId === 'super-investigate-fix' ? 'imperative' : 'advisory',
-      onProgress: (m) => { emitProgress(emit, sessionId, m); },
+      injectionStyle:
+        resolvedId === 'super-investigate-fix' ? 'imperative' : 'advisory',
+      onProgress: (m) => {
+        emitProgress(emit, sessionId, m);
+      },
     });
   } catch (e) {
-    emitProgress(emit, sessionId, `Wide fan-out failed (${(e as Error).message}); running the base pattern directly.`);
+    emitProgress(
+      emit,
+      sessionId,
+      `Wide fan-out failed (${(e as Error).message}); running the base pattern directly.`,
+    );
   }
   if (!result || result.synthBoundary === 0 || !result.injection) {
-    await runPatternStepsOnMain({ state, sessionId, emit, userText, pattern, resolvedId, startIdx: 0, injection: null, projectDir });
+    await runPatternStepsOnMain({
+      state,
+      sessionId,
+      emit,
+      userText,
+      pattern,
+      resolvedId,
+      startIdx: 0,
+      injection: null,
+      projectDir,
+    });
     return;
   }
-  await runPatternStepsOnMain({ state, sessionId, emit, userText, pattern, resolvedId, startIdx: result.synthBoundary, injection: result.injection, projectDir });
+  await runPatternStepsOnMain({
+    state,
+    sessionId,
+    emit,
+    userText,
+    pattern,
+    resolvedId,
+    startIdx: result.synthBoundary,
+    injection: result.injection,
+    projectDir,
+  });
 }
 
 /** Max-mode: run the base pattern across N peers with cross-pollination, pick a
@@ -1640,15 +2148,35 @@ async function runMaxModeTurn(
       provider: makePeerProvider(),
       pollinator: AUX_MODEL,
       pickerModel: AUX_MODEL,
-      onProgress: (m) => { emitProgress(emit, sessionId, m); },
+      onProgress: (m) => {
+        emitProgress(emit, sessionId, m);
+      },
     });
-    emitProgress(emit, sessionId, `Winner: ${res.winner.modelId} — ${res.reason}`);
+    emitProgress(
+      emit,
+      sessionId,
+      `Winner: ${res.winner.modelId} — ${res.reason}`,
+    );
     await applyWinnerDiff(sessionId, projectDir, res.winnerDiff, emit);
     accruePeerCostToParent(sessionId, res.winner.id);
     await disposePeerSession(res.winner.id);
   } catch (e) {
-    emitProgress(emit, sessionId, `Max-mode failed (${(e as Error).message}); running a single pass.`);
-    await runPatternStepsOnMain({ state, sessionId, emit, userText, pattern, resolvedId: pattern.id, startIdx: 0, injection: null, projectDir });
+    emitProgress(
+      emit,
+      sessionId,
+      `Max-mode failed (${(e as Error).message}); running a single pass.`,
+    );
+    await runPatternStepsOnMain({
+      state,
+      sessionId,
+      emit,
+      userText,
+      pattern,
+      resolvedId: pattern.id,
+      startIdx: 0,
+      injection: null,
+      projectDir,
+    });
   }
 }
 
@@ -1662,7 +2190,8 @@ async function runGroupModeTurn(
   projectDir: string | null,
 ): Promise<void> {
   const mm = state.modelMode;
-  const models = mm.kind === 'group' && mm.models.length > 0 ? mm.models : DEFAULT_PEER_POOL;
+  const models =
+    mm.kind === 'group' && mm.models.length > 0 ? mm.models : DEFAULT_PEER_POOL;
   const personas = mm.kind === 'group' ? mm.personas : undefined;
   try {
     const res = await runGroupMode({
@@ -1672,35 +2201,80 @@ async function runGroupModeTurn(
       callbacks: makePeerCallbacks(sessionId),
       provider: makePeerProvider(),
       pickerModel: AUX_MODEL,
-      onProgress: (m) => { emitProgress(emit, sessionId, m); },
+      onProgress: (m) => {
+        emitProgress(emit, sessionId, m);
+      },
     });
-    emitProgress(emit, sessionId, `Winner: ${res.winner.modelId} (${res.reason})`);
+    emitProgress(
+      emit,
+      sessionId,
+      `Winner: ${res.winner.modelId} (${res.reason})`,
+    );
     await applyWinnerDiff(sessionId, projectDir, res.winnerDiff, emit);
     accruePeerCostToParent(sessionId, res.winner.id);
     await disposePeerSession(res.winner.id);
   } catch (e) {
-    emitProgress(emit, sessionId, `Group-mode failed (${(e as Error).message}); running a single pass.`);
+    emitProgress(
+      emit,
+      sessionId,
+      `Group-mode failed (${(e as Error).message}); running a single pass.`,
+    );
     await state.controller.send(userText);
   }
 }
 
 /** Apply a winning peer's diff to the parent project via `git apply`. Best-effort;
  *  narrates success/failure into the chat (never silent). */
-async function applyWinnerDiff(sessionId: string, projectDir: string | null, diff: string, emit: Emit): Promise<void> {
-  if (!projectDir) { emitProgress(emit, sessionId, 'No project directory — cannot apply the winning changes.'); return; }
-  if (!diff.trim()) { emitProgress(emit, sessionId, 'The winner made no file changes.'); return; }
+async function applyWinnerDiff(
+  sessionId: string,
+  projectDir: string | null,
+  diff: string,
+  emit: Emit,
+): Promise<void> {
+  if (!projectDir) {
+    emitProgress(
+      emit,
+      sessionId,
+      'No project directory — cannot apply the winning changes.',
+    );
+    return;
+  }
+  if (!diff.trim()) {
+    emitProgress(emit, sessionId, 'The winner made no file changes.');
+    return;
+  }
   const patchPath = `${projectDir}/.ugly-winner.patch`;
   try {
     await native.fs.writeFile(patchPath, diff);
-    const r = await spawnCollect('git', ['-C', projectDir, 'apply', '--reject', '--whitespace=nowarn', patchPath], {});
-    await spawnCollect('bash', ['-lc', `rm -f ${JSON.stringify(patchPath)}`], {}).catch(() => undefined);
+    const r = await spawnCollect(
+      'git',
+      ['-C', projectDir, 'apply', '--reject', '--whitespace=nowarn', patchPath],
+      {},
+    );
+    await spawnCollect(
+      'bash',
+      ['-lc', `rm -f ${JSON.stringify(patchPath)}`],
+      {},
+    ).catch(() => undefined);
     if ((r.code ?? 0) !== 0) {
-      emitProgress(emit, sessionId, `Could not cleanly apply the winner's diff (some hunks may be in .rej files):\n${r.stderr.slice(-800)}`);
+      emitProgress(
+        emit,
+        sessionId,
+        `Could not cleanly apply the winner's diff (some hunks may be in .rej files):\n${r.stderr.slice(-800)}`,
+      );
     } else {
-      emitProgress(emit, sessionId, "Applied the winning peer's changes to your project.");
+      emitProgress(
+        emit,
+        sessionId,
+        "Applied the winning peer's changes to your project.",
+      );
     }
   } catch (e) {
-    emitProgress(emit, sessionId, `Failed to apply the winner's diff: ${(e as Error).message}`);
+    emitProgress(
+      emit,
+      sessionId,
+      `Failed to apply the winner's diff: ${(e as Error).message}`,
+    );
   }
 }
 
@@ -1718,7 +2292,9 @@ async function resolvePatternForTurn(
   const mode = state.patternMode;
   if (mode === 'none') return null;
   if (mode === 'auto') {
-    const cls = await classifyForAuto(userText, agentStepJudge).catch(() => null);
+    const cls = await classifyForAuto(userText, agentStepJudge).catch(
+      () => null,
+    );
     return cls && isClassificationConfident(cls) ? cls.pattern : null;
   }
   return isPatternId(mode) ? mode : null;
@@ -1754,11 +2330,24 @@ async function parkForStepReview(
   // strip + can answer it. `stepId` on the doc holds the REVIEW id (what answerStepReview
   // needs); the display fields ride the question JSON. Resolves via awaitStepReview.
   const interactionId = stepInteractionId(sessionId, id);
-  void putInteraction({ id: interactionId, sessionId, kind: 'step_review', stepId: id, question: JSON.stringify({ stepId: step.id, stepLabel: step.label, patternId: patternId ?? '', createdAt }) });
+  void putInteraction({
+    id: interactionId,
+    sessionId,
+    kind: 'step_review',
+    stepId: id,
+    question: JSON.stringify({
+      stepId: step.id,
+      stepLabel: step.label,
+      patternId: patternId ?? '',
+      createdAt,
+    }),
+  });
   try {
     return await awaitStepReview(id, sessionId);
   } finally {
-    state.pendingStepReviews = state.pendingStepReviews.filter((p) => p.id !== id);
+    state.pendingStepReviews = state.pendingStepReviews.filter(
+      (p) => p.id !== id,
+    );
     emitTelemetry(state, sessionId);
     void resolveInteraction(interactionId);
   }
@@ -1771,7 +2360,11 @@ export function abortClientAgent(sessionId: string): void {
   rejectStepReviewsForSession(sessionId); // release any parked review gate first
   rejectAllAskUser(); // release any parked ask_user tool promises
   const killed = killSessionBashProcs(sessionId);
-  if (killed) console.info('[clientAgent:abort]', JSON.stringify({ sessionId, killedBashProcs: killed }));
+  if (killed)
+    console.info(
+      '[clientAgent:abort]',
+      JSON.stringify({ sessionId, killedBashProcs: killed }),
+    );
   sessions.get(sessionId)?.controller.abort();
 }
 
@@ -1794,8 +2387,16 @@ export function clearClientAgentSession(sessionId: string): void {
   killSessionBashProcs(sessionId); // stop any shell work before we drop the session
   const s = sessions.get(sessionId);
   if (!s) return;
-  try { s.controller.abort(); } catch { /* no in-flight turn */ }
-  try { s.controller.dispose(); } catch { /* already torn down */ }
+  try {
+    s.controller.abort();
+  } catch {
+    /* no in-flight turn */
+  }
+  try {
+    s.controller.dispose();
+  } catch {
+    /* already torn down */
+  }
   sessions.delete(sessionId);
 }
 
@@ -1806,7 +2407,9 @@ export function clearClientAgentSession(sessionId: string): void {
 // without reaching into `sessions`. Peers run vanilla (`patternMode: 'none'`); the
 // host owns step decomposition and sends one instruction message per step.
 
-const noopEmit: Emit = () => { /* peers are internal — no studio UI emission */ };
+const noopEmit: Emit = () => {
+  /* peers are internal — no studio UI emission */
+};
 
 /** Spawn (idempotently) a peer sub-session pinned to `modelId`, provisioning its
  *  worktree. `group` registers the blackboard/ask_peer tools for the peer. Returns
@@ -1819,13 +2422,19 @@ export async function spawnPeerSession(
   const selection: AgentSelection = {
     model: modelId,
     patternMode: 'none',
-    modelMode: opts?.group ? { kind: 'group', models: [modelId] } : { kind: 'single', model: modelId },
+    modelMode: opts?.group
+      ? { kind: 'group', models: [modelId] }
+      : { kind: 'single', model: modelId },
   };
   getOrCreate(peerId, noopEmit, selection, { peer: true });
   const projectPath = getActiveProjectPath();
   const ws = await ensureSessionWorkspace(peerId, projectPath);
   // ws.dir is '' for a non-worktree fallback → use the project root instead.
-  return { id: peerId, modelId, cwd: ws.dir !== '' ? ws.dir : (projectPath ?? '') };
+  return {
+    id: peerId,
+    modelId,
+    cwd: ws.dir !== '' ? ws.dir : (projectPath ?? ''),
+  };
 }
 
 /** Deliver one synthetic user message to a peer and await turn settle. `policy`
@@ -1835,12 +2444,18 @@ export async function spawnPeerSession(
 export async function sendPeerSession(
   peerId: string,
   text: string,
-  policy?: { allowedTools?: readonly ToolName[]; descriptionSuffixes?: Partial<Record<ToolName, string>> },
+  policy?: {
+    allowedTools?: readonly ToolName[];
+    descriptionSuffixes?: Partial<Record<ToolName, string>>;
+  },
 ): Promise<void> {
   const s = sessions.get(peerId);
   if (!s) throw new Error(`peer session not found: ${peerId}`);
   s.currentStep = policy?.allowedTools
-    ? ({ allowedTools: policy.allowedTools, toolDescriptionSuffixes: policy.descriptionSuffixes } as unknown as Step)
+    ? ({
+        allowedTools: policy.allowedTools,
+        toolDescriptionSuffixes: policy.descriptionSuffixes,
+      } as unknown as Step)
     : null;
   try {
     await s.controller.send(text);
@@ -1858,7 +2473,8 @@ export function peerHistoryText(peerId: string): string {
     const m = msgs[i] as { role?: string; content?: unknown };
     if (m.role !== 'assistant') continue;
     if (typeof m.content === 'string') return m.content;
-    if (Array.isArray(m.content)) return m.content.map((b) => (b as { text?: string }).text ?? '').join('');
+    if (Array.isArray(m.content))
+      return m.content.map((b) => (b as { text?: string }).text ?? '').join('');
   }
   return '';
 }
@@ -1879,11 +2495,23 @@ export async function disposePeerSession(peerId: string): Promise<void> {
   killSessionBashProcs(peerId);
   const s = sessions.get(peerId);
   if (s) {
-    try { s.controller.abort(); } catch { /* no in-flight turn */ }
-    try { s.controller.dispose(); } catch { /* already torn down */ }
+    try {
+      s.controller.abort();
+    } catch {
+      /* no in-flight turn */
+    }
+    try {
+      s.controller.dispose();
+    } catch {
+      /* already torn down */
+    }
     sessions.delete(peerId);
   }
-  try { await removeSessionWorkspace(peerId, getActiveProjectPath()); } catch { /* best effort */ }
+  try {
+    await removeSessionWorkspace(peerId, getActiveProjectPath());
+  } catch {
+    /* best effort */
+  }
 }
 
 /** The main session's controller (the mid-mode survivor) — lets peerHost inject the
@@ -1895,11 +2523,16 @@ export function getMainController(sessionId: string): AgentController | null {
 /** The parent session's live diff (for merge/winner bookkeeping). */
 export async function mainSessionDiff(sessionId: string): Promise<string> {
   const ws = getSessionWorkspace(sessionId);
-  return sessionGitDiff((ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? null);
+  return sessionGitDiff(
+    (ws?.isWorktree ? ws.dir : getActiveProjectPath()) ?? null,
+  );
 }
 
 /** Aggregate a peer's accrued cost onto the parent session's telemetry + emit. */
-export function accruePeerCostToParent(parentSessionId: string, peerId: string): void {
+export function accruePeerCostToParent(
+  parentSessionId: string,
+  peerId: string,
+): void {
   const parent = sessions.get(parentSessionId);
   if (!parent) return;
   parent.cost += peerSessionCost(peerId);
@@ -1912,7 +2545,9 @@ export function accruePeerCostToParent(parentSessionId: string, peerId: string):
  * here (not a separate peerHost.ts) so it can reach the module-private peer
  * primitives without an import cycle (clientAgent → host → peerHost → clientAgent).
  */
-export function makePeerCallbacks(parentSessionId: string): import('./patterns/peerTypes').MaxModeCallbacks {
+export function makePeerCallbacks(
+  parentSessionId: string,
+): import('./patterns/peerTypes').MaxModeCallbacks {
   const peerId = (i: number): string => `${parentSessionId}:peer${i}`;
   return {
     async spawnPeers(modelIds, opts) {
@@ -1921,7 +2556,9 @@ export function makePeerCallbacks(parentSessionId: string): import('./patterns/p
         modelIds.map(async (modelId, i) => {
           // A survivor peer (mid mode) is handled by the parent controller, not here;
           // spawnPeers only ever receives loser/participant model ids.
-          const { id, cwd } = await spawnPeerSession(peerId(i), modelId, { group });
+          const { id, cwd } = await spawnPeerSession(peerId(i), modelId, {
+            group,
+          });
           const persona = opts?.personas?.[i];
           return { id, modelId, cwd, ...(persona ? { persona } : {}) };
         }),
@@ -1965,11 +2602,15 @@ export function makePeerProvider(): import('./patterns/peerTypes').PeerProvider 
         }),
         ...(signal ? { signal } : {}),
       });
-      const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
+      const json = (await res.json()) as {
+        result?: { message?: { content?: unknown } };
+        error?: string;
+      };
       if (json.error) throw new Error(json.error);
       const content = json.result?.message?.content;
       if (typeof content === 'string') return content;
-      if (Array.isArray(content)) return content.map((b) => (b as { text?: string }).text ?? '').join('');
+      if (Array.isArray(content))
+        return content.map((b) => (b as { text?: string }).text ?? '').join('');
       return '';
     },
   };

@@ -44,7 +44,9 @@ beforeEach(() => {
       '/proj/b.ts': 'x\ny\nz\n',
     },
   });
-  vi.mocked(getEditorLspClient).mockReset().mockResolvedValue(fakeClient as never);
+  vi.mocked(getEditorLspClient)
+    .mockReset()
+    .mockResolvedValue(fakeClient as never);
   Object.values(fakeClient).forEach((f) => vi.mocked(f).mockClear());
 });
 
@@ -122,14 +124,26 @@ describe('lspHover', () => {
 describe('unsaved-buffer content passthrough', () => {
   it('lspHover syncs the live buffer via openFile(path, content)', async () => {
     const out = await lspHover(
-      { path: '/proj/a.ts', line: 2, character: 5, cwd: '/proj', content: 'const edited = 1;' },
+      {
+        path: '/proj/a.ts',
+        line: 2,
+        character: 5,
+        cwd: '/proj',
+        content: 'const edited = 1;',
+      },
       '/proj',
     );
     expect(out).toEqual({ contents: '```ts\nfunction foo(): void\n```' });
-    expect(fakeClient.openFile).toHaveBeenCalledWith('/proj/a.ts', 'const edited = 1;');
+    expect(fakeClient.openFile).toHaveBeenCalledWith(
+      '/proj/a.ts',
+      'const edited = 1;',
+    );
   });
   it('lspDefinition without content opens from disk (content undefined)', async () => {
-    await lspDefinition({ path: '/proj/b.ts', line: 0, character: 2, cwd: '/proj' }, '/proj');
+    await lspDefinition(
+      { path: '/proj/b.ts', line: 0, character: 2, cwd: '/proj' },
+      '/proj',
+    );
     expect(fakeClient.openFile).toHaveBeenCalledWith('/proj/b.ts', undefined);
   });
 });

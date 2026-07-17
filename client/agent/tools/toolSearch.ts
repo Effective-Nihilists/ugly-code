@@ -13,7 +13,9 @@ const SPEC: TextGenTool = {
     'tool_request before using it.',
   parameters: {
     type: 'object',
-    properties: { query: { type: 'string', description: 'What you want to do.' } },
+    properties: {
+      query: { type: 'string', description: 'What you want to do.' },
+    },
     required: ['query'],
     additionalProperties: false,
   },

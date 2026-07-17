@@ -48,9 +48,7 @@ interface PopoverProps {
    * menu items can close the popover after selection without the parent
    * needing to thread state down.
    */
-  children:
-    | React.ReactNode
-    | ((ctx: PopoverRenderContext) => React.ReactNode);
+  children: React.ReactNode | ((ctx: PopoverRenderContext) => React.ReactNode);
 
   /** Floating UI placement. Defaults to 'bottom-start'. */
   placement?: Placement;
@@ -204,10 +202,12 @@ export function Popover({
     if (!isValidElement(trigger)) {
       throw new Error('<Popover> requires a single ReactElement trigger');
     }
-    interface TriggerProps { ref?: React.Ref<HTMLElement> }
+    interface TriggerProps {
+      ref?: React.Ref<HTMLElement>;
+    }
     const triggerWithRef = trigger as ReactElement<TriggerProps>;
     return cloneElement(triggerWithRef, {
-      ref: refs.setReference,
+      'ref': refs.setReference,
       ...getReferenceProps({
         // Forward existing onClick on the trigger so callers can still observe
         // click events for analytics / focus management.
@@ -221,7 +221,9 @@ export function Popover({
   }, [trigger, refs.setReference, getReferenceProps, role, open, labelId]);
 
   // Render-prop form gives children a close() handle.
-  const close = (): void => { setOpen(false); };
+  const close = (): void => {
+    setOpen(false);
+  };
   const renderedContent =
     typeof children === 'function'
       ? (children as (ctx: PopoverRenderContext) => React.ReactNode)({ close })

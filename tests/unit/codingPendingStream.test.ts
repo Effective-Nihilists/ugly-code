@@ -4,7 +4,10 @@
 // from the docs, with no dependency on the gated task.listen event stream.
 import { describe, expect, it } from 'vitest';
 import { rowsToDisplayMessages } from '../../client/studio/agent/sessionDisplay';
-import { projectAgentMessagesToChat, type RawAgentMessage } from '../../client/studio/hooks/useCodingAgentChat';
+import {
+  projectAgentMessagesToChat,
+  type RawAgentMessage,
+} from '../../client/studio/hooks/useCodingAgentChat';
 
 const sid = 'cs:test';
 const assistantRow = (seq: number, text: string, pending: boolean) => ({
@@ -12,10 +15,15 @@ const assistantRow = (seq: number, text: string, pending: boolean) => ({
   role: 'assistant' as const,
   kind: 'message' as const,
   compacted: false,
-  content: JSON.stringify({ content: [{ type: 'text', text }], ...(pending ? { pending: true } : {}) }),
+  content: JSON.stringify({
+    content: [{ type: 'text', text }],
+    ...(pending ? { pending: true } : {}),
+  }),
 });
 const project = (rows: ReturnType<typeof assistantRow>[]) =>
-  projectAgentMessagesToChat(rowsToDisplayMessages(sid, rows) as unknown as RawAgentMessage[]);
+  projectAgentMessagesToChat(
+    rowsToDisplayMessages(sid, rows) as unknown as RawAgentMessage[],
+  );
 
 describe('C-transcript: pending transient row → isStreaming, committed → finished', () => {
   it('a pending assistant row projects to an isStreaming message', () => {
@@ -33,8 +41,12 @@ describe('C-transcript: pending transient row → isStreaming, committed → fin
 
   it('replacing the pending row with a committed one flips the streaming flag off', () => {
     const streaming = project([assistantRow(0, 'partial…', true)]);
-    expect(streaming.some((m) => m.role === 'assistant' && m.isStreaming)).toBe(true);
+    expect(streaming.some((m) => m.role === 'assistant' && m.isStreaming)).toBe(
+      true,
+    );
     const committed = project([assistantRow(0, 'final answer', false)]);
-    expect(committed.some((m) => m.role === 'assistant' && m.isStreaming)).toBe(false);
+    expect(committed.some((m) => m.role === 'assistant' && m.isStreaming)).toBe(
+      false,
+    );
   });
 });

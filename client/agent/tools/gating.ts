@@ -10,17 +10,33 @@ import { fullCatalog } from './catalog';
 
 /** COMMON — always available, both modes. */
 const COMMON_TOOLS: ToolName[] = [
-  'read', 'write', 'edit', 'multiedit', 'glob', 'grep', 'bash', 'todos',
-  'python_exec', 'web_fetch',
+  'read',
+  'write',
+  'edit',
+  'multiedit',
+  'glob',
+  'grep',
+  'bash',
+  'todos',
+  'python_exec',
+  'web_fetch',
 ];
 
 /** Added only in single (default interactive) mode. */
 const SINGLE_MODE_TOOLS: ToolName[] = [
-  'spec_read', 'spec_write', 'scratchpad',
+  'spec_read',
+  'spec_write',
+  'scratchpad',
   'memory_add',
-  'delegate', 'delegate_parallel', 'ask_user', 'web_search',
-  'analyze_image', 'dep_docs', 'python_libraries',
-  'tool_search', 'tool_request',
+  'delegate',
+  'delegate_parallel',
+  'ask_user',
+  'web_search',
+  'analyze_image',
+  'dep_docs',
+  'python_libraries',
+  'tool_search',
+  'tool_request',
 ];
 
 /** Added only in group (multi-model) mode. */
@@ -28,8 +44,12 @@ const GROUP_MODE_TOOLS: ToolName[] = ['blackboard_post'];
 
 /** Added (either mode) only when the open project is an ugly-app project. */
 const UGLY_APP_TOOLS: ToolName[] = [
-  'database', 'database_sql_query',
-  'dev_server_start', 'dev_server_stop', 'dev_server_logs', 'dev_server_errors',
+  'database',
+  'database_sql_query',
+  'dev_server_start',
+  'dev_server_stop',
+  'dev_server_logs',
+  'dev_server_errors',
   'inspect_ux',
 ];
 
@@ -58,11 +78,21 @@ export interface GatingInput {
 export function allowedToolNames(input: GatingInput): Set<ToolName> {
   const f = { ...DEFAULT_FEATURES, ...input.features };
   const s = new Set<ToolName>(COMMON_TOOLS);
-  (input.mode === 'group' ? GROUP_MODE_TOOLS : SINGLE_MODE_TOOLS).forEach((t) => s.add(t));
+  (input.mode === 'group' ? GROUP_MODE_TOOLS : SINGLE_MODE_TOOLS).forEach((t) =>
+    s.add(t),
+  );
   if (input.isUglyApp) UGLY_APP_TOOLS.forEach((t) => s.add(t));
-  if (!f.specs) { s.delete('spec_read'); s.delete('spec_write'); }
-  if (!f.memory) { s.delete('memory_add'); }
-  if (!f.multiAgent) { s.delete('delegate'); s.delete('delegate_parallel'); }
+  if (!f.specs) {
+    s.delete('spec_read');
+    s.delete('spec_write');
+  }
+  if (!f.memory) {
+    s.delete('memory_add');
+  }
+  if (!f.multiAgent) {
+    s.delete('delegate');
+    s.delete('delegate_parallel');
+  }
   if (!f.interactive) s.delete('ask_user');
   return s;
 }

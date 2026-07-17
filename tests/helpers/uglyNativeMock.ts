@@ -43,7 +43,9 @@ const state: MockState = {
 };
 
 /** Reconfigure the mock for a test (call in beforeEach). */
-export function resetMock(opts: { files?: Record<string, string>; proc?: ProcFn } = {}): void {
+export function resetMock(
+  opts: { files?: Record<string, string>; proc?: ProcFn } = {},
+): void {
   state.files = new Map(Object.entries(opts.files ?? {}));
   state.proc = opts.proc ?? defaultProc;
   state.calls = [];
@@ -52,7 +54,8 @@ export function resetMock(opts: { files?: Record<string, string>; proc?: ProcFn 
 }
 
 export const mockFiles = (): Map<string, string> => state.files;
-export const mockCalls = (): { channel: string; payload: unknown }[] => state.calls;
+export const mockCalls = (): { channel: string; payload: unknown }[] =>
+  state.calls;
 
 function emit(event: string, data: unknown): void {
   (state.listeners.get(event) ?? []).forEach((cb) => cb(data));
@@ -76,7 +79,8 @@ const invoke = (channel: string, payload: unknown): Promise<unknown> => {
 
     case 'fs.readFile': {
       const path = String(p.path);
-      if (!state.files.has(path)) return Promise.reject(new Error(`ENOENT: no such file ${path}`));
+      if (!state.files.has(path))
+        return Promise.reject(new Error(`ENOENT: no such file ${path}`));
       return Promise.resolve({ content: state.files.get(path) });
     }
     case 'fs.writeFile':
@@ -132,7 +136,10 @@ const invoke = (channel: string, payload: unknown): Promise<unknown> => {
 
     case 'process.spawn': {
       const id = `p${state.seq++}`;
-      const res = state.proc(String(p.cmd), Array.isArray(p.args) ? p.args.map(String) : []);
+      const res = state.proc(
+        String(p.cmd),
+        Array.isArray(p.args) ? p.args.map(String) : [],
+      );
       // Emit asynchronously so the facade's post-spawn subscribe() is registered first.
       setTimeout(() => {
         if (res.error) emit(`process.error:${id}`, { err: res.error });
@@ -162,7 +169,11 @@ const subscribe = (event: string, cb: (d: unknown) => void): (() => void) => {
   const arr = state.listeners.get(event) ?? [];
   arr.push(cb);
   state.listeners.set(event, arr);
-  return () => state.listeners.set(event, (state.listeners.get(event) ?? []).filter((f) => f !== cb));
+  return () =>
+    state.listeners.set(
+      event,
+      (state.listeners.get(event) ?? []).filter((f) => f !== cb),
+    );
 };
 
 /** Install the mock as globalThis.UglyNative. Must run BEFORE ugly-app/native is

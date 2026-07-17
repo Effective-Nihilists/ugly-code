@@ -7,17 +7,26 @@ import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
 import { projectRoot } from './lspForProject';
 
-const README_NAMES = ['README.md', 'readme.md', 'README', 'README.markdown', 'Readme.md'];
+const README_NAMES = [
+  'README.md',
+  'readme.md',
+  'README',
+  'README.markdown',
+  'Readme.md',
+];
 
 const SPEC: TextGenTool = {
   name: 'dep_docs',
   description:
     "Read a dependency's documentation (README, else package.json summary) from " +
-    'the project node_modules. Use to learn a library\'s API before using it.',
+    "the project node_modules. Use to learn a library's API before using it.",
   parameters: {
     type: 'object',
     properties: {
-      package: { type: 'string', description: 'Package name, e.g. "zod" or "@scope/pkg".' },
+      package: {
+        type: 'string',
+        description: 'Package name, e.g. "zod" or "@scope/pkg".',
+      },
     },
     required: ['package'],
     additionalProperties: false,
@@ -42,7 +51,9 @@ export const depDocsTool: ToolModule = {
       }
     }
     try {
-      const pj = JSON.parse(await native.fs.readFile(`${base}/package.json`)) as {
+      const pj = JSON.parse(
+        await native.fs.readFile(`${base}/package.json`),
+      ) as {
         description?: string;
         homepage?: string;
         version?: string;

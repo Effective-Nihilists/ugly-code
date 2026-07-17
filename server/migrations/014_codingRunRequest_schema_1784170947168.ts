@@ -10,6 +10,10 @@ export async function up(query: typeof pgQuery): Promise<void> {
     updated  TIMESTAMPTZ NOT NULL DEFAULT now(),
     version  INTEGER NOT NULL DEFAULT 1
   )`);
-  await query(`CREATE INDEX IF NOT EXISTS "idx_codingRunRequest_data" ON "codingRunRequest" USING GIN (data)`);
-  await query(`CREATE INDEX IF NOT EXISTS "idx_codingRunRequest_userId_status" ON "codingRunRequest" ((data->>'userId'), (data->>'status'))`);
+  await query(
+    `CREATE INDEX IF NOT EXISTS "idx_codingRunRequest_data" ON "codingRunRequest" USING GIN (data)`,
+  );
+  await query(
+    `CREATE INDEX IF NOT EXISTS "idx_codingRunRequest_userId_status" ON "codingRunRequest" ((data->>'userId'), (data->>'status'))`,
+  );
 }

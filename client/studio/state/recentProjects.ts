@@ -26,7 +26,10 @@ interface RecentSocket {
 }
 
 /** This device's stable proxy identity, or null off a native desktop host. */
-async function selfDevice(): Promise<{ deviceId: string; deviceLabel: string } | null> {
+async function selfDevice(): Promise<{
+  deviceId: string;
+  deviceLabel: string;
+} | null> {
   if (!isNativeAvailable()) return null;
   try {
     // proxy.self rides the low-level UglyNative protocol (not the high-level
@@ -34,10 +37,12 @@ async function selfDevice(): Promise<{ deviceId: string; deviceLabel: string } |
     // typed contract, and resolves to null off a desktop host anyway.
     const native = installUglyNative();
     const invoke = (channel: string, payload?: unknown): Promise<unknown> =>
-      (native.invoke as (channel: string, payload?: unknown) => Promise<unknown>)(
-        channel,
-        payload,
-      );
+      (
+        native.invoke as (
+          channel: string,
+          payload?: unknown,
+        ) => Promise<unknown>
+      )(channel, payload);
     const r = await invoke('proxy.self');
     if (r && typeof r === 'object') {
       const o = r as { deviceId?: unknown; deviceLabel?: unknown };
@@ -59,7 +64,11 @@ async function selfDevice(): Promise<{ deviceId: string; deviceLabel: string } |
  * client that isn't a desktop host (the phone reads recents but never creates
  * them). Best-effort: never throws into the open flow.
  */
-export async function recordRecentProject(socket: unknown, name: string, path: string): Promise<void> {
+export async function recordRecentProject(
+  socket: unknown,
+  name: string,
+  path: string,
+): Promise<void> {
   if (!socket || !path) return;
   const self = await selfDevice();
   if (!self) return;
@@ -83,10 +92,17 @@ export async function recordRecentProject(socket: unknown, name: string, path: s
  * on an older shell). Best-effort — the open still falls back to the host picker.
  */
 export function connectToHost(deviceId: string, label?: string): void {
-  if (!deviceId || typeof window === 'undefined' || typeof CustomEvent !== 'function') return;
+  if (
+    !deviceId ||
+    typeof window === 'undefined' ||
+    typeof CustomEvent !== 'function'
+  )
+    return;
   try {
     window.dispatchEvent(
-      new CustomEvent('uglyNative', { detail: { event: 'proxy:connect', data: { deviceId, label } } }),
+      new CustomEvent('uglyNative', {
+        detail: { event: 'proxy:connect', data: { deviceId, label } },
+      }),
     );
   } catch {
     /* best-effort */
@@ -94,7 +110,10 @@ export function connectToHost(deviceId: string, label?: string): void {
 }
 
 /** Remove a recent project by its synced doc id (the ProjectRow delete button). */
-export async function removeRecentProject(socket: unknown, id: string): Promise<void> {
+export async function removeRecentProject(
+  socket: unknown,
+  id: string,
+): Promise<void> {
   if (!socket || !id) return;
   try {
     await (socket as RecentSocket).request('removeRecentProject', { id });

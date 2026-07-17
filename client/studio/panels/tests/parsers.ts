@@ -38,7 +38,11 @@ export function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export function makeTestId(runner: TestRunner, file: string, ident: string): string {
+export function makeTestId(
+  runner: TestRunner,
+  file: string,
+  ident: string,
+): string {
   return `${runner}::${file}::${ident}`;
 }
 
@@ -49,7 +53,8 @@ export function parseTestId(
   const parts = id.split('::');
   if (parts.length < 3) return null;
   const runner = parts[0];
-  if (runner !== 'vitest' && runner !== 'pytest' && runner !== 'playwright') return null;
+  if (runner !== 'vitest' && runner !== 'pytest' && runner !== 'playwright')
+    return null;
   return { runner, file: parts[1] ?? '', ident: parts.slice(2).join('::') };
 }
 
@@ -133,7 +138,9 @@ export function parseVitestTapLine(line: string): TestEvent | null {
   return {
     id: makeTestId('vitest', file, name),
     status,
-    ...(durationMs != null && Number.isFinite(durationMs) ? { durationMs } : {}),
+    ...(durationMs != null && Number.isFinite(durationMs)
+      ? { durationMs }
+      : {}),
   };
 }
 
@@ -157,7 +164,10 @@ interface VitestJsonSuite {
 export function parseVitestReport(
   json: string,
   repoRoot: string,
-): { statuses: Map<string, TestEvent['status']>; failures: Map<string, TestFailure> } {
+): {
+  statuses: Map<string, TestEvent['status']>;
+  failures: Map<string, TestFailure>;
+} {
   const statuses = new Map<string, TestEvent['status']>();
   const failures = new Map<string, TestFailure>();
   let doc: { testResults?: VitestJsonSuite[] };
@@ -174,7 +184,11 @@ export function parseVitestReport(
       const ident = [...(a.ancestorTitles ?? []), a.title].join(' > ');
       const id = makeTestId('vitest', file, ident);
       const st =
-        a.status === 'passed' ? 'passed' : a.status === 'failed' ? 'failed' : 'skipped';
+        a.status === 'passed'
+          ? 'passed'
+          : a.status === 'failed'
+            ? 'failed'
+            : 'skipped';
       statuses.set(id, st);
       const msg = a.failureMessages?.[0];
       if (st === 'failed' && msg) {
@@ -286,7 +300,9 @@ export function parsePytestJunit(xml: string): Map<string, TestFailure> {
     const name = attrRe(attrs, 'name');
     if (!classname || !name) continue;
     // `<skipped>` is NOT a failure. Also handle the self-closing form.
-    const fail = /<(failure|error)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/.exec(body);
+    const fail = /<(failure|error)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/.exec(
+      body,
+    );
     if (!fail) continue;
     const failAttrs = group(fail, 2) ?? '';
     const stack = decodeXml(group(fail, 3) ?? '');
@@ -316,7 +332,13 @@ interface PwSpec {
   title?: string;
   file?: string;
   line?: number;
-  tests?: { projectName?: string; results?: { status?: string; errors?: { message?: string; stack?: string }[] }[] }[];
+  tests?: {
+    projectName?: string;
+    results?: {
+      status?: string;
+      errors?: { message?: string; stack?: string }[];
+    }[];
+  }[];
 }
 interface PwSuite {
   specs?: PwSpec[];
@@ -353,7 +375,9 @@ export function parsePlaywrightList(json: string, rootDirRel = ''): TestCase[] {
   const byKey = new Map<string, TestCase>();
   for (const sp of specs) {
     if (!sp.file || !sp.title || sp.line == null) continue;
-    const file = rootDirRel ? `${rootDirRel.replace(/\/+$/, '')}/${sp.file}` : sp.file;
+    const file = rootDirRel
+      ? `${rootDirRel.replace(/\/+$/, '')}/${sp.file}`
+      : sp.file;
     const ident = `${sp.line}::${sp.title}`;
     const id = makeTestId('playwright', file, ident);
     const projects = (sp.tests ?? [])
@@ -361,7 +385,8 @@ export function parsePlaywrightList(json: string, rootDirRel = ''): TestCase[] {
       .filter((p): p is string => typeof p === 'string' && p.length > 0);
     const existing = byKey.get(id);
     if (existing) {
-      for (const p of projects) if (!existing.projects?.includes(p)) existing.projects?.push(p);
+      for (const p of projects)
+        if (!existing.projects?.includes(p)) existing.projects?.push(p);
       continue;
     }
     byKey.set(id, {
@@ -392,7 +417,14 @@ const PW_LIST_RE =
  */
 export function parsePlaywrightListLine(
   line: string,
-): { file: string; line: number; title: string; project: string; status: TestEvent['status']; durationMs?: number } | null {
+): {
+  file: string;
+  line: number;
+  title: string;
+  project: string;
+  status: TestEvent['status'];
+  durationMs?: number;
+} | null {
   const m = PW_LIST_RE.exec(stripAnsi(line).trimEnd().replace(/^\s+/, ''));
   if (!m) return null;
   const [, mark, project, file, lineNo, , rest] = m;
@@ -427,7 +459,10 @@ export function parsePlaywrightListLine(
 export function parsePlaywrightReport(
   json: string,
   rootDirRel = '',
-): { statuses: Map<string, TestEvent['status']>; failures: Map<string, TestFailure> } {
+): {
+  statuses: Map<string, TestEvent['status']>;
+  failures: Map<string, TestFailure>;
+} {
   const statuses = new Map<string, TestEvent['status']>();
   const failures = new Map<string, TestFailure>();
   let doc: { suites?: PwSuite[] };
@@ -441,7 +476,9 @@ export function parsePlaywrightReport(
 
   for (const sp of specs) {
     if (!sp.file || !sp.title || sp.line == null) continue;
-    const file = rootDirRel ? `${rootDirRel.replace(/\/+$/, '')}/${sp.file}` : sp.file;
+    const file = rootDirRel
+      ? `${rootDirRel.replace(/\/+$/, '')}/${sp.file}`
+      : sp.file;
     const id = makeTestId('playwright', file, `${sp.line}::${sp.title}`);
 
     // A spec runs once per project. Aggregate: any failure fails the row; all
@@ -456,8 +493,12 @@ export function parsePlaywrightReport(
           const e = r.errors?.[0];
           if (e && !firstErr) {
             firstErr = {
-              message: stripAnsi(e.message ?? 'test failed').split('\n')[0] ?? 'test failed',
-              stack: e.stack ? stripAnsi(e.stack) : stripAnsi(e.message ?? '') || undefined,
+              message:
+                stripAnsi(e.message ?? 'test failed').split('\n')[0] ??
+                'test failed',
+              stack: e.stack
+                ? stripAnsi(e.stack)
+                : stripAnsi(e.message ?? '') || undefined,
             };
           }
         } else if (r.status === 'passed') anyPassed = true;
@@ -484,7 +525,8 @@ export function matchPlaywrightEvent(
     if (c.selector.runner !== 'playwright') continue;
     if (c.selector.line !== ev.line || c.selector.title !== ev.title) continue;
     const cf = toPosix(c.file);
-    if (evFile === cf || evFile.endsWith('/' + cf) || cf.endsWith('/' + evFile)) return c.id;
+    if (evFile === cf || evFile.endsWith('/' + cf) || cf.endsWith('/' + evFile))
+      return c.id;
   }
   return null;
 }

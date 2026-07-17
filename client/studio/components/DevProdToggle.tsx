@@ -28,14 +28,18 @@ export function DevProdToggle({
         data-id="devprod-toggle-dev"
         label="Dev"
         active={mode === 'dev'}
-        onClick={() => { onModeChange('dev'); }}
+        onClick={() => {
+          onModeChange('dev');
+        }}
         disabled={disabled}
       />
       <ToggleButton
         data-id="devprod-toggle-prod"
         label="Prod"
         active={mode === 'prod'}
-        onClick={() => { onModeChange('prod'); }}
+        onClick={() => {
+          onModeChange('prod');
+        }}
         disabled={disabled}
       />
     </div>
@@ -49,10 +53,10 @@ function ToggleButton({
   disabled,
   'data-id': dataId,
 }: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  disabled?: boolean;
+  'label': string;
+  'active': boolean;
+  'onClick': () => void;
+  'disabled'?: boolean;
   'data-id'?: string;
 }) {
   return (

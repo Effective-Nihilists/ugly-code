@@ -25,8 +25,18 @@ import { ProdPanel } from './panels/ProdPanel';
 import { PreviewPanel } from './panels/PreviewPanel';
 import { FilePanel } from './panels/FilePanel';
 import {
-  DeployIcon, DatabaseIcon, ErrorsIcon, EventsIcon, WorkersIcon, TerminalIcon, FeedbackIcon, TestsIcon,
-  AgentIcon, PreviewIcon, FileIcon, GitIcon,
+  DeployIcon,
+  DatabaseIcon,
+  ErrorsIcon,
+  EventsIcon,
+  WorkersIcon,
+  TerminalIcon,
+  FeedbackIcon,
+  TestsIcon,
+  AgentIcon,
+  PreviewIcon,
+  FileIcon,
+  GitIcon,
 } from './panels/navIcons';
 import { useIsMobile } from './hooks/useIsMobile';
 
@@ -37,8 +47,19 @@ import { useIsMobile } from './hooks/useIsMobile';
 //    Events / Workers / Terminal. Errors/Events/Workers are prod-only; Database
 //    appears in both (dev in the top tabs, prod in the sidebar).
 type WorkspaceTab =
-  | 'chat' | 'preview' | 'file' | 'git' | 'tests' | 'database'
-  | 'deploy' | 'prodDatabase' | 'errors' | 'events' | 'workers' | 'terminal' | 'feedback';
+  | 'chat'
+  | 'preview'
+  | 'file'
+  | 'git'
+  | 'tests'
+  | 'database'
+  | 'deploy'
+  | 'prodDatabase'
+  | 'errors'
+  | 'events'
+  | 'workers'
+  | 'terminal'
+  | 'feedback';
 const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: 'chat', label: 'Agent' },
   { id: 'preview', label: 'Preview' },
@@ -48,8 +69,19 @@ const TABS: { id: WorkspaceTab; label: string }[] = [
   { id: 'database', label: 'Database' },
 ];
 const ALL_TABS: WorkspaceTab[] = [
-  'chat', 'preview', 'file', 'git', 'tests', 'database',
-  'deploy', 'prodDatabase', 'errors', 'events', 'workers', 'terminal', 'feedback',
+  'chat',
+  'preview',
+  'file',
+  'git',
+  'tests',
+  'database',
+  'deploy',
+  'prodDatabase',
+  'errors',
+  'events',
+  'workers',
+  'terminal',
+  'feedback',
 ];
 // The deploy tab used to be `publish`, and that id is written into the URL
 // (`?tab=publish`). Keep old links and restored windows working.
@@ -80,10 +112,13 @@ function readSidebarW(): number {
 function isWorkspaceTab(value: string): value is WorkspaceTab {
   return (ALL_TABS as string[]).includes(value);
 }
-function readWorkspaceUrl(): { tab: WorkspaceTab | null; session: string | null } {
+function readWorkspaceUrl(): {
+  tab: WorkspaceTab | null;
+  session: string | null;
+} {
   const p = new URLSearchParams(window.location.search);
   const raw = p.get('tab');
-  const t = raw !== null ? LEGACY_TAB_IDS[raw] ?? raw : null;
+  const t = raw !== null ? (LEGACY_TAB_IDS[raw] ?? raw) : null;
   return {
     tab: t !== null && isWorkspaceTab(t) ? t : null,
     session: p.get('session'),
@@ -162,68 +197,98 @@ export default function StudioProjectPage({
   // Resizable sidebar. Window-level pointer listeners (not setPointerCapture) — on macOS the
   // window-controls drag region swallows mousemove otherwise (see ugly-studio dock-drag notes).
   const [sidebarW, setSidebarW] = React.useState<number>(readSidebarW);
-  const startResize = React.useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = sidebarW;
-    const onMove = (ev: PointerEvent): void => {
-      const w = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, startW + (ev.clientX - startX)));
-      setSidebarW(w);
-    };
-    const onUp = (): void => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      setSidebarW((w) => { localStorage.setItem(SIDEBAR_W_KEY, String(w)); return w; });
-    };
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-  }, [sidebarW]);
+  const startResize = React.useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = sidebarW;
+      const onMove = (ev: PointerEvent): void => {
+        const w = Math.max(
+          SIDEBAR_MIN,
+          Math.min(SIDEBAR_MAX, startW + (ev.clientX - startX)),
+        );
+        setSidebarW(w);
+      };
+      const onUp = (): void => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        setSidebarW((w) => {
+          localStorage.setItem(SIDEBAR_W_KEY, String(w));
+          return w;
+        });
+      };
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    },
+    [sidebarW],
+  );
 
   // Below 768px the workspace collapses to one full-width column + a slide-in
   // nav drawer (the sidebar isn't rendered inline). Leaving mobile closes it.
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const closeDrawer = React.useCallback(() => { setDrawerOpen(false); }, []);
-  React.useEffect(() => { if (!isMobile) setDrawerOpen(false); }, [isMobile]);
+  const closeDrawer = React.useCallback(() => {
+    setDrawerOpen(false);
+  }, []);
+  React.useEffect(() => {
+    if (!isMobile) setDrawerOpen(false);
+  }, [isMobile]);
 
   React.useEffect(() => {
     setActiveProjectPath(projectPath ?? null);
-    return () => { setActiveProjectPath(null); };
+    return () => {
+      setActiveProjectPath(null);
+    };
   }, [projectPath]);
 
   // A file (with an optional line) to open in the File panel — set when a tool
   // card / console file path is clicked, consumed + cleared by <FilePanel>.
-  const [pendingFile, setPendingFile] = React.useState<{ path: string; line?: number } | null>(null);
+  const [pendingFile, setPendingFile] = React.useState<{
+    path: string;
+    line?: number;
+  } | null>(null);
 
   // One handler for clickable links across ALL panels (chat tool widgets + publish console +
   // anything using LinkifiedText). http(s) opens the browser; a FILE path opens in the in-app
   // File panel (was: OS default editor) so clicking a tool's path stays inside Studio.
-  const openUri = React.useCallback((uri: string) => {
-    if (/^https?:\/\//i.test(uri)) {
-      // Open web links in a NEW TAB of this browser (the Studio host intercepts
-      // window.open as a new tab) rather than kicking out to the OS default
-      // browser. Fall back to openExternal only if the tab was blocked (popup
-      // blocker / host denied → null), so the link still opens somewhere.
-      const opened = window.open(uri, '_blank', 'noopener,noreferrer');
-      if (!opened) void native.system.openExternal({ url: uri });
-      return;
-    }
-    // File path, possibly `file://`-prefixed and/or with a trailing :line[-endLine].
-    let p = uri.replace(/^file:\/\//, '');
-    let line: number | undefined;
-    const m = /:(\d+)(?:-\d+)?$/.exec(p);
-    if (m) { line = Number(m[1]); p = p.slice(0, m.index); }
-    const isAbs = p.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('\\\\');
-    const abs = isAbs || !projectPath ? p : `${projectPath.replace(/[\\/]+$/, '')}/${p}`;
-    setPendingFile(line ? { path: abs, line } : { path: abs });
-    setTab('file');
-  }, [projectPath]);
+  const openUri = React.useCallback(
+    (uri: string) => {
+      if (/^https?:\/\//i.test(uri)) {
+        // Open web links in a NEW TAB of this browser (the Studio host intercepts
+        // window.open as a new tab) rather than kicking out to the OS default
+        // browser. Fall back to openExternal only if the tab was blocked (popup
+        // blocker / host denied → null), so the link still opens somewhere.
+        const opened = window.open(uri, '_blank', 'noopener,noreferrer');
+        if (!opened) void native.system.openExternal({ url: uri });
+        return;
+      }
+      // File path, possibly `file://`-prefixed and/or with a trailing :line[-endLine].
+      let p = uri.replace(/^file:\/\//, '');
+      let line: number | undefined;
+      const m = /:(\d+)(?:-\d+)?$/.exec(p);
+      if (m) {
+        line = Number(m[1]);
+        p = p.slice(0, m.index);
+      }
+      const isAbs =
+        p.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('\\\\');
+      const abs =
+        isAbs || !projectPath
+          ? p
+          : `${projectPath.replace(/[\\/]+$/, '')}/${p}`;
+      setPendingFile(line ? { path: abs, line } : { path: abs });
+      setTab('file');
+    },
+    [projectPath],
+  );
 
-  const clearPendingFile = React.useCallback(() => { setPendingFile(null); }, []);
+  const clearPendingFile = React.useCallback(() => {
+    setPendingFile(null);
+  }, []);
 
   // Reset the (live-synced) session list when the project actually changes — the
   // trackDocs effect below re-subscribes for the new projectId and re-seeds it.
@@ -283,7 +348,16 @@ export default function StudioProjectPage({
       // Prepend: a brand-new session is the newest-created, so it sits at the
       // top of the sidebar (created-desc order) until the server poll picks
       // it up.
-      return [{ compositeId: id, title: 'Session', updated_at: Date.now(), created_at: Date.now(), model: 'auto' }, ...prev];
+      return [
+        {
+          compositeId: id,
+          title: 'Session',
+          updated_at: Date.now(),
+          created_at: Date.now(),
+          model: 'auto',
+        },
+        ...prev,
+      ];
     });
     setActiveSessionId(id);
   }, []);
@@ -307,50 +381,76 @@ export default function StudioProjectPage({
   // Hand a feedback report to the coding agent: seed the composer with a fix
   // prompt (via the same sessionStorage bridges the eval flow uses) in an existing
   // session or a fresh one, then switch to it. The user reviews + hits Send.
-  const sendFeedbackToAgent = React.useCallback((prompt: string, sessionId: string | null) => {
-    if (sessionId) {
-      try { sessionStorage.setItem(`eval-first-turn-prompt:${sessionId}`, prompt); } catch { /* ignore */ }
-      selectSession(sessionId);
-    } else {
-      try {
-        sessionStorage.setItem('eval-pending-task', JSON.stringify({ taskName: 'feedback-fix', firstTurnPrompt: prompt }));
-      } catch { /* ignore */ }
-      newSession();
-    }
-  }, [selectSession, newSession]);
+  const sendFeedbackToAgent = React.useCallback(
+    (prompt: string, sessionId: string | null) => {
+      if (sessionId) {
+        try {
+          sessionStorage.setItem(`eval-first-turn-prompt:${sessionId}`, prompt);
+        } catch {
+          /* ignore */
+        }
+        selectSession(sessionId);
+      } else {
+        try {
+          sessionStorage.setItem(
+            'eval-pending-task',
+            JSON.stringify({
+              taskName: 'feedback-fix',
+              firstTurnPrompt: prompt,
+            }),
+          );
+        } catch {
+          /* ignore */
+        }
+        newSession();
+      }
+    },
+    [selectSession, newSession],
+  );
 
-  const archiveSession = React.useCallback((id: string) => {
-    setStored((prev) => prev.filter((s) => s.compositeId !== id));
-    setActiveSessionId((cur) => (cur === id ? null : cur));
-    // Archiving the session currently mounted in the chat pane must drop its
-    // view back to the new-session hero. The pane is keyed on chatKey only
-    // (not activeSessionId), so bump chatKey to force that remount.
-    if (id === activeSessionId) setChatKey((k) => k + 1);
-    // Persist the archive + tear down the session's worktree (best-effort).
-    void sessionApi.archive({ sessionId: id });
-    void import('./agent/sessionWorkspace').then((m) => m.removeSessionWorkspace(id, projectPath ?? null));
-  }, [projectPath, activeSessionId]);
+  const archiveSession = React.useCallback(
+    (id: string) => {
+      setStored((prev) => prev.filter((s) => s.compositeId !== id));
+      setActiveSessionId((cur) => (cur === id ? null : cur));
+      // Archiving the session currently mounted in the chat pane must drop its
+      // view back to the new-session hero. The pane is keyed on chatKey only
+      // (not activeSessionId), so bump chatKey to force that remount.
+      if (id === activeSessionId) setChatKey((k) => k + 1);
+      // Persist the archive + tear down the session's worktree (best-effort).
+      void sessionApi.archive({ sessionId: id });
+      void import('./agent/sessionWorkspace').then((m) =>
+        m.removeSessionWorkspace(id, projectPath ?? null),
+      );
+    },
+    [projectPath, activeSessionId],
+  );
 
   // Rename a session: optimistic local update + persist via upsert. The chat's
   // in-memory agent state is the live source of truth while a turn runs, so we
   // also poke the clientAgent's title so the next persistMeta doesn't clobber
   // the user's edit with a stale value. Click-to-rename lives on the session row.
-  const renameSession = React.useCallback((id: string, title: string) => {
-    const trimmed = title.trim().slice(0, 120);
-    if (!trimmed) return;
-    setStored((prev) => prev.map((s) => (s.compositeId === id ? { ...s, title: trimmed } : s)));
-    void (async () => {
-      const projectId = await resolveProjectId(projectPath ?? null);
-      void sessionApi.upsert({ sessionId: id, projectId, title: trimmed });
-      // Keep the live agent state in sync so a subsequent persistMeta (fired on
-      // the next turn boundary) writes the user's title, not the old one.
-      try {
-        const { setSessionTitle } = await import('./agent/clientAgent');
-        setSessionTitle(id, trimmed);
-      } catch { /* agent module optional */ }
-    })();
-  }, [projectPath]);
-
+  const renameSession = React.useCallback(
+    (id: string, title: string) => {
+      const trimmed = title.trim().slice(0, 120);
+      if (!trimmed) return;
+      setStored((prev) =>
+        prev.map((s) => (s.compositeId === id ? { ...s, title: trimmed } : s)),
+      );
+      void (async () => {
+        const projectId = await resolveProjectId(projectPath ?? null);
+        void sessionApi.upsert({ sessionId: id, projectId, title: trimmed });
+        // Keep the live agent state in sync so a subsequent persistMeta (fired on
+        // the next turn boundary) writes the user's title, not the old one.
+        try {
+          const { setSessionTitle } = await import('./agent/clientAgent');
+          setSessionTitle(id, trimmed);
+        } catch {
+          /* agent module optional */
+        }
+      })();
+    },
+    [projectPath],
+  );
 
   const sidebarSessions: SessionListSidebarSession[] = stored.map((s) => ({
     compositeId: s.compositeId,
@@ -359,11 +459,15 @@ export default function StudioProjectPage({
     // Thinking indicator: the ACTIVE session uses the chat's instant live signal;
     // every session also honors the server-persisted status from the poll (covers
     // background/peer sessions + the active one once the poll catches up).
-    running: (s.compositeId === activeSessionId && activeRunning) || s.status === 'running',
+    running:
+      (s.compositeId === activeSessionId && activeRunning) ||
+      s.status === 'running',
     // Failed sessions (crashed background task or a failed turn → server
     // `status:'error'`) show an ERROR pill — unless the session is actively
     // re-running, in which case "thinking" wins (a new turn is recovering it).
-    errored: s.status === 'error' && !(s.compositeId === activeSessionId && activeRunning),
+    errored:
+      s.status === 'error' &&
+      !(s.compositeId === activeSessionId && activeRunning),
     model: s.model,
     totalTokens: s.totalTokens ?? 0,
     totalCost: s.totalCost ?? 0,
@@ -376,8 +480,14 @@ export default function StudioProjectPage({
   const sidebarProps = {
     sessions: sidebarSessions,
     activeCompositeId: activeSessionId,
-    onSelect: (id: string) => { selectSession(id); closeDrawer(); },
-    onNewSession: () => { newSession(); closeDrawer(); },
+    onSelect: (id: string) => {
+      selectSession(id);
+      closeDrawer();
+    },
+    onNewSession: () => {
+      newSession();
+      closeDrawer();
+    },
     onArchiveSession: archiveSession,
     onRenameSession: renameSession,
     timeAgo: timeAgoShort,
@@ -391,16 +501,82 @@ export default function StudioProjectPage({
       label: t.label,
       icon: SESSION_VIEW_ICONS[t.id],
       active: tab === t.id,
-      onClick: () => { setTab(t.id); closeDrawer(); },
+      onClick: () => {
+        setTab(t.id);
+        closeDrawer();
+      },
     })),
     footerNav: [
-      { id: 'deploy', label: 'Deploy', icon: <DeployIcon />, active: tab === 'deploy', onClick: () => { setTab('deploy'); closeDrawer(); } },
-      { id: 'prodDatabase', label: 'Database', icon: <DatabaseIcon />, active: tab === 'prodDatabase', onClick: () => { setTab('prodDatabase'); closeDrawer(); } },
-      { id: 'errors', label: 'Errors', icon: <ErrorsIcon />, active: tab === 'errors', onClick: () => { setTab('errors'); closeDrawer(); } },
-      { id: 'events', label: 'Events', icon: <EventsIcon />, active: tab === 'events', onClick: () => { setTab('events'); closeDrawer(); } },
-      { id: 'feedback', label: 'Feedback', icon: <FeedbackIcon />, active: tab === 'feedback', onClick: () => { setTab('feedback'); closeDrawer(); } },
-      { id: 'workers', label: 'Workers', icon: <WorkersIcon />, active: tab === 'workers', onClick: () => { setTab('workers'); closeDrawer(); } },
-      { id: 'terminal', label: 'Terminal', icon: <TerminalIcon />, active: tab === 'terminal', onClick: () => { setTab('terminal'); closeDrawer(); } },
+      {
+        id: 'deploy',
+        label: 'Deploy',
+        icon: <DeployIcon />,
+        active: tab === 'deploy',
+        onClick: () => {
+          setTab('deploy');
+          closeDrawer();
+        },
+      },
+      {
+        id: 'prodDatabase',
+        label: 'Database',
+        icon: <DatabaseIcon />,
+        active: tab === 'prodDatabase',
+        onClick: () => {
+          setTab('prodDatabase');
+          closeDrawer();
+        },
+      },
+      {
+        id: 'errors',
+        label: 'Errors',
+        icon: <ErrorsIcon />,
+        active: tab === 'errors',
+        onClick: () => {
+          setTab('errors');
+          closeDrawer();
+        },
+      },
+      {
+        id: 'events',
+        label: 'Events',
+        icon: <EventsIcon />,
+        active: tab === 'events',
+        onClick: () => {
+          setTab('events');
+          closeDrawer();
+        },
+      },
+      {
+        id: 'feedback',
+        label: 'Feedback',
+        icon: <FeedbackIcon />,
+        active: tab === 'feedback',
+        onClick: () => {
+          setTab('feedback');
+          closeDrawer();
+        },
+      },
+      {
+        id: 'workers',
+        label: 'Workers',
+        icon: <WorkersIcon />,
+        active: tab === 'workers',
+        onClick: () => {
+          setTab('workers');
+          closeDrawer();
+        },
+      },
+      {
+        id: 'terminal',
+        label: 'Terminal',
+        icon: <TerminalIcon />,
+        active: tab === 'terminal',
+        onClick: () => {
+          setTab('terminal');
+          closeDrawer();
+        },
+      },
     ],
     // Settings lives in the sidebar's top header bar (a global preference,
     // not a workspace tab). StudioShell owns the modal and listens for this
@@ -416,123 +592,234 @@ export default function StudioProjectPage({
 
   return (
     <ThemeProvider>
-    <div style={{ ...S.root, paddingBottom: `max(${insets.bottom}px, var(--keyboard-inset-height, 0px))` }}>
-      {!isMobile && (
-        <>
-          <div style={{ ...S.sidebar, width: sidebarW }}>
-            <SessionListSidebar {...sidebarProps} />
-          </div>
-          <div
-            style={S.resizer}
-            onPointerDown={startResize}
-            role="separator"
-            aria-orientation="vertical"
-            title="Drag to resize"
-          />
-        </>
-      )}
-      <main style={S.main}>
-        <header style={S.header}>
-          <TabPickerStyles />
-          {isMobile ? (
-            <button
-              data-id="mobile-nav-toggle"
-              onClick={() => { setDrawerOpen(true); }}
-              style={S.hamburger}
-              aria-label="Open navigation"
-            >
-              <HamburgerIcon />
-            </button>
-          ) : (
-            <button data-id="back-to-projects" onClick={onBack} style={S.back}>
-              ‹ Projects
-            </button>
-          )}
-          <span style={S.name}>{isMobile ? activeViewLabel : projectName}</span>
-          {!isMobile && projectPath && <span style={S.path}>{projectPath}</span>}
-          {/* On desktop the header now shows the active view name (the five
-              session views moved into the sidebar's per-session sub-nav). */}
-          {!isMobile && <span style={S.path}>· {activeViewLabel}</span>}
-          <span style={{ flex: 1 }} />
-        </header>
-        <ChatOpenUriProvider value={openUri}>
-        <div style={S.content}>
-          {/* Chat stays mounted (preserves the agent session); others mount on demand.
-              key bumps on session switch so the chat reloads the selected session. */}
-          <div style={{ ...S.pane, display: tab === 'chat' ? 'flex' : 'none' }}>
-            <CodingAgentChat
-              // Key on chatKey ONLY — never on activeSessionId. When the chat
-              // creates its own session, recordSession sets activeSessionId,
-              // which previously flipped this key and destroyed the live
-              // instance mid-create — the fresh instance then re-fetched the
-              // just-created session before its message + setting RPCs had
-              // persisted, so the model/plan/initial message only appeared
-              // after a manual reload. Explicit session switches (select/new/
-              // archive-active) bump chatKey to force the remount they need.
-              key={`chat-${chatKey}`}
-              {...(activeSessionId ? { initialSessionId: activeSessionId } : {})}
-              {...(() => {
-                // Reopening a FAILED session: surface its persisted failure text as a
-                // durable error bubble in the transcript (the live crash bubble was
-                // lost on reload/switch). Cleared server-side once a new turn recovers.
-                const err = activeSessionId
-                  ? stored.find((s) => s.compositeId === activeSessionId)?.lastError
-                  : undefined;
-                return err ? { initialLastError: err } : {};
-              })()}
-              onSessionCreated={recordSession}
-              onResumeMissing={archiveSession}
-              onOpenUri={openUri}
-              onRunningChange={setActiveRunning}
-            />
-          </div>
-          {/* Session tabs (dev-scoped) */}
-          {tab === 'preview' && <div style={S.pane}><PreviewPanel sessionId={activeSessionId} /></div>}
-          {tab === 'file' && <div style={S.pane}><FilePanel openTarget={pendingFile} onOpened={clearPendingFile} sessionId={activeSessionId} /></div>}
-          {tab === 'git' && <div style={S.pane}><GitPanel sessionId={activeSessionId} /></div>}
-          {tab === 'tests' && <div style={S.pane}><TestsPanel /></div>}
-          {tab === 'database' && <div style={S.paneScroll}><DatabasePanel forceDev /></div>}
-          {/* Sidebar prod views */}
-          {tab === 'deploy' && <div style={S.pane}><ProdPanel /></div>}
-          {tab === 'prodDatabase' && <div style={S.paneScroll}><DatabasePanel forceProd onDeploy={() => { setTab('deploy'); }} /></div>}
-          {tab === 'errors' && <div style={S.paneScroll}><ErrorsPanel forceProd onDeploy={() => { setTab('deploy'); }} /></div>}
-          {tab === 'events' && <div style={S.paneScroll}><EventsPanel onDeploy={() => { setTab('deploy'); }} /></div>}
-          {tab === 'feedback' && <div style={S.paneScroll}><FeedbackPanel onDeploy={() => { setTab('deploy'); }} sessions={stored.map((s) => ({ compositeId: s.compositeId, title: s.title }))} onSendToAgent={sendFeedbackToAgent} /></div>}
-          {tab === 'workers' && <div style={S.paneScroll}><WorkersPanel forceProd /></div>}
-          {tab === 'terminal' && <div style={S.pane}><TerminalPanel /></div>}
-        </div>
-        </ChatOpenUriProvider>
-      </main>
-      {isMobile && (
-        <>
-          <div
-            data-id="mobile-nav-scrim"
-            onClick={closeDrawer}
-            style={{ ...S.scrim, ...(drawerOpen ? S.scrimOpen : {}) }}
-          />
-          <div data-id="mobile-nav-drawer" style={{ ...S.drawer, ...(drawerOpen ? S.drawerOpen : {}) }}>
-            <button data-id="mobile-drawer-back" onClick={() => { onBack(); closeDrawer(); }} style={S.drawerBack}>
-              ‹ Projects
-            </button>
-            <div style={S.viewsList}>
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  data-id={`mobile-view-${t.id}`}
-                  onClick={() => { setTab(t.id); closeDrawer(); }}
-                  style={{ ...S.viewRow, ...(tab === t.id ? S.viewRowActive : {}) }}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <div style={S.drawerSidebar}>
+      <div
+        style={{
+          ...S.root,
+          paddingBottom: `max(${insets.bottom}px, var(--keyboard-inset-height, 0px))`,
+        }}
+      >
+        {!isMobile && (
+          <>
+            <div style={{ ...S.sidebar, width: sidebarW }}>
               <SessionListSidebar {...sidebarProps} />
             </div>
-          </div>
-        </>
-      )}
-    </div>
+            <div
+              style={S.resizer}
+              onPointerDown={startResize}
+              role="separator"
+              aria-orientation="vertical"
+              title="Drag to resize"
+            />
+          </>
+        )}
+        <main style={S.main}>
+          <header style={S.header}>
+            <TabPickerStyles />
+            {isMobile ? (
+              <button
+                data-id="mobile-nav-toggle"
+                onClick={() => {
+                  setDrawerOpen(true);
+                }}
+                style={S.hamburger}
+                aria-label="Open navigation"
+              >
+                <HamburgerIcon />
+              </button>
+            ) : (
+              <button
+                data-id="back-to-projects"
+                onClick={onBack}
+                style={S.back}
+              >
+                ‹ Projects
+              </button>
+            )}
+            <span style={S.name}>
+              {isMobile ? activeViewLabel : projectName}
+            </span>
+            {!isMobile && projectPath && (
+              <span style={S.path}>{projectPath}</span>
+            )}
+            {/* On desktop the header now shows the active view name (the five
+              session views moved into the sidebar's per-session sub-nav). */}
+            {!isMobile && <span style={S.path}>· {activeViewLabel}</span>}
+            <span style={{ flex: 1 }} />
+          </header>
+          <ChatOpenUriProvider value={openUri}>
+            <div style={S.content}>
+              {/* Chat stays mounted (preserves the agent session); others mount on demand.
+              key bumps on session switch so the chat reloads the selected session. */}
+              <div
+                style={{ ...S.pane, display: tab === 'chat' ? 'flex' : 'none' }}
+              >
+                <CodingAgentChat
+                  // Key on chatKey ONLY — never on activeSessionId. When the chat
+                  // creates its own session, recordSession sets activeSessionId,
+                  // which previously flipped this key and destroyed the live
+                  // instance mid-create — the fresh instance then re-fetched the
+                  // just-created session before its message + setting RPCs had
+                  // persisted, so the model/plan/initial message only appeared
+                  // after a manual reload. Explicit session switches (select/new/
+                  // archive-active) bump chatKey to force the remount they need.
+                  key={`chat-${chatKey}`}
+                  {...(activeSessionId
+                    ? { initialSessionId: activeSessionId }
+                    : {})}
+                  {...(() => {
+                    // Reopening a FAILED session: surface its persisted failure text as a
+                    // durable error bubble in the transcript (the live crash bubble was
+                    // lost on reload/switch). Cleared server-side once a new turn recovers.
+                    const err = activeSessionId
+                      ? stored.find((s) => s.compositeId === activeSessionId)
+                          ?.lastError
+                      : undefined;
+                    return err ? { initialLastError: err } : {};
+                  })()}
+                  onSessionCreated={recordSession}
+                  onResumeMissing={archiveSession}
+                  onOpenUri={openUri}
+                  onRunningChange={setActiveRunning}
+                />
+              </div>
+              {/* Session tabs (dev-scoped) */}
+              {tab === 'preview' && (
+                <div style={S.pane}>
+                  <PreviewPanel sessionId={activeSessionId} />
+                </div>
+              )}
+              {tab === 'file' && (
+                <div style={S.pane}>
+                  <FilePanel
+                    openTarget={pendingFile}
+                    onOpened={clearPendingFile}
+                    sessionId={activeSessionId}
+                  />
+                </div>
+              )}
+              {tab === 'git' && (
+                <div style={S.pane}>
+                  <GitPanel sessionId={activeSessionId} />
+                </div>
+              )}
+              {tab === 'tests' && (
+                <div style={S.pane}>
+                  <TestsPanel />
+                </div>
+              )}
+              {tab === 'database' && (
+                <div style={S.paneScroll}>
+                  <DatabasePanel forceDev />
+                </div>
+              )}
+              {/* Sidebar prod views */}
+              {tab === 'deploy' && (
+                <div style={S.pane}>
+                  <ProdPanel />
+                </div>
+              )}
+              {tab === 'prodDatabase' && (
+                <div style={S.paneScroll}>
+                  <DatabasePanel
+                    forceProd
+                    onDeploy={() => {
+                      setTab('deploy');
+                    }}
+                  />
+                </div>
+              )}
+              {tab === 'errors' && (
+                <div style={S.paneScroll}>
+                  <ErrorsPanel
+                    forceProd
+                    onDeploy={() => {
+                      setTab('deploy');
+                    }}
+                  />
+                </div>
+              )}
+              {tab === 'events' && (
+                <div style={S.paneScroll}>
+                  <EventsPanel
+                    onDeploy={() => {
+                      setTab('deploy');
+                    }}
+                  />
+                </div>
+              )}
+              {tab === 'feedback' && (
+                <div style={S.paneScroll}>
+                  <FeedbackPanel
+                    onDeploy={() => {
+                      setTab('deploy');
+                    }}
+                    sessions={stored.map((s) => ({
+                      compositeId: s.compositeId,
+                      title: s.title,
+                    }))}
+                    onSendToAgent={sendFeedbackToAgent}
+                  />
+                </div>
+              )}
+              {tab === 'workers' && (
+                <div style={S.paneScroll}>
+                  <WorkersPanel forceProd />
+                </div>
+              )}
+              {tab === 'terminal' && (
+                <div style={S.pane}>
+                  <TerminalPanel />
+                </div>
+              )}
+            </div>
+          </ChatOpenUriProvider>
+        </main>
+        {isMobile && (
+          <>
+            <div
+              data-id="mobile-nav-scrim"
+              onClick={closeDrawer}
+              style={{ ...S.scrim, ...(drawerOpen ? S.scrimOpen : {}) }}
+            />
+            <div
+              data-id="mobile-nav-drawer"
+              style={{ ...S.drawer, ...(drawerOpen ? S.drawerOpen : {}) }}
+            >
+              <button
+                data-id="mobile-drawer-back"
+                onClick={() => {
+                  onBack();
+                  closeDrawer();
+                }}
+                style={S.drawerBack}
+              >
+                ‹ Projects
+              </button>
+              <div style={S.viewsList}>
+                {TABS.map((t) => (
+                  <button
+                    key={t.id}
+                    data-id={`mobile-view-${t.id}`}
+                    onClick={() => {
+                      setTab(t.id);
+                      closeDrawer();
+                    }}
+                    style={{
+                      ...S.viewRow,
+                      ...(tab === t.id ? S.viewRowActive : {}),
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div style={S.drawerSidebar}>
+                <SessionListSidebar {...sidebarProps} />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </ThemeProvider>
   );
 }
@@ -540,17 +827,35 @@ export default function StudioProjectPage({
 // Display label per tab — drives the mobile header title + the drawer Views
 // list reuses TABS for its own labels (these match).
 const ALL_TAB_LABELS: Record<WorkspaceTab, string> = {
-  chat: 'Agent', preview: 'Preview', file: 'File', git: 'Git', tests: 'Tests', database: 'Database',
-  deploy: 'Deploy', prodDatabase: 'Database', errors: 'Errors', events: 'Events', feedback: 'Feedback',
-  workers: 'Workers', terminal: 'Terminal',
+  chat: 'Agent',
+  preview: 'Preview',
+  file: 'File',
+  git: 'Git',
+  tests: 'Tests',
+  database: 'Database',
+  deploy: 'Deploy',
+  prodDatabase: 'Database',
+  errors: 'Errors',
+  events: 'Events',
+  feedback: 'Feedback',
+  workers: 'Workers',
+  terminal: 'Terminal',
 };
 
 // Minimal inline hamburger (no emoji / no lucide-react dep — matches the repo's
 // inline-SVG icon convention).
 function HamburgerIcon(): React.ReactElement {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
       <line x1="3" y1="6" x2="21" y2="6" />
       <line x1="3" y1="12" x2="21" y2="12" />
       <line x1="3" y1="18" x2="21" y2="18" />
@@ -576,39 +881,220 @@ const S: Record<string, React.CSSProperties> = {
   // padding on L/R/bottom keeps content clear of side notches + the home
   // indicator; the header owns the TOP inset so its bar fills behind the status
   // bar (immersive). All env() insets are 0 on desktop → a no-op there.
-  root: { display: 'flex', height: '100dvh', boxSizing: 'border-box', paddingLeft: 'var(--safe-area-inset-left)', paddingRight: 'var(--safe-area-inset-right)', paddingBottom: 'var(--safe-area-inset-bottom)', background: 'var(--bg-primary)', color: 'var(--text-primary)' },
-  sidebar: { flex: 'none', display: 'flex', minHeight: 0, borderRight: '1px solid var(--border)' },
+  root: {
+    display: 'flex',
+    height: '100dvh',
+    boxSizing: 'border-box',
+    paddingLeft: 'var(--safe-area-inset-left)',
+    paddingRight: 'var(--safe-area-inset-right)',
+    paddingBottom: 'var(--safe-area-inset-bottom)',
+    background: 'var(--bg-primary)',
+    color: 'var(--text-primary)',
+  },
+  sidebar: {
+    flex: 'none',
+    display: 'flex',
+    minHeight: 0,
+    borderRight: '1px solid var(--border)',
+  },
   // Thin draggable gutter between the session sidebar and the workspace.
-  resizer: { width: 5, flex: 'none', cursor: 'col-resize', background: 'transparent', marginLeft: -3, zIndex: 5 },
+  resizer: {
+    width: 5,
+    flex: 'none',
+    cursor: 'col-resize',
+    background: 'transparent',
+    marginLeft: -3,
+    zIndex: 5,
+  },
   main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
   // Fixed 36px height to line up exactly with the session-list sidebar header.
   // Right padding reserves space for the fixed top-right feedback icon so the
   // tab control never slides under it (see [data-id='feedback-button'] in styles.css).
   // Height grows by the top inset and paddingTop pushes content below the notch,
   // so the panel background fills behind the status bar (immersive header).
-  header: { display: 'flex', alignItems: 'center', gap: 10, height: 'calc(36px + var(--safe-area-inset-top))', paddingTop: 'var(--safe-area-inset-top)', paddingRight: 42, paddingBottom: 0, paddingLeft: 12, boxSizing: 'border-box', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', flexShrink: 0 },
-  back: { fontFamily: 'var(--font-mono)', fontSize: 11.5, lineHeight: 1, height: 24, display: 'inline-flex', alignItems: 'center', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '0 9px', cursor: 'pointer', flexShrink: 0 },
-  name: { fontFamily: 'var(--font-mono)', fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 },
-  path: { fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 320 },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    height: 'calc(36px + var(--safe-area-inset-top))',
+    paddingTop: 'var(--safe-area-inset-top)',
+    paddingRight: 42,
+    paddingBottom: 0,
+    paddingLeft: 12,
+    boxSizing: 'border-box',
+    borderBottom: '1px solid var(--border)',
+    background: 'var(--bg-panel)',
+    flexShrink: 0,
+  },
+  back: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11.5,
+    lineHeight: 1,
+    height: 24,
+    display: 'inline-flex',
+    alignItems: 'center',
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    padding: '0 9px',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  name: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12.5,
+    fontWeight: 700,
+    color: 'var(--text-primary)',
+    flexShrink: 0,
+  },
+  path: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11.5,
+    color: 'var(--text-muted)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: 320,
+  },
   // Segmented control: one rounded track holding the tab chips.
-  tabBar: { display: 'inline-flex', alignItems: 'center', gap: 2, height: 26, padding: 3, boxSizing: 'border-box', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, flexShrink: 0 },
-  tabSeg: { height: '100%', display: 'inline-flex', alignItems: 'center', padding: '0 11px', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.01em', color: 'var(--text-muted)', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', transition: 'color 120ms ease, background 120ms ease, box-shadow 120ms ease' },
-  tabSegActive: { background: 'var(--bg-primary)', color: 'var(--accent)', boxShadow: '0 1px 2px rgba(0,0,0,0.16)' },
-  content: { flex: 1, minHeight: 0, display: 'flex', position: 'relative', background: 'var(--bg-primary)' },
-  pane: { flex: 1, minHeight: 0, minWidth: 0, flexDirection: 'column', display: 'flex' },
+  tabBar: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 2,
+    height: 26,
+    padding: 3,
+    boxSizing: 'border-box',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    flexShrink: 0,
+  },
+  tabSeg: {
+    height: '100%',
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '0 11px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.01em',
+    color: 'var(--text-muted)',
+    background: 'transparent',
+    border: 'none',
+    borderRadius: 5,
+    cursor: 'pointer',
+    transition:
+      'color 120ms ease, background 120ms ease, box-shadow 120ms ease',
+  },
+  tabSegActive: {
+    background: 'var(--bg-primary)',
+    color: 'var(--accent)',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.16)',
+  },
+  content: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    position: 'relative',
+    background: 'var(--bg-primary)',
+  },
+  pane: {
+    flex: 1,
+    minHeight: 0,
+    minWidth: 0,
+    flexDirection: 'column',
+    display: 'flex',
+  },
   paneScroll: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'auto' },
-  placeholder: { display: 'flex', flexDirection: 'column', gap: 8, padding: 32, maxWidth: 560, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 },
+  placeholder: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    padding: 32,
+    maxWidth: 560,
+    fontFamily: 'var(--font-mono)',
+    fontSize: 13,
+    color: 'var(--text-muted)',
+    lineHeight: 1.6,
+  },
   // --- Mobile nav drawer (rendered below 768px) ---
-  hamburger: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 28, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', flexShrink: 0, padding: 0 },
+  hamburger: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 28,
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    cursor: 'pointer',
+    flexShrink: 0,
+    padding: 0,
+  },
   // Scrim + drawer sit above the fixed feedback button (z-index 1000 in styles.css).
   // visibility toggles so the closed overlay isn't hit-testable (Playwright not.toBeVisible passes).
-  scrim: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', opacity: 0, visibility: 'hidden', transition: 'opacity 180ms ease, visibility 180ms ease', zIndex: 1100 },
+  scrim: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.45)',
+    opacity: 0,
+    visibility: 'hidden',
+    transition: 'opacity 180ms ease, visibility 180ms ease',
+    zIndex: 1100,
+  },
   scrimOpen: { opacity: 1, visibility: 'visible' },
-  drawer: { position: 'fixed', top: 0, left: 0, bottom: 0, width: 'min(86vw, 320px)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', borderRight: '1px solid var(--border)', transform: 'translateX(-100%)', visibility: 'hidden', transition: 'transform 200ms ease, visibility 200ms ease', zIndex: 1200, paddingTop: 'var(--safe-area-inset-top)', paddingBottom: 'var(--safe-area-inset-bottom)', boxSizing: 'border-box' },
+  drawer: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 'min(86vw, 320px)',
+    display: 'flex',
+    flexDirection: 'column',
+    background: 'var(--bg-panel)',
+    borderRight: '1px solid var(--border)',
+    transform: 'translateX(-100%)',
+    visibility: 'hidden',
+    transition: 'transform 200ms ease, visibility 200ms ease',
+    zIndex: 1200,
+    paddingTop: 'var(--safe-area-inset-top)',
+    paddingBottom: 'var(--safe-area-inset-bottom)',
+    boxSizing: 'border-box',
+  },
   drawerOpen: { transform: 'translateX(0)', visibility: 'visible' },
-  drawerBack: { flex: 'none', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 12, height: 40, padding: '0 14px', background: 'transparent', color: 'var(--text-primary)', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer' },
-  viewsList: { flex: 'none', display: 'flex', flexDirection: 'column', padding: '6px 0', borderBottom: '1px solid var(--border)' },
-  viewRow: { textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 13, height: 40, padding: '0 14px', background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer' },
+  drawerBack: {
+    flex: 'none',
+    textAlign: 'left',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+    height: 40,
+    padding: '0 14px',
+    background: 'transparent',
+    color: 'var(--text-primary)',
+    border: 'none',
+    borderBottom: '1px solid var(--border)',
+    cursor: 'pointer',
+  },
+  viewsList: {
+    flex: 'none',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '6px 0',
+    borderBottom: '1px solid var(--border)',
+  },
+  viewRow: {
+    textAlign: 'left',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 13,
+    height: 40,
+    padding: '0 14px',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    border: 'none',
+    cursor: 'pointer',
+  },
   viewRowActive: { color: 'var(--accent)', background: 'var(--bg-secondary)' },
   drawerSidebar: { flex: 1, minHeight: 0, display: 'flex' },
 };

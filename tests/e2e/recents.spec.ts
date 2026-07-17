@@ -17,9 +17,14 @@ const auth = loadDevAuth();
 const DEVICE = { deviceId: 'e2e-device-1', deviceLabel: 'E2E MacBook' };
 
 test.describe('Recent projects — cross-device sync', () => {
-  test.skip(!auth, 'No ~/.ugly-bot/auth.json — run logged in to a real session');
+  test.skip(
+    !auth,
+    'No ~/.ugly-bot/auth.json — run logged in to a real session',
+  );
 
-  test('opening a project records it (stamped with this device) and it syncs to the picker', async ({ page }) => {
+  test('opening a project records it (stamped with this device) and it syncs to the picker', async ({
+    page,
+  }) => {
     page.on('console', (m) => {
       if (m.type() === 'error') console.log('[browser:error]', m.text());
     });
@@ -29,7 +34,10 @@ test.describe('Recent projects — cross-device sync', () => {
 
     // Open a folder → StudioShell.openProject → recordRecentProject over the REAL
     // ugly-app socket → recentProject row in the dev DB → trackDocs fans out.
-    await page.getByRole('button', { name: /Open Folder/ }).first().click();
+    await page
+      .getByRole('button', { name: /Open Folder/ })
+      .first()
+      .click();
     await page.getByPlaceholder(/project$/).fill(projectPath);
     await page.getByRole('button', { name: /Open Folder →/i }).click();
     await page.locator('[data-id=home-prompt-input]').waitFor();
@@ -49,10 +57,14 @@ test.describe('Recent projects — cross-device sync', () => {
     // on a fresh snapshot rather than a live delta because local dev has no NATS
     // (trackDocs serves the initial query but not live updates); the persisted
     // removal is what we're verifying here.
-    await page.locator(`[data-id="recent-project-delete-${projectPath}"]`).click();
+    await page
+      .locator(`[data-id="recent-project-delete-${projectPath}"]`)
+      .click();
     await page.waitForTimeout(1_000); // let the remove request land
     await page.goto('/');
-    await expect(page.locator(`[data-id="recent-project-${projectPath}"]`)).toHaveCount(0, {
+    await expect(
+      page.locator(`[data-id="recent-project-${projectPath}"]`),
+    ).toHaveCount(0, {
       timeout: 15_000,
     });
   });

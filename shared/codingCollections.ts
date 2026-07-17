@@ -62,10 +62,18 @@ export const CodingSessionSchema = z.object({
   // via trackDocs — replacing the old `codebase_readiness` control event, which only reached
   // the host-attached renderer over task.listen (never a headless/remote client). Loose shape
   // (JSONB); the reader validates with CodebaseReadinessSchema.
-  codebaseReadiness: z.object({ indexer: z.unknown().optional(), diagnostics: z.unknown().optional() }).optional(),
+  codebaseReadiness: z
+    .object({
+      indexer: z.unknown().optional(),
+      diagnostics: z.unknown().optional(),
+    })
+    .optional(),
 });
 export type CodingSessionStatus = 'running' | 'idle' | 'done' | 'error';
-export type CodingSession = Omit<InferDocType<typeof CodingSessionSchema>, 'status'> & {
+export type CodingSession = Omit<
+  InferDocType<typeof CodingSessionSchema>,
+  'status'
+> & {
   status: CodingSessionStatus;
 };
 
@@ -87,7 +95,10 @@ export const CodingSessionMessageSchema = z.object({
 });
 export type CodingSessionMessageRole = 'user' | 'assistant' | 'tool';
 export type CodingSessionMessageKind = 'message' | 'summary';
-export type CodingSessionMessage = Omit<InferDocType<typeof CodingSessionMessageSchema>, 'role' | 'kind'> & {
+export type CodingSessionMessage = Omit<
+  InferDocType<typeof CodingSessionMessageSchema>,
+  'role' | 'kind'
+> & {
   role: CodingSessionMessageRole;
   kind: CodingSessionMessageKind;
 };
@@ -118,7 +129,10 @@ export const CodingRunRequestSchema = z.object({
   createdAt: z.number(),
 });
 export type CodingRunRequestStatus = 'pending' | 'claimed' | 'done' | 'error';
-export type CodingRunRequest = Omit<InferDocType<typeof CodingRunRequestSchema>, 'status'> & {
+export type CodingRunRequest = Omit<
+  InferDocType<typeof CodingRunRequestSchema>,
+  'status'
+> & {
   status: CodingRunRequestStatus;
 };
 
@@ -147,7 +161,10 @@ export const CodingInteractionSchema = z.object({
   createdAt: z.number(),
 });
 export type CodingInteractionStatus = 'pending' | 'answered' | 'done';
-export type CodingInteraction = Omit<InferDocType<typeof CodingInteractionSchema>, 'status'> & {
+export type CodingInteraction = Omit<
+  InferDocType<typeof CodingInteractionSchema>,
+  'status'
+> & {
   status: CodingInteractionStatus;
 };
 
@@ -165,7 +182,10 @@ export function compareCodingMessages(
   a: { seq: number; kind: string },
   b: { seq: number; kind: string },
 ): number {
-  return a.seq - b.seq || (a.kind === 'summary' ? -1 : 0) - (b.kind === 'summary' ? -1 : 0);
+  return (
+    a.seq - b.seq ||
+    (a.kind === 'summary' ? -1 : 0) - (b.kind === 'summary' ? -1 : 0)
+  );
 }
 
 // INFERENCE-BUDGET NOTE: with `db: d1` on the meta, INLINE `indexes: [...]` tuples
@@ -204,7 +224,14 @@ export const codingCollections = defineCollections({
     // the authenticated userId for owner-scoped collections); `projectId` is the list
     // routing key the client subscribes on. Query filter {userId,projectId,archived}
     // stays covered by codingSessionIndexes.
-    meta: { cache: false, trackable: true, trackKeys: ['userId', 'projectId'], public: false, cascadeFrom: null, db: d1 },
+    meta: {
+      cache: false,
+      trackable: true,
+      trackKeys: ['userId', 'projectId'],
+      public: false,
+      cascadeFrom: null,
+      db: d1,
+    },
     indexes: codingSessionIndexes,
   },
   codingSessionMessage: {
@@ -213,21 +240,42 @@ export const codingCollections = defineCollections({
     // so the transcript is preserved. (Cascade would key on `codingSessionId`; we
     // use `sessionId`.) Live-synced to the transcript via trackDocs keyed by
     // `sessionId`; `userId` owner-scopes it (Workers injects the authed userId).
-    meta: { cache: false, trackable: true, trackKeys: ['userId', 'sessionId'], public: false, cascadeFrom: null, db: d1 },
+    meta: {
+      cache: false,
+      trackable: true,
+      trackKeys: ['userId', 'sessionId'],
+      public: false,
+      cascadeFrom: null,
+      db: d1,
+    },
     indexes: codingSessionMessageIndexes,
   },
   codingRunRequest: {
     schema: CodingRunRequestSchema,
     // Live-synced to the OWNING desktop host via trackDocs keyed by userId (the host
     // filters to projects it hosts). No cascade — short-lived control docs.
-    meta: { cache: false, trackable: true, trackKeys: ['userId'], public: false, cascadeFrom: null, db: d1 },
+    meta: {
+      cache: false,
+      trackable: true,
+      trackKeys: ['userId'],
+      public: false,
+      cascadeFrom: null,
+      db: d1,
+    },
     indexes: codingRunRequestIndexes,
   },
   codingInteraction: {
     schema: CodingInteractionSchema,
     // Client tracks by sessionId (render cards for the open session); host tracks by
     // userId (forward answers/commands for owned sessions). No cascade — short-lived.
-    meta: { cache: false, trackable: true, trackKeys: ['userId', 'sessionId'], public: false, cascadeFrom: null, db: d1 },
+    meta: {
+      cache: false,
+      trackable: true,
+      trackKeys: ['userId', 'sessionId'],
+      public: false,
+      cascadeFrom: null,
+      db: d1,
+    },
     indexes: codingInteractionIndexes,
   },
 });

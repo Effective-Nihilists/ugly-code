@@ -33,7 +33,12 @@ const C = {
 
 interface ElectronApi {
   onBinariesProgress?: (
-    cb: (e: { origin: string; name: string; phase: string; pct: number }) => void,
+    cb: (e: {
+      origin: string;
+      name: string;
+      phase: string;
+      pct: number;
+    }) => void,
   ) => () => void;
 }
 
@@ -46,11 +51,15 @@ export default function BinariesInstallOverlay(): ReactElement | null {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    const api = (window as unknown as { electronAPI?: ElectronApi }).electronAPI;
+    const api = (window as unknown as { electronAPI?: ElectronApi })
+      .electronAPI;
     if (!api?.onBinariesProgress) return;
     return api.onBinariesProgress((e) => {
       setDismissed(false);
-      setTools((prev) => ({ ...prev, [e.name]: { phase: e.phase, pct: e.pct } }));
+      setTools((prev) => ({
+        ...prev,
+        [e.name]: { phase: e.phase, pct: e.pct },
+      }));
     });
   }, []);
 
@@ -61,8 +70,12 @@ export default function BinariesInstallOverlay(): ReactElement | null {
   // Clear shortly after every tool has finished successfully.
   useEffect(() => {
     if (allDone) {
-      const id = setTimeout(() => { setTools({}); }, 700);
-      return () => { clearTimeout(id); };
+      const id = setTimeout(() => {
+        setTools({});
+      }, 700);
+      return () => {
+        clearTimeout(id);
+      };
     }
     return undefined;
   }, [allDone]);
@@ -94,7 +107,8 @@ export default function BinariesInstallOverlay(): ReactElement | null {
           borderRadius: 14,
           padding: '20px 20px 18px',
           color: C.ink,
-          boxShadow: '0 28px 70px -22px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.03)',
+          boxShadow:
+            '0 28px 70px -22px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.03)',
           // System UI for prose; tool NAMES stay monospace (they're identifiers).
           fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
         }}
@@ -109,21 +123,40 @@ export default function BinariesInstallOverlay(): ReactElement | null {
               height: 30,
               borderRadius: 8,
               flexShrink: 0,
-              background: failed ? 'rgba(248,113,113,.12)' : 'rgba(232,145,60,.12)',
+              background: failed
+                ? 'rgba(248,113,113,.12)'
+                : 'rgba(232,145,60,.12)',
               border: `1px solid ${failed ? 'rgba(248,113,113,.3)' : 'rgba(232,145,60,.3)'}`,
             }}
           >
             {failed ? (
               <AlertTriangle size={16} color={C.bad} />
             ) : (
-              <Wrench size={15} color={C.accent} style={{ animation: 'uglyBinSpin 2.4s linear infinite' }} />
+              <Wrench
+                size={15}
+                color={C.accent}
+                style={{ animation: 'uglyBinSpin 2.4s linear infinite' }}
+              />
             )}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14.5, fontWeight: 650, letterSpacing: '-0.01em' }}>
+            <div
+              style={{
+                fontSize: 14.5,
+                fontWeight: 650,
+                letterSpacing: '-0.01em',
+              }}
+            >
               {failed ? 'Tool install failed' : 'Setting up tools'}
             </div>
-            <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2, lineHeight: 1.35 }}>
+            <div
+              style={{
+                fontSize: 11.5,
+                color: C.sub,
+                marginTop: 2,
+                lineHeight: 1.35,
+              }}
+            >
               {failed
                 ? 'Some tools could not be installed — check your connection.'
                 : 'This page is paused until its tools finish downloading.'}
@@ -146,7 +179,14 @@ export default function BinariesInstallOverlay(): ReactElement | null {
         </div>
 
         {/* Per-tool rows */}
-        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div
+          style={{
+            marginTop: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
           {entries.map(([name, t]) => {
             const isDone = t.phase === 'done';
             const isFailed = t.phase === 'failed';
@@ -168,7 +208,8 @@ export default function BinariesInstallOverlay(): ReactElement | null {
                     width: 78,
                     fontSize: 12,
                     fontWeight: 600,
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, Menlo, monospace',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -218,7 +259,9 @@ export default function BinariesInstallOverlay(): ReactElement | null {
                       <span>Failed</span>
                     </>
                   ) : t.phase === 'download' ? (
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.round(t.pct)}%</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {Math.round(t.pct)}%
+                    </span>
                   ) : (
                     <span>{LABEL[t.phase] ?? t.phase}</span>
                   )}
@@ -233,7 +276,9 @@ export default function BinariesInstallOverlay(): ReactElement | null {
           <div style={{ marginTop: 16, display: 'flex', gap: 9 }}>
             <button
               type="button"
-              onClick={() => { window.location.reload(); }}
+              onClick={() => {
+                window.location.reload();
+              }}
               style={{
                 flex: 1,
                 display: 'flex',
@@ -248,14 +293,17 @@ export default function BinariesInstallOverlay(): ReactElement | null {
                 cursor: 'pointer',
                 fontSize: 12.5,
                 fontWeight: 700,
-              }} data-id="retry"
+              }}
+              data-id="retry"
             >
               <RotateCw size={13} />
               Retry
             </button>
             <button
               type="button"
-              onClick={() => { setDismissed(true); }}
+              onClick={() => {
+                setDismissed(true);
+              }}
               style={{
                 flex: 1,
                 padding: '9px 10px',
@@ -266,7 +314,8 @@ export default function BinariesInstallOverlay(): ReactElement | null {
                 cursor: 'pointer',
                 fontSize: 12.5,
                 fontWeight: 600,
-              }} data-id="dismiss"
+              }}
+              data-id="dismiss"
             >
               Dismiss
             </button>

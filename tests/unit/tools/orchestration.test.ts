@@ -7,7 +7,10 @@ import {
   delegateTool,
   delegateParallelTool,
 } from '../../../client/agent/tools/delegate';
-import { blackboardPostTool, readBlackboard } from '../../../client/agent/tools/blackboard';
+import {
+  blackboardPostTool,
+  readBlackboard,
+} from '../../../client/agent/tools/blackboard';
 
 // A fake step that immediately returns an assistant message (no tool calls).
 const echoStep =
@@ -16,7 +19,10 @@ const echoStep =
 
 describe('runSubAgent', () => {
   it('runs the nested loop and returns the final assistant text', async () => {
-    const out = await runSubAgent('do a thing', { step: echoStep('sub done'), maxSteps: 2 });
+    const out = await runSubAgent('do a thing', {
+      step: echoStep('sub done'),
+      maxSteps: 2,
+    });
     expect(out).toBe('sub done');
   });
   it('blocks nested delegation (recursion guard)', async () => {
@@ -32,7 +38,10 @@ describe('delegate tools', () => {
     expect(await delegateTool.run({ task: 't' }, {})).toMatch(/unavailable/i);
   });
   it('delegate runs a subagent when step is present', async () => {
-    const out = await delegateTool.run({ task: 'find X' }, { step: echoStep('found X') });
+    const out = await delegateTool.run(
+      { task: 'find X' },
+      { step: echoStep('found X') },
+    );
     expect(out).toBe('found X');
   });
   it('delegate_parallel aggregates subtask results', async () => {

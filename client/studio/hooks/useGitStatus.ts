@@ -31,7 +31,14 @@ export function useGitStatus(pollIntervalMs = 5000, cwd?: string) {
       setRemote(result.remote);
       setFiles(result.files);
     } catch (e) {
-      console.error('[useGitStatus:gitStatus]', JSON.stringify({ cwd: cwd ?? null, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[useGitStatus:gitStatus]',
+        JSON.stringify({
+          cwd: cwd ?? null,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
     }
   }, [socket, cwd]);
 
@@ -44,7 +51,9 @@ export function useGitStatus(pollIntervalMs = 5000, cwd?: string) {
     if (!isTabActive) return;
     void refresh();
     const interval = setInterval(refresh, pollIntervalMs);
-    return () => { clearInterval(interval); };
+    return () => {
+      clearInterval(interval);
+    };
   }, [refresh, pollIntervalMs, isTabActive]);
 
   return { branch, remote, files, changedCount: files.length, refresh };

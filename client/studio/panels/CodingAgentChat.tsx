@@ -53,9 +53,22 @@ import {
 import { registerFeedbackContextProvider } from 'ugly-app/client';
 import { MdastViewer } from 'ugly-app/markdown/client';
 import { isNativeAvailable } from 'ugly-app/native';
-import { sessionBranchName, sessionWorktreeDir } from '../agent/sessionWorkspace';
+import {
+  sessionBranchName,
+  sessionWorktreeDir,
+} from '../agent/sessionWorkspace';
 import { buildDiffRows, diffStats, type Part } from './tokenDiff';
-import { badgeLabel, grepBadgeNoun, grepHidesPattern, grepOperationName, grepResultCount, parseEditStat, parseGlobFiles, parseGrepOutput, searchBadge } from './toolCardSummary';
+import {
+  badgeLabel,
+  grepBadgeNoun,
+  grepHidesPattern,
+  grepOperationName,
+  grepResultCount,
+  parseEditStat,
+  parseGlobFiles,
+  parseGrepOutput,
+  searchBadge,
+} from './toolCardSummary';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
 import { formatCurrency } from '../shared/Currency';
 import { estimateCost, isSubscriptionProvider } from '../shared/model-rates';
@@ -92,7 +105,11 @@ import {
   resolveSlashSelection,
   type Skill,
 } from '../hooks/useSlashCommands';
-import { useSocket, getActiveProjectPath, codebaseCall } from '../hooks/useSocket';
+import {
+  useSocket,
+  getActiveProjectPath,
+  codebaseCall,
+} from '../hooks/useSocket';
 import { isTool } from '../../../shared/agent';
 import { native } from 'ugly-app/native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -101,10 +118,7 @@ import { timeAgoShort } from '../utils/timeAgo';
 import { EvalScorecard } from './EvalScorecard';
 import { type FinishFailureInfo } from './FinishFailurePopup';
 import { type SubscriptionProvider } from './ModelSelector';
-import {
-  NewSessionHero,
-  type NewSessionStartParams,
-} from './NewSessionHero';
+import { NewSessionHero, type NewSessionStartParams } from './NewSessionHero';
 import { PatternStrip } from './PatternStrip';
 import {
   ReasoningSelector,
@@ -130,7 +144,10 @@ function _ensureTicker(): void {
 }
 function _releaseTicker(): void {
   if (_tickerSubs > 0) return;
-  if (_tickerTimer) { clearInterval(_tickerTimer); _tickerTimer = null; }
+  if (_tickerTimer) {
+    clearInterval(_tickerTimer);
+    _tickerTimer = null;
+  }
 }
 
 /** Subscribe to a shared 1s heartbeat. Returns the unsubscribe function.
@@ -153,7 +170,9 @@ function useCopyButton(): [string | null, (key: string, text: string) => void] {
     try {
       void navigator.clipboard.writeText(text);
       setCopied(key);
-      setTimeout(() => { setCopied((c) => (c === key ? null : c)); }, 1200);
+      setTimeout(() => {
+        setCopied((c) => (c === key ? null : c));
+      }, 1200);
     } catch {
       /* ignore */
     }
@@ -224,7 +243,9 @@ function readToolCardExpanded(): Record<string, boolean> {
  *  Re-inserting at the end keeps the map ordered oldest→newest so the cap drops stale ids. */
 function writeToolCardExpanded(id: string, expanded: boolean | null): void {
   try {
-    const entries = Object.entries(readToolCardExpanded()).filter(([k]) => k !== id);
+    const entries = Object.entries(readToolCardExpanded()).filter(
+      ([k]) => k !== id,
+    );
     if (expanded !== null) entries.push([id, expanded]);
     localStorage.setItem(
       TOOL_CARD_EXPAND_KEY,
@@ -272,8 +293,12 @@ function ToolCardShell({
   const [showRunning, setShowRunning] = useState(false);
   useEffect(() => {
     if (status === 'running' || status === 'executing') {
-      const t = setTimeout(() => { setShowRunning(true); }, 500);
-      return () => { clearTimeout(t); };
+      const t = setTimeout(() => {
+        setShowRunning(true);
+      }, 500);
+      return () => {
+        clearTimeout(t);
+      };
     }
     setShowRunning(false);
   }, [status]);
@@ -291,7 +316,9 @@ function ToolCardShell({
     >
       <div
         data-id="tool-result-toggle"
-        onClick={() => { setExpanded(!expanded); }}
+        onClick={() => {
+          setExpanded(!expanded);
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -503,10 +530,10 @@ function SectionLabel({
     accent === 'success'
       ? 'var(--success)'
       : accent === 'error'
-      ? 'var(--error)'
-      : accent === 'accent'
-      ? 'var(--accent)'
-      : 'var(--text-muted)';
+        ? 'var(--error)'
+        : accent === 'accent'
+          ? 'var(--accent)'
+          : 'var(--text-muted)';
   return (
     <div
       style={{
@@ -1074,10 +1101,10 @@ function TodoList({
                   color: isDone
                     ? 'var(--text-muted)'
                     : isPaused
-                    ? 'var(--text-secondary)'
-                    : isActive
-                    ? 'var(--text-primary)'
-                    : 'var(--text-secondary)',
+                      ? 'var(--text-secondary)'
+                      : isActive
+                        ? 'var(--text-primary)'
+                        : 'var(--text-secondary)',
                   textDecoration: isDone ? 'line-through' : 'none',
                   fontWeight: isActive && !isPaused ? 600 : 400,
                   wordBreak: 'break-word',
@@ -1170,7 +1197,7 @@ function PinnedTodos({
   if (todos.length === 0 || allDone) return null;
   const currentLabel = currentTask
     ? inProgress
-      ? inProgress.activeForm ?? inProgress.content
+      ? (inProgress.activeForm ?? inProgress.content)
       : currentTask.content
     : null;
   return (
@@ -1183,7 +1210,9 @@ function PinnedTodos({
     >
       <div
         data-id="diff-block-toggle"
-        onClick={() => { setCollapsed((c) => !c); }}
+        onClick={() => {
+          setCollapsed((c) => !c);
+        }}
         style={{
           cursor: 'pointer',
           display: 'flex',
@@ -1389,19 +1418,27 @@ function EditCard({ tool }: { tool: ToolUse }) {
     // as a pure addition — git said +1 −1 while the card said +1 −0.
     const reported = parseEditStat(tool.result);
     if (reported) return reported;
-    if (additions > 0 || removals > 0) return { added: additions, removed: removals };
-    const tally = (o: string | undefined, n: string | undefined): { added: number; removed: number } =>
+    if (additions > 0 || removals > 0)
+      return { added: additions, removed: removals };
+    const tally = (
+      o: string | undefined,
+      n: string | undefined,
+    ): { added: number; removed: number } =>
       diffStats(buildDiffRows(o ?? '', n ?? ''));
     if (multiEdits.length > 0) {
       return multiEdits.reduce(
         (acc: { added: number; removed: number }, e: ToolInputEdit) => {
           const s = tally(e.old_string, e.new_string ?? e.new_content);
-          return { added: acc.added + s.added, removed: acc.removed + s.removed };
+          return {
+            added: acc.added + s.added,
+            removed: acc.removed + s.removed,
+          };
         },
         { added: 0, removed: 0 },
       );
     }
-    if (oldContent !== undefined || newContent !== undefined) return tally(oldContent, newContent);
+    if (oldContent !== undefined || newContent !== undefined)
+      return tally(oldContent, newContent);
     return { added: 0, removed: 0 };
   }, [tool.result, additions, removals, multiEdits, oldContent, newContent]);
 
@@ -1421,7 +1458,9 @@ function EditCard({ tool }: { tool: ToolUse }) {
           {(derived.added > 0 || derived.removed > 0) && (
             <>
               {' '}
-              <span style={{ color: 'var(--success)' }}>+{derived.added}</span>{' '}
+              <span style={{ color: 'var(--success)' }}>
+                +{derived.added}
+              </span>{' '}
               <span style={{ color: 'var(--error)' }}>−{derived.removed}</span>
             </>
           )}
@@ -1624,8 +1663,25 @@ function DiffLineRow({
   color: string;
 }) {
   return (
-    <div style={{ display: 'flex', gap: 6, background: bg, padding: '0 6px', borderRadius: 2 }}>
-      <span style={{ flexShrink: 0, width: 8, color: signColor, userSelect: 'none' }}>{sign}</span>
+    <div
+      style={{
+        display: 'flex',
+        gap: 6,
+        background: bg,
+        padding: '0 6px',
+        borderRadius: 2,
+      }}
+    >
+      <span
+        style={{
+          flexShrink: 0,
+          width: 8,
+          color: signColor,
+          userSelect: 'none',
+        }}
+      >
+        {sign}
+      </span>
       <span
         style={{
           flex: 1,
@@ -1642,8 +1698,16 @@ function DiffLineRow({
 }
 
 const DIFF_TONE = {
-  del: { bg: 'rgba(227,18,11,0.06)', mark: 'rgba(227,18,11,0.22)', sign: 'var(--error)' },
-  add: { bg: 'rgba(30,180,90,0.06)', mark: 'rgba(30,180,90,0.22)', sign: 'var(--success)' },
+  del: {
+    bg: 'rgba(227,18,11,0.06)',
+    mark: 'rgba(227,18,11,0.22)',
+    sign: 'var(--error)',
+  },
+  add: {
+    bg: 'rgba(30,180,90,0.06)',
+    mark: 'rgba(30,180,90,0.22)',
+    sign: 'var(--success)',
+  },
 } as const;
 
 function DiffParts({ parts, mark }: { parts: Part[]; mark: string }) {
@@ -1685,7 +1749,10 @@ function EditBeforeAfter({
   oldStr?: string;
   newStr?: string;
 }) {
-  const rows = useMemo(() => buildDiffRows(oldStr ?? '', newStr ?? ''), [oldStr, newStr]);
+  const rows = useMemo(
+    () => buildDiffRows(oldStr ?? '', newStr ?? ''),
+    [oldStr, newStr],
+  );
   const stats = useMemo(() => diffStats(rows), [rows]);
   if (!oldStr && !newStr) return null;
   if (rows.length === 0) return null;
@@ -1725,7 +1792,12 @@ function EditBeforeAfter({
           }
           if (row.kind === 'context') {
             return (
-              <DiffLineRow key={i} sign=" " signColor="transparent" color="var(--text-muted)">
+              <DiffLineRow
+                key={i}
+                sign=" "
+                signColor="transparent"
+                color="var(--text-muted)"
+              >
                 {row.text || ' '}
               </DiffLineRow>
             );
@@ -1866,7 +1938,7 @@ function BashCard({
   const displayOutput =
     tool.status === 'executing' && tool.liveOutput
       ? tool.liveOutput
-      : tool.result ?? '';
+      : (tool.result ?? '');
   const result = tool.result ?? '';
   const exitMatch = /Exit code (\d+)/.exec(result);
   const exitCode = exitMatch ? parseInt(exitMatch[1], 10) : null;
@@ -2143,7 +2215,7 @@ function DevServerCard({
     typeof input.timeout_ms === 'number' ? input.timeout_ms : undefined;
   const running = tool.status === 'running' || tool.status === 'executing';
   const displayOutput =
-    running && tool.liveOutput ? tool.liveOutput : tool.result ?? '';
+    running && tool.liveOutput ? tool.liveOutput : (tool.result ?? '');
   // Live elapsed timer + remaining-until-timeout. Same pattern as
   // BashCard so a wedged dev server feels symmetrical with a wedged
   // bash command. Uses a shared 1Hz ticker so it only ticks while a
@@ -2282,7 +2354,13 @@ function GlobCard({ tool }: { tool: ToolUse }) {
   const metaCount = typeof meta.count === 'number' ? meta.count : null;
   const truncated = meta.truncated === true;
   const lines = parseGlobFiles(result);
-  const badge = searchBadge(tool.status, result, metaCount, truncated, (t) => parseGlobFiles(t).length);
+  const badge = searchBadge(
+    tool.status,
+    result,
+    metaCount,
+    truncated,
+    (t) => parseGlobFiles(t).length,
+  );
   return (
     <ToolCardShell
       icon={<Search size={13} />}
@@ -2307,7 +2385,8 @@ function GlobCard({ tool }: { tool: ToolUse }) {
         <span
           style={{
             fontSize: 10,
-            color: badge.kind === 'failed' ? 'var(--error)' : 'var(--text-muted)',
+            color:
+              badge.kind === 'failed' ? 'var(--error)' : 'var(--text-muted)',
             fontVariantNumeric: 'tabular-nums',
           }}
         >
@@ -2363,18 +2442,26 @@ function GrepCard({ tool }: { tool: ToolUse }) {
   const include: string = input.include ?? '';
   const parsed = parseGrepOutput(tool.result ?? '');
   const truncated = !!meta.truncated;
-  const metaMatches = typeof meta.number_of_matches === 'number' ? meta.number_of_matches : null;
+  const metaMatches =
+    typeof meta.number_of_matches === 'number' ? meta.number_of_matches : null;
   // An errored grep (rg never ran) must not be summarized as "0 matches" — that's an
   // affirmative claim about a codebase nothing searched.
   // Count what the MODE actually returns: files_with_matches gives bare paths and count
   // gives "file:N" — neither parses as a hit, so the search that found every file the
   // agent edited badged "0 matches" while listing them in its own body.
-  const outputMode: string | undefined = typeof input.output_mode === 'string' ? input.output_mode : undefined;
+  const outputMode: string | undefined =
+    typeof input.output_mode === 'string' ? input.output_mode : undefined;
   // `grep` is the implementation; the card must name the OPERATION. A failed typecheck
   // (grep mode 'lsp-diagnostics') rendered as a nameless "grep failed" chip.
-  const grepMode: string | undefined = typeof input.mode === 'string' ? input.mode : undefined;
-  const badge = searchBadge(tool.status, tool.result, metaMatches, truncated,
-    (t) => grepResultCount(t, outputMode));
+  const grepMode: string | undefined =
+    typeof input.mode === 'string' ? input.mode : undefined;
+  const badge = searchBadge(
+    tool.status,
+    tool.result,
+    metaMatches,
+    truncated,
+    (t) => grepResultCount(t, outputMode),
+  );
 
   // Group hits by file for compact display.
   const byFile = new Map<string, GrepHit[]>();
@@ -2392,15 +2479,15 @@ function GrepCard({ tool }: { tool: ToolUse }) {
           {/* A whole-project operation (typecheck) has no meaningful pattern — an empty
               chip made the failed card look like a broken text search. */}
           {!grepHidesPattern(grepMode) && (
-          <code
-            style={{
-              background: 'var(--bg-primary)',
-              padding: '0 3px',
-              borderRadius: 3,
-            }}
-          >
-            {pattern}
-          </code>
+            <code
+              style={{
+                background: 'var(--bg-primary)',
+                padding: '0 3px',
+                borderRadius: 3,
+              }}
+            >
+              {pattern}
+            </code>
           )}
           {include && (
             <>
@@ -2426,7 +2513,8 @@ function GrepCard({ tool }: { tool: ToolUse }) {
         <span
           style={{
             fontSize: 10,
-            color: badge.kind === 'failed' ? 'var(--error)' : 'var(--text-muted)',
+            color:
+              badge.kind === 'failed' ? 'var(--error)' : 'var(--text-muted)',
             fontVariantNumeric: 'tabular-nums',
           }}
         >
@@ -2790,45 +2878,45 @@ function SessionReadout({
       } (this parent ran no LLM of its own).`
     : '';
   const costTitle = showActual
-    ? `Actual upstream cost so far: ${formatCurrency(
-        totalCost,
-      )}${peerCaveat}`
+    ? `Actual upstream cost so far: ${formatCurrency(totalCost)}${peerCaveat}`
     : showEstimate
-    ? [
-        `Estimated cost at standard rates: ${formatCurrency(estimate.total)}`,
-        '',
-        `Input  ${formatTokens(totalPromptTokens)}: ${formatCurrency(
-          estimate.parts.input,
-        )}`,
-        `Output ${formatTokens(totalCompletionTokens)}: ${formatCurrency(
-          estimate.parts.output,
-        )}`,
-        totalCacheReadTokens > 0
-          ? `Cache read  ${formatTokens(
-              totalCacheReadTokens,
-            )}: ${formatCurrency(estimate.parts.cacheRead)}`
-          : null,
-        totalCacheCreationTokens > 0
-          ? `Cache write ${formatTokens(
-              totalCacheCreationTokens,
-            )}: ${formatCurrency(estimate.parts.cacheWrite)}`
-          : null,
-      ]
-        .filter((line) => line !== null)
-        .join('\n') +
-      subscriptionCaveat +
-      peerCaveat
-    : '';
+      ? [
+          `Estimated cost at standard rates: ${formatCurrency(estimate.total)}`,
+          '',
+          `Input  ${formatTokens(totalPromptTokens)}: ${formatCurrency(
+            estimate.parts.input,
+          )}`,
+          `Output ${formatTokens(totalCompletionTokens)}: ${formatCurrency(
+            estimate.parts.output,
+          )}`,
+          totalCacheReadTokens > 0
+            ? `Cache read  ${formatTokens(
+                totalCacheReadTokens,
+              )}: ${formatCurrency(estimate.parts.cacheRead)}`
+            : null,
+          totalCacheCreationTokens > 0
+            ? `Cache write ${formatTokens(
+                totalCacheCreationTokens,
+              )}: ${formatCurrency(estimate.parts.cacheWrite)}`
+            : null,
+        ]
+          .filter((line) => line !== null)
+          .join('\n') +
+        subscriptionCaveat +
+        peerCaveat
+      : '';
   // Cost line folded into the token tooltip so hovering the token chip also
   // shows what the session cost (actual upstream cost when reported, else a
   // rate-card estimate) — requested via feedback.
   const tokenCostLine = showActual
     ? `\nEst. cost so far: ${formatCurrency(totalCost)}`
     : showEstimate
-    ? `\nEst. cost: ${formatCurrency(estimate.total)} (standard rates${
-        isSubscriptionProvider(resolvedSingleModel) ? '; billed via subscription' : ''
-      })`
-    : '';
+      ? `\nEst. cost: ${formatCurrency(estimate.total)} (standard rates${
+          isSubscriptionProvider(resolvedSingleModel)
+            ? '; billed via subscription'
+            : ''
+        })`
+      : '';
   const tokenTitle = `Input: ${totalPromptTokens.toLocaleString()} tokens · Output: ${totalCompletionTokens.toLocaleString()} tokens${
     totalCacheReadTokens > 0
       ? ` · Cache read: ${totalCacheReadTokens.toLocaleString()}`
@@ -2857,12 +2945,12 @@ function SessionReadout({
       const rowEstimate =
         row.cost > 0
           ? row.cost
-          : estimateCost(row.model, {
+          : (estimateCost(row.model, {
               inputTokens: row.inputTokens,
               outputTokens: row.outputTokens,
               cacheReadTokens: row.cacheReadTokens,
               cacheCreationTokens: row.cacheCreationTokens,
-            })?.total ?? 0;
+            })?.total ?? 0);
       multiModelTotal += rowEstimate;
       const tokenSum =
         row.inputTokens +
@@ -2951,8 +3039,8 @@ function ContextMeter({ info, model, disabled, onClick }: ContextMeterProps) {
     pct >= 85
       ? 'var(--error, #e24)'
       : pct >= 60
-      ? 'var(--warning, #d80)'
-      : 'var(--text-muted)';
+        ? 'var(--warning, #d80)'
+        : 'var(--text-muted)';
   const windowLabel = info.contextWindow
     ? ` of ${formatTokens(info.contextWindow)}-token window`
     : '';
@@ -3206,7 +3294,9 @@ function ChatMarkdown({
       for (const e of entries) setWidth(Math.max(200, e.contentRect.width));
     });
     ro.observe(el);
-    return () => { ro.disconnect(); };
+    return () => {
+      ro.disconnect();
+    };
   }, []);
   const { mode } = useTheme();
   const isDark = mode === 'dark';
@@ -3242,7 +3332,11 @@ function renderAssistantContent(
     seg.kind === 'think' ? (
       <ReasoningBlock key={`r${i}`} body={seg.body} />
     ) : (
-      <ChatMarkdown key={`t${i}`} text={seg.body} streaming={streaming ?? false} />
+      <ChatMarkdown
+        key={`t${i}`}
+        text={seg.body}
+        streaming={streaming ?? false}
+      />
     ),
   );
 }
@@ -3295,7 +3389,9 @@ function parseTerminated(content: string): {
       const parsed: unknown = JSON.parse(optMatch[1]);
       if (
         Array.isArray(parsed) &&
-        parsed.every((x): x is string => typeof x === 'string' && x.trim().length > 0)
+        parsed.every(
+          (x): x is string => typeof x === 'string' && x.trim().length > 0,
+        )
       ) {
         options = parsed.map((s) => s.trim()).slice(0, 4);
       }
@@ -3419,10 +3515,10 @@ function JudgeCard({ msg }: { msg: ChatMessage }) {
     v === 'continue'
       ? 'var(--text-muted)'
       : ivKind === 'terminate'
-      ? 'var(--error)'
-      : ivKind === 'replan' || ivKind === 'ask_user'
-      ? 'var(--warning, #d68a00)'
-      : 'var(--accent, #4a90e2)';
+        ? 'var(--error)'
+        : ivKind === 'replan' || ivKind === 'ask_user'
+          ? 'var(--warning, #d68a00)'
+          : 'var(--accent, #4a90e2)';
   const summary = `${j.kind} · ${j.model} · ${v}${
     ivKind ? `/${ivKind}` : ''
   } · ${j.latencyMs}ms · ${j.promptTokens + j.completionTokens} tok`;
@@ -3440,7 +3536,9 @@ function JudgeCard({ msg }: { msg: ChatMessage }) {
       >
         <div
           data-id="skill-card-toggle"
-          onClick={() => { setExpanded((e) => !e); }}
+          onClick={() => {
+            setExpanded((e) => !e);
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -3725,7 +3823,9 @@ function DoneCard({
         <div>
           <div
             data-id="finish-files-toggle"
-            onClick={() => { setFilesExpanded((v) => !v); }}
+            onClick={() => {
+              setFilesExpanded((v) => !v);
+            }}
             style={{
               cursor: 'pointer',
               fontSize: 11,
@@ -3768,8 +3868,8 @@ function DoneCard({
                         f.status === 'A'
                           ? 'var(--accent)'
                           : f.status === 'D'
-                          ? 'var(--error)'
-                          : 'var(--text-muted)',
+                            ? 'var(--error)'
+                            : 'var(--text-muted)',
                     }}
                   >
                     {f.status}
@@ -3808,7 +3908,9 @@ function DoneCard({
           <button
             type="button"
             data-id="done-entry-finish"
-            onClick={() => { controls.onRunFinish(); }}
+            onClick={() => {
+              controls.onRunFinish();
+            }}
             style={{
               background: 'var(--accent)',
               color: '#fff',
@@ -3855,8 +3957,8 @@ function DoneCard({
               {fp.running
                 ? 'Finishing…'
                 : fp.ok
-                ? 'Session finished'
-                : 'Finish failed'}
+                  ? 'Session finished'
+                  : 'Finish failed'}
             </span>
             {fp.squashSha && (
               <span
@@ -3906,9 +4008,11 @@ function DoneCard({
                     s.name === 'tests') && (
                     <button
                       data-id="stop-stage"
-                      onClick={() =>
-                        { controls.onStopStage(s.name as 'tsc' | 'lint' | 'tests'); }
-                      }
+                      onClick={() => {
+                        controls.onStopStage(
+                          s.name as 'tsc' | 'lint' | 'tests',
+                        );
+                      }}
                       style={{
                         background: 'transparent',
                         border: '1px solid var(--border)',
@@ -4022,7 +4126,9 @@ function DoneCard({
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               data-id="done-entry-dirty-main-commit"
-              onClick={() => { controls.onResolveDirtyMain(true); }}
+              onClick={() => {
+                controls.onResolveDirtyMain(true);
+              }}
               style={{
                 background: 'var(--accent)',
                 color: '#fff',
@@ -4037,7 +4143,9 @@ function DoneCard({
             </button>
             <button
               data-id="done-entry-dirty-main-cancel"
-              onClick={() => { controls.onResolveDirtyMain(false); }}
+              onClick={() => {
+                controls.onResolveDirtyMain(false);
+              }}
               style={{
                 background: 'transparent',
                 color: 'var(--text-secondary)',
@@ -4075,7 +4183,9 @@ function DoneCard({
           <textarea
             data-id="done-entry-review-message"
             value={reviewMessage}
-            onChange={(e) => { setReviewMessage(e.target.value); }}
+            onChange={(e) => {
+              setReviewMessage(e.target.value);
+            }}
             rows={4}
             style={{
               width: '100%',
@@ -4091,7 +4201,9 @@ function DoneCard({
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               data-id="done-entry-review-accept"
-              onClick={() => { controls.onAcceptReview(reviewMessage); }}
+              onClick={() => {
+                controls.onAcceptReview(reviewMessage);
+              }}
               style={{
                 background: 'var(--accent)',
                 color: '#fff',
@@ -4106,7 +4218,9 @@ function DoneCard({
             </button>
             <button
               data-id="done-entry-review-reject"
-              onClick={() => { controls.onRejectReview(); }}
+              onClick={() => {
+                controls.onRejectReview();
+              }}
               style={{
                 background: 'transparent',
                 color: 'var(--text-secondary)',
@@ -4186,11 +4300,11 @@ function DoneCard({
               controls.failurePopup.stage === 'tests') && (
               <button
                 data-id="done-entry-failure-skip"
-                onClick={() =>
-                  { controls.onSkipGate(
+                onClick={() => {
+                  controls.onSkipGate(
                     controls.failurePopup!.stage as 'tsc' | 'lint' | 'tests',
-                  ); }
-                }
+                  );
+                }}
                 style={{
                   background: 'transparent',
                   color: 'var(--text-secondary)',
@@ -4206,7 +4320,9 @@ function DoneCard({
             )}
             <button
               data-id="done-entry-failure-close"
-              onClick={() => { controls.onCloseFailure(); }}
+              onClick={() => {
+                controls.onCloseFailure();
+              }}
               style={{
                 background: 'transparent',
                 color: 'var(--text-muted)',
@@ -4262,7 +4378,9 @@ function DoneCard({
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               data-id="done-entry-archive-confirm"
-              onClick={() => { controls.onArchive(); }}
+              onClick={() => {
+                controls.onArchive();
+              }}
               style={{
                 background: 'var(--accent)',
                 color: '#fff',
@@ -4277,7 +4395,9 @@ function DoneCard({
             </button>
             <button
               data-id="done-entry-archive-dismiss"
-              onClick={() => { controls.onDismissArchive(); }}
+              onClick={() => {
+                controls.onDismissArchive();
+              }}
               style={{
                 background: 'transparent',
                 color: 'var(--text-secondary)',
@@ -4410,7 +4530,9 @@ function JudgeTerminatedCard({
                 data-id="critique-option-pick"
                 key={idx}
                 type="button"
-                onClick={() => { onPickOption(opt); }}
+                onClick={() => {
+                  onPickOption(opt);
+                }}
                 style={{
                   textAlign: 'left',
                   padding: '7px 10px',
@@ -4656,7 +4778,9 @@ function AssistantMessage({
       setRestoreState('working');
       const ok = await onRestoreCheckpoint(msg.id);
       setRestoreState(ok ? 'done' : 'failed');
-      setTimeout(() => { setRestoreState('idle'); }, 3000);
+      setTimeout(() => {
+        setRestoreState('idle');
+      }, 3000);
     }
   };
 
@@ -4716,7 +4840,9 @@ function AssistantMessage({
                   data-id="restore-checkpoint-action"
                   state={restoreState}
                   onClick={() => void handleRestoreClick()}
-                  onCancel={() => { setRestoreState('idle'); }}
+                  onCancel={() => {
+                    setRestoreState('idle');
+                  }}
                 />
               ) : (
                 <span />
@@ -4732,7 +4858,11 @@ function AssistantMessage({
         if (lower === 'think') {
           return <ThinkCard key={tool.id} tool={tool} />;
         }
-        if (isTool(lower, 'edit') || isTool(lower, 'write') || isTool(lower, 'multiedit')) {
+        if (
+          isTool(lower, 'edit') ||
+          isTool(lower, 'write') ||
+          isTool(lower, 'multiedit')
+        ) {
           return <EditCard key={tool.id} tool={tool} />;
         }
         if (isTool(lower, 'bash')) {
@@ -4744,7 +4874,10 @@ function AssistantMessage({
             />
           );
         }
-        if (isTool(lower, 'dev_server_start') || isTool(lower, 'dev_server_stop')) {
+        if (
+          isTool(lower, 'dev_server_start') ||
+          isTool(lower, 'dev_server_stop')
+        ) {
           return (
             <DevServerCard
               key={tool.id}
@@ -4784,20 +4917,20 @@ function RestoreCheckpointAction({
     state === 'confirming'
       ? 'Click again to restore'
       : state === 'working'
-      ? 'Restoring…'
-      : state === 'done'
-      ? 'Restored ✓'
-      : state === 'failed'
-      ? 'Restore failed'
-      : 'Restore to this checkpoint';
+        ? 'Restoring…'
+        : state === 'done'
+          ? 'Restored ✓'
+          : state === 'failed'
+            ? 'Restore failed'
+            : 'Restore to this checkpoint';
   const color =
     state === 'confirming'
       ? 'var(--warning, #d97706)'
       : state === 'done'
-      ? 'var(--success, #1eb45a)'
-      : state === 'failed'
-      ? 'var(--error, #e3120b)'
-      : 'var(--text-muted)';
+        ? 'var(--success, #1eb45a)'
+        : state === 'failed'
+          ? 'var(--error, #e3120b)'
+          : 'var(--text-muted)';
   return (
     <div
       className="us-restore-action"
@@ -4992,7 +5125,9 @@ function AskUserCard({
           type="text"
           placeholder="Other…"
           value={otherText}
-          onChange={(e) => { setOtherText(e.target.value); }}
+          onChange={(e) => {
+            setOtherText(e.target.value);
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && otherText.trim() && !submitting) {
               void submit(`Other: ${otherText.trim()}`);
@@ -5131,7 +5266,9 @@ function StepReviewCard({
       <textarea
         data-id="step-review-feedback"
         value={feedback}
-        onChange={(e) => { setFeedback(e.target.value); }}
+        onChange={(e) => {
+          setFeedback(e.target.value);
+        }}
         onKeyDown={(e) => {
           if (
             e.key === 'Enter' &&
@@ -5270,7 +5407,9 @@ function SubagentChildCard({ child }: { child: SubagentChild }) {
     >
       <div
         data-id="subagent-toggle"
-        onClick={() => { setExpanded((v) => !v); }}
+        onClick={() => {
+          setExpanded((v) => !v);
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -5340,10 +5479,7 @@ function SubagentChildCard({ child }: { child: SubagentChild }) {
 interface AutoRouteHintProps {
   routing: {
     source:
-      | 'manual'
-      | 'auto-classified'
-      | 'auto-default'
-      | 'expensive-parallel';
+      'manual' | 'auto-classified' | 'auto-default' | 'expensive-parallel';
     modelId: string;
     reason?: string;
     profileSummary?: string;
@@ -5370,7 +5506,7 @@ function AutoRouteHint({ routing }: AutoRouteHintProps) {
   const isParallel = routing.source === 'expensive-parallel';
   const label = isParallel
     ? `parallel: ${routing.parallelBranches?.length ?? 0} branches`
-    : routing.reason ?? `auto: → ${routing.modelId}`;
+    : (routing.reason ?? `auto: → ${routing.modelId}`);
   const tooltipParts: string[] = [];
   if (routing.profileSummary) {
     tooltipParts.push(`profile: ${routing.profileSummary}`);
@@ -5511,10 +5647,10 @@ function MaxModePeerPills({
         const status = isWinner
           ? 'winner'
           : stuck
-          ? `stuck ~${stuckMin}m`
-          : p.running
-          ? 'running'
-          : 'idle';
+            ? `stuck ~${stuckMin}m`
+            : p.running
+              ? 'running'
+              : 'idle';
         const amber = 'var(--warning, #d97706)';
         return (
           <button
@@ -5655,8 +5791,8 @@ function PeerLiveStrip({
                 stuckMs > 0
                   ? `${peer.model} · stuck ~${stuckMin}m\n\nNo events received from this peer for ${stuckMin} min — likely a provider hang, rate-limit cascade, or parser failure. The runner has not auto-aborted; use Stop on the parent to cancel.`
                   : live
-                  ? `${peer.model} · live ${live.stream}`
-                  : peer.model
+                    ? `${peer.model} · live ${live.stream}`
+                    : peer.model
               }
             >
               <span
@@ -5734,8 +5870,7 @@ function CodebaseReadinessPill({
   onOpenStats,
 }: {
   readiness:
-    | import('../shared/api').SessionSnapshot['codebaseReadiness']
-    | null;
+    import('../shared/api').SessionSnapshot['codebaseReadiness'] | null;
   /** Open the detailed stats modal. */
   onOpenStats: () => void;
 }) {
@@ -5786,30 +5921,28 @@ function CodebaseReadinessPill({
     if (indexer.status === 'error') return 'Semantic index: error';
     return 'Semantic index: not indexed';
   })();
-  const shortLabel =
-    nativeMissing
-      ? 'Codebase: desktop app'
-      : tone === 'loading'
+  const shortLabel = nativeMissing
+    ? 'Codebase: desktop app'
+    : tone === 'loading'
       ? 'Codebase: loading…'
       : tone === 'active'
-      ? 'Codebase: analyzing…'
-      : tone === 'ready'
-      ? 'Codebase: ready'
-      : tone === 'error'
-      ? 'Codebase: error'
-      : 'Codebase: idle';
-  const fullHeadline =
-    nativeMissing
-      ? 'Codebase analysis runs on your machine — open this project in the Ugly Studio desktop app'
-      : tone === 'loading'
+        ? 'Codebase: analyzing…'
+        : tone === 'ready'
+          ? 'Codebase: ready'
+          : tone === 'error'
+            ? 'Codebase: error'
+            : 'Codebase: idle';
+  const fullHeadline = nativeMissing
+    ? 'Codebase analysis runs on your machine — open this project in the Ugly Studio desktop app'
+    : tone === 'loading'
       ? 'Codebase analysis: loading — you can start now; it runs in the background'
       : tone === 'active'
-      ? 'Codebase analysis running — AI coding quality reduced until ready'
-      : tone === 'ready'
-      ? 'Codebase analysis ready'
-      : tone === 'error'
-      ? 'Codebase analysis: error'
-      : 'Codebase analysis: not started';
+        ? 'Codebase analysis running — AI coding quality reduced until ready'
+        : tone === 'ready'
+          ? 'Codebase analysis ready'
+          : tone === 'error'
+            ? 'Codebase analysis: error'
+            : 'Codebase analysis: not started';
 
   // Full-detail tooltip. The loading state has no numbers to show yet (the host
   // hasn't reported), so explain WHAT is loading + what to expect rather than a
@@ -6265,10 +6398,16 @@ CodingAgentChatProps = {}) {
   };
   useEffect(
     () =>
-      registerFeedbackContextProvider('sessionBundle', (): Record<string, string> =>
-        sessionId
-          ? { sessionBundle: JSON.stringify(capSessionBundle(feedbackBundleRef.current)) }
-          : {},
+      registerFeedbackContextProvider(
+        'sessionBundle',
+        (): Record<string, string> =>
+          sessionId
+            ? {
+                sessionBundle: JSON.stringify(
+                  capSessionBundle(feedbackBundleRef.current),
+                ),
+              }
+            : {},
       ),
     [sessionId],
   );
@@ -6290,7 +6429,9 @@ CodingAgentChatProps = {}) {
         'codebaseDiagnostics',
         async (): Promise<Record<string, string>> => {
           const cwd = getActiveProjectPath() ?? '';
-          const activeRepo = new URLSearchParams(window.location.search).get('repo');
+          const activeRepo = new URLSearchParams(window.location.search).get(
+            'repo',
+          );
           const diag: Record<string, unknown> = {
             nativeAvailable: isNativeAvailable(),
             cwd,
@@ -6300,7 +6441,9 @@ CodingAgentChatProps = {}) {
           };
           if (isNativeAvailable() && cwd) {
             try {
-              diag.freshStatus = await codebaseCall('codebaseStatus', { projectPath: cwd });
+              diag.freshStatus = await codebaseCall('codebaseStatus', {
+                projectPath: cwd,
+              });
             } catch (e) {
               diag.statusError = e instanceof Error ? e.message : String(e);
             }
@@ -6355,7 +6498,6 @@ CodingAgentChatProps = {}) {
     [],
   );
   const handleHeroSubmit = useCallback(
-
     async (params: NewSessionStartParams) => {
       // Apply the axis picks to THIS session, model first (it may convert
       // the backend in place for a Claude-CLI <-> ugly.bot switch).
@@ -6421,7 +6563,9 @@ CodingAgentChatProps = {}) {
   // most needs to be told where their change went (fresh reload, snapshot not yet in).
   // The path and branch are deterministic, so ask the filesystem — the same thing Git
   // and File now do.
-  const [worktreeOnDisk, setWorktreeOnDisk] = useState<{ branch: string } | null>(null);
+  const [worktreeOnDisk, setWorktreeOnDisk] = useState<{
+    branch: string;
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
     // Re-check inside the tick, never bail before arming it: `getActiveProjectPath()`
@@ -6430,17 +6574,28 @@ CodingAgentChatProps = {}) {
     // the exact moment it's needed least. Both inputs are cheap to re-read.
     const check = async (): Promise<void> => {
       const projectPath = getActiveProjectPath();
-      if (!sessionId || !projectPath) { if (!cancelled) setWorktreeOnDisk(null); return; }
+      if (!sessionId || !projectPath) {
+        if (!cancelled) setWorktreeOnDisk(null);
+        return;
+      }
       try {
         const dir = sessionWorktreeDir(projectPath, sessionId);
         const exists = await native.fs.exists(dir);
-        if (!cancelled) setWorktreeOnDisk(exists ? { branch: sessionBranchName(sessionId) } : null);
-      } catch { if (!cancelled) setWorktreeOnDisk(null); }
+        if (!cancelled)
+          setWorktreeOnDisk(
+            exists ? { branch: sessionBranchName(sessionId) } : null,
+          );
+      } catch {
+        if (!cancelled) setWorktreeOnDisk(null);
+      }
     };
     void check();
     // The worktree is created by the first turn, after this mounts — so poll.
     const t = setInterval(() => void check(), 3000);
-    return () => { cancelled = true; clearInterval(t); };
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
   }, [sessionId]);
 
   const worktreeRef = useRef(worktree);
@@ -6620,7 +6775,7 @@ CodingAgentChatProps = {}) {
           const parentBranch =
             finishPipelineRef.current.conflictStage === 'merge_squash'
               ? 'parent'
-              : worktreeRef.current?.parentBranch ?? 'parent';
+              : (worktreeRef.current?.parentBranch ?? 'parent');
           const fileList = conflicts.map((f) => `- \`${f}\``).join('\n');
           const conflictMsg =
             `Merge from \`${parentBranch}\` produced conflicts during Finish.\n\n` +
@@ -6696,8 +6851,8 @@ CodingAgentChatProps = {}) {
       openFailurePopup(
         res.stage === 'conflict'
           ? 'conflict'
-          : (res.stage as FinishFailureInfo['stage'] | undefined) ??
-            'merge_squash',
+          : ((res.stage as FinishFailureInfo['stage'] | undefined) ??
+              'merge_squash'),
         res,
       );
     },
@@ -6822,8 +6977,7 @@ CodingAgentChatProps = {}) {
                 id: m.id,
                 role: m.role,
                 parts: m.parts as
-                  | { type: string; data?: unknown }[]
-                  | undefined,
+                  { type: string; data?: unknown }[] | undefined,
                 ...(m.created_at !== undefined && { created_at: m.created_at }),
               },
             }));
@@ -6998,9 +7152,9 @@ CodingAgentChatProps = {}) {
     checkWorktreeBehind,
   ]);
 
-  const [scratchpadEntries, setScratchpadEntries] = useState<
-    ScratchpadEntry[]
-  >([]);
+  const [scratchpadEntries, setScratchpadEntries] = useState<ScratchpadEntry[]>(
+    [],
+  );
   // Fetch scratchpad entries on session mount, after each AI turn ends,
   // and whenever the panel is opened. Drives the count badge so the
   // bottom-bar scratchpad button only appears when entries exist.
@@ -7175,7 +7329,15 @@ CodingAgentChatProps = {}) {
       );
       setEvalLocalGrade(result);
     } catch (err) {
-      console.error('[CodingAgentChat:evalGradeSession]', JSON.stringify({ sessionId, taskName: evalTaskName === '' ? undefined : evalTaskName, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        '[CodingAgentChat:evalGradeSession]',
+        JSON.stringify({
+          sessionId,
+          taskName: evalTaskName === '' ? undefined : evalTaskName,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a non-Error throw makes .message undefined at runtime despite the cast
       setEvalGradeError((err as Error).message ?? 'grading failed');
     } finally {
@@ -7471,7 +7633,9 @@ CodingAgentChatProps = {}) {
     // model picks it up on its very next LLM round instead of waiting
     // for the whole turn to finish.
     if (hasMoreNewer) {
-      void jumpToTail().then(() => { pinToBottom(); });
+      void jumpToTail().then(() => {
+        pinToBottom();
+      });
     }
     void sendMessage(trimmed, hasAttachments ? attachments : undefined);
     setInput('');
@@ -7515,7 +7679,9 @@ CodingAgentChatProps = {}) {
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('keydown', onKey); };
+    return () => {
+      window.removeEventListener('keydown', onKey);
+    };
   }, [pendingPermissions, approvePermission, skipAllPermissions]);
 
   const handleKeyDown = useCallback(
@@ -7632,7 +7798,9 @@ CodingAgentChatProps = {}) {
       >
         <CodebaseStatsModal
           open={codebaseStatsOpen}
-          onClose={() => { setCodebaseStatsOpen(false); }}
+          onClose={() => {
+            setCodebaseStatsOpen(false);
+          }}
           seed={codebaseReadiness ?? null}
         />
         <div className="panel-toolbar">
@@ -7648,7 +7816,12 @@ CodingAgentChatProps = {}) {
               onClick={() => void compactNow()}
             />
           )}
-          <CodebaseReadinessPill readiness={codebaseReadiness} onOpenStats={() => { setCodebaseStatsOpen(true); }} />
+          <CodebaseReadinessPill
+            readiness={codebaseReadiness}
+            onOpenStats={() => {
+              setCodebaseStatsOpen(true);
+            }}
+          />
           {/* Session-id copy button removed per feedback (header was cluttered). */}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
@@ -7688,7 +7861,9 @@ CodingAgentChatProps = {}) {
         {showScratchpad && (
           <ScratchpadPanel
             entries={scratchpadEntries}
-            onClose={() => { setShowScratchpad(false); }}
+            onClose={() => {
+              setShowScratchpad(false);
+            }}
           />
         )}
         {error && (
@@ -7725,12 +7900,16 @@ CodingAgentChatProps = {}) {
       {evalScorecardModalOpen && evalScorecardResult && (
         <EvalScorecardModal
           result={evalScorecardResult}
-          onClose={() => { setEvalScorecardModalOpen(false); }}
+          onClose={() => {
+            setEvalScorecardModalOpen(false);
+          }}
         />
       )}
       <CodebaseStatsModal
         open={codebaseStatsOpen}
-        onClose={() => { setCodebaseStatsOpen(false); }}
+        onClose={() => {
+          setCodebaseStatsOpen(false);
+        }}
         seed={codebaseReadiness ?? null}
       />
 
@@ -7750,7 +7929,9 @@ CodingAgentChatProps = {}) {
         {showScratchpad && (
           <ScratchpadPanel
             entries={scratchpadEntries}
-            onClose={() => { setShowScratchpad(false); }}
+            onClose={() => {
+              setShowScratchpad(false);
+            }}
           />
         )}
         {/* Header strip — tokens + cost on the left, compaction +
@@ -7771,10 +7952,10 @@ CodingAgentChatProps = {}) {
               const tooltip = pullInFlight
                 ? 'Pulling…'
                 : worktreeBlocked
-                ? 'Resolve the current merge conflict first'
-                : upToDate
-                ? `Already up to date with ${parentBranch}`
-                : `Pull from ${parentBranch}`;
+                  ? 'Resolve the current merge conflict first'
+                  : upToDate
+                    ? `Already up to date with ${parentBranch}`
+                    : `Pull from ${parentBranch}`;
               return (
                 <button
                   data-id="pull-parent"
@@ -7818,7 +7999,12 @@ CodingAgentChatProps = {}) {
               onClick={() => void compactNow()}
             />
           )}
-          <CodebaseReadinessPill readiness={codebaseReadiness} onOpenStats={() => { setCodebaseStatsOpen(true); }} />
+          <CodebaseReadinessPill
+            readiness={codebaseReadiness}
+            onOpenStats={() => {
+              setCodebaseStatsOpen(true);
+            }}
+          />
           {/* Session-id copy button removed per feedback (header was cluttered). */}
           {worktree && !sessionInfo?.title?.includes('finished') && (
             <button
@@ -7937,9 +8123,9 @@ CodingAgentChatProps = {}) {
             {onOpenSession && (
               <button
                 data-id="open-parent-session"
-                onClick={() =>
-                  { onOpenSession(sessionInfo.parentSessionId!); }
-                }
+                onClick={() => {
+                  onOpenSession(sessionInfo.parentSessionId!);
+                }}
                 style={{
                   background: 'transparent',
                   border: '1px solid var(--accent)',
@@ -8116,10 +8302,14 @@ CodingAgentChatProps = {}) {
                       onResolveDirtyMain: resolveDirtyMainPrompt,
                       onAcceptReview: (cm) => void handleReviewAccept(cm),
                       onRejectReview: handleReviewReject,
-                      onCloseFailure: () => { setFailurePopup(null); },
+                      onCloseFailure: () => {
+                        setFailurePopup(null);
+                      },
                       onSkipGate: skipFailedStage,
                       onArchive: () => void handleArchiveSession(),
-                      onDismissArchive: () => { setShowArchivePrompt(false); },
+                      onDismissArchive: () => {
+                        setShowArchivePrompt(false);
+                      },
                     }}
                   />
                 );
@@ -8309,8 +8499,8 @@ CodingAgentChatProps = {}) {
             if (!head) return null;
             const isPeer = head.sessionId !== sessionId;
             const peerModel = isPeer
-              ? peerSessions?.find((p) => p.compositeId === head.sessionId)
-                  ?.model ?? 'Peer'
+              ? (peerSessions?.find((p) => p.compositeId === head.sessionId)
+                  ?.model ?? 'Peer')
               : undefined;
             return (
               <div style={{ flexShrink: 0 }}>
@@ -8410,7 +8600,9 @@ CodingAgentChatProps = {}) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setEvalScorecardModalOpen(true); }}
+                  onClick={() => {
+                    setEvalScorecardModalOpen(true);
+                  }}
                   data-id="eval-show-scoreboard-button"
                   style={{
                     fontFamily: 'var(--font-label)',
@@ -8532,18 +8724,43 @@ CodingAgentChatProps = {}) {
               color: 'var(--text-secondary)',
             }}
           >
-            <GitBranch size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
-            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Edits are on <code style={{ fontFamily: 'SF Mono, Fira Code, Consolas, monospace' }}>{worktree?.branch ?? worktreeOnDisk?.branch}</code>
+            <GitBranch
+              size={12}
+              style={{ flexShrink: 0, color: 'var(--text-muted)' }}
+            />
+            <span
+              style={{
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Edits are on{' '}
+              <code
+                style={{
+                  fontFamily: 'SF Mono, Fira Code, Consolas, monospace',
+                }}
+              >
+                {worktree?.branch ?? worktreeOnDisk?.branch}
+              </code>
               {' — not in '}
-              <code style={{ fontFamily: 'SF Mono, Fira Code, Consolas, monospace' }}>{worktree?.parentBranch ?? 'your project'}</code>
+              <code
+                style={{
+                  fontFamily: 'SF Mono, Fira Code, Consolas, monospace',
+                }}
+              >
+                {worktree?.parentBranch ?? 'your project'}
+              </code>
               {' yet.'}
             </span>
             <button
               type="button"
               data-id="worktree-banner-finish"
               title={`Merge this session's changes into ${worktree?.parentBranch ?? 'your project'}`}
-              onClick={() => { void runFinish(); }}
+              onClick={() => {
+                void runFinish();
+              }}
               style={{
                 marginLeft: 'auto',
                 flexShrink: 0,
@@ -8587,7 +8804,11 @@ CodingAgentChatProps = {}) {
             scratchpadCount={scratchpadEntries.length}
             showScratchpad={showScratchpad}
             onToggleScratchpad={
-              sessionId ? () => { setShowScratchpad((v) => !v); } : undefined
+              sessionId
+                ? () => {
+                    setShowScratchpad((v) => !v);
+                  }
+                : undefined
             }
             readiness={codebaseReadiness}
           />
@@ -8669,8 +8890,7 @@ function CodingAgentInputArea({
    * driven by server-side push instead of client-side polling.
    */
   readiness:
-    | import('../shared/api').SessionSnapshot['codebaseReadiness']
-    | null;
+    import('../shared/api').SessionSnapshot['codebaseReadiness'] | null;
 }) {
   const handleSlashSelect = useCallback(
     (skill: Skill) => {
@@ -8835,14 +9055,14 @@ function CodingAgentInputArea({
   const placeholder = awaitingAskUser
     ? 'Agent is waiting on your answer above\u2026'
     : pendingSkill
-    ? ''
-    : codebaseAnalysisActive
-    ? 'Codebase analysis running \u2014 AI coding quality will be reduced until it finishes'
-    : isStreaming
-    ? `Thinking\u2026 type to inject mid-turn (Esc to stop, ${shortcut(
-        'Enter',
-      )} to send)`
-    : `Message agent\u2026 (${shortcut('Enter')} to send)`;
+      ? ''
+      : codebaseAnalysisActive
+        ? 'Codebase analysis running \u2014 AI coding quality will be reduced until it finishes'
+        : isStreaming
+          ? `Thinking\u2026 type to inject mid-turn (Esc to stop, ${shortcut(
+              'Enter',
+            )} to send)`
+          : `Message agent\u2026 (${shortcut('Enter')} to send)`;
 
   return (
     <div
@@ -8982,7 +9202,9 @@ function CodingAgentInputArea({
                   />
                   <button
                     data-id="remove-attachment"
-                    onClick={() => { removeAttachment(i); }}
+                    onClick={() => {
+                      removeAttachment(i);
+                    }}
                     title="Remove"
                     style={{
                       position: 'absolute',
@@ -9018,7 +9240,9 @@ function CodingAgentInputArea({
             {pendingSkill && (
               <SkillPill
                 name={pendingSkill}
-                onRemove={() => { onPendingSkillChange(null); }}
+                onRemove={() => {
+                  onPendingSkillChange(null);
+                }}
               />
             )}
             {isStreaming && (
@@ -9190,7 +9414,9 @@ function EvalScorecardModal({
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('keydown', onKey); };
+    return () => {
+      window.removeEventListener('keydown', onKey);
+    };
   }, [onClose]);
   return (
     <div
@@ -9211,7 +9437,9 @@ function EvalScorecardModal({
     >
       <div
         data-id="popup-content"
-        onClick={(e) => { e.stopPropagation(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
         style={{
           width: 'min(720px, 100%)',
           maxHeight: '90vh',
@@ -9244,11 +9472,16 @@ export function CodingAgentChat(props: CodingAgentChatProps = {}) {
 type SandboxStatus = Awaited<ReturnType<typeof native.sandbox.status>>;
 
 /** Resolve the open project's id (from `.uglyapp`) + dir for sandbox calls. */
-async function resolveProjectInfo(): Promise<{ projectId: string | null; projectDir: string | null }> {
+async function resolveProjectInfo(): Promise<{
+  projectId: string | null;
+  projectDir: string | null;
+}> {
   const projectDir = getActiveProjectPath();
   if (!projectDir) return { projectId: null, projectDir: null };
   try {
-    const ua = JSON.parse(await native.fs.readFile(projectDir + '/.uglyapp')) as { projectId?: string };
+    const ua = JSON.parse(
+      await native.fs.readFile(projectDir + '/.uglyapp'),
+    ) as { projectId?: string };
     return { projectId: ua.projectId ?? null, projectDir };
   } catch {
     return { projectId: null, projectDir };

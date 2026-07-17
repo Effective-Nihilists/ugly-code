@@ -177,9 +177,13 @@ function useIsDesktop(): boolean {
     typeof window === 'undefined' ? true : window.innerWidth >= 900,
   );
   useEffect(() => {
-    const onResize = () => { setIsDesktop(window.innerWidth >= 900); };
+    const onResize = () => {
+      setIsDesktop(window.innerWidth >= 900);
+    };
     window.addEventListener('resize', onResize);
-    return () => { window.removeEventListener('resize', onResize); };
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
   return isDesktop;
 }
@@ -267,13 +271,16 @@ function MacArchToggle({
             key={a}
             type="button"
             data-id={`landing-mac-arch-${a}`}
-            onClick={() => { setMacArch(a); }}
+            onClick={() => {
+              setMacArch(a);
+            }}
             style={{
               padding: '6px 12px',
               background: active ? BRAND_GLOW : 'transparent',
               color: active ? BRAND : TEXT_MUTED,
               border: 'none',
-              borderRight: a === 'arm64' ? `1px solid ${BORDER_STRONG}` : 'none',
+              borderRight:
+                a === 'arm64' ? `1px solid ${BORDER_STRONG}` : 'none',
               cursor: 'pointer',
               font: 'inherit',
               letterSpacing: 'inherit',
@@ -369,13 +376,23 @@ function NavBar() {
   );
 }
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
   return (
     <a
       className="ugly-link"
       href={href}
       data-id={`landing-navlink-${href}`}
-      style={{ color: TEXT_MUTED, textDecoration: 'none', transition: 'color 160ms ease' }}
+      style={{
+        color: TEXT_MUTED,
+        textDecoration: 'none',
+        transition: 'color 160ms ease',
+      }}
     >
       {children}
     </a>
@@ -415,7 +432,11 @@ function HeroInstall({
       ? 'mac-x64'
       : 'mac-arm64';
   const installOs: InstallOs =
-    userOS === 'win' ? 'win' : userOS === 'linux' ? 'linux-appimage' : macTarget;
+    userOS === 'win'
+      ? 'win'
+      : userOS === 'linux'
+        ? 'linux-appimage'
+        : macTarget;
 
   // On click: create an install intent so Studio opens code.ugly.bot after
   // install, then download via the code-bearing /dl URL when the target can
@@ -522,17 +543,17 @@ function HeroInstall({
               marginBottom: 12,
             }}
           >
-            <strong style={{ color: TEXT, fontWeight: 700 }}>
-              Ugly Code
-            </strong>{' '}
-            is an AI coding agent with 35 tools wired in — GLM-5.1 (or your model
-            of choice) vs. Claude Code + Sonnet, at{' '}
+            <strong style={{ color: TEXT, fontWeight: 700 }}>Ugly Code</strong>{' '}
+            is an AI coding agent with 35 tools wired in — GLM-5.1 (or your
+            model of choice) vs. Claude Code + Sonnet, at{' '}
             <span style={{ color: BRAND, fontWeight: 700 }}>
               less than 20% of the cost
             </span>
             . It runs inside{' '}
-            <strong style={{ color: TEXT, fontWeight: 700 }}>Ugly Studio</strong>,
-            the free desktop app. The bill is on screen.
+            <strong style={{ color: TEXT, fontWeight: 700 }}>
+              Ugly Studio
+            </strong>
+            , the free desktop app. The bill is on screen.
           </p>
         </ScrollAnimatedView>
 
@@ -553,7 +574,12 @@ function HeroInstall({
 
         <ScrollAnimatedView animation="slideUp" delay={550} threshold={0}>
           <div
-            style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}
+            style={{
+              display: 'flex',
+              gap: 14,
+              flexWrap: 'wrap',
+              marginBottom: 16,
+            }}
           >
             <a
               className="ugly-cta"
@@ -564,7 +590,9 @@ function HeroInstall({
             >
               Download for {osLabels[userOS]}
               {primary && (
-                <span style={{ fontFamily: FONT_MONO, fontSize: 11, opacity: 0.7 }}>
+                <span
+                  style={{ fontFamily: FONT_MONO, fontSize: 11, opacity: 0.7 }}
+                >
                   {formatSize(primary.size)}
                 </span>
               )}
@@ -609,10 +637,20 @@ function HeroInstall({
               flexWrap: 'wrap',
             }}
           >
-            <a href="#install" className="ugly-link" data-id="landing-system-requirements" style={navMetaStyle()}>
+            <a
+              href="#install"
+              className="ugly-link"
+              data-id="landing-system-requirements"
+              style={navMetaStyle()}
+            >
               System requirements
             </a>
-            <a href="#install" className="ugly-link" data-id="landing-changelog" style={navMetaStyle()}>
+            <a
+              href="#install"
+              className="ugly-link"
+              data-id="landing-changelog"
+              style={navMetaStyle()}
+            >
               Changelog
             </a>
           </div>
@@ -621,7 +659,9 @@ function HeroInstall({
 
       <WindowsTrustModal
         url={winPromptUrl}
-        onClose={() => { setWinPromptUrl(null); }}
+        onClose={() => {
+          setWinPromptUrl(null);
+        }}
       />
     </div>
   );
@@ -667,10 +707,12 @@ function HarnessLayer({ isDesktop }: { isDesktop: boolean }) {
   return (
     <LayerWrap id="harness" num="01" lbl="The harness" isDesktop={isDesktop}>
       <LayerHeading isDesktop={isDesktop}>
-        Cuts the model off when it{' '}
-        <span style={{ color: BRAND }}>wanders</span>.
+        Cuts the model off when it <span style={{ color: BRAND }}>wanders</span>
+        .
       </LayerHeading>
-      <LayerPromise>Hard caps · budget ledger · 3-strike termination</LayerPromise>
+      <LayerPromise>
+        Hard caps · budget ledger · 3-strike termination
+      </LayerPromise>
 
       <div
         style={{
@@ -685,9 +727,7 @@ function HarnessLayer({ isDesktop }: { isDesktop: boolean }) {
         <div>
           <LoopCard />
           <Guards />
-          <CodeCite
-            path="studio/server/coding-agent/session-loop/session-loop.ts:50"
-          />
+          <CodeCite path="studio/server/coding-agent/session-loop/session-loop.ts:50" />
         </div>
       </div>
     </LayerWrap>
@@ -721,7 +761,9 @@ function HarnessTranscript() {
         }}
       >
         <span>session · model: GLM-5.1</span>
-        <span style={{ color: OK, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span
+          style={{ color: OK, display: 'flex', alignItems: 'center', gap: 6 }}
+        >
           <span
             style={{
               width: 7,
@@ -878,7 +920,13 @@ function Counter({ v, brand }: { v: string; brand?: boolean }) {
 
 function LoopCard() {
   return (
-    <div style={{ border: `1px solid ${BORDER}`, background: BG_ELEV, padding: 28 }}>
+    <div
+      style={{
+        border: `1px solid ${BORDER}`,
+        background: BG_ELEV,
+        padding: 28,
+      }}
+    >
       <div
         style={{
           fontFamily: FONT_MONO,
@@ -959,14 +1007,24 @@ function Guards() {
       <Guard k="Round cap" v="100" desc="Hard limit before forced summarize." />
       <Guard k="Wall clock" v="12 h" desc="Absolute ceiling per session." />
       <Guard k="Cost cap" v="$ usd" desc="Configurable. Ledgered per call." />
-      <Guard k="3-strike" v="stop" desc="3 consecutive give-up turns → terminate." />
+      <Guard
+        k="3-strike"
+        v="stop"
+        desc="3 consecutive give-up turns → terminate."
+      />
     </div>
   );
 }
 
 function Guard({ k, v, desc }: { k: string; v: string; desc: string }) {
   return (
-    <div style={{ border: `1px solid ${BORDER}`, padding: 18, fontFamily: FONT_MONO }}>
+    <div
+      style={{
+        border: `1px solid ${BORDER}`,
+        padding: 18,
+        fontFamily: FONT_MONO,
+      }}
+    >
       <div
         style={{
           fontSize: 10,
@@ -992,7 +1050,12 @@ function Guard({ k, v, desc }: { k: string; v: string; desc: string }) {
         {v}
       </div>
       <div
-        style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 8, lineHeight: 1.5 }}
+        style={{
+          fontSize: 11,
+          color: TEXT_MUTED,
+          marginTop: 8,
+          lineHeight: 1.5,
+        }}
       >
         {desc}
       </div>
@@ -1014,7 +1077,9 @@ function CodeCite({ path }: { path: string }) {
       }}
     >
       Grounded in{' '}
-      <span style={{ color: TEXT_MUTED, textTransform: 'none', letterSpacing: 0 }}>
+      <span
+        style={{ color: TEXT_MUTED, textTransform: 'none', letterSpacing: 0 }}
+      >
         {path}
       </span>
     </div>
@@ -1031,7 +1096,9 @@ function IDELayer({ isDesktop }: { isDesktop: boolean }) {
       <LayerHeading isDesktop={isDesktop}>
         Gives the model <span style={{ color: BRAND }}>real evidence</span>.
       </LayerHeading>
-      <LayerPromise>More tools wired in than any other coding agent</LayerPromise>
+      <LayerPromise>
+        More tools wired in than any other coding agent
+      </LayerPromise>
 
       <div
         style={{
@@ -1056,7 +1123,13 @@ function ToolChart() {
     { name: 'ugly-studio', w: 100, v: 35, us: true },
   ];
   return (
-    <div style={{ border: `1px solid ${BORDER}`, background: BG_ELEV, padding: 28 }}>
+    <div
+      style={{
+        border: `1px solid ${BORDER}`,
+        background: BG_ELEV,
+        padding: 28,
+      }}
+    >
       <div
         style={{
           fontFamily: FONT_MONO,
@@ -1109,7 +1182,8 @@ function ToolChart() {
                 width: `${b.w}%`,
                 background: b.us ? BRAND : TEXT_MUTED,
                 boxShadow: b.us ? `0 0 14px ${BRAND_GLOW_STRONG}` : 'none',
-                animation: 'ugly-bar-fill 1100ms cubic-bezier(0.16,1,0.3,1) 200ms both',
+                animation:
+                  'ugly-bar-fill 1100ms cubic-bezier(0.16,1,0.3,1) 200ms both',
               }}
             />
           </div>
@@ -1141,7 +1215,9 @@ function ToolChart() {
       >
         Captured June 2026 · proxy logs in
         <br />
-        <span style={{ color: TEXT_MUTED, textTransform: 'none', letterSpacing: 0 }}>
+        <span
+          style={{ color: TEXT_MUTED, textTransform: 'none', letterSpacing: 0 }}
+        >
           studio/evals/proxy-logs/v4-gap-compare/REPORT.md
         </span>
       </div>
@@ -1152,9 +1228,15 @@ function ToolChart() {
 function ToolList() {
   const isDesktop = useIsDesktop();
   const tools: { name: string; gap?: boolean }[] = [
-    { name: 'read' }, { name: 'edit' }, { name: 'bash' },
-    { name: 'grep' }, { name: 'glob' }, { name: 'write' },
-    { name: 'todos' }, { name: 'multiedit' }, { name: 'web_fetch' },
+    { name: 'read' },
+    { name: 'edit' },
+    { name: 'bash' },
+    { name: 'grep' },
+    { name: 'glob' },
+    { name: 'write' },
+    { name: 'todos' },
+    { name: 'multiedit' },
+    { name: 'web_fetch' },
     { name: 'python_exec', gap: true },
     { name: 'memory_add', gap: true },
     { name: 'spec_write', gap: true },
@@ -1169,7 +1251,13 @@ function ToolList() {
     { name: 'database_sql_query', gap: true },
   ];
   return (
-    <div style={{ border: `1px solid ${BORDER}`, background: BG_ELEV, padding: isDesktop ? 28 : 18 }}>
+    <div
+      style={{
+        border: `1px solid ${BORDER}`,
+        background: BG_ELEV,
+        padding: isDesktop ? 28 : 18,
+      }}
+    >
       <div
         style={{
           display: 'flex',
@@ -1212,7 +1300,8 @@ function ToolList() {
             style={{
               padding: '14px 12px',
               borderRight: (i + 1) % 3 === 0 ? 'none' : `1px solid ${BORDER}`,
-              borderBottom: i >= tools.length - 3 ? 'none' : `1px solid ${BORDER}`,
+              borderBottom:
+                i >= tools.length - 3 ? 'none' : `1px solid ${BORDER}`,
               fontFamily: FONT_MONO,
               fontSize: 12,
               fontWeight: 700,
@@ -1322,7 +1411,9 @@ function PlatformAppCard() {
           <BrowserDot />
           <BrowserDot />
         </span>
-        <span style={{ color: TEXT, marginLeft: 6 }}>image-gallery.ugly.app</span>
+        <span style={{ color: TEXT, marginLeft: 6 }}>
+          image-gallery.ugly.app
+        </span>
         <span
           style={{
             marginLeft: 'auto',
@@ -1401,9 +1492,7 @@ function PlatformAppCard() {
           <ActivityRow verb="render" rest="242ms" />
           <ActivityRow
             verb="error"
-            rest={
-              <span style={{ color: ERR }}>NPE: thumbnails[0]</span>
-            }
+            rest={<span style={{ color: ERR }}>NPE: thumbnails[0]</span>}
           />
         </div>
       </div>
@@ -1414,18 +1503,17 @@ function PlatformAppCard() {
 function BrowserDot() {
   return (
     <span
-      style={{ width: 9, height: 9, border: `1px solid ${TEXT_FAINT}`, display: 'inline-block' }}
+      style={{
+        width: 9,
+        height: 9,
+        border: `1px solid ${TEXT_FAINT}`,
+        display: 'inline-block',
+      }}
     />
   );
 }
 
-function ActivityRow({
-  verb,
-  rest,
-}: {
-  verb: string;
-  rest: React.ReactNode;
-}) {
+function ActivityRow({ verb, rest }: { verb: string; rest: React.ReactNode }) {
   return (
     <div>
       <span
@@ -1493,7 +1581,10 @@ function EventsCard() {
         flexDirection: 'column',
       }}
     >
-      <CardHead title="events · errors · perf" right="inspect_ux + dev_server_*" />
+      <CardHead
+        title="events · errors · perf"
+        right="inspect_ux + dev_server_*"
+      />
       <div
         style={{
           padding: '18px 22px',
@@ -1504,21 +1595,28 @@ function EventsCard() {
         }}
       >
         <TickerRow>
-          <K>event=</K><V>click</V> <K>route=</K><V>/gallery</V>
+          <K>event=</K>
+          <V>click</V> <K>route=</K>
+          <V>/gallery</V>
         </TickerRow>
         <TickerRow>
-          <K>event=</K><V>upload</V> <K>size=</K><V>2.1mb</V>
+          <K>event=</K>
+          <V>upload</V> <K>size=</K>
+          <V>2.1mb</V>
         </TickerRow>
         <TickerRow>
-          <K>perf=</K><V>render</V> <K>ms=</K><V>242</V>
+          <K>perf=</K>
+          <V>render</V> <K>ms=</K>
+          <V>242</V>
         </TickerRow>
         <TickerRow>
           <K>error=</K>
-          <span style={{ color: ERR }}>NPE</span>{' '}
-          <K>file=</K><V>Page.tsx:42</V>
+          <span style={{ color: ERR }}>NPE</span> <K>file=</K>
+          <V>Page.tsx:42</V>
         </TickerRow>
         <TickerRow>
-          <K>feedback=</K><V>&quot;lightbox stuck&quot;</V>
+          <K>feedback=</K>
+          <V>&quot;lightbox stuck&quot;</V>
         </TickerRow>
       </div>
     </div>
@@ -1616,7 +1714,8 @@ function VisionCard() {
             <K>&quot;missing&quot;</K>: <span style={{ color: ERR }}>[5]</span>,
           </div>
           <div style={{ paddingLeft: 14 }}>
-            <K>&quot;lightbox&quot;</K>: <span style={{ color: TEXT_FAINT }}>null</span>
+            <K>&quot;lightbox&quot;</K>:{' '}
+            <span style={{ color: TEXT_FAINT }}>null</span>
           </div>
           <div>{'}'}</div>
         </div>
@@ -1662,7 +1761,14 @@ function Thumb({ missing }: { missing?: boolean }) {
 
 function TickerRow({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        alignItems: 'baseline',
+        flexWrap: 'wrap',
+      }}
+    >
       {children}
     </div>
   );
@@ -1685,8 +1791,20 @@ function S({ children }: { children: React.ReactNode }) {
 // ===========================================================================
 
 function BetSection({ isDesktop }: { isDesktop: boolean }) {
-  const rows: { model: string; w: number; score: string; price: string; us?: boolean }[] = [
-    { model: 'ugly-studio + GLM-5.1', w: 95, score: '84.0', price: '$0.22', us: true },
+  const rows: {
+    model: string;
+    w: number;
+    score: string;
+    price: string;
+    us?: boolean;
+  }[] = [
+    {
+      model: 'ugly-studio + GLM-5.1',
+      w: 95,
+      score: '84.0',
+      price: '$0.22',
+      us: true,
+    },
     { model: 'claude code + Sonnet 4.6', w: 93, score: '82.8', price: '$0.31' },
     { model: 'claude code + Opus 4.7', w: 98, score: '86.8', price: '$1.46' },
   ];
@@ -1736,7 +1854,10 @@ function BetSection({ isDesktop }: { isDesktop: boolean }) {
           fontWeight: 700,
         }}
       >
-        Methodology · <span style={{ color: TEXT_MUTED }}>youtube/EP01_MEDIUM_ARTICLE.md</span>
+        Methodology ·{' '}
+        <span style={{ color: TEXT_MUTED }}>
+          youtube/EP01_MEDIUM_ARTICLE.md
+        </span>
       </div>
     </LayerWrap>
   );
@@ -1776,7 +1897,9 @@ function BetRow({
         fontWeight: head ? 700 : us ? 700 : 500,
       }}
     >
-      <div style={{ color: head ? TEXT_FAINT : us ? BRAND : TEXT }}>{model}</div>
+      <div style={{ color: head ? TEXT_FAINT : us ? BRAND : TEXT }}>
+        {model}
+      </div>
       {head ? (
         <div>{scoreSlot}</div>
       ) : (
@@ -1841,7 +1964,8 @@ function InstallDeep({
   return (
     <LayerWrap id="install" num="05" lbl="Install" isDesktop={isDesktop}>
       <LayerHeading isDesktop={isDesktop}>
-        Install Ugly Studio. <span style={{ color: BRAND }}>Open it</span>. Start coding.
+        Install Ugly Studio. <span style={{ color: BRAND }}>Open it</span>.
+        Start coding.
       </LayerHeading>
       <LayerPromise>
         Ugly Code runs inside Ugly Studio · Mac · Windows · Linux
@@ -1907,7 +2031,9 @@ function InstallDeep({
           gap: 14,
         }}
       >
-        <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: TEXT_MUTED }}>
+        <span
+          style={{ fontFamily: FONT_MONO, fontSize: 13, color: TEXT_MUTED }}
+        >
           On the go —
         </span>
         <a
@@ -2009,11 +2135,15 @@ function InstallCard({
           lineHeight: 1.7,
         }}
       >
-        <span style={{ color: TEXT_MUTED, textTransform: 'none', letterSpacing: 0 }}>
+        <span
+          style={{ color: TEXT_MUTED, textTransform: 'none', letterSpacing: 0 }}
+        >
           {req}
         </span>
       </div>
-      {archToggle && <div style={{ alignSelf: 'flex-start' }}>{archToggle}</div>}
+      {archToggle && (
+        <div style={{ alignSelf: 'flex-start' }}>{archToggle}</div>
+      )}
       <a
         href={info?.url ?? '#'}
         data-id={`landing-install-download-${fileLabel}`}
@@ -2194,9 +2324,9 @@ function ShowEnd({ isDesktop }: { isDesktop: boolean }) {
               marginBottom: 24,
             }}
           >
-            This is a bad idea. I can promise you it will be Ugly. The
-            same three pillars you just read about — harness, IDE,
-            platform — walked through with receipts on screen.
+            This is a bad idea. I can promise you it will be Ugly. The same
+            three pillars you just read about — harness, IDE, platform — walked
+            through with receipts on screen.
           </p>
           <a
             href="https://www.youtube.com/@ugly.bot_app"
@@ -2543,7 +2673,9 @@ function WindowsTrustModal({
         }}
       >
         <div
-          onClick={(e) => { e.stopPropagation(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
           data-id="landing-modal-content"
           style={{
             pointerEvents: 'auto',
@@ -2577,19 +2709,18 @@ function WindowsTrustModal({
             Heads-up on the Windows download
           </h2>
           <p style={{ margin: 0, marginBottom: 14 }}>
-            Windows will almost certainly block this installer on first
-            launch with a &ldquo;Windows protected your PC&rdquo; dialog
-            and &ldquo;Unknown publisher&rdquo; warning. The installer is
-            safe &mdash; it&rsquo;s the same code behind the Mac download
-            &mdash; it&rsquo;s just not code-signed yet.
+            Windows will almost certainly block this installer on first launch
+            with a &ldquo;Windows protected your PC&rdquo; dialog and
+            &ldquo;Unknown publisher&rdquo; warning. The installer is safe
+            &mdash; it&rsquo;s the same code behind the Mac download &mdash;
+            it&rsquo;s just not code-signed yet.
           </p>
           <p style={{ margin: 0, marginBottom: 14 }}>
-            I&rsquo;m sorry about this. Windows code-signing that removes
-            the warning costs <strong>~$120/year</strong> (Azure Trusted
-            Signing), and Ugly Studio is a solo project right now.
-            I&rsquo;m not willing to spend that until there are enough
-            real users to justify it. If that changes, the warning goes
-            away.
+            I&rsquo;m sorry about this. Windows code-signing that removes the
+            warning costs <strong>~$120/year</strong> (Azure Trusted Signing),
+            and Ugly Studio is a solo project right now. I&rsquo;m not willing
+            to spend that until there are enough real users to justify it. If
+            that changes, the warning goes away.
           </p>
           <p
             style={{
@@ -2602,8 +2733,8 @@ function WindowsTrustModal({
               color: TEXT,
             }}
           >
-            <strong>To install:</strong> when SmartScreen shows the
-            dialog, click <em>More info</em>, then <em>Run anyway</em>.
+            <strong>To install:</strong> when SmartScreen shows the dialog,
+            click <em>More info</em>, then <em>Run anyway</em>.
           </p>
           <div
             style={{

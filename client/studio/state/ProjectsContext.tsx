@@ -315,7 +315,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     setOpenTabs((prev) => {
       if (prev.length > 0) return prev;
       const tabId = makeTabId();
-      queueMicrotask(() => { setActiveTabId(tabId); });
+      queueMicrotask(() => {
+        setActiveTabId(tabId);
+      });
       return [
         {
           tabId,
@@ -452,7 +454,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           // Defer to a microtask so React schedules it after this
           // setOpenTabs commit rather than batching them into one
           // render with mismatched (old tabs, new active) state.
-          queueMicrotask(() => { setActiveTabId(nextActive); });
+          queueMicrotask(() => {
+            setActiveTabId(nextActive);
+          });
         }
         return combined;
       });
@@ -536,7 +540,14 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       void socket
         .request('openProject', { path: seed.projectPath })
         .catch((e: unknown) => {
-          console.error('[ProjectsContext:openProject-seed]', JSON.stringify({ projectPath: seed.projectPath, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+          console.error(
+            '[ProjectsContext:openProject-seed]',
+            JSON.stringify({
+              projectPath: seed.projectPath,
+              error: e instanceof Error ? e.message : String(e),
+            }),
+            e instanceof Error ? e.stack : undefined,
+          );
         });
       // Tear-out windows don't go through the warm-start preload
       // path; release the workspace gate immediately so EditorInner
@@ -730,7 +741,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         // the floating button while another project tab is focused.
         const newTabId = makeTabId();
         promotedTabId = newTabId;
-        queueMicrotask(() => { setActiveTabId(newTabId); });
+        queueMicrotask(() => {
+          setActiveTabId(newTabId);
+        });
         return [
           ...prev,
           {

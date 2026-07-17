@@ -3,7 +3,12 @@
  * monolith's server/coding-agent/squash-merge.ts, on top of ./gitExec.ts. Shared
  * by the auto-finish pipeline and the manual "merge this session" surface.
  */
-import { gitMergeSquash, gitUnqueued, runGitCommand, runInGitQueue } from './gitExec';
+import {
+  gitMergeSquash,
+  gitUnqueued,
+  runGitCommand,
+  runInGitQueue,
+} from './gitExec';
 
 const MAX_HEADER_LEN = 70;
 
@@ -15,8 +20,7 @@ export interface SquashMergeArgs {
 }
 
 export type SquashMergeResult =
-  | { ok: true; sha: string }
-  | { ok: false; conflicts: string[] };
+  { ok: true; sha: string } | { ok: false; conflicts: string[] };
 
 export interface DerivedCommitMessageArgs {
   /** Model-generated session title from `info.title`. Preferred when non-empty. */
@@ -28,18 +32,26 @@ export interface DerivedCommitMessageArgs {
 }
 
 function cleanLine(s: string): string {
-  return s.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return s
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function truncate(s: string): string {
-  return s.length <= MAX_HEADER_LEN ? s : `${s.slice(0, MAX_HEADER_LEN - 3)}...`;
+  return s.length <= MAX_HEADER_LEN
+    ? s
+    : `${s.slice(0, MAX_HEADER_LEN - 3)}...`;
 }
 
 function pickHeader(args: DerivedCommitMessageArgs): string {
   const title = cleanLine(args.title ?? '');
   if (title.length > 0) return truncate(title);
   const fromUser =
-    (args.firstUserMessageText ?? '').split('\n').map(cleanLine).find((l) => l.length > 0) ?? '';
+    (args.firstUserMessageText ?? '')
+      .split('\n')
+      .map(cleanLine)
+      .find((l) => l.length > 0) ?? '';
   if (fromUser.length > 0) return truncate(fromUser);
   return `ugly-studio session ${args.compositeId.slice(0, 12)}`;
 }
@@ -57,7 +69,9 @@ export function derivedCommitMessage(args: DerivedCommitMessageArgs): string {
  * The commit + rev-parse share ONE queue slot so no other caller can move HEAD
  * between them.
  */
-export async function squashMergeSession(args: SquashMergeArgs): Promise<SquashMergeResult> {
+export async function squashMergeSession(
+  args: SquashMergeArgs,
+): Promise<SquashMergeResult> {
   const { mainRepo, parentBranch, sessionBranch, commitMessage } = args;
 
   await runGitCommand(mainRepo, ['checkout', parentBranch]);
@@ -67,13 +81,19 @@ export async function squashMergeSession(args: SquashMergeArgs): Promise<SquashM
 
   const sha = await runInGitQueue(async () => {
     const commitArgs = [
-      '-c', 'user.name=ugly-studio',
-      '-c', 'user.email=session@ugly-studio.local',
-      'commit', '-m', commitMessage,
+      '-c',
+      'user.name=ugly-studio',
+      '-c',
+      'user.email=session@ugly-studio.local',
+      'commit',
+      '-m',
+      commitMessage,
     ];
     const commit = await gitUnqueued(mainRepo, commitArgs);
     if (commit.code !== 0) {
-      throw new Error(`git ${commitArgs.join(' ')} exited ${commit.code}: ${commit.stderr.trim()}`);
+      throw new Error(
+        `git ${commitArgs.join(' ')} exited ${commit.code}: ${commit.stderr.trim()}`,
+      );
     }
     const rev = await gitUnqueued(mainRepo, ['rev-parse', 'HEAD']);
     return rev.stdout.trim();

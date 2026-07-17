@@ -74,7 +74,9 @@ export function ThemeProvider({
       setSystemMode(e.matches ? 'dark' : 'light');
     };
     mq.addEventListener('change', handler);
-    return () => { mq.removeEventListener('change', handler); };
+    return () => {
+      mq.removeEventListener('change', handler);
+    };
   }, []);
 
   const resolved: ResolvedTheme = useMemo(() => {

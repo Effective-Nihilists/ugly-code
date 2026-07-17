@@ -28,13 +28,21 @@ export const webSearchTool: ToolModule = {
   async run(input) {
     const query = (typeof input.query === 'string' ? input.query : '').trim();
     if (!query) return 'web_search: `query` is required';
-    const url = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query);
+    const url =
+      'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query);
     try {
       const page = await native.browse.extract(url, { format: 'text' });
       const body = page.content.replace(/\n{3,}/g, '\n\n').slice(0, 8000);
       return body.trim() || `(no results for ${JSON.stringify(query)})`;
     } catch (e) {
-      console.error('[webSearchTool:extract]', JSON.stringify({ query, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
+      console.error(
+        '[webSearchTool:extract]',
+        JSON.stringify({
+          query,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+        e instanceof Error ? e.stack : undefined,
+      );
       return `web_search failed: ${(e as Error).message}`;
     }
   },

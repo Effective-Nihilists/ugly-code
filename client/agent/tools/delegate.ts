@@ -23,18 +23,28 @@ export const delegateTool: ToolModule = {
     parameters: {
       type: 'object',
       properties: {
-        task: { type: 'string', description: 'The subtask, described in full (the sub-agent has no other context).' },
-        tools: { type: 'array', items: { type: 'string' }, description: 'Optional: restrict the sub-agent to these tool names.' },
+        task: {
+          type: 'string',
+          description:
+            'The subtask, described in full (the sub-agent has no other context).',
+        },
+        tools: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: restrict the sub-agent to these tool names.',
+        },
       },
       required: ['task'],
       additionalProperties: false,
     },
   } satisfies TextGenTool,
   async run(input, ctx) {
-    const step = (ctx)?.step;
+    const step = ctx?.step;
     if (!step) return noStep();
-    const allowedTools = Array.isArray(input.tools) ? (input.tools as unknown[]).map(String) : undefined;
-    return runSubAgent((typeof input.task === 'string' ? input.task : ''), {
+    const allowedTools = Array.isArray(input.tools)
+      ? (input.tools as unknown[]).map(String)
+      : undefined;
+    return runSubAgent(typeof input.task === 'string' ? input.task : '', {
       step,
       ctx,
       ...(allowedTools ? { allowedTools } : {}),
@@ -52,22 +62,30 @@ export const delegateParallelTool: ToolModule = {
     parameters: {
       type: 'object',
       properties: {
-        tasks: { type: 'array', items: { type: 'string' }, description: 'The independent subtasks.' },
+        tasks: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'The independent subtasks.',
+        },
       },
       required: ['tasks'],
       additionalProperties: false,
     },
   } satisfies TextGenTool,
   async run(input, ctx) {
-    const step = (ctx)?.step;
+    const step = ctx?.step;
     if (!step) return noStep();
-    const tasks = Array.isArray(input.tasks) ? (input.tasks as unknown[]).map(String) : [];
-    if (tasks.length === 0) return 'delegate_parallel: `tasks` must be a non-empty array';
+    const tasks = Array.isArray(input.tasks)
+      ? (input.tasks as unknown[]).map(String)
+      : [];
+    if (tasks.length === 0)
+      return 'delegate_parallel: `tasks` must be a non-empty array';
     const results = await Promise.all(
       tasks.map((t, i) =>
         runSubAgent(t, { step, ctx }).then(
           (r) => `## Subtask ${i + 1}: ${t}\n${r}`,
-          (e: unknown) => `## Subtask ${i + 1}: ${t}\n(failed: ${(e as Error).message})`,
+          (e: unknown) =>
+            `## Subtask ${i + 1}: ${t}\n(failed: ${(e as Error).message})`,
         ),
       ),
     );

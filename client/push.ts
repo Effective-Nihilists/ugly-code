@@ -15,7 +15,9 @@
  *   if (!registered) await requestPushPermission();
  */
 
-const _UGLY_BOT = (window as unknown as { __UGLY_BOT_URL__?: string }).__UGLY_BOT_URL__ ?? 'https://ugly.bot';
+const _UGLY_BOT =
+  (window as unknown as { __UGLY_BOT_URL__?: string }).__UGLY_BOT_URL__ ??
+  'https://ugly.bot';
 const PUSH_FRAME_URL = `${_UGLY_BOT}/push-frame`;
 const PUSH_FRAME_ORIGIN = _UGLY_BOT;
 
@@ -27,7 +29,9 @@ let pendingResolvers: {
 }[] = [];
 
 function getToken(): string {
-  return (window as unknown as { __AUTH_TOKEN__?: string }).__AUTH_TOKEN__ ?? '';
+  return (
+    (window as unknown as { __AUTH_TOKEN__?: string }).__AUTH_TOKEN__ ?? ''
+  );
 }
 
 function ensureIframe(): Promise<void> {
@@ -122,7 +126,9 @@ export async function requestPushPermission(): Promise<{
     (resolve) => {
       pendingResolvers.push({
         func: 'pushRegistered',
-        resolve: () => { resolve({ success: true }); },
+        resolve: () => {
+          resolve({ success: true });
+        },
       });
     },
   );

@@ -12,10 +12,15 @@ import path from 'node:path';
 import { grepTool } from '../../../client/agent/tools/grep';
 import { shutdownAllEditorLspClients } from '../../../client/studio/agent/lsp/registry';
 
-const BIN = path.resolve(process.cwd(), 'node_modules/.bin/typescript-language-server');
+const BIN = path.resolve(
+  process.cwd(),
+  'node_modules/.bin/typescript-language-server',
+);
 const available = fs.existsSync(BIN);
 if (!available) {
-  console.warn('[grep e2e] typescript-language-server not installed — skipping');
+  console.warn(
+    '[grep e2e] typescript-language-server not installed — skipping',
+  );
 }
 const suite = available ? describe : describe.skip;
 
@@ -25,18 +30,31 @@ suite('grep lsp-defs e2e (real typescript-language-server)', () => {
 
   beforeAll(() => {
     saved = (globalThis as { UglyNative?: unknown }).UglyNative;
-    (globalThis as { UglyNative?: unknown }).UglyNative = createNodeUglyNative();
+    (globalThis as { UglyNative?: unknown }).UglyNative =
+      createNodeUglyNative();
     fs.rmSync(fixtureDir, { recursive: true, force: true });
     fs.mkdirSync(fixtureDir, { recursive: true });
     fs.writeFileSync(
       path.join(fixtureDir, 'tsconfig.json'),
       JSON.stringify({
-        compilerOptions: { strict: true, module: 'esnext', moduleResolution: 'bundler', target: 'es2022', noEmit: true },
+        compilerOptions: {
+          strict: true,
+          module: 'esnext',
+          moduleResolution: 'bundler',
+          target: 'es2022',
+          noEmit: true,
+        },
         include: ['*.ts'],
       }),
     );
-    fs.writeFileSync(path.join(fixtureDir, 'a.ts'), 'export function fooBarBaz(): number {\n  return 42;\n}\n');
-    fs.writeFileSync(path.join(fixtureDir, 'b.ts'), "import { fooBarBaz } from './a';\nexport const z = fooBarBaz();\n");
+    fs.writeFileSync(
+      path.join(fixtureDir, 'a.ts'),
+      'export function fooBarBaz(): number {\n  return 42;\n}\n',
+    );
+    fs.writeFileSync(
+      path.join(fixtureDir, 'b.ts'),
+      "import { fooBarBaz } from './a';\nexport const z = fooBarBaz();\n",
+    );
   });
 
   afterAll(async () => {
@@ -45,15 +63,11 @@ suite('grep lsp-defs e2e (real typescript-language-server)', () => {
     fs.rmSync(fixtureDir, { recursive: true, force: true });
   });
 
-  it(
-    'grep mode lsp-defs resolves a symbol to its declaration file',
-    async () => {
-      const out = await grepTool.run(
-        { mode: 'lsp-defs', pattern: 'fooBarBaz' },
-        { projectDir: fixtureDir },
-      );
-      expect(out).toMatch(/a\.ts:1:/);
-    },
-    60_000,
-  );
+  it('grep mode lsp-defs resolves a symbol to its declaration file', async () => {
+    const out = await grepTool.run(
+      { mode: 'lsp-defs', pattern: 'fooBarBaz' },
+      { projectDir: fixtureDir },
+    );
+    expect(out).toMatch(/a\.ts:1:/);
+  }, 60_000);
 });

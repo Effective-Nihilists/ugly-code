@@ -281,8 +281,7 @@ export function applyPersonaToInitialPrompt(
   // 5/5 in single-mode — the operational preamble is suspect. This
   // env is the cheapest A/B to isolate that signal before deeper
   // changes.
-  const skipPreamble =
-    process.env.UGLY_GROUP_SKIP_OPERATIONAL_PREAMBLE === '1';
+  const skipPreamble = process.env.UGLY_GROUP_SKIP_OPERATIONAL_PREAMBLE === '1';
   const opPreamble = skipPreamble ? '' : GROUP_MODE_OPERATIONAL_PREAMBLE;
   const personaSection =
     persona.preamble.length > 0 ? `${persona.preamble}\n\n---\n\n` : '';

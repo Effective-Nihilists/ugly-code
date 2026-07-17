@@ -75,7 +75,11 @@ describe('grep runLspMode', () => {
         { name: 'foo', uri: 'file:///proj/a.ts', line: 3, character: 5 },
       ],
     } as never);
-    const out = await runLspMode('lsp-defs', { pattern: 'foo', mode: 'lsp-defs' }, { projectDir: '/proj' });
+    const out = await runLspMode(
+      'lsp-defs',
+      { pattern: 'foo', mode: 'lsp-defs' },
+      { projectDir: '/proj' },
+    );
     expect(out).toMatch(/a\.ts:3:5/);
     expect(out).not.toMatch(/^\/proj/m); // cwd-stripped
   });
@@ -95,7 +99,11 @@ describe('grep runLspMode', () => {
       findImplementations: async () => [],
     };
     vi.mocked(lspForProject).mockResolvedValue(client as never);
-    const out = await runLspMode('lsp-refs', { pattern: 'foo', mode: 'lsp-refs' }, { projectDir: '/proj' });
+    const out = await runLspMode(
+      'lsp-refs',
+      { pattern: 'foo', mode: 'lsp-refs' },
+      { projectDir: '/proj' },
+    );
     expect(client.openFile).toHaveBeenCalled();
     expect(out).toMatch(/a\.ts:1:17/);
     expect(out).toMatch(/b\.ts:4:10/);
@@ -103,7 +111,11 @@ describe('grep runLspMode', () => {
 
   it('falls back to a text search when LSP is unavailable (no dead "retry" reply)', async () => {
     vi.mocked(lspForProject).mockResolvedValue(null);
-    const out = await runLspMode('lsp-defs', { pattern: 'foo', mode: 'lsp-defs' }, { projectDir: '/proj' });
+    const out = await runLspMode(
+      'lsp-defs',
+      { pattern: 'foo', mode: 'lsp-defs' },
+      { projectDir: '/proj' },
+    );
     // The old behavior returned "(lsp not available … retry shortly)" and burned a round-trip;
     // now it runs a plain ripgrep instead so the agent gets real hits.
     expect(out).not.toMatch(/not available|not yet initialized|retry/i);
@@ -135,10 +147,20 @@ describe('grep auto-supplement', () => {
       getState: () => 'ready',
       workspaceSymbol: async (q: string) =>
         q === 'AppTabPicker'
-          ? [{ name: 'AppTabPicker', uri: 'file:///proj/comp/AppTabPicker.tsx', line: 10, character: 14 }]
+          ? [
+              {
+                name: 'AppTabPicker',
+                uri: 'file:///proj/comp/AppTabPicker.tsx',
+                line: 10,
+                character: 14,
+              },
+            ]
           : [],
     } as never);
-    const out = await grepTool.run({ pattern: 'AppTabPicker' }, { projectDir: '/proj' });
+    const out = await grepTool.run(
+      { pattern: 'AppTabPicker' },
+      { projectDir: '/proj' },
+    );
     expect(out).toMatch(/src\/x\.ts:5/); // exact hit preserved
     expect(out).toMatch(/LSP DEFINITIONS/);
     expect(out).toMatch(/AppTabPicker\.tsx:10:14/);
@@ -146,7 +168,10 @@ describe('grep auto-supplement', () => {
 
   it('does not supplement a literal or non-identifier grep', async () => {
     resetMock({ proc: () => ({ stdout: 'src/x.ts:5:foo\n', code: 0 }) });
-    const out = await grepTool.run({ pattern: 'foo.*bar' }, { projectDir: '/proj' });
+    const out = await grepTool.run(
+      { pattern: 'foo.*bar' },
+      { projectDir: '/proj' },
+    );
     expect(out).not.toMatch(/LSP DEFINITIONS/);
   });
 });

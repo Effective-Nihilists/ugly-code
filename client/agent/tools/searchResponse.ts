@@ -27,14 +27,16 @@ export type SearchResponse =
 export function provenance(h: SearchHit): string {
   const parts = [`${h.mode} ${h.score.toFixed(2)}`];
   if (h.fts_rank !== undefined) parts.push(`fts#${h.fts_rank}`);
-  if (h.semantic_score !== undefined) parts.push(`sem ${h.semantic_score.toFixed(2)}`);
+  if (h.semantic_score !== undefined)
+    parts.push(`sem ${h.semantic_score.toFixed(2)}`);
   return parts.join(' · ');
 }
 
 /** Agent-facing text for a search response — never a silent empty list. */
 export function formatSearchResult(resp: SearchResponse): string {
   if (resp.status !== 'ready') {
-    if (resp.status === 'unavailable') return `(search unavailable: ${resp.error})`;
+    if (resp.status === 'unavailable')
+      return `(search unavailable: ${resp.error})`;
     if (resp.status === 'indexing') {
       return '(codebase indexing still in progress — retry shortly, or use mode="exact")';
     }
@@ -45,6 +47,9 @@ export function formatSearchResult(resp: SearchResponse): string {
     return '(no matches — try mode="exact" or a different query)';
   }
   return resp.results
-    .map((h) => `${h.file_path}:${h.start_line}-${h.end_line}  (${provenance(h)})\n${h.content}`)
+    .map(
+      (h) =>
+        `${h.file_path}:${h.start_line}-${h.end_line}  (${provenance(h)})\n${h.content}`,
+    )
     .join('\n\n---\n\n');
 }

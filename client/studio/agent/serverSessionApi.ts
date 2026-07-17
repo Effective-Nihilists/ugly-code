@@ -11,7 +11,11 @@ import { native } from 'ugly-app/native';
 import type { ContentPart } from 'ugly-app/agent/client';
 import type { AgentMessage, AgentContentPart } from '../../../shared/agent';
 import type { SessionConfig } from '../../../shared/sessionConfig';
-import { setSessionStore, getSessionStore, type SessionStore } from './sessionStore';
+import {
+  setSessionStore,
+  getSessionStore,
+  type SessionStore,
+} from './sessionStore';
 
 async function api<T>(name: string, input: unknown): Promise<T | null> {
   try {
@@ -37,7 +41,10 @@ async function api<T>(name: string, input: unknown): Promise<T | null> {
 // devices firing in the same ms), so `_id = run:<sessionId>:<seq>` stays unique per turn.
 let lastRunSeq = 0;
 function nextRunSeq(): number {
-  const seq = Math.max(Date.now() * 1000 + Math.floor(Math.random() * 1000), lastRunSeq + 1);
+  const seq = Math.max(
+    Date.now() * 1000 + Math.floor(Math.random() * 1000),
+    lastRunSeq + 1,
+  );
   lastRunSeq = seq;
   return seq;
 }
@@ -48,15 +55,26 @@ function nextRunSeq(): number {
  * request id (or null on failure — the caller surfaces the error).
  */
 export async function createRunRequest(input: {
-  sessionId: string; projectId: string; prompt: string; buildId: string; selection?: string;
+  sessionId: string;
+  projectId: string;
+  prompt: string;
+  buildId: string;
+  selection?: string;
 }): Promise<{ id: string } | null> {
-  return api<{ id: string }>('codingRunRequestCreate', { ...input, seq: nextRunSeq() });
+  return api<{ id: string }>('codingRunRequestCreate', {
+    ...input,
+    seq: nextRunSeq(),
+  });
 }
 
 /** Read a run-request's status (client watchdog: still `pending` → no host claimed it). */
 export async function getRunRequestStatus(
   id: string,
-): Promise<{ status: 'pending' | 'claimed' | 'done' | 'error'; host?: string; error?: string } | null> {
+): Promise<{
+  status: 'pending' | 'claimed' | 'done' | 'error';
+  host?: string;
+  error?: string;
+} | null> {
   return api('codingRunRequestGet', { id });
 }
 
@@ -70,35 +88,52 @@ export async function setCodebaseReadiness(
 }
 
 // ── Interactive control (doc-driven) — the id scheme both sides reconstruct ──────────
-export const askInteractionId = (sessionId: string, toolCallId: string): string => `int:${sessionId}:ask:${toolCallId}`;
-export const stepInteractionId = (sessionId: string, stepId: string): string => `int:${sessionId}:step:${stepId}`;
+export const askInteractionId = (
+  sessionId: string,
+  toolCallId: string,
+): string => `int:${sessionId}:ask:${toolCallId}`;
+export const stepInteractionId = (sessionId: string, stepId: string): string =>
+  `int:${sessionId}:step:${stepId}`;
 
 /** Post a pending interaction — a QUESTION (agent) or a COMMAND (client). */
 export async function putInteraction(input: {
-  id: string; sessionId: string; kind: 'ask_user' | 'step_review' | 'stop' | 'tool_stop';
-  toolCallId?: string; stepId?: string; question?: string;
+  id: string;
+  sessionId: string;
+  kind: 'ask_user' | 'step_review' | 'stop' | 'tool_stop';
+  toolCallId?: string;
+  stepId?: string;
+  question?: string;
 }): Promise<{ id: string } | null> {
   return api('codingInteractionPut', input);
 }
 /** Client answers a parked question; the owning host forwards it to the task. */
-export async function respondInteraction(id: string, response: string): Promise<{ ok: boolean } | null> {
+export async function respondInteraction(
+  id: string,
+  response: string,
+): Promise<{ ok: boolean } | null> {
   return api('codingInteractionRespond', { id, response });
 }
 /** Mark an interaction handled (agent, once its awaited answer resolves / the gate clears). */
-export async function resolveInteraction(id: string): Promise<{ ok: boolean } | null> {
+export async function resolveInteraction(
+  id: string,
+): Promise<{ ok: boolean } | null> {
   return api('codingInteractionResolve', { id });
 }
 
 // `.uglyapp` carries a stable projectId that survives folder moves; fall back to
 // the project path (still a stable per-project key) when it isn't published yet.
 const projectIdCache = new Map<string, string>();
-export async function resolveProjectId(projectPath: string | null): Promise<string> {
+export async function resolveProjectId(
+  projectPath: string | null,
+): Promise<string> {
   if (!projectPath) return 'unknown';
   const cached = projectIdCache.get(projectPath);
   if (cached) return cached;
   let id = projectPath;
   try {
-    const ua = JSON.parse(await native.fs.readFile(`${projectPath}/.uglyapp`)) as { projectId?: string };
+    const ua = JSON.parse(
+      await native.fs.readFile(`${projectPath}/.uglyapp`),
+    ) as { projectId?: string };
     if (ua.projectId) id = ua.projectId;
   } catch {
     /* no .uglyapp yet — the path is a fine stable key */
@@ -111,8 +146,14 @@ export async function resolveProjectId(projectPath: string | null): Promise<stri
 // A tool row bundles ALL of a turn's results into ONE row so the server
 // transcript stays aligned with runAgent's working context (which folds tool
 // results into a single user message) — critical for the compaction seq-mapping.
-export interface ToolResultPayload { tool_use_id: string; content: string; is_error: boolean }
-export interface ToolRowPayload { results: ToolResultPayload[] }
+export interface ToolResultPayload {
+  tool_use_id: string;
+  content: string;
+  is_error: boolean;
+}
+export interface ToolRowPayload {
+  results: ToolResultPayload[];
+}
 
 // Assistant rows store the turn content PLUS the model that produced it (so the
 // chat can show a per-message model badge after reload). Legacy rows stored a
@@ -123,7 +164,12 @@ export interface ToolRowPayload { results: ToolResultPayload[] }
 // its content is still growing, so the display omits the terminal `finish` part and the
 // row renders as `isStreaming`. The durable commit at the same seq drops `pending` → the
 // row flips finished. Only ever set on transient writes; committed rows never carry it.
-export interface AssistantContentPayload { content: ContentPart[]; model?: string; toolStartedAt?: Record<string, number>; pending?: boolean }
+export interface AssistantContentPayload {
+  content: ContentPart[];
+  model?: string;
+  toolStartedAt?: Record<string, number>;
+  pending?: boolean;
+}
 export function decodeAssistantPayload(raw: unknown): AssistantContentPayload {
   if (Array.isArray(raw)) return { content: raw as ContentPart[] }; // legacy: bare content
   const p = (raw ?? {}) as Partial<AssistantContentPayload>;
@@ -139,7 +185,10 @@ export type StoredRole = 'user' | 'assistant' | 'tool';
 export type StoredKind = 'message' | 'summary';
 
 // One entry per currently-uncompacted transcript row, in working-context order.
-export interface ActiveRow { seq: number; id: string }
+export interface ActiveRow {
+  seq: number;
+  id: string;
+}
 
 export interface CompactionPlan {
   /** _ids of the rows to flag compacted (originals + any superseded summary). */
@@ -230,13 +279,21 @@ export function rowToMessage(r: StoredMessageRow): AgentMessage {
   const payload: unknown = JSON.parse(r.content);
   if (r.role === 'assistant') {
     // ContentPart[] and AgentMessage's content union are the same blocks, nominally distinct.
-    return { role: 'assistant', content: decodeAssistantPayload(payload).content as AgentMessage['content'] };
+    return {
+      role: 'assistant',
+      content: decodeAssistantPayload(payload)
+        .content as AgentMessage['content'],
+    };
   }
   if (r.role === 'tool') {
     const results = (payload as Partial<ToolRowPayload>).results ?? [];
     return {
       role: 'user',
-      content: results.map((x) => ({ type: 'tool_result' as const, tool_use_id: x.tool_use_id, content: x.content })),
+      content: results.map((x) => ({
+        type: 'tool_result' as const,
+        tool_use_id: x.tool_use_id,
+        content: x.content,
+      })),
     };
   }
   // user message OR compaction summary → a plain user-text message.
@@ -256,13 +313,19 @@ export interface ResumeContext {
  * cleanly: a dangling assistant `tool_use` gets an interrupted `tool_result`, and a trailing
  * user message gets a continue-ready assistant turn. Pure + exported for tests.
  */
-export function reconstructResumeContext(rows: StoredMessageRow[], sessionId: string): ResumeContext {
+export function reconstructResumeContext(
+  rows: StoredMessageRow[],
+  sessionId: string,
+): ResumeContext {
   const raw: AgentMessage[] = [];
   const activeRows: ActiveRow[] = [];
   let maxSeq = -1;
   for (const r of rows) {
     maxSeq = Math.max(maxSeq, r.seq);
-    const id = r.kind === 'summary' ? `${sessionId}:summary:${r.seq}` : `${sessionId}:${r.seq}`;
+    const id =
+      r.kind === 'summary'
+        ? `${sessionId}:summary:${r.seq}`
+        : `${sessionId}:${r.seq}`;
     activeRows.push({ seq: r.seq, id });
     raw.push(rowToMessage(r));
   }
@@ -277,7 +340,10 @@ export function reconstructResumeContext(rows: StoredMessageRow[], sessionId: st
   let prev: AgentMessage | undefined;
   for (const m of raw) {
     if (prev?.role === m.role) {
-      prev = { role: m.role, content: [...asParts(prev.content), ...asParts(m.content)] };
+      prev = {
+        role: m.role,
+        content: [...asParts(prev.content), ...asParts(m.content)],
+      };
       messages[messages.length - 1] = prev;
     } else {
       prev = m;
@@ -287,7 +353,10 @@ export function reconstructResumeContext(rows: StoredMessageRow[], sessionId: st
   const tail = messages.at(-1);
   if (tail?.role === 'assistant' && Array.isArray(tail.content)) {
     const uses = tail.content.filter(
-      (b): b is { type: 'tool_use'; id: string; name: string; input: unknown } => b.type === 'tool_use',
+      (
+        b,
+      ): b is { type: 'tool_use'; id: string; name: string; input: unknown } =>
+        b.type === 'tool_use',
     );
     if (uses.length > 0) {
       messages.push({
@@ -295,7 +364,8 @@ export function reconstructResumeContext(rows: StoredMessageRow[], sessionId: st
         content: uses.map((u) => ({
           type: 'tool_result' as const,
           tool_use_id: u.id,
-          content: '[Interrupted: this tool did not finish before the session was reloaded.]',
+          content:
+            '[Interrupted: this tool did not finish before the session was reloaded.]',
         })),
       });
     }
@@ -303,7 +373,12 @@ export function reconstructResumeContext(rows: StoredMessageRow[], sessionId: st
   if (messages[messages.length - 1]?.role === 'user') {
     messages.push({
       role: 'assistant',
-      content: [{ type: 'text', text: 'The previous step was interrupted before it finished. Ready to continue.' }],
+      content: [
+        {
+          type: 'text',
+          text: 'The previous step was interrupted before it finished. Ready to continue.',
+        },
+      ],
     });
   }
   return { messages, activeRows, nextSeq: maxSeq + 1 };

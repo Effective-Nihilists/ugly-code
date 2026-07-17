@@ -27,7 +27,8 @@ export interface LspResult {
 
 export function languageForPath(path: string): CmLanguage | null {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
-  if (['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs'].includes(ext)) return 'javascript';
+  if (['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs'].includes(ext))
+    return 'javascript';
   if (ext === 'py') return 'python';
   if (ext === 'css' || ext === 'scss') return 'css';
   if (ext === 'html' || ext === 'htm' || ext === 'xml') return 'html';
@@ -35,7 +36,12 @@ export function languageForPath(path: string): CmLanguage | null {
   return null;
 }
 
-function input(path: string, pos: EditorPos, content: string, projectPath: string | null) {
+function input(
+  path: string,
+  pos: EditorPos,
+  content: string,
+  projectPath: string | null,
+) {
   return {
     path,
     line: pos.line,
@@ -52,16 +58,31 @@ async function locate(
   content: string,
   projectPath: string | null,
 ): Promise<LspResult[]> {
-  const { results } = await fn(input(path, pos, content, projectPath), projectPath);
+  const { results } = await fn(
+    input(path, pos, content, projectPath),
+    projectPath,
+  );
   return results;
 }
 
-export const runDefinition = (p: string, pos: EditorPos, c: string, root: string | null) =>
-  locate(lspDefinition, p, pos, c, root);
-export const runImplementation = (p: string, pos: EditorPos, c: string, root: string | null) =>
-  locate(lspImplementation, p, pos, c, root);
-export const runReferences = (p: string, pos: EditorPos, c: string, root: string | null) =>
-  locate(lspReferences, p, pos, c, root);
+export const runDefinition = (
+  p: string,
+  pos: EditorPos,
+  c: string,
+  root: string | null,
+) => locate(lspDefinition, p, pos, c, root);
+export const runImplementation = (
+  p: string,
+  pos: EditorPos,
+  c: string,
+  root: string | null,
+) => locate(lspImplementation, p, pos, c, root);
+export const runReferences = (
+  p: string,
+  pos: EditorPos,
+  c: string,
+  root: string | null,
+) => locate(lspReferences, p, pos, c, root);
 
 export async function runHover(
   p: string,

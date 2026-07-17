@@ -19,7 +19,9 @@ export const allPages = {
   ['user/:userId']: lazyPage(() => import('./pages/UserPage')),
   ['search']: lazyPage(() => import('./pages/SearchPage')),
   ['test/scroll']: lazyPage(() => import('./pages/ScrollTestPage')),
-  ['test/inspect-fixture']: lazyPage(() => import('./pages/InspectFixturePage')),
+  ['test/inspect-fixture']: lazyPage(
+    () => import('./pages/InspectFixturePage'),
+  ),
   ['test/inspect-fixture-other']: lazyPage(
     () => import('./pages/InspectFixtureOtherPage'),
   ),

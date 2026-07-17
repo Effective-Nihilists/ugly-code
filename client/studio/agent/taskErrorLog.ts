@@ -42,7 +42,11 @@ function stringifyArg(a: unknown): string {
  * `origin` is the app origin (e.g. https://code.ugly.bot); a falsy origin or a
  * runtime without `fetch` makes this a no-op. Idempotent.
  */
-export function installTaskErrorLog(opts: { origin: string; sessionId: string; source?: string }): void {
+export function installTaskErrorLog(opts: {
+  origin: string;
+  sessionId: string;
+  source?: string;
+}): void {
   if (installed) return;
   const origin = (opts.origin || '').replace(/\/$/, '');
   if (!origin || typeof fetch !== 'function') return;
@@ -51,7 +55,8 @@ export function installTaskErrorLog(opts: { origin: string; sessionId: string; s
   const url = `${origin}/api/errorLogCaptureNoAuth`;
   const pageUrl = `${origin}/?session=${encodeURIComponent(opts.sessionId)}`;
   const source = opts.source ?? 'coding-task';
-  const consoleBuffer: { timestamp: number; level: string; message: string }[] = [];
+  const consoleBuffer: { timestamp: number; level: string; message: string }[] =
+    [];
   const sendBuffer: Entry[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
   let flushing = false;
@@ -129,7 +134,11 @@ export function installTaskErrorLog(opts: { origin: string; sessionId: string; s
   // failures. Skip it here, mirroring taskRunner.mjs's isChannelClosed shutdown path.
   const isChannelClosed = (e: unknown): boolean => {
     const err = e as { code?: string; message?: string } | null;
-    return !!err && (err.code === 'ERR_IPC_CHANNEL_CLOSED' || /channel closed/i.test(err.message ?? ''));
+    return (
+      !!err &&
+      (err.code === 'ERR_IPC_CHANNEL_CLOSED' ||
+        /channel closed/i.test(err.message ?? ''))
+    );
   };
   const proc = (globalThis as { process?: NodeJS.Process }).process;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a browser-shimmed `process` may expose no `.on`

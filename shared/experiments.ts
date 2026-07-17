@@ -17,7 +17,7 @@ export const experiments: Experiment<AppEventName>[] = [
     name: 'CTA Button Copy',
     description: 'Tests two versions of the homepage CTA button label',
     branches: [
-      { id: 'control',   name: 'Control',   weight: 1 },
+      { id: 'control', name: 'Control', weight: 1 },
       { id: 'treatment', name: 'Treatment', weight: 1 },
     ],
     events: ['SESSION_START', 'CTA_CLICK'],

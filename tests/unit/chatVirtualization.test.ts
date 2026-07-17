@@ -37,7 +37,8 @@ function createScrollMock(
       unobserve() {}
       disconnect() {}
     },
-    requestAnimationFrame: (cb: () => void) => setTimeout(cb, 0) as unknown as number,
+    requestAnimationFrame: (cb: () => void) =>
+      setTimeout(cb, 0) as unknown as number,
     cancelAnimationFrame: (id: number) => clearTimeout(id),
     setTimeout: setTimeout,
     clearTimeout: clearTimeout,
@@ -48,8 +49,12 @@ function createScrollMock(
     offsetHeight: viewportPx,
     scrollTop: 0,
     scrollHeight: contentPx,
-    addEventListener: (_event: string, cb: () => void) => { scrollListeners.add(cb); },
-    removeEventListener: (_event: string, cb: () => void) => { scrollListeners.delete(cb); },
+    addEventListener: (_event: string, cb: () => void) => {
+      scrollListeners.add(cb);
+    },
+    removeEventListener: (_event: string, cb: () => void) => {
+      scrollListeners.delete(cb);
+    },
     ownerDocument: { defaultView: targetWindow },
     _triggerScroll(top: number) {
       this.scrollTop = top;
@@ -79,7 +84,12 @@ function syncScrollToFn(
 
 describe('Virtualizer (core, @tanstack/virtual-core v3)', () => {
   function makeVirtualizer(
-    opts: Partial<import('@tanstack/virtual-core').VirtualizerOptions<HTMLDivElement, HTMLDivElement>> = {},
+    opts: Partial<
+      import('@tanstack/virtual-core').VirtualizerOptions<
+        HTMLDivElement,
+        HTMLDivElement
+      >
+    > = {},
   ) {
     const el = createScrollMock();
     const v = new Virtualizer({
@@ -241,7 +251,9 @@ describe('pinToBottom gating', () => {
   });
 
   it('is a no-op when the scroll element is null', () => {
-    const pinToBottom = (el: { scrollTop: number; scrollHeight: number } | null) => {
+    const pinToBottom = (
+      el: { scrollTop: number; scrollHeight: number } | null,
+    ) => {
       if (!el) return;
       el.scrollTop = el.scrollHeight;
     };
@@ -321,7 +333,11 @@ describe('ResizeObserver re-pin gate', () => {
   });
 
   it('unblocks after a gate clears', () => {
-    const pinGate = { isLoadingOlder: true, isLoadingNewer: false, hasMoreNewer: false };
+    const pinGate = {
+      isLoadingOlder: true,
+      isLoadingNewer: false,
+      hasMoreNewer: false,
+    };
     const { pinToBottom, roCallback } = createRORepin(pinGate);
 
     roCallback();
@@ -342,7 +358,10 @@ describe('critique group indexing', () => {
 
   function computeCritiqueGroups(
     messages: { role: string; content: string }[],
-  ): { critiqueGroupIndex: Record<number, number>; critiqueGroupTotal: number[] } {
+  ): {
+    critiqueGroupIndex: Record<number, number>;
+    critiqueGroupTotal: number[];
+  } {
     const total: number[] = [];
     const idx: Record<number, number> = {};
     let groupStart = 0;
@@ -358,7 +377,10 @@ describe('critique group indexing', () => {
         finalizeGroup(i);
         groupStart = i;
         seenInGroup = 0;
-      } else if (m.role === 'user' && m.content.includes(CRITIQUE_MARKER_CLIENT)) {
+      } else if (
+        m.role === 'user' &&
+        m.content.includes(CRITIQUE_MARKER_CLIENT)
+      ) {
         seenInGroup += 1;
         idx[i] = seenInGroup;
       }
@@ -379,7 +401,8 @@ describe('critique group indexing', () => {
       { role: 'user', content: '🔍 [This is an automated code review]\nfoo' },
       { role: 'user', content: '🔍 [This is an automated code review]\nbar' },
     ];
-    const { critiqueGroupTotal, critiqueGroupIndex } = computeCritiqueGroups(msgs);
+    const { critiqueGroupTotal, critiqueGroupIndex } =
+      computeCritiqueGroups(msgs);
     expect(critiqueGroupTotal).toEqual([2, 2, 2]);
     expect(critiqueGroupIndex[1]).toBe(1);
     expect(critiqueGroupIndex[2]).toBe(2);
@@ -390,9 +413,13 @@ describe('critique group indexing', () => {
       { role: 'user', content: 'first prompt' },
       { role: 'user', content: '🔍 [This is an automated code review]\nfix?' },
       { role: 'user', content: 'second prompt' },
-      { role: 'user', content: '🔍 [This is an automated code review]\nstill?' },
+      {
+        role: 'user',
+        content: '🔍 [This is an automated code review]\nstill?',
+      },
     ];
-    const { critiqueGroupTotal, critiqueGroupIndex } = computeCritiqueGroups(msgs);
+    const { critiqueGroupTotal, critiqueGroupIndex } =
+      computeCritiqueGroups(msgs);
     expect(critiqueGroupTotal).toEqual([1, 1, 1, 1]);
     expect(critiqueGroupIndex[1]).toBe(1);
     expect(critiqueGroupIndex[3]).toBe(1);

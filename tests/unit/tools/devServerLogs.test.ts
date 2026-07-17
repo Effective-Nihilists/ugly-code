@@ -5,20 +5,28 @@ import { devServerLogsTool } from '../../../client/agent/tools/devServerLogs';
 
 beforeEach(() =>
   resetMock({
-    files: { '/proj/.ugly-studio/dev-server.log': 'l1\nl2\nERROR boom\nl4\nl5\n' },
+    files: {
+      '/proj/.ugly-studio/dev-server.log': 'l1\nl2\nERROR boom\nl4\nl5\n',
+    },
   }),
 );
 
 describe('dev_server_logs', () => {
   it('returns the last N lines', async () => {
-    const out = await devServerLogsTool.run({ lines: 2 }, { projectDir: '/proj' });
+    const out = await devServerLogsTool.run(
+      { lines: 2 },
+      { projectDir: '/proj' },
+    );
     expect(out).toContain('l4');
     expect(out).toContain('l5');
     expect(out).not.toContain('l1');
   });
 
   it('filters lines by substring', async () => {
-    const out = await devServerLogsTool.run({ filter: 'ERROR' }, { projectDir: '/proj' });
+    const out = await devServerLogsTool.run(
+      { filter: 'ERROR' },
+      { projectDir: '/proj' },
+    );
     expect(out).toContain('boom');
     expect(out).not.toContain('l1');
   });

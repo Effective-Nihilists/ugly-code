@@ -2,7 +2,11 @@ import * as fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import type { Page } from '@playwright/test';
-import { CapabilityGate, GrantStore, originScopeDir } from 'ugly-app/native/server';
+import {
+  CapabilityGate,
+  GrantStore,
+  originScopeDir,
+} from 'ugly-app/native/server';
 
 /**
  * Bundled-tool allowlist — MIRROR of the Ugly Studio daemon's BUNDLED_BINARIES
@@ -49,10 +53,17 @@ export interface GatedNativeOpts {
  *
  * Returns the resolved scope root so a test can read what was written.
  */
-export async function installGatedNative(page: Page, opts: GatedNativeOpts): Promise<{ scopeRoot: string }> {
+export async function installGatedNative(
+  page: Page,
+  opts: GatedNativeOpts,
+): Promise<{ scopeRoot: string }> {
   const bundled = opts.bundledBinaries ?? DAEMON_BUNDLED_BINARIES;
   const store = new GrantStore([ORIGIN]); // trusted origin
-  const gate = new CapabilityGate({ store, baseDir: opts.root, bundledBinaries: bundled });
+  const gate = new CapabilityGate({
+    store,
+    baseDir: opts.root,
+    bundledBinaries: bundled,
+  });
   const scopeRoot = originScopeDir(opts.root, ORIGIN);
   mkdirSync(scopeRoot, { recursive: true }); // the origin's sandbox folder must exist
 
@@ -64,57 +75,69 @@ export async function installGatedNative(page: Page, opts: GatedNativeOpts): Pro
     return { fs: g.fs, process: [...g.process] };
   });
   // fs.* → gate.resolveFsPath authorizes + confines, then the real syscall.
-  await page.exposeFunction('__gnFs', (op: string, path: string, content: string) => {
-    const abs = gate.resolveFsPath(ORIGIN, path); // throws PermissionDenied on deny/escape
-    switch (op) {
-      case 'readFile':
-        return { content: fs.readFileSync(abs, 'utf8') };
-      case 'writeFile':
-        fs.writeFileSync(abs, content ?? '');
-        return {};
-      case 'readdir':
-        return {
-          entries: fs
-            .readdirSync(abs, { withFileTypes: true })
-            .map((d) => ({ name: d.name, isDirectory: d.isDirectory(), isFile: d.isFile() })),
-        };
-      case 'mkdir':
-        fs.mkdirSync(abs, { recursive: true });
-        return {};
-      case 'exists':
-        return { exists: fs.existsSync(abs) };
-      default:
-        return {};
-    }
-  });
+  await page.exposeFunction(
+    '__gnFs',
+    (op: string, path: string, content: string) => {
+      const abs = gate.resolveFsPath(ORIGIN, path); // throws PermissionDenied on deny/escape
+      switch (op) {
+        case 'readFile':
+          return { content: fs.readFileSync(abs, 'utf8') };
+        case 'writeFile':
+          fs.writeFileSync(abs, content ?? '');
+          return {};
+        case 'readdir':
+          return {
+            entries: fs
+              .readdirSync(abs, { withFileTypes: true })
+              .map((d) => ({
+                name: d.name,
+                isDirectory: d.isDirectory(),
+                isFile: d.isFile(),
+              })),
+          };
+        case 'mkdir':
+          fs.mkdirSync(abs, { recursive: true });
+          return {};
+        case 'exists':
+          return { exists: fs.existsSync(abs) };
+        default:
+          return {};
+      }
+    },
+  );
   // process.spawn → gate.checkProcess (allowlist + grant) + resolveProcessCwd
   // (confinement), then the real child process. Resolves after exit with the
   // collected output (commands under test are short).
   await page.exposeFunction(
     '__gnSpawn',
     (cmd: string, args: string[], cwd: string | undefined) =>
-      new Promise<{ stdout: string; stderr: string; code: number | null }>((res, rej) => {
-        try {
-          gate.checkProcess(ORIGIN, cmd); // throws PermissionDenied if not allowed
-          const safeCwd = gate.resolveProcessCwd(ORIGIN, cwd); // throws on escape
-          mkdirSync(safeCwd, { recursive: true });
-          let out = '';
-          let err = '';
-          const proc = spawn(cmd, args ?? [], { cwd: safeCwd });
-          proc.stdout?.on('data', (d) => (out += d));
-          proc.stderr?.on('data', (d) => (err += d));
-          proc.on('error', (e) => res({ stdout: out, stderr: err + String(e), code: 1 }));
-          proc.on('close', (code) => res({ stdout: out, stderr: err, code }));
-        } catch (e) {
-          rej(e as Error); // gate denial → page-side invoke rejects
-        }
-      }),
+      new Promise<{ stdout: string; stderr: string; code: number | null }>(
+        (res, rej) => {
+          try {
+            gate.checkProcess(ORIGIN, cmd); // throws PermissionDenied if not allowed
+            const safeCwd = gate.resolveProcessCwd(ORIGIN, cwd); // throws on escape
+            mkdirSync(safeCwd, { recursive: true });
+            let out = '';
+            let err = '';
+            const proc = spawn(cmd, args ?? [], { cwd: safeCwd });
+            proc.stdout?.on('data', (d) => (out += d));
+            proc.stderr?.on('data', (d) => (err += d));
+            proc.on('error', (e) =>
+              res({ stdout: out, stderr: err + String(e), code: 1 }),
+            );
+            proc.on('close', (code) => res({ stdout: out, stderr: err, code }));
+          } catch (e) {
+            rej(e as Error); // gate denial → page-side invoke rejects
+          }
+        },
+      ),
   );
 
   await page.addInitScript((sandboxSupported: boolean) => {
     const listeners: Record<string, Array<(d: unknown) => void>> = {};
     let seq = 0;
-    const emit = (e: string, d: unknown): void => (listeners[e] ?? []).forEach((cb) => cb(d));
+    const emit = (e: string, d: unknown): void =>
+      (listeners[e] ?? []).forEach((cb) => cb(d));
     // In-memory sandbox state (the real OS-user backend lives in the daemon —
     // here we mirror the contract so the client's pill + tool wiring is testable).
     const sbInit = new Set<string>();
@@ -133,10 +156,14 @@ export async function installGatedNative(page: Page, opts: GatedNativeOpts): Pro
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       invoke: async (ch: string, p: any = {}) => {
-        if (ch === 'permissions.request') return { granted: await w.__gnRequest(p) };
-        if (ch === 'permissions.query') return { granted: await w.__gnRequest({}) };
-        if (ch === 'fs.readFile') return w.__gnFs('readFile', String(p.path), '');
-        if (ch === 'fs.writeFile') return w.__gnFs('writeFile', String(p.path), String(p.content ?? ''));
+        if (ch === 'permissions.request')
+          return { granted: await w.__gnRequest(p) };
+        if (ch === 'permissions.query')
+          return { granted: await w.__gnRequest({}) };
+        if (ch === 'fs.readFile')
+          return w.__gnFs('readFile', String(p.path), '');
+        if (ch === 'fs.writeFile')
+          return w.__gnFs('writeFile', String(p.path), String(p.content ?? ''));
         if (ch === 'fs.readdir') return w.__gnFs('readdir', String(p.path), '');
         if (ch === 'fs.mkdir') return w.__gnFs('mkdir', String(p.path), '');
         if (ch === 'fs.exists') return w.__gnFs('exists', String(p.path), '');
@@ -152,7 +179,8 @@ export async function installGatedNative(page: Page, opts: GatedNativeOpts): Pro
           };
         }
         if (ch === 'sandbox.initialize') {
-          if (!sandboxSupported) return { ok: false, error: 'sandbox not supported on unsupported' };
+          if (!sandboxSupported)
+            return { ok: false, error: 'sandbox not supported on unsupported' };
           sbInit.add(String(p.projectId));
           return { ok: true };
         }
@@ -163,11 +191,19 @@ export async function installGatedNative(page: Page, opts: GatedNativeOpts): Pro
         if (ch === 'process.spawn') {
           // The facade sends { cmd, args, opts }; cwd + sandbox live on opts.
           const opts = p.opts ?? p;
-          if (opts?.sandbox) w.__sandboxSpawns.push({ cmd: String(p.cmd), sandbox: opts.sandbox });
+          if (opts?.sandbox)
+            w.__sandboxSpawns.push({
+              cmd: String(p.cmd),
+              sandbox: opts.sandbox,
+            });
           const id = 'p' + seq++;
           // __gnSpawn rejects (gate denial) → this await throws → invoke rejects.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const r: any = await w.__gnSpawn(String(p.cmd), (p.args ?? []).map(String), opts?.cwd ? String(opts.cwd) : undefined);
+          const r: any = await w.__gnSpawn(
+            String(p.cmd),
+            (p.args ?? []).map(String),
+            opts?.cwd ? String(opts.cwd) : undefined,
+          );
           setTimeout(() => {
             if (r.stdout) emit('process.stdout:' + id, { chunk: r.stdout });
             if (r.stderr) emit('process.stderr:' + id, { chunk: r.stderr });
@@ -175,7 +211,12 @@ export async function installGatedNative(page: Page, opts: GatedNativeOpts): Pro
           }, 0);
           return { id, pid: 1000 + seq };
         }
-        if (ch === 'process.write' || ch === 'process.closeStdin' || ch === 'process.kill') return {};
+        if (
+          ch === 'process.write' ||
+          ch === 'process.closeStdin' ||
+          ch === 'process.kill'
+        )
+          return {};
         return {};
       },
     };

@@ -40,9 +40,16 @@ export function stripComments(src: string): string {
       const quote = c;
       out += src[i++];
       while (i < n) {
-        if (src[i] === '\\') { out += src[i] + (src[i + 1] ?? ''); i += 2; continue; }
+        if (src[i] === '\\') {
+          out += src[i] + (src[i + 1] ?? '');
+          i += 2;
+          continue;
+        }
         out += src[i];
-        if (src[i] === quote) { i++; break; }
+        if (src[i] === quote) {
+          i++;
+          break;
+        }
         i++;
       }
       continue;

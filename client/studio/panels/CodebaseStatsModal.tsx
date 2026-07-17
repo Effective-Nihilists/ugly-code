@@ -42,16 +42,35 @@ function fmtRate(n: number | undefined, unit: string): string {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '5px 0' }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        gap: 16,
+        padding: '5px 0',
+      }}
+    >
       <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{label}</span>
-      <span style={{ color: 'var(--text-primary)', fontSize: 12, fontFamily: 'var(--font-mono, monospace)' }}>
+      <span
+        style={{
+          color: 'var(--text-primary)',
+          fontSize: 12,
+          fontFamily: 'var(--font-mono, monospace)',
+        }}
+      >
         {value}
       </span>
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div style={{ marginBottom: 18 }}>
       <div
@@ -77,15 +96,36 @@ function ProgressBar({ pct }: { pct: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div
-        style={{ flex: 1, height: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', overflow: 'hidden' }}
+        style={{
+          flex: 1,
+          height: 6,
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
+          overflow: 'hidden',
+        }}
         role="progressbar"
         aria-valuenow={Math.round(clamped)}
         aria-valuemin={0}
         aria-valuemax={100}
       >
-        <div style={{ width: `${clamped}%`, height: '100%', background: 'var(--accent, #f0a000)', transition: 'width 300ms linear' }} />
+        <div
+          style={{
+            width: `${clamped}%`,
+            height: '100%',
+            background: 'var(--accent, #f0a000)',
+            transition: 'width 300ms linear',
+          }}
+        />
       </div>
-      <span style={{ fontSize: 12, fontFamily: 'var(--font-mono, monospace)', color: 'var(--text-primary)', minWidth: 40, textAlign: 'right' }}>
+      <span
+        style={{
+          fontSize: 12,
+          fontFamily: 'var(--font-mono, monospace)',
+          color: 'var(--text-primary)',
+          minWidth: 40,
+          textAlign: 'right',
+        }}
+      >
         {clamped.toFixed(0)}%
       </span>
     </div>
@@ -107,7 +147,11 @@ function PhaseStepper({ active }: { active: Phase | undefined }) {
               padding: '3px 9px',
               border: '1px solid var(--border)',
               borderColor: now ? 'var(--accent, #f0a000)' : 'var(--border)',
-              color: now ? 'var(--accent, #f0a000)' : done ? 'var(--text-primary)' : 'var(--text-muted)',
+              color: now
+                ? 'var(--accent, #f0a000)'
+                : done
+                  ? 'var(--text-primary)'
+                  : 'var(--text-muted)',
               opacity: idx === -1 ? 0.5 : 1,
               whiteSpace: 'nowrap',
             }}
@@ -149,8 +193,10 @@ export function CodebaseStatsModal({
   const pct = (() => {
     if (!indexer) return 0;
     if (indexer.status === 'ready') return 100;
-    if (indexer.totalChunks) return ((indexer.indexedChunks ?? 0) / indexer.totalChunks) * 100;
-    if (indexer.totalFiles) return ((indexer.indexedFiles ?? 0) / indexer.totalFiles) * 100;
+    if (indexer.totalChunks)
+      return ((indexer.indexedChunks ?? 0) / indexer.totalChunks) * 100;
+    if (indexer.totalFiles)
+      return ((indexer.indexedFiles ?? 0) / indexer.totalFiles) * 100;
     return 0;
   })();
 
@@ -176,25 +222,51 @@ export function CodebaseStatsModal({
   const pctKnown = indexer?.status === 'ready' || !noProgressYet;
 
   return (
-    <Modal open={open} onClose={onClose} size="md" ariaLabel="Codebase analysis">
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="md"
+      ariaLabel="Codebase analysis"
+    >
       <Modal.Header>Codebase analysis</Modal.Header>
       <Modal.Body>
         {nativeMissing ? (
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-            Codebase analysis runs on your machine. Open this project in the Ugly Studio desktop
-            app to enable semantic search — a browser tab has no
-            host to run the indexer.
+          <p
+            style={{
+              fontSize: 13,
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+              margin: 0,
+            }}
+          >
+            Codebase analysis runs on your machine. Open this project in the
+            Ugly Studio desktop app to enable semantic search — a browser tab
+            has no host to run the indexer.
           </p>
         ) : !live ? (
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-            The host indexer is starting up. On first use it downloads a Python runtime and an
-            embedding model, which can take a few minutes.
+          <p
+            style={{
+              fontSize: 13,
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+              margin: 0,
+            }}
+          >
+            The host indexer is starting up. On first use it downloads a Python
+            runtime and an embedding model, which can take a few minutes.
           </p>
         ) : (
           <>
             <Section title="Semantic index">
               {daemonDown ? (
-                <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 4px' }}>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.6,
+                    margin: '0 0 4px',
+                  }}
+                >
                   {daemonMessage}
                 </p>
               ) : (
@@ -211,21 +283,36 @@ export function CodebaseStatsModal({
                   )}
                 </>
               )}
-              <Row label="Status" value={daemonDown ? 'starting' : indexer?.status ?? '—'} />
+              <Row
+                label="Status"
+                value={daemonDown ? 'starting' : (indexer?.status ?? '—')}
+              />
               {!!indexer?.totalFiles && (
-                <Row label="Files" value={`${indexer.indexedFiles ?? 0} / ${indexer.totalFiles}`} />
+                <Row
+                  label="Files"
+                  value={`${indexer.indexedFiles ?? 0} / ${indexer.totalFiles}`}
+                />
               )}
               {!!indexer?.totalChunks && (
-                <Row label="Chunks" value={`${indexer.indexedChunks ?? 0} / ${indexer.totalChunks}`} />
+                <Row
+                  label="Chunks"
+                  value={`${indexer.indexedChunks ?? 0} / ${indexer.totalChunks}`}
+                />
               )}
               {/* Rates and ETA only exist once embedding has started. Rendering
                   four "—" rows next to an "estimating…" was the bulk of the
                   modal's empty-looking body. */}
               {indexer?.filesPerSec != null && (
-                <Row label="Files / sec" value={fmtRate(indexer.filesPerSec, 'files')} />
+                <Row
+                  label="Files / sec"
+                  value={fmtRate(indexer.filesPerSec, 'files')}
+                />
               )}
               {indexer?.chunksPerSec != null && (
-                <Row label="Chunks / sec" value={fmtRate(indexer.chunksPerSec, 'chunks')} />
+                <Row
+                  label="Chunks / sec"
+                  value={fmtRate(indexer.chunksPerSec, 'chunks')}
+                />
               )}
               {(indexer?.status === 'ready' || indexer?.etaSeconds != null) && (
                 <Row
@@ -238,22 +325,45 @@ export function CodebaseStatsModal({
                 />
               )}
               {indexer?.elapsedSeconds != null && (
-                <Row label="Elapsed" value={fmtDuration(indexer.elapsedSeconds)} />
+                <Row
+                  label="Elapsed"
+                  value={fmtDuration(indexer.elapsedSeconds)}
+                />
               )}
             </Section>
 
             {hasDiagnostics && (
               <Section title="Diagnostics">
                 {daemonMessage && !daemonDown && (
-                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--text-secondary)',
+                      margin: '0 0 8px',
+                    }}
+                  >
                     {daemonMessage}
                   </p>
                 )}
                 {indexer?.error && (
-                  <p style={{ fontSize: 12, color: '#e53935', margin: '0 0 8px' }}>{indexer.error}</p>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: '#e53935',
+                      margin: '0 0 8px',
+                    }}
+                  >
+                    {indexer.error}
+                  </p>
                 )}
                 {diagnostics?.lastError && (
-                  <p style={{ fontSize: 12, color: '#e53935', margin: '0 0 8px' }}>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: '#e53935',
+                      margin: '0 0 8px',
+                    }}
+                  >
                     {diagnostics.lastError}
                   </p>
                 )}

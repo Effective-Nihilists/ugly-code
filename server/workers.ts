@@ -116,10 +116,16 @@ const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
 
   // Recent projects — synced across the user's devices/sessions. Mirrors the
   // Node entry (server/index.ts) but reads the per-request TypedDB via workersDb().
-  recordRecentProject: async (userId, { deviceId, deviceLabel, path, name }) => {
+  recordRecentProject: async (
+    userId,
+    { deviceId, deviceLabel, path, name },
+  ) => {
     const _id = `${userId}:${deviceId}:${path}`;
     const trimmed = name.trim();
-    const label = trimmed !== '' ? trimmed : (path.split('/').filter(Boolean).pop() ?? path);
+    const label =
+      trimmed !== ''
+        ? trimmed
+        : (path.split('/').filter(Boolean).pop() ?? path);
     const doc: RecentProject = {
       _id,
       userId,
@@ -137,7 +143,8 @@ const requestHandlers: Partial<RequestHandlers<typeof requests>> = {
   removeRecentProject: async (userId, { id }) => {
     const db = workersDb();
     const row = await db.getDoc(collections.recentProject, id);
-    if (row && row.userId !== userId) throw new Error('Recent project not found');
+    if (row && row.userId !== userId)
+      throw new Error('Recent project not found');
     if (row) await db.deleteDoc(collections.recentProject, id);
     return { ok: true };
   },

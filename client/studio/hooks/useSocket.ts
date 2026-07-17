@@ -16,14 +16,27 @@ import { useContext, useMemo } from 'react';
 import type { AppSocket } from 'ugly-app/client';
 import { native, permissions, taskEntryUrl } from 'ugly-app/native';
 import { buildId } from '../../../shared/Build';
-import type { AppRegistry, ReasoningEffort, SessionSnapshot } from '../shared/api';
+import type {
+  AppRegistry,
+  ReasoningEffort,
+  SessionSnapshot,
+} from '../shared/api';
 import { stripComments } from '../shared/stripComments';
 import { composeSessionSnapshot } from '../agent/sessionSnapshot';
 import { ProjectScopeContext } from '../state/ProjectScopeContext';
 import { firstTurnPrompt, getEvalTask, listEvalTasks } from '../evals/registry';
 import { gradeProject, type GradeDeps } from '../evals/grader';
 import { listRunHistory, deleteRunFromHistory } from '../evals/history';
-import { sessionApi, resolveProjectId, createRunRequest, getRunRequestStatus, putInteraction, respondInteraction, askInteractionId, stepInteractionId } from '../agent/serverSessionApi';
+import {
+  sessionApi,
+  resolveProjectId,
+  createRunRequest,
+  getRunRequestStatus,
+  putInteraction,
+  respondInteraction,
+  askInteractionId,
+  stepInteractionId,
+} from '../agent/serverSessionApi';
 import { rowsToDisplayMessages } from '../agent/sessionDisplay';
 import { DB_SCRIPT } from '../db/dbScript';
 import {
@@ -43,11 +56,16 @@ async function spawnForPath(cmd: string): Promise<string> {
   // the daemon accepts a per-binary allowlist array.
   type GrantReq = Parameters<typeof permissions.request>[0];
   await permissions
-    .request({ fs: 'full', process: ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'] } as unknown as GrantReq)
+    .request({
+      fs: 'full',
+      process: ['bash', 'node', 'git', 'npm', 'npx', 'pnpm'],
+    } as unknown as GrantReq)
     // A grant failure is a leading indicator of the spawn NativeUnavailable that
     // usually follows (the process facade pre-checks permissions over the same
     // channel) — surface it to telemetry instead of swallowing it silently.
-    .catch((e: unknown) => { console.warn('[studio:spawn] permission grant failed', e); });
+    .catch((e: unknown) => {
+      console.warn('[studio:spawn] permission grant failed', e);
+    });
   return new Promise<string>((resolve, reject) => {
     let out = '';
     let err = '';
@@ -58,26 +76,45 @@ async function spawnForPath(cmd: string): Promise<string> {
     // for a non-zero exit — nothing at all (the caller only setError()s in the UI).
     // Always tag with the full cmd so remote reports are actionable.
     const fail = (reason: string, detail: string): Error => {
-      console.error('[studio:spawn-failed]', JSON.stringify({ cmd, reason, detail: detail.slice(-2000) }));
+      console.error(
+        '[studio:spawn-failed]',
+        JSON.stringify({ cmd, reason, detail: detail.slice(-2000) }),
+      );
       return new Error(`${reason}\n${detail}`.trim());
     };
     try {
       const proc = native.process.spawn('bash', ['-lc', cmd], {});
       proc.onStdout((c) => (out += c));
       proc.onStderr((c) => (err += c));
-      proc.onError((e) => { reject(fail('spawn error', e)); });
+      proc.onError((e) => {
+        reject(fail('spawn error', e));
+      });
       proc.onExit((code) => {
         if (code !== 0) {
-          reject(fail(`command failed (exit ${code ?? 'null'})`, (err || out).trim()));
+          reject(
+            fail(
+              `command failed (exit ${code ?? 'null'})`,
+              (err || out).trim(),
+            ),
+          );
           return;
         }
-        const lines = out.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+        const lines = out
+          .trim()
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean);
         resolve(lines[lines.length - 1] ?? '');
       });
     } catch (e) {
       // Synchronous throw — e.g. `NativeUnavailable: process.spawn` when no native
       // shell/host is wired. Log WITH the cmd so it's not an anonymous facade error.
-      reject(fail('spawn threw (native shell unavailable?)', e instanceof Error ? e.message : String(e)));
+      reject(
+        fail(
+          'spawn threw (native shell unavailable?)',
+          e instanceof Error ? e.message : String(e),
+        ),
+      );
     }
   });
 }
@@ -92,7 +129,10 @@ type Handler = (input: Input) => Promise<unknown>;
 function str(v: unknown): string {
   return typeof v === 'string' ? v : String(v);
 }
-type CustomMessageHandler = (msg: { type: string; [key: string]: unknown }) => void;
+type CustomMessageHandler = (msg: {
+  type: string;
+  [key: string]: unknown;
+}) => void;
 
 const customMessageHandlers = new Set<CustomMessageHandler>();
 export function onCustomMessage(handler: CustomMessageHandler): () => void {
@@ -113,8 +153,17 @@ export function isConnected(): boolean {
 
 // The opened project's absolute path now lives in a React-free module (so the agent loop
 // can bundle headless). Re-exported here for existing importers (StudioProjectPage, etc.).
-import { getActiveProjectPath, setActiveProjectPath, getActiveRepoPath } from '../projectPath';
-export { getActiveProjectPath, setActiveProjectPath, getActiveRepoPath, readAuthTokenCookie };
+import {
+  getActiveProjectPath,
+  setActiveProjectPath,
+  getActiveRepoPath,
+} from '../projectPath';
+export {
+  getActiveProjectPath,
+  setActiveProjectPath,
+  getActiveRepoPath,
+  readAuthTokenCookie,
+};
 
 // ── Background coding-task adoption ──────────────────────────────────────────
 // The coding session runs as a background task (Studio desktop, or mobile via the Ugly
@@ -131,7 +180,10 @@ const listenedTaskIds = new Set<string>();
  * machine singleton, so ANY live coding task can service any project's request —
  * try each known task id until one answers. Returns null when none is running.
  */
-export async function codebaseCall<T>(method: string, payload: unknown): Promise<T | null> {
+export async function codebaseCall<T>(
+  method: string,
+  payload: unknown,
+): Promise<T | null> {
   for (const id of sessionTaskIds.values()) {
     try {
       return await native.task.call<T>(id, method, payload);
@@ -143,7 +195,9 @@ export async function codebaseCall<T>(method: string, payload: unknown): Promise
 }
 function readAuthTokenCookie(): string {
   try {
-    const m = document.cookie.split('; ').find((c) => c.startsWith('auth_token='));
+    const m = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('auth_token='));
     return m ? m.slice('auth_token='.length) : '';
   } catch {
     return '';
@@ -163,7 +217,9 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
   try {
     const existing = (await native.task.enum()).find((t) => t.id === id);
     priorStatus = existing ? existing.status : null;
-  } catch { /* enum unreachable — proceed to ensure anyway */ }
+  } catch {
+    /* enum unreachable — proceed to ensure anyway */
+  }
   const priorLive = priorStatus === 'running' || priorStatus === 'starting';
   // Upsert via the framework's generic, race-safe task.ensure: reuse the running
   // task when its bundle (`entry`, which pins the buildId) matches, else replace it
@@ -189,14 +245,25 @@ async function ensureCodingTask(sessionId: string): Promise<string> {
   // surface again, and let the agent's persistMeta('running') clear the stored error.
   crashedSessions.delete(sessionId);
   // Rolling context for every send (visible in errorLog's recentLogs on any capture).
-  console.log('[coding-task] ensure id=%s session=%s reused=%s prior=%s', id, sessionId, reused, priorStatus ?? 'none');
+  console.log(
+    '[coding-task] ensure id=%s session=%s reused=%s prior=%s',
+    id,
+    sessionId,
+    reused,
+    priorStatus ?? 'none',
+  );
   // Replacing a LIVE task means its build no longer matches the SPA (a version
   // mismatch) — the ONLY legitimate reason to restart a running session. This is
   // EXPECTED, not a fault: log it (so an unexpected restart is still traceable in the
   // rolling context) but never as an error/warn row. A crash, by contrast, arrives as
   // a task `error`/abnormal-`exit` event (see wireTaskListener) and IS surfaced.
   if (!reused && priorLive) {
-    console.log('[coding-task] restarted session %s on a new build (prior task %s was replaced; entry=%s)', sessionId, priorStatus, entry);
+    console.log(
+      '[coding-task] restarted session %s on a new build (prior task %s was replaced; entry=%s)',
+      sessionId,
+      priorStatus,
+      entry,
+    );
   }
   sessionTaskIds.set(sessionId, id);
   // A freshly started task dropped the old host listener (stop's cleanup), so force a
@@ -216,7 +283,10 @@ function wireTaskListener(id: string): void {
     // load failure): taskRunner emits an `error` event. Always a real failure.
     if (event === 'error') {
       const d = (data ?? {}) as { message?: string };
-      reportCodingSessionError(sessionIdOf(id), `The coding session crashed: ${d.message ?? 'unknown error'}. Send a message to restart it.`);
+      reportCodingSessionError(
+        sessionIdOf(id),
+        `The coding session crashed: ${d.message ?? 'unknown error'}. Send a message to restart it.`,
+      );
       return;
     }
     // The child process exited. Distinguish a CRASH (surface it) from an EXPECTED kill
@@ -277,8 +347,15 @@ function reportCodingSessionError(sessionId: string, text: string): void {
     try {
       const projectId = await resolveProjectId(getActiveProjectPath());
       if (!projectId) return;
-      await sessionApi.upsert({ sessionId, projectId, status: 'error', lastError: text.slice(0, 2000) });
-    } catch { /* best-effort — telemetry/state persistence must never throw */ }
+      await sessionApi.upsert({
+        sessionId,
+        projectId,
+        status: 'error',
+        lastError: text.slice(0, 2000),
+      });
+    } catch {
+      /* best-effort — telemetry/state persistence must never throw */
+    }
   })();
 }
 /**
@@ -293,14 +370,20 @@ function reportCodingSessionError(sessionId: string, text: string): void {
 async function attachCodingTask(sessionId: string): Promise<boolean> {
   if (!sessionId) return false;
   const id = 'coding:' + sessionId;
-  if (listenedTaskIds.has(id)) { sessionTaskIds.set(sessionId, id); return true; }
+  if (listenedTaskIds.has(id)) {
+    sessionTaskIds.set(sessionId, id);
+    return true;
+  }
   let live = false;
   try {
     const existing = (await native.task.enum()).find((t) => t.id === id);
     // Attach to whatever live task the host has (no buildId pin — a viewer must
     // not stop/replace the sender's task; events are shape-stable frames).
-    live = !!existing && existing.status !== 'exited' && existing.status !== 'error';
-  } catch { /* host unreachable — caller retries */ }
+    live =
+      !!existing && existing.status !== 'exited' && existing.status !== 'error';
+  } catch {
+    /* host unreachable — caller retries */
+  }
   if (!live) return false;
   sessionTaskIds.set(sessionId, id);
   wireTaskListener(id);
@@ -321,7 +404,12 @@ async function watchRunRequest(sessionId: string, id: string): Promise<void> {
   }
   const st = await getRunRequestStatus(id).catch(() => null);
   if (!st || st.status === 'pending') {
-    emitAgentError(sessionId, new Error('No desktop host picked up this session. Open Ugly Studio on your computer (with this project) and send again.'));
+    emitAgentError(
+      sessionId,
+      new Error(
+        'No desktop host picked up this session. Open Ugly Studio on your computer (with this project) and send again.',
+      ),
+    );
   }
 }
 function emitAgentError(sessionId: string, e: unknown): void {
@@ -329,7 +417,11 @@ function emitAgentError(sessionId: string, e: unknown): void {
   const text = e instanceof Error ? e.message : String(e);
   // Surface via the `error` event — useCodingAgentChat handles `type:'error'` directly
   // (the transcript itself is doc-sourced), so the failure shows as an error banner.
-  emitCustom({ type: 'codingAgent:event', sessionId, event: { type: 'error', text } });
+  emitCustom({
+    type: 'codingAgent:event',
+    sessionId,
+    event: { type: 'error', text },
+  });
   // Also carry it as an assistant ⚠ event for any consumer that renders message events
   // (the doc-sourced transcript ignores it).
   emitCustom({
@@ -361,7 +453,11 @@ const modelKey = (sid: string): string => `ugly-studio:model:${sid}`;
 export function setSessionModel(sessionId: string, model: string): void {
   if (!sessionId || !model) return;
   sessionModels.set(sessionId, model);
-  try { localStorage.setItem(modelKey(sessionId), model); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(modelKey(sessionId), model);
+  } catch {
+    /* ignore */
+  }
 }
 export function getSessionModel(sessionId: string): string | null {
   const inMem = sessionModels.get(sessionId);
@@ -369,8 +465,13 @@ export function getSessionModel(sessionId: string): string | null {
   // Survive reload: routing (claude-cli vs ugly.bot) must persist per session.
   try {
     const saved = localStorage.getItem(modelKey(sessionId));
-    if (saved) { sessionModels.set(sessionId, saved); return saved; }
-  } catch { /* ignore */ }
+    if (saved) {
+      sessionModels.set(sessionId, saved);
+      return saved;
+    }
+  } catch {
+    /* ignore */
+  }
   return null;
 }
 
@@ -396,7 +497,11 @@ export function patchSessionAxes(sessionId: string, patch: SessionAxes): void {
   // Survive reload: without this the axes map resets on remount and the mount
   // snapshot falls back to defaults — the "picked deepseek, reloaded, back to
   // auto" report. localStorage mirrors sessionModels' own persistence.
-  try { localStorage.setItem(axesKey(sessionId), JSON.stringify(merged)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(axesKey(sessionId), JSON.stringify(merged));
+  } catch {
+    /* ignore */
+  }
 }
 /** Session axes, hydrated from localStorage on the first read after a reload. */
 export function getSessionAxes(sessionId: string): SessionAxes {
@@ -409,7 +514,9 @@ export function getSessionAxes(sessionId: string): SessionAxes {
       sessionAxes.set(sessionId, parsed);
       return parsed;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return {};
 }
 /** Compose the full selection the coding task needs for a turn: the routed
@@ -422,7 +529,12 @@ function buildSelection(sessionId: string): Record<string, unknown> {
 /** A local Claude Code CLI model id (defined here to avoid a static import cycle
  *  with claudeCliAgent, which imports from this module). */
 function isClaudeCliModel(model: string | null | undefined): boolean {
-  return !!model && (model === 'claude-cli' || model === 'claude-code' || model.startsWith('claude-code:'));
+  return (
+    !!model &&
+    (model === 'claude-cli' ||
+      model === 'claude-code' ||
+      model.startsWith('claude-code:'))
+  );
 }
 
 // Grader IO over the native bridge: run tools (tsc/vitest) in the project and
@@ -435,8 +547,12 @@ const gradeDeps: GradeDeps = {
         const proc = native.process.spawn(cmd, args, { cwd });
         proc.onStdout((c) => (out += c));
         proc.onStderr((c) => (out += c));
-        proc.onError((e) => { resolve({ out: `${out}\n${e}`, code: 1 }); });
-        proc.onExit((code) => { resolve({ out, code }); });
+        proc.onError((e) => {
+          resolve({ out: `${out}\n${e}`, code: 1 });
+        });
+        proc.onExit((code) => {
+          resolve({ out, code });
+        });
       } catch (e) {
         resolve({ out: (e as Error).message, code: 1 });
       }
@@ -459,12 +575,17 @@ const gradeDeps: GradeDeps = {
         },
       }),
     });
-    const json = (await res.json()) as { result?: { message?: { content?: unknown } }; error?: string };
+    const json = (await res.json()) as {
+      result?: { message?: { content?: unknown } };
+      error?: string;
+    };
     if (json.error) throw new Error(json.error);
     const content = json.result?.message?.content;
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
-      return content.map((b) => (b as { type?: string; text?: string }).text ?? '').join('');
+      return content
+        .map((b) => (b as { type?: string; text?: string }).text ?? '')
+        .join('');
     }
     return '';
   },
@@ -484,7 +605,9 @@ const ZERO_RUN_TOTALS = {
 /** Spawn the opened project's `ugly-app <cmd> --json` CLI (reads its prod D1
  *  telemetry) and parse the NDJSON output into docs. Resolves [] on any failure
  *  (project not deployed, no CF token, command missing) so panels degrade. */
-function runCli(cmd: string): Promise<{ _id: string; created: number; data: Record<string, unknown> }[]> {
+function runCli(
+  cmd: string,
+): Promise<{ _id: string; created: number; data: Record<string, unknown> }[]> {
   const proj = getActiveRepoPath();
   if (!proj) return Promise.resolve([]);
   return new Promise((resolve) => {
@@ -496,7 +619,9 @@ function runCli(cmd: string): Promise<{ _id: string; created: number; data: Reco
         { cwd: proj },
       );
       proc.onStdout((c) => (stdout += c));
-      proc.onError(() => { resolve([]); });
+      proc.onError(() => {
+        resolve([]);
+      });
       proc.onExit(() => {
         const docs = stdout
           .split('\n')
@@ -504,13 +629,25 @@ function runCli(cmd: string): Promise<{ _id: string; created: number; data: Reco
           .filter(Boolean)
           .map((l) => {
             try {
-              return JSON.parse(l) as { _id: string; created: number; data: Record<string, unknown> };
+              return JSON.parse(l) as {
+                _id: string;
+                created: number;
+                data: Record<string, unknown>;
+              };
             } catch {
               return null;
             }
           })
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `data` is `as`-cast as always-present, but parsed NDJSON may genuinely omit it
-          .filter((d): d is { _id: string; created: number; data: Record<string, unknown> } => !!d && !!d.data);
+          .filter(
+            (
+              d,
+            ): d is {
+              _id: string;
+              created: number;
+              data: Record<string, unknown>;
+            } => !!d && !!d.data,
+          );
         resolve(docs);
       });
     } catch {
@@ -522,7 +659,9 @@ function runCli(cmd: string): Promise<{ _id: string; created: number; data: Reco
 /** Studio's ugly.bot session as the CLI's auth.json blob (owner token needed by
  *  `feedback:resolve`). Mirrored in ProdPanel's bridge — the canonical copy is here. */
 export function uglyBotAuthJson(): string | null {
-  const m = document.cookie.split('; ').find((c) => c.startsWith('auth_token='));
+  const m = document.cookie
+    .split('; ')
+    .find((c) => c.startsWith('auth_token='));
   const token = m ? m.slice('auth_token='.length) : '';
   if (!token) return null;
   try {
@@ -530,7 +669,11 @@ export function uglyBotAuthJson(): string | null {
       atob((token.split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/')),
     ) as { sub?: string };
     if (!payload.sub) return null;
-    return JSON.stringify({ token, userId: payload.sub, serverUrl: 'https://ugly.bot' });
+    return JSON.stringify({
+      token,
+      userId: payload.sub,
+      serverUrl: 'https://ugly.bot',
+    });
   } catch {
     return null;
   }
@@ -575,10 +718,17 @@ async function resolveFeedbackCli(
       });
       p.onStdout((c) => (out += c));
       p.onStderr((c) => (out += c));
-      p.onError((e) => { reject(new Error(e)); });
+      p.onError((e) => {
+        reject(new Error(e));
+      });
       p.onExit((code) => {
         if (code === 0) resolve();
-        else reject(new Error(`feedback:resolve failed (${code ?? '?'}): ${out.slice(-300)}`));
+        else
+          reject(
+            new Error(
+              `feedback:resolve failed (${code ?? '?'}): ${out.slice(-300)}`,
+            ),
+          );
       });
     } catch (e) {
       reject(e instanceof Error ? e : new Error(String(e)));
@@ -589,22 +739,30 @@ async function resolveFeedbackCli(
 const mapWorkerStatus = (s: unknown): 'completed' | 'failed' =>
   s === 'error' ? 'failed' : 'completed';
 
-function runDbScript(op: string, mode: string, input: unknown): Promise<unknown> {
+function runDbScript(
+  op: string,
+  mode: string,
+  input: unknown,
+): Promise<unknown> {
   const proj = getActiveRepoPath();
   if (!proj) return Promise.reject(new Error('No active project'));
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
     try {
-      const proc = native.process.spawn('node', ['--input-type=module', '-e', DB_SCRIPT], {
-        cwd: proj,
-        env: {
-          UGLY_DB_MODE: mode,
-          UGLY_DB_PROJECT: proj,
-          UGLY_DB_OP: op,
-          UGLY_DB_INPUT: JSON.stringify(input ?? {}),
+      const proc = native.process.spawn(
+        'node',
+        ['--input-type=module', '-e', DB_SCRIPT],
+        {
+          cwd: proj,
+          env: {
+            UGLY_DB_MODE: mode,
+            UGLY_DB_PROJECT: proj,
+            UGLY_DB_OP: op,
+            UGLY_DB_INPUT: JSON.stringify(input ?? {}),
+          },
         },
-      });
+      );
       proc.onStdout((c) => (stdout += c));
       proc.onStderr((c) => (stderr += c));
       // Centralized failure telemetry: every DB-script failure is console.error'd
@@ -614,8 +772,14 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
       // alone. (stderr carries a benign multi-line pg SSL deprecation warning; it's
       // deliberately NOT the error — the script emits a structured `__dbError` on
       // stdout instead.)
-      const failTelemetry = (reason: string, extra: Record<string, unknown>): void => {
-        console.error('[DB:runDbScript]', JSON.stringify({ op, mode, project: proj, reason, ...extra }));
+      const failTelemetry = (
+        reason: string,
+        extra: Record<string, unknown>,
+      ): void => {
+        console.error(
+          '[DB:runDbScript]',
+          JSON.stringify({ op, mode, project: proj, reason, ...extra }),
+        );
       };
       proc.onError((e) => {
         failTelemetry('spawn-error', { error: e });
@@ -627,15 +791,37 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
           try {
             parsed = JSON.parse(stdout || '{}');
           } catch {
-            failTelemetry('unparseable-stdout', { code, stdoutTail: stdout.slice(-400), stderrTail: stderr.slice(-400) });
-            reject(new Error('DB query: unparseable output: ' + stdout.slice(0, 200)));
+            failTelemetry('unparseable-stdout', {
+              code,
+              stdoutTail: stdout.slice(-400),
+              stderrTail: stderr.slice(-400),
+            });
+            reject(
+              new Error(
+                'DB query: unparseable output: ' + stdout.slice(0, 200),
+              ),
+            );
             return;
           }
           // The script caught its own error and reported it structurally — surface
           // the REAL cause (with redacted target) instead of a generic failure.
-          const dbErr = (parsed as { __dbError?: { message?: string; code?: string; target?: string; stack?: string } }).__dbError;
+          const dbErr = (
+            parsed as {
+              __dbError?: {
+                message?: string;
+                code?: string;
+                target?: string;
+                stack?: string;
+              };
+            }
+          ).__dbError;
           if (dbErr) {
-            failTelemetry('db-error', { code: dbErr.code ?? null, target: dbErr.target ?? null, message: dbErr.message ?? null, stack: dbErr.stack ?? null });
+            failTelemetry('db-error', {
+              code: dbErr.code ?? null,
+              target: dbErr.target ?? null,
+              message: dbErr.message ?? null,
+              stack: dbErr.stack ?? null,
+            });
             reject(new Error(dbErr.message ?? 'DB query failed'));
             return;
           }
@@ -643,7 +829,11 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
         } else {
           // Non-zero exit without a structured error (the script crashed before it
           // could report) — capture the raw streams so the crash is still debuggable.
-          failTelemetry('nonzero-exit', { code, stdoutTail: stdout.slice(-400), stderrTail: stderr.slice(-800) });
+          failTelemetry('nonzero-exit', {
+            code,
+            stdoutTail: stdout.slice(-400),
+            stderrTail: stderr.slice(-800),
+          });
           reject(new Error(stderr.trim() || `node exited ${String(code)}`));
         }
       });
@@ -658,7 +848,10 @@ function runDbScript(op: string, mode: string, input: unknown): Promise<unknown>
 const SETTINGS_KEY = 'ugly-studio:settings';
 function loadSettings(): Record<string, unknown> {
   try {
-    return JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Record<string, unknown>;
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Record<
+      string,
+      unknown
+    >;
   } catch {
     return {};
   }
@@ -672,7 +865,11 @@ function saveSetting(key: string, value: unknown): void {
 const handlers: Record<string, Handler> = {
   // ── mount reads — safe empties so the shell renders without a sidecar ──
   listOpenProjects: () =>
-    Promise.resolve({ projects: [], activePath: null, activeLayoutContent: null }),
+    Promise.resolve({
+      projects: [],
+      activePath: null,
+      activeLayoutContent: null,
+    }),
   getOpenProjectAggregates: () => Promise.resolve({ aggregates: {} }),
   getStudioUserSettings: () => Promise.resolve({ entries: loadSettings() }),
   setStudioUserSetting: (i) => {
@@ -683,7 +880,10 @@ const handlers: Record<string, Handler> = {
   // via a node+pg script over native.process. ──
   dbCollections: (i) => runDbScript('collections', str(i.mode ?? 'dev'), {}),
   dbGetDoc: (i) =>
-    runDbScript('getDoc', str(i.mode ?? 'dev'), { collection: i.collection, id: i.id }),
+    runDbScript('getDoc', str(i.mode ?? 'dev'), {
+      collection: i.collection,
+      id: i.id,
+    }),
   dbGetQuery: (i) =>
     runDbScript('getQuery', str(i.mode ?? 'dev'), {
       collection: i.collection,
@@ -692,8 +892,10 @@ const handlers: Record<string, Handler> = {
       limit: i.limit,
       skip: i.skip,
     }),
-  dbCount: (i) => runDbScript('count', str(i.mode ?? 'dev'), { collection: i.collection }),
-  dbSchema: (i) => runDbScript('schema', str(i.mode ?? 'dev'), { collection: i.collection }),
+  dbCount: (i) =>
+    runDbScript('count', str(i.mode ?? 'dev'), { collection: i.collection }),
+  dbSchema: (i) =>
+    runDbScript('schema', str(i.mode ?? 'dev'), { collection: i.collection }),
   // Raw SQL console. Writes require allowWrite; DROP/TRUNCATE/ALTER + WHERE-less
   // UPDATE/DELETE require force; UPDATE/DELETE support dryRun (txn + ROLLBACK).
   dbExec: (i) =>
@@ -733,7 +935,15 @@ const handlers: Record<string, Handler> = {
   },
   errorLogGetSummary: async () => {
     const docs = await runCli('errors');
-    const map = new Map<string, { message: string; count: number; lastSeen: number; latestErrorId: string }>();
+    const map = new Map<
+      string,
+      {
+        message: string;
+        count: number;
+        lastSeen: number;
+        latestErrorId: string;
+      }
+    >();
     for (const d of docs) {
       const msg = str(d.data.message ?? '');
       const e = map.get(msg);
@@ -744,10 +954,17 @@ const handlers: Record<string, Handler> = {
           e.latestErrorId = d._id;
         }
       } else {
-        map.set(msg, { message: msg, count: 1, lastSeen: d.created, latestErrorId: d._id });
+        map.set(msg, {
+          message: msg,
+          count: 1,
+          lastSeen: d.created,
+          latestErrorId: d._id,
+        });
       }
     }
-    return { aggregations: [...map.values()].sort((a, b) => b.count - a.count) };
+    return {
+      aggregations: [...map.values()].sort((a, b) => b.count - a.count),
+    };
   },
   feedbackList: async () => {
     const docs = await runCli('feedback');
@@ -806,19 +1023,35 @@ const handlers: Record<string, Handler> = {
   // description }) })`. The runs list (below) still comes from prod telemetry.
   workersGetManifest: async () => {
     const proj = getActiveRepoPath();
-    if (!proj) return { available: false, reason: 'No project open.', workers: [] };
+    if (!proj)
+      return { available: false, reason: 'No project open.', workers: [] };
     let src = '';
     for (const rel of ['/shared/cron.ts', '/src/shared/cron.ts']) {
-      try { src = await native.fs.readFile(proj + rel); break; } catch { /* try next */ }
+      try {
+        src = await native.fs.readFile(proj + rel);
+        break;
+      } catch {
+        /* try next */
+      }
     }
-    if (!src) return { available: false, reason: 'No shared/cron.ts in this project.', workers: [] };
+    if (!src)
+      return {
+        available: false,
+        reason: 'No shared/cron.ts in this project.',
+        workers: [],
+      };
     // Scan LIVE CODE only. This is a regex over source text, which has no idea what a
     // comment is: every scaffold ships a commented-out example
     //   //   nightly: defineWorker({ schedule: '0 3 * * *', description: '…' }),
     // and it was being listed as a real worker with an "Enqueue on Prod" button for a
     // task that doesn't exist (its description rendered as the literal '…').
     const code = stripComments(src);
-    const workers: { name: string; schedule?: string; description?: string; defaultInput: unknown }[] = [];
+    const workers: {
+      name: string;
+      schedule?: string;
+      description?: string;
+      defaultInput: unknown;
+    }[] = [];
     const re = /(\w+)\s*:\s*defineWorker\(\s*\{([\s\S]*?)\}\s*\)/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(code)) !== null) {
@@ -826,11 +1059,18 @@ const handlers: Record<string, Handler> = {
       const body = m[2];
       const schedule = /schedule\s*:\s*['"]([^'"]*)['"]/.exec(body)?.[1];
       const description = /description\s*:\s*['"]([^'"]*)['"]/.exec(body)?.[1];
-      workers.push({ name, ...(schedule ? { schedule } : {}), ...(description ? { description } : {}), defaultInput: {} });
+      workers.push({
+        name,
+        ...(schedule ? { schedule } : {}),
+        ...(description ? { description } : {}),
+        defaultInput: {},
+      });
     }
     return {
       available: workers.length > 0,
-      ...(workers.length === 0 ? { reason: 'No cron tasks defined in shared/cron.ts.' } : {}),
+      ...(workers.length === 0
+        ? { reason: 'No cron tasks defined in shared/cron.ts.' }
+        : {}),
       workers,
     };
   },
@@ -868,7 +1108,9 @@ const handlers: Record<string, Handler> = {
     };
   },
   workersRun: () =>
-    Promise.resolve({ runId: 'manual-' + Math.random().toString(36).slice(2, 9) }),
+    Promise.resolve({
+      runId: 'manual-' + Math.random().toString(36).slice(2, 9),
+    }),
 
   // ── project-page (session sidebar) reads — server-backed (survive reload) ──
   codingAgentListSessions: async () => {
@@ -906,9 +1148,15 @@ const handlers: Record<string, Handler> = {
         let out = '';
         try {
           const p = native.process.spawn('git', ['-C', dir, ...args], {});
-          p.onStdout((c) => { out += c; });
-          p.onExit((code) => { resolve({ code: code ?? -1, out }); });
-          p.onError(() => { resolve({ code: -1, out }); });
+          p.onStdout((c) => {
+            out += c;
+          });
+          p.onExit((code) => {
+            resolve({ code: code ?? -1, out });
+          });
+          p.onError(() => {
+            resolve({ code: -1, out });
+          });
         } catch {
           resolve({ code: -1, out: '' });
         }
@@ -922,7 +1170,8 @@ const handlers: Record<string, Handler> = {
       .filter((l) => l.trim().length > 0)
       .map((l) => ({ status: l.slice(0, 2).trim(), path: l.slice(3).trim() }));
     const remoteR = await run(['remote', 'get-url', 'origin']);
-    const remote = remoteR.code === 0 && remoteR.out.trim() ? remoteR.out.trim() : null;
+    const remote =
+      remoteR.code === 0 && remoteR.out.trim() ? remoteR.out.trim() : null;
     return { branch, remote, files };
   },
   deleteCodingAgentSession: async (i) => {
@@ -933,7 +1182,9 @@ const handlers: Record<string, Handler> = {
   // + branch are preserved (unlike abandon), so it can be resumed on unarchive.
   // Same server soft-archive op as delete.
   codingAgentArchiveSession: async (i) => {
-    await sessionApi.archive({ sessionId: str(i.compositeId ?? i.sessionId ?? '') });
+    await sessionApi.archive({
+      sessionId: str(i.compositeId ?? i.sessionId ?? ''),
+    });
     return { ok: true };
   },
   // No persisted active-spec source in the Phase-1 shim (the spec system —
@@ -966,10 +1217,16 @@ const handlers: Record<string, Handler> = {
       createdAt: now,
       updatedAt: now,
       model,
-      reasoningEffort: (axes.reasoningEffort as ReasoningEffort | undefined) ?? 'medium',
-      permissionMode: (axes.permissionMode as SessionSnapshot['permissionMode'] | undefined) ?? 'edit',
-      modelMode: (axes.modelMode as SessionSnapshot['modelMode'] | undefined) ?? { kind: 'single', model },
-      patternMode: (axes.patternMode as SessionSnapshot['patternMode'] | undefined) ?? 'auto',
+      reasoningEffort:
+        (axes.reasoningEffort as ReasoningEffort | undefined) ?? 'medium',
+      permissionMode:
+        (axes.permissionMode as
+          SessionSnapshot['permissionMode'] | undefined) ?? 'edit',
+      modelMode: (axes.modelMode as
+        SessionSnapshot['modelMode'] | undefined) ?? { kind: 'single', model },
+      patternMode:
+        (axes.patternMode as SessionSnapshot['patternMode'] | undefined) ??
+        'auto',
       cost: 0,
       promptTokens: 0,
       completionTokens: 0,
@@ -1001,12 +1258,17 @@ const handlers: Record<string, Handler> = {
     // null, so a new-session hero pre-pick only arrives here). `mode` is the
     // legacy permission axis ('edit' | 'yolo').
     if (i.mode) patchSessionAxes(sessionId, { permissionMode: str(i.mode) });
-    if (i.patternMode) patchSessionAxes(sessionId, { patternMode: str(i.patternMode) });
-    if (i.branchMode) patchSessionAxes(sessionId, { branchMode: str(i.branchMode) as "worktree" | "main" });
+    if (i.patternMode)
+      patchSessionAxes(sessionId, { patternMode: str(i.patternMode) });
+    if (i.branchMode)
+      patchSessionAxes(sessionId, {
+        branchMode: str(i.branchMode) as 'worktree' | 'main',
+      });
     if (i.modelMode) {
       patchSessionAxes(sessionId, { modelMode: i.modelMode });
       const mm = i.modelMode as { kind?: string; model?: string };
-      if (mm.kind === 'single' && mm.model) setSessionModel(sessionId, mm.model);
+      if (mm.kind === 'single' && mm.model)
+        setSessionModel(sessionId, mm.model);
     }
     return Promise.resolve({ sessionId });
   },
@@ -1018,7 +1280,9 @@ const handlers: Record<string, Handler> = {
     if (isClaudeCliModel(model)) {
       void import('../agent/claudeCliAgent')
         .then((m) => m.runClaudeCliTurn(sessionId, message, model!, emitCustom))
-        .catch((e: unknown) => { emitAgentError(sessionId, e); });
+        .catch((e: unknown) => {
+          emitAgentError(sessionId, e);
+        });
       return Promise.resolve({});
     }
     // 2. Doc-driven: write a `codingRunRequest` doc — the owning desktop host claims +
@@ -1030,12 +1294,22 @@ const handlers: Record<string, Handler> = {
       const projectId = await resolveProjectId(getActiveProjectPath());
       const sel = buildSelection(sessionId);
       const res = await createRunRequest({
-        sessionId, projectId, prompt: message, buildId,
-        ...(Object.keys(sel).length > 0 ? { selection: JSON.stringify(sel) } : {}),
+        sessionId,
+        projectId,
+        prompt: message,
+        buildId,
+        ...(Object.keys(sel).length > 0
+          ? { selection: JSON.stringify(sel) }
+          : {}),
       });
       // A null result means the SERVER write failed (network/500) — the turn never enqueued.
       if (!res) {
-        emitAgentError(sessionId, new Error("Couldn't reach the server to queue your message — check your connection and try again."));
+        emitAgentError(
+          sessionId,
+          new Error(
+            "Couldn't reach the server to queue your message — check your connection and try again.",
+          ),
+        );
         return;
       }
       // Host watchdog: the run-request is written `pending`; the owning desktop host claims
@@ -1048,12 +1322,18 @@ const handlers: Record<string, Handler> = {
   codingAgentChatStop: (i) => {
     const sessionId = str(i.sessionId ?? '');
     if (isClaudeCliModel(getSessionModel(sessionId))) {
-      void import('../agent/claudeCliAgent').then((m) => { m.abortClaudeCli(sessionId); });
+      void import('../agent/claudeCliAgent').then((m) => {
+        m.abortClaudeCli(sessionId);
+      });
       return Promise.resolve({});
     }
     // Doc-driven: write a stop COMMAND the owning host forwards to its local task —
     // proxy-free, so a phone can stop a turn it started.
-    void putInteraction({ id: `int:${sessionId}:stop:${Date.now()}`, sessionId, kind: 'stop' });
+    void putInteraction({
+      id: `int:${sessionId}:stop:${Date.now()}`,
+      sessionId,
+      kind: 'stop',
+    });
     return Promise.resolve({});
   },
   // `/clear`: wipe the conversation in place. Reset the running task's in-memory
@@ -1064,8 +1344,13 @@ const handlers: Record<string, Handler> = {
   codingAgentChatClearMessages: (i) => {
     const sessionId = str(i.sessionId ?? '');
     const taskId = sessionTaskIds.get(sessionId);
-    if (taskId) void native.task.call(taskId, 'clear').catch(() => {/* noop */});
-    void sessionApi.clearMessages({ sessionId }).catch(() => {/* noop */});
+    if (taskId)
+      void native.task.call(taskId, 'clear').catch(() => {
+        /* noop */
+      });
+    void sessionApi.clearMessages({ sessionId }).catch(() => {
+      /* noop */
+    });
     return Promise.resolve({ ok: true });
   },
   // A bash card's Stop button → kill the running tool's process in the task
@@ -1074,7 +1359,12 @@ const handlers: Record<string, Handler> = {
   codingAgentToolStop: (i) => {
     const sessionId = str(i.sessionId ?? '');
     const toolCallId = str(i.toolCallId ?? '');
-    void putInteraction({ id: `int:${sessionId}:toolstop:${toolCallId}`, sessionId, kind: 'tool_stop', toolCallId });
+    void putInteraction({
+      id: `int:${sessionId}:toolstop:${toolCallId}`,
+      sessionId,
+      kind: 'tool_stop',
+      toolCallId,
+    });
     return Promise.resolve({ ok: true });
   },
   // ── Interactive turn controls — doc-driven: the client answers via a doc the owning
@@ -1083,13 +1373,19 @@ const handlers: Record<string, Handler> = {
   codingAgentAnswerAskUser: (i) => {
     const sessionId = str(i.sessionId ?? '');
     const toolCallId = str(i.toolCallId ?? '');
-    void respondInteraction(askInteractionId(sessionId, toolCallId), JSON.stringify({ answer: str(i.value ?? '') }));
+    void respondInteraction(
+      askInteractionId(sessionId, toolCallId),
+      JSON.stringify({ answer: str(i.value ?? '') }),
+    );
     return Promise.resolve({ ok: true });
   },
   codingAgentAnswerStepReview: (i) => {
     const sessionId = str(i.sessionId ?? '');
     const stepId = str(i.id ?? '');
-    void respondInteraction(stepInteractionId(sessionId, stepId), JSON.stringify({ action: i.action, feedback: i.feedback }));
+    void respondInteraction(
+      stepInteractionId(sessionId, stepId),
+      JSON.stringify({ action: i.action, feedback: i.feedback }),
+    );
     return Promise.resolve({ ok: true });
   },
   codingAgentCompactNow: (i) => {
@@ -1109,13 +1405,17 @@ const handlers: Record<string, Handler> = {
   // The four set* RPCs below record the user's pick per session so the next
   // turn's snapshot echoes it (they were no-ops, which is why picks reverted).
   codingAgentSetReasoningEffort: (i) => {
-    patchSessionAxes(str(i.sessionId ?? ''), { reasoningEffort: str(i.effort ?? '') });
+    patchSessionAxes(str(i.sessionId ?? ''), {
+      reasoningEffort: str(i.effort ?? ''),
+    });
     return Promise.resolve({});
   },
   codingAgentGrantPermission: () => Promise.resolve({}),
   codingAgentSkipPermissions: () => Promise.resolve({}),
   codingAgentSetPermissionMode: (i) => {
-    patchSessionAxes(str(i.sessionId ?? ''), { permissionMode: str(i.permissionMode ?? '') });
+    patchSessionAxes(str(i.sessionId ?? ''), {
+      permissionMode: str(i.permissionMode ?? ''),
+    });
     return Promise.resolve({});
   },
   codingAgentSetModelMode: (i) => {
@@ -1129,7 +1429,9 @@ const handlers: Record<string, Handler> = {
     return Promise.resolve({});
   },
   codingAgentSetPatternMode: (i) => {
-    patchSessionAxes(str(i.sessionId ?? ''), { patternMode: str(i.patternMode ?? '') });
+    patchSessionAxes(str(i.sessionId ?? ''), {
+      patternMode: str(i.patternMode ?? ''),
+    });
     return Promise.resolve({});
   },
   markSessionViewed: () => Promise.resolve({}),
@@ -1183,7 +1485,10 @@ const handlers: Record<string, Handler> = {
   // also writes — so a run produced on either surface shows up here. (Studio-side
   // WRITE on grade is a follow-up; needs host-HOME path resolution — see history.ts.)
   evalListHistory: () => listRunHistory(),
-  evalDeleteRun: (i) => deleteRunFromHistory(str((i as { projectName?: string }).projectName ?? '')),
+  evalDeleteRun: (i) =>
+    deleteRunFromHistory(
+      str((i as { projectName?: string }).projectName ?? ''),
+    ),
   // The eval picker pre-fills a task's turn prompts. Read straight from the
   // local eval registry (same source as evalListTasks/evalCreateProject).
   evalGetTask: (i) => {
@@ -1237,7 +1542,9 @@ const handlers: Record<string, Handler> = {
         taskName: taskName || 'unknown',
         projectPath,
         ...(task?.gates ? { gates: task.gates } : {}),
-        ...(task?.successCriteria ? { successCriteria: task.successCriteria } : {}),
+        ...(task?.successCriteria
+          ? { successCriteria: task.successCriteria }
+          : {}),
         runTotals: ZERO_RUN_TOTALS,
       },
       gradeDeps,
@@ -1252,7 +1559,10 @@ const handlers: Record<string, Handler> = {
     const name = str(i.name ?? '').trim();
     // A leading `~` is NOT expanded inside the double quotes below — map it to
     // `$HOME`, which is.
-    const parentDir = (str(i.parentDir ?? '').trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
+    const parentDir = (str(i.parentDir ?? '').trim() || '~').replace(
+      /^~(?=$|\/)/,
+      '$HOME',
+    );
     if (!name) throw new Error('Project name is required');
     const q = (s: string): string => s.replace(/"/g, '\\"');
     const cmd =
@@ -1270,9 +1580,17 @@ const handlers: Record<string, Handler> = {
   cloneProject: async (i) => {
     const url = str(i.url ?? '').trim();
     if (!url) throw new Error('Repository URL is required');
-    const parentDir = (str(i.parentDir ?? '').trim() || '~').replace(/^~(?=$|\/)/, '$HOME');
+    const parentDir = (str(i.parentDir ?? '').trim() || '~').replace(
+      /^~(?=$|\/)/,
+      '$HOME',
+    );
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty trailing segment must also fall back to 'repo', not just undefined
-    const name = url.replace(/\/+$/, '').replace(/\.git$/, '').split(/[/:]/).pop() || 'repo';
+    const name =
+      url
+        .replace(/\/+$/, '')
+        .replace(/\.git$/, '')
+        .split(/[/:]/)
+        .pop() || 'repo';
     const q = (s: string): string => s.replace(/"/g, '\\"');
     const cmd =
       `mkdir -p "${q(parentDir)}" && cd "${q(parentDir)}" && ` +
@@ -1291,7 +1609,9 @@ const handlers: Record<string, Handler> = {
   cancelTask: () => Promise.resolve({}),
 
   // ── filesystem subset over window.UglyNative (the Phase-1 keystone) ──
-  readFile: async (i) => ({ content: await native.fs.readFile(String(i.path)) }),
+  readFile: async (i) => ({
+    content: await native.fs.readFile(String(i.path)),
+  }),
   writeFile: async (i) => {
     await native.fs.writeFile(String(i.path), str(i.content ?? ''));
     return {};
@@ -1301,7 +1621,10 @@ const handlers: Record<string, Handler> = {
     return {};
   },
   renameFile: async (i) => {
-    await native.fs.rename(String(i.from ?? i.oldPath), String(i.to ?? i.newPath));
+    await native.fs.rename(
+      String(i.from ?? i.oldPath),
+      String(i.to ?? i.newPath),
+    );
     return {};
   },
   listDirectory: async (i) => {
@@ -1319,7 +1642,8 @@ const handlers: Record<string, Handler> = {
   // / hover). Backed by a per-workspace typescript-language-server the studio
   // host spawns via npx; positions are 0-indexed in, 1-indexed out. ──
   lspDefinition: (i) => lspDefinition(lspInput(i), getActiveProjectPath()),
-  lspImplementation: (i) => lspImplementation(lspInput(i), getActiveProjectPath()),
+  lspImplementation: (i) =>
+    lspImplementation(lspInput(i), getActiveProjectPath()),
   lspReferences: (i) => lspReferences(lspInput(i), getActiveProjectPath()),
   lspHover: (i) => lspHover(lspInput(i), getActiveProjectPath()),
 };
@@ -1346,15 +1670,21 @@ export function nativeRequest(name: string, input?: unknown): Promise<unknown> {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- index access is typed non-optional, but an unwired name resolves to undefined at runtime (the "not yet wired" fallback)
   if (h) return h((input ?? {}) as Input);
   return Promise.reject(
-    new Error(`[studio] '${name}' is not yet wired to window.UglyNative (Phase 1)`),
+    new Error(
+      `[studio] '${name}' is not yet wired to window.UglyNative (Phase 1)`,
+    ),
   );
 }
 
 const nativeSocket = {
   request: (name: string, input?: unknown) => nativeRequest(name, input),
   connect: (_token?: string) => Promise.resolve(),
-  send: () => {/* noop */},
-  emit: () => {/* noop */},
+  send: () => {
+    /* noop */
+  },
+  emit: () => {
+    /* noop */
+  },
 };
 
 export function useSocket(): AppSocket<AppRegistry> {

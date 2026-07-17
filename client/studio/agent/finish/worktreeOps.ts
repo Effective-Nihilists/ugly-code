@@ -36,12 +36,21 @@ async function isAncestorOfHead(cwd: string, sha: string): Promise<boolean> {
  * (mid-merge) so the user/agent can resolve it — matching the monolith behavior;
  * the finish pipeline detects the in-progress merge on its next run.
  */
-export async function refreshWorktree(worktree: SessionWorktree): Promise<RefreshOutcome> {
+export async function refreshWorktree(
+  worktree: SessionWorktree,
+): Promise<RefreshOutcome> {
   if (await gitHasInProgressMerge(worktree.path)) {
-    return { kind: 'conflict', conflicts: await gitStatusConflicts(worktree.path) };
+    return {
+      kind: 'conflict',
+      conflicts: await gitStatusConflicts(worktree.path),
+    };
   }
   const targetSha = await revParse(worktree.mainRepo, worktree.parentBranch);
-  if (!targetSha) return { kind: 'skipped', reason: `Parent ref ${worktree.parentBranch} not found` };
+  if (!targetSha)
+    return {
+      kind: 'skipped',
+      reason: `Parent ref ${worktree.parentBranch} not found`,
+    };
 
   const currentHead = await revParse(worktree.path, 'HEAD');
   if (currentHead && currentHead === targetSha) return { kind: 'noop' };
@@ -60,7 +69,10 @@ export async function teardownWorktree(
 ): Promise<void> {
   const { mainRepo } = worktree;
   const rm = await git(mainRepo, [
-    'worktree', 'remove', ...(opts.force ? ['--force'] : []), worktree.path,
+    'worktree',
+    'remove',
+    ...(opts.force ? ['--force'] : []),
+    worktree.path,
   ]);
   if (rm.code !== 0) {
     // git refused — remove the dir manually and prune the stale registration.
@@ -75,18 +87,30 @@ export async function teardownWorktree(
 }
 
 /** Commits on the session branch not yet on the parent (`parent..HEAD`). -1 on error. */
-export async function worktreeAheadCount(worktree: SessionWorktree): Promise<number> {
-  const r = await git(worktree.path, ['rev-list', '--count', `${worktree.parentBranch}..HEAD`]);
+export async function worktreeAheadCount(
+  worktree: SessionWorktree,
+): Promise<number> {
+  const r = await git(worktree.path, [
+    'rev-list',
+    '--count',
+    `${worktree.parentBranch}..HEAD`,
+  ]);
   if (r.code !== 0) return -1;
   const n = parseInt(r.stdout.trim(), 10);
   return Number.isFinite(n) ? n : -1;
 }
 
 /** Commits on the parent not yet in the worktree (`HEAD..parent`). -1 on error. */
-export async function worktreeBehindCount(worktree: SessionWorktree): Promise<number> {
+export async function worktreeBehindCount(
+  worktree: SessionWorktree,
+): Promise<number> {
   const targetSha = await revParse(worktree.mainRepo, worktree.parentBranch);
   if (!targetSha) return 0;
-  const r = await git(worktree.path, ['rev-list', '--count', `HEAD..${worktree.parentBranch}`]);
+  const r = await git(worktree.path, [
+    'rev-list',
+    '--count',
+    `HEAD..${worktree.parentBranch}`,
+  ]);
   if (r.code !== 0) return -1;
   const n = parseInt(r.stdout.trim(), 10);
   return Number.isFinite(n) ? n : -1;

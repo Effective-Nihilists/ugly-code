@@ -68,10 +68,16 @@ const GATE: React.CSSProperties = {
 
 export default function StudioShell(): React.ReactElement {
   // Restore an open project from the URL on first paint (deep link / reload).
-  const [open, setOpen] = React.useState<OpenProject | null>(() => projectFromUrl());
+  const [open, setOpen] = React.useState<OpenProject | null>(() =>
+    projectFromUrl(),
+  );
   // When set, the picker has handed off to the live "Create Project" progress
   // view (streams `npx ugly-app init` + `pnpm install`); on success it opens.
-  const [creating, setCreating] = React.useState<{ name: string; parentDir: string; features: string[] } | null>(null);
+  const [creating, setCreating] = React.useState<{
+    name: string;
+    parentDir: string;
+    features: string[];
+  } | null>(null);
   // The ugly-app socket (cross-device sync). Optional: a logged-out shell still
   // renders the picker; it just won't record/sync recents until sign-in.
   const app = useAppOptional();
@@ -82,15 +88,18 @@ export default function StudioShell(): React.ReactElement {
   // is module-cached, so this single early read serves every picker instance.
   useGlmCodingKey();
 
-  const openProject = React.useCallback((name: string, path?: string) => {
-    const next: OpenProject = { name, ...(path ? { path } : {}) };
-    // Stamp this open into the synced recent-projects list (desktop only —
-    // recordRecentProject no-ops when there's no local host to point at).
-    if (path) void recordRecentProject(app?.socket, name, path);
-    setCreating(null);
-    setOpen(next);
-    pushProjectUrl(next);
-  }, [app]);
+  const openProject = React.useCallback(
+    (name: string, path?: string) => {
+      const next: OpenProject = { name, ...(path ? { path } : {}) };
+      // Stamp this open into the synced recent-projects list (desktop only —
+      // recordRecentProject no-ops when there's no local host to point at).
+      if (path) void recordRecentProject(app?.socket, name, path);
+      setCreating(null);
+      setOpen(next);
+      pushProjectUrl(next);
+    },
+    [app],
+  );
   const closeProject = React.useCallback(() => {
     setOpen(null);
     pushProjectUrl(null);
@@ -102,7 +111,9 @@ export default function StudioShell(): React.ReactElement {
   // ModelSelector dispatch when a locked subscription row is clicked.
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   React.useEffect(() => {
-    const onOpenSettings = (): void => { setSettingsOpen(true); };
+    const onOpenSettings = (): void => {
+      setSettingsOpen(true);
+    };
     window.addEventListener('ugly-studio:open-settings', onOpenSettings);
     // Cmd/Ctrl+, — the platform-standard Settings shortcut. Bound at the SHELL,
     // not a screen, so settings are reachable from every logged-in view: the
@@ -123,9 +134,13 @@ export default function StudioShell(): React.ReactElement {
 
   // Browser Back/Forward → re-derive the open project from the URL.
   React.useEffect(() => {
-    const onPop = (): void => { setOpen(projectFromUrl()); };
+    const onPop = (): void => {
+      setOpen(projectFromUrl());
+    };
     window.addEventListener('popstate', onPop);
-    return () => { window.removeEventListener('popstate', onPop); };
+    return () => {
+      window.removeEventListener('popstate', onPop);
+    };
   }, []);
 
   // Request — and thereby PROVISION — the bundled toolchain the IDE relies on:
@@ -152,16 +167,31 @@ export default function StudioShell(): React.ReactElement {
     // Bundled tools we PROVISION — typed against ugly-app's catalog (BundledToolName)
     // so a typo or a non-catalog name is a BUILD error, not a silent no-op on the
     // install side (which is how postgres went un-provisioned before).
-    const bundled: readonly BundledToolName[] = ['node', 'git', 'curl', 'pnpm', 'uv', 'postgres', 'minio', 'rg'];
+    const bundled: readonly BundledToolName[] = [
+      'node',
+      'git',
+      'curl',
+      'pnpm',
+      'uv',
+      'postgres',
+      'minio',
+      'rg',
+    ];
     // System executables we only need spawn PERMISSION for — present on every host
     // or shipped with node (npm/npx), so NOT catalog/installable tools.
     const permissionOnly = ['bash', 'npm', 'npx'];
     let alive = true;
     void permissions
-      .request({ process: [...permissionOnly, ...bundled] } as unknown as GrantReq)
+      .request({
+        process: [...permissionOnly, ...bundled],
+      } as unknown as GrantReq)
       .catch(() => undefined)
-      .finally(() => { if (alive) setBinariesReady(true); });
-    return () => { alive = false; };
+      .finally(() => {
+        if (alive) setBinariesReady(true);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   let body: React.ReactNode;
@@ -172,13 +202,32 @@ export default function StudioShell(): React.ReactElement {
     // progress on top when the host emits it.
     body = (
       <div data-id="binaries-install-gate" style={GATE}>
-        <div className="us-spin" style={{ fontSize: 22, color: 'var(--accent)' }}>⟳</div>
-        <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 15 }}>
+        <div
+          className="us-spin"
+          style={{ fontSize: 22, color: 'var(--accent)' }}
+        >
+          ⟳
+        </div>
+        <div
+          style={{
+            fontFamily: 'var(--font-heading)',
+            fontWeight: 700,
+            fontSize: 15,
+          }}
+        >
           Setting up your developer tools…
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', maxWidth: 380, textAlign: 'center' }}>
-          Installing the bundled toolchain (node, git, pnpm, postgres…). This runs
-          once and can take a few minutes on a fresh machine.
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 12,
+            color: 'var(--text-muted)',
+            maxWidth: 380,
+            textAlign: 'center',
+          }}
+        >
+          Installing the bundled toolchain (node, git, pnpm, postgres…). This
+          runs once and can take a few minutes on a fresh machine.
         </div>
       </div>
     );
@@ -188,8 +237,12 @@ export default function StudioShell(): React.ReactElement {
         name={creating.name}
         parentDir={creating.parentDir}
         features={creating.features}
-        onDone={(name, path) => { openProject(name, path); }}
-        onCancel={() => { setCreating(null); }}
+        onDone={(name, path) => {
+          openProject(name, path);
+        }}
+        onCancel={() => {
+          setCreating(null);
+        }}
       />
     );
   } else if (open) {
@@ -204,10 +257,16 @@ export default function StudioShell(): React.ReactElement {
     body = (
       <ProjectsProvider>
         <ProjectOnboarding
-          onProjectOpen={(name, path) => { openProject(name, path); }}
-          onBeginCreate={(name, parentDir, features) => { setCreating({ name, parentDir, features }); }}
+          onProjectOpen={(name, path) => {
+            openProject(name, path);
+          }}
+          onBeginCreate={(name, parentDir, features) => {
+            setCreating({ name, parentDir, features });
+          }}
           platform={null}
-          onOpenSettings={() => { setSettingsOpen(true); }}
+          onOpenSettings={() => {
+            setSettingsOpen(true);
+          }}
           leaving={false}
         />
       </ProjectsProvider>
@@ -219,7 +278,9 @@ export default function StudioShell(): React.ReactElement {
       {body}
       <StudioSettingsModal
         open={settingsOpen}
-        onClose={() => { setSettingsOpen(false); }}
+        onClose={() => {
+          setSettingsOpen(false);
+        }}
       />
       <ModalHost />
       <PopoverHost />

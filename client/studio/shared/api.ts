@@ -304,7 +304,9 @@ export const CodebaseReadinessSchema = z.object({
     // still-provisioning daemon still parses (this is a STRICT parse — unknown
     // keys are dropped, missing-but-required keys reject the whole reading).
     // Rates + ETA are computed in the daemon off one monotonic clock.
-    phase: z.enum(['scanning', 'chunking', 'embedding', 'committing']).optional(),
+    phase: z
+      .enum(['scanning', 'chunking', 'embedding', 'committing'])
+      .optional(),
     indexedFiles: z.number().optional(),
     filesPerSec: z.number().optional(),
     chunksPerSec: z.number().optional(),
@@ -891,15 +893,17 @@ export type PublishCaptureRequest = z.infer<typeof PublishCaptureRequestSchema>;
  * the file lives inside the asar and is sealed; the same logic returns
  * the immutable contents.
  */
-type RecipeStepShape = z.infer<typeof PublishCaptureActionSchema> | {
-  kind: 'for-each';
-  /** Loop-variable name inside sub-step substitutions. Defaults to "item". */
-  as?: string;
-  /** Each item is a plain object whose fields are referenced as `{<as>.<field>}`. */
-  items: Record<string, string | number | boolean>[];
-  steps: RecipeStepShape[];
-  label?: string;
-};
+type RecipeStepShape =
+  | z.infer<typeof PublishCaptureActionSchema>
+  | {
+      kind: 'for-each';
+      /** Loop-variable name inside sub-step substitutions. Defaults to "item". */
+      as?: string;
+      /** Each item is a plain object whose fields are referenced as `{<as>.<field>}`. */
+      items: Record<string, string | number | boolean>[];
+      steps: RecipeStepShape[];
+      label?: string;
+    };
 export const RecipeStepSchema: z.ZodType<RecipeStepShape> = z.lazy(() =>
   z.union([
     PublishCaptureActionSchema,
@@ -3192,12 +3196,23 @@ export const requests = defineRequests({
         .array(
           z.object({
             field: z.string(),
-            op: z.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'exists']),
+            op: z.enum([
+              'eq',
+              'ne',
+              'gt',
+              'gte',
+              'lt',
+              'lte',
+              'contains',
+              'exists',
+            ]),
             value: z.string().optional(),
           }),
         )
         .optional(),
-      sort: z.object({ field: z.string(), dir: z.enum(['asc', 'desc']) }).optional(),
+      sort: z
+        .object({ field: z.string(), dir: z.enum(['asc', 'desc']) })
+        .optional(),
       limit: z.number().optional(),
       skip: z.number().optional(),
     }),

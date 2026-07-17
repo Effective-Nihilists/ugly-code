@@ -1,4 +1,9 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from 'react';
 import { EditorState, Compartment } from '@codemirror/state';
 import {
   EditorView,
@@ -98,10 +103,38 @@ export const CodeMirrorFileEditor = forwardRef<CmEditorHandle, Props>(
           highlightActiveLine(),
           history(),
           keymap.of([
-            { key: 'Mod-s', preventDefault: true, run: () => { cb.current.onSave(); return true; } },
-            { key: 'F12', preventDefault: true, run: (v) => { cb.current.onDefinition(posOf(v)); return true; } },
-            { key: 'Mod-F12', preventDefault: true, run: (v) => { cb.current.onImplementation(posOf(v)); return true; } },
-            { key: 'Shift-F12', preventDefault: true, run: (v) => { cb.current.onReferences(posOf(v)); return true; } },
+            {
+              key: 'Mod-s',
+              preventDefault: true,
+              run: () => {
+                cb.current.onSave();
+                return true;
+              },
+            },
+            {
+              key: 'F12',
+              preventDefault: true,
+              run: (v) => {
+                cb.current.onDefinition(posOf(v));
+                return true;
+              },
+            },
+            {
+              key: 'Mod-F12',
+              preventDefault: true,
+              run: (v) => {
+                cb.current.onImplementation(posOf(v));
+                return true;
+              },
+            },
+            {
+              key: 'Shift-F12',
+              preventDefault: true,
+              run: (v) => {
+                cb.current.onReferences(posOf(v));
+                return true;
+              },
+            },
             ...defaultKeymap,
             ...historyKeymap,
             ...searchKeymap,
