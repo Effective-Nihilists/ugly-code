@@ -208,6 +208,7 @@ const DEFAULT_EXPANDED_TOOLS = new Set([
   'delegate_parallel',
   'python',
   'write',
+  'edit',
   'multiedit',
   'think',
 ]);
@@ -1279,6 +1280,7 @@ interface ToolInput {
   old_string?: string;
   new_string?: string;
   new_content?: string;
+  content?: string;
   edits?: ToolInputEdit[];
   thought?: string;
   filter?: string;
@@ -1326,7 +1328,7 @@ function EditCard({ tool }: { tool: ToolUse }) {
   // `new_string`. The `write` tool also uses `new_content`. Surface either.
   const oldContent: string | undefined = meta.old_content ?? input.old_string;
   const newContent: string | undefined =
-    meta.new_content ?? input.new_string ?? input.new_content;
+    meta.new_content ?? input.new_string ?? input.new_content ?? input.content;
   const targetDescription = !isMulti ? describeEditTarget(input) : undefined;
   const diffText: string | undefined = meta.diff;
   // Capture the multi-edit array once: TS loses the `Array.isArray` narrowing on

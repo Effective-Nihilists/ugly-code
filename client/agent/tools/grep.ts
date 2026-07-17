@@ -235,15 +235,17 @@ async function runDiagnostics(args: GrepArgs, ctx: ToolContext | undefined): Pro
  *  monolith `runLspMode`; `ctx.lsp` → `lspForProject(ctx)`. */
 export async function runLspMode(
   mode: 'lsp-defs' | 'lsp-refs' | 'lsp-impls',
-  symbol: string,
+  args: GrepArgs,
   ctx: ToolContext | undefined,
 ): Promise<string> {
+  const symbol = args.pattern;
   const lsp = await lspForProject(ctx);
-  if (!lsp) {
-    return `(lsp not available — mode=${mode} requires the TypeScript language server)`;
-  }
-  if (lsp.getState() !== 'ready') {
-    return `(lsp not yet initialized — state=${lsp.getState()}; retry shortly)`;
+  // LSP unavailable, or still warming up on a fresh session: fall back to a plain text search
+  // instead of returning a dead "retry shortly" result. An explicit lsp-defs grep shouldn't
+  // burn a round-trip while the index boots — that "lsp not yet initialized" reply is what made
+  // a cold session flail (grep → nothing → glob → nothing) before it finally ran `ls`.
+  if (lsp?.getState() !== 'ready') {
+    return runExact({ ...args, mode: 'exact' }, ctx);
   }
   // Ensure the project graph is loaded so workspaceSymbol returns cross-file
   // results (memoized after the first call).
@@ -342,7 +344,7 @@ export const grepTool: ToolModule = {
       args.mode === 'lsp-refs' ||
       args.mode === 'lsp-impls'
     ) {
-      return runLspMode(args.mode, args.pattern, ctx);
+      return runLspMode(args.mode, args, ctx);
     }
 
     // Auto-supplement: for a bare-identifier auto grep, run the exact pass and
