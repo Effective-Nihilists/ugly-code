@@ -241,9 +241,8 @@ async function provision(sessionId: string, projectPath: string | null, onProgre
     return fallback();
   }
 
-  const safe = safeId(sessionId);
-  const dir = `${projectPath}/.ugly-studio/worktrees/${safe}`;
-  const branch = `ugly-studio/session/${safe}`;
+  const dir = sessionWorktreeDir(projectPath, sessionId);
+  const branch = sessionBranchName(sessionId);
 
   try {
     if (!(await exists(dir))) {
@@ -294,6 +293,15 @@ export function sessionPort(sessionId: string): number {
  *  and fall back to the project root. Lets the Git + Preview panels show the agent's change. */
 export function sessionWorktreeDir(projectPath: string, sessionId: string): string {
   return `${projectPath}/.ugly-studio/worktrees/${safeId(sessionId)}`;
+}
+
+/** Deterministic branch name for a session's worktree — the counterpart to
+ *  `sessionWorktreeDir`, so the renderer can name the branch a change lives on without
+ *  waiting for a worker snapshot to arrive (it's null on a fresh reload, which is
+ *  precisely when the user is asking "where did my change go?"). Single definition:
+ *  `ensureSessionWorkspace` builds the real branch from the same pieces. */
+export function sessionBranchName(sessionId: string): string {
+  return `ugly-studio/session/${safeId(sessionId)}`;
 }
 
 /** Sync accessor for tool handlers (null until ensureSessionWorkspace resolves). */

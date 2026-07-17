@@ -53,6 +53,7 @@ import {
 import { registerFeedbackContextProvider } from 'ugly-app/client';
 import { MdastViewer } from 'ugly-app/markdown/client';
 import { isNativeAvailable } from 'ugly-app/native';
+import { sessionBranchName, sessionWorktreeDir } from '../agent/sessionWorkspace';
 import { buildDiffRows, diffStats, type Part } from './tokenDiff';
 import { badgeLabel, parseGlobFiles, parseGrepOutput, searchBadge } from './toolCardSummary';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
@@ -6408,6 +6409,28 @@ CodingAgentChatProps = {}) {
   // the auto-fix loop on every state update.
   const finishPipelineRef = useRef(finishPipeline);
   const isStreamingRef = useRef(isStreaming);
+  // Does this session have a worktree ON DISK? The `worktree` binding above only
+  // arrives with a session SNAPSHOT from the worker, so it's null exactly when a user
+  // most needs to be told where their change went (fresh reload, snapshot not yet in).
+  // The path and branch are deterministic, so ask the filesystem — the same thing Git
+  // and File now do.
+  const [worktreeOnDisk, setWorktreeOnDisk] = useState<{ branch: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const projectPath = getActiveProjectPath();
+    if (!sessionId || !projectPath) { setWorktreeOnDisk(null); return; }
+    const check = async (): Promise<void> => {
+      try {
+        const dir = sessionWorktreeDir(projectPath, sessionId);
+        const exists = await native.fs.exists(dir);
+        if (!cancelled) setWorktreeOnDisk(exists ? { branch: sessionBranchName(sessionId) } : null);
+      } catch { if (!cancelled) setWorktreeOnDisk(null); }
+    };
+    void check();
+    const t = setInterval(() => void check(), 5000); // appears on the first turn
+    return () => { cancelled = true; clearInterval(t); };
+  }, [sessionId]);
+
   const worktreeRef = useRef(worktree);
   useEffect(() => {
     finishPipelineRef.current = finishPipeline;
@@ -8482,7 +8505,7 @@ CodingAgentChatProps = {}) {
             gated behind a `status` message in the transcript, so a first-time user hunts
             for it and concludes there isn't one. This banner is unconditional whenever a
             worktree exists: it names the branch and offers the action. */}
-        {!isChildSession && worktree?.branch && (
+        {!isChildSession && (worktree?.branch ?? worktreeOnDisk) && (
           <div
             data-id="worktree-banner"
             style={{
@@ -8499,15 +8522,15 @@ CodingAgentChatProps = {}) {
           >
             <GitBranch size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Edits are on <code style={{ fontFamily: 'SF Mono, Fira Code, Consolas, monospace' }}>{worktree.branch}</code>
+              Edits are on <code style={{ fontFamily: 'SF Mono, Fira Code, Consolas, monospace' }}>{worktree?.branch ?? worktreeOnDisk?.branch}</code>
               {' — not in '}
-              <code style={{ fontFamily: 'SF Mono, Fira Code, Consolas, monospace' }}>{worktree.parentBranch}</code>
+              <code style={{ fontFamily: 'SF Mono, Fira Code, Consolas, monospace' }}>{worktree?.parentBranch ?? 'your project'}</code>
               {' yet.'}
             </span>
             <button
               type="button"
               data-id="worktree-banner-finish"
-              title={`Merge this session's changes into ${worktree.parentBranch}`}
+              title={`Merge this session's changes into ${worktree?.parentBranch ?? 'your project'}`}
               onClick={() => { void runFinish(); }}
               style={{
                 marginLeft: 'auto',
