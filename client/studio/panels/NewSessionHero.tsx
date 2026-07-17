@@ -596,8 +596,7 @@ export function NewSessionHero({
                 data-us-tooltip="The defaults work fine; hover any pill for what it controls."
                 data-us-tooltip-placement="top"
               >
-                Run options{' '}
-                <span style={{ opacity: 0.7 }}>· optional</span>
+                Run options <span style={{ opacity: 0.7 }}>· optional</span>
               </span>
               {showAdvancedModes && (
                 <BranchDropdown value={branchMode} onChange={setBranchMode} />
