@@ -133,20 +133,22 @@ export const DB_SCRIPT = [
   "function d1Flatten(rows){ return rows.map((row) => { let d = {}; if (row.data){ try { d = JSON.parse(row.data); } catch {} } return Object.assign({ _id: row._id }, (d && typeof d === 'object') ? d : {}, { _created: row.created, _updated: row.updated }); }); }",
   "async function d1TableExists(name){ const r = await d1All(\"SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name = ? LIMIT 1\", [ident(name)]); return r.length > 0; }",
   // estimatedCount: SQLite has no cheap reltuples, so count each table via a UNION ALL of
-  // scalar subqueries. CHUNKED — one UNION ALL over EVERY table blows past D1/SQLite's
-  // compound-SELECT term cap once an app has enough tables (framework builtins + collections
-  // + telemetry), failing the whole Browse list with `too many terms in compound SELECT`.
-  // Batch keeps each compound query small; a handful of round-trips is fine for a table list.
+  // scalar subqueries. CHUNKED SMALL — Cloudflare D1's compound-SELECT term cap is TINY
+  // (empirically ~4-5 UNION terms with count subqueries, NOT SQLite's default 500), so one
+  // UNION over every table (or even 20) fails the whole Browse list with `too many terms in
+  // compound SELECT`. Keep each batch ≤4 terms; run batches in parallel so many tables still
+  // load in ~one round-trip.
   "async function d1CountNames(tables){",
   "  if (!tables.length) return [];",
-  "  const CHUNK = 20;",
-  "  const out = [];",
-  "  for (let i = 0; i < tables.length; i += CHUNK) {",
-  "    const batch = tables.slice(i, i + CHUNK);",
+  "  const CHUNK = 4;",
+  "  const batches = [];",
+  "  for (let i = 0; i < tables.length; i += CHUNK) batches.push(tables.slice(i, i + CHUNK));",
+  "  const results = await Promise.all(batches.map((batch) => {",
   "    const unionSql = batch.map((t) => \"SELECT '\" + String(t).replace(/'/g, \"''\") + \"' AS name, (SELECT count(*) FROM `\" + ident(t) + \"`) AS n\").join(' UNION ALL ');",
-  "    const rows = await d1All(unionSql, []);",
-  "    for (const x of rows) out.push({ name: String(x.name), estimatedCount: Math.max(0, Number(x.n) || 0) });",
-  "  }",
+  "    return d1All(unionSql, []);",
+  "  }));",
+  "  const out = [];",
+  "  for (const rows of results) for (const x of rows) out.push({ name: String(x.name), estimatedCount: Math.max(0, Number(x.n) || 0) });",
   "  return out;",
   "}",
   "async function d1ListAll(){ const tables = (await d1All(\"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT LIKE 'd1_%' ORDER BY name\", [])).map((r) => String(r.name)); return d1CountNames(tables); }",
