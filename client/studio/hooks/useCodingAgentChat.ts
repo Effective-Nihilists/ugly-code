@@ -1,11 +1,24 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { useAppOptional } from 'ugly-app/client';
-import type { ReasoningEffort, SessionSnapshot } from '../shared/api';
-import { SessionSnapshotSchema } from '../shared/api';
-import { spliceMissingUserRows } from '../agent/messageBackfill';
-import { parseCodebaseReadinessEvent } from '../agent/codebaseReadinessEvent';
-import { ProjectScopeContext } from '../state/ProjectScopeContext';
-import { onCustomMessage, getSessionModel, getSessionAxes, setSessionModel, patchSessionAxes } from './useSocket';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useAppOptional } from "ugly-app/client";
+import type { ReasoningEffort, SessionSnapshot } from "../shared/api";
+import { SessionSnapshotSchema } from "../shared/api";
+import { spliceMissingUserRows } from "../agent/messageBackfill";
+import { parseCodebaseReadinessEvent } from "../agent/codebaseReadinessEvent";
+import { ProjectScopeContext } from "../state/ProjectScopeContext";
+import {
+  onCustomMessage,
+  getSessionModel,
+  getSessionAxes,
+  setSessionModel,
+  patchSessionAxes,
+} from "./useSocket";
 import {
   readServerConfig,
   writeServerConfig,
@@ -13,12 +26,19 @@ import {
   axesToConfig,
   coerceModelMode,
   type AxisState,
-} from '../agent/sessionConfigStore';
-import type { SessionConfig, SessionConfigDefaults } from '../../../shared/sessionConfig';
-import { subscribeEditorLspStatus } from '../agent/lsp/registry';
-import { rowsToDisplayMessages } from '../agent/sessionDisplay';
-import type { StoredMessageRow, StoredRole, StoredKind } from '../agent/serverSessionApi';
-import { compareCodingMessages } from '../../../shared/codingCollections';
+} from "../agent/sessionConfigStore";
+import type {
+  SessionConfig,
+  SessionConfigDefaults,
+} from "../../../shared/sessionConfig";
+import { subscribeEditorLspStatus } from "../agent/lsp/registry";
+import { rowsToDisplayMessages } from "../agent/sessionDisplay";
+import type {
+  StoredMessageRow,
+  StoredRole,
+  StoredKind,
+} from "../agent/serverSessionApi";
+import { compareCodingMessages } from "../../../shared/codingCollections";
 
 /** A `codingSessionMessage` doc as delivered by trackDocs (for the projection).
  *  Extends the DBObject system fields (`version`/`created`/`updated`) so it satisfies
@@ -88,7 +108,7 @@ export interface ToolUse {
    * 'executing' — args fully emitted, tool is actually executing server-side (no tool_result yet).
    * 'done' / 'error' — tool_result has arrived.
    */
-  status: 'running' | 'executing' | 'done' | 'error';
+  status: "running" | "executing" | "done" | "error";
   /**
    * Partial output streamed from the server while the tool is
    * executing (bash, fetch, python_exec). Populated by `tool_progress`
@@ -190,7 +210,7 @@ const DEFAULT_FEATURES: CodingAgentFeatures = {
   systemSkills: { enabled: true },
   autoTsc: { enabled: false },
   codebaseIndex: true,
-  autoAllowlist: ['deepseek_v4_pro', 'deepseek_v4_flash', 'glm_5_1'],
+  autoAllowlist: ["deepseek_v4_pro", "deepseek_v4_flash", "glm_5_1"],
   pureJudgeMode: false,
   expensiveParallel: false,
 };
@@ -227,7 +247,7 @@ function serverToFeatures(ca: ServerCodingAgent): CodingAgentFeatures {
       : DEFAULT_FEATURES.autoAllowlist,
     pureJudgeMode: !!ca.pureJudgeMode,
     expensiveParallel: !!ca.expensiveParallel,
-    ...(typeof ca.temperatureOverride === 'number'
+    ...(typeof ca.temperatureOverride === "number"
       ? { temperatureOverride: ca.temperatureOverride }
       : {}),
   };
@@ -348,7 +368,7 @@ export interface CodingAgentSessionInfo {
    * auto-fire turn loop, the "Grade run" button, and the inline
    * scorecard render.
    */
-  eval?: import('../shared/api').SessionEvalState | null;
+  eval?: import("../shared/api").SessionEvalState | null;
 }
 
 /**
@@ -357,7 +377,7 @@ export interface CodingAgentSessionInfo {
  * here so the client doesn't have to import server types directly.
  */
 export interface JudgeCallSnapshot {
-  kind: 'iter' | 'post_turn' | 'session_strategist';
+  kind: "iter" | "post_turn" | "session_strategist";
   model: string;
   latencyMs: number;
   promptTokens: number;
@@ -373,7 +393,7 @@ export interface JudgeCallSnapshot {
     extra?: Record<string, string>;
   };
   output: {
-    verdict: 'continue' | 'intervene';
+    verdict: "continue" | "intervene";
     intervention?: {
       kind: string;
       text: string;
@@ -407,7 +427,7 @@ export interface DoneStateSnapshot {
     aheadCount: number | null;
     changedFiles: readonly {
       path: string;
-      status: 'A' | 'M' | 'D' | 'R' | '?';
+      status: "A" | "M" | "D" | "R" | "?";
     }[];
   };
   finishOutcome?: {
@@ -416,20 +436,15 @@ export interface DoneStateSnapshot {
     message?: string;
     stages: readonly {
       name:
-        | 'precheck_dirty_main'
-        | 'merge_parent'
-        | 'tsc'
-        | 'lint'
-        | 'tests'
-        | 'merge_squash'
-        | 'cleanup';
+        | "precheck_dirty_main"
+        | "merge_parent"
+        | "tsc"
+        | "lint"
+        | "tests"
+        | "merge_squash"
+        | "cleanup";
       state:
-        | 'pending'
-        | 'running'
-        | 'passed'
-        | 'failed'
-        | 'skipped'
-        | 'stopped';
+        "pending" | "running" | "passed" | "failed" | "skipped" | "stopped";
       exitCode?: number;
       command?: string;
     }[];
@@ -445,7 +460,7 @@ export interface ChatMessage {
    * back into the agent's LLM context. The hard filter lives
    * server-side in historyToLlmMessages.
    */
-  role: 'user' | 'assistant' | 'judge' | 'status';
+  role: "user" | "assistant" | "judge" | "status";
   content: string;
   toolUses: ToolUse[];
   thinking?: string;
@@ -470,7 +485,7 @@ export interface ChatMessage {
    * one-shot at send time.
    */
   attachments?: {
-    mediaType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
+    mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
     base64: string;
     filename?: string;
   }[];
@@ -506,7 +521,7 @@ export interface ChatMessage {
  * without needing to subscribe to events itself.
  */
 export interface LspStatus {
-  state: 'initializing' | 'ready' | 'error' | 'disabled' | 'closed' | 'idle';
+  state: "initializing" | "ready" | "error" | "disabled" | "closed" | "idle";
   errors: number;
   warnings: number;
   lastUpdatedAt: number | null;
@@ -520,7 +535,7 @@ export interface LspStatus {
  * glance whether the judge is nudging or terminating turns.
  */
 export interface JudgeVerdict {
-  kind: 'critique' | 'terminated' | 'replan_restart';
+  kind: "critique" | "terminated" | "replan_restart";
   text?: string;
   reason?: string;
   at: number;
@@ -570,7 +585,7 @@ async function rawAgentApi(method: string, input: object): Promise<unknown> {
   // Phase 3b: the coding-agent RPCs route through the native transport shim
   // (window.UglyNative) instead of a sidecar `/api/*` fetch. The shim runs the
   // agent loop client-side for chatSend.
-  const { nativeRequest } = await import('./useSocket');
+  const { nativeRequest } = await import("./useSocket");
   return nativeRequest(method, input);
 }
 
@@ -611,42 +626,42 @@ function useScopedAgentApi(): typeof rawAgentApi {
 // ugly.bot-routed framework model (no BYO key required). A user who
 // previously picked a different model (incl. `'auto'`) keeps it via
 // localStorage — only first-launch sessions land on this default.
-const DEFAULT_MODEL = 'deepseek_v4_pro';
+const DEFAULT_MODEL = "deepseek_v4_pro";
 
 const BACKEND = {
-  chatCreate: 'codingAgentChatCreate',
-  chatSend: 'codingAgentChatSend',
-  chatStop: 'codingAgentChatStop',
-  chatClearMessages: 'codingAgentChatClearMessages',
-  toolStop: 'codingAgentToolStop',
-  chatSetModel: 'codingAgentChatSetModel',
-  chatSetReasoningEffort: 'codingAgentSetReasoningEffort',
-  chatListMessages: 'codingAgentChatListMessages',
-  grantPermission: 'codingAgentGrantPermission',
-  skipPermissions: 'codingAgentSkipPermissions',
-  setPermissionMode: 'codingAgentSetPermissionMode',
-  setModelMode: 'codingAgentSetModelMode',
-  setPatternMode: 'codingAgentSetPatternMode',
-  finish: 'finishCodingAgentSession',
-  merge: 'mergeFinishedCodingAgentSession',
-  finishStop: 'codingAgentFinishStop',
-  abandon: 'abandonCodingAgentSession',
-  archive: 'codingAgentArchiveSession',
-  refreshWorktree: 'refreshCodingAgentSession',
-  worktreeBehind: 'getCodingAgentWorktreeBehind',
-  worktreeAhead: 'getCodingAgentWorktreeAhead',
-  markSessionViewed: 'markSessionViewed',
+  chatCreate: "codingAgentChatCreate",
+  chatSend: "codingAgentChatSend",
+  chatStop: "codingAgentChatStop",
+  chatClearMessages: "codingAgentChatClearMessages",
+  toolStop: "codingAgentToolStop",
+  chatSetModel: "codingAgentChatSetModel",
+  chatSetReasoningEffort: "codingAgentSetReasoningEffort",
+  chatListMessages: "codingAgentChatListMessages",
+  grantPermission: "codingAgentGrantPermission",
+  skipPermissions: "codingAgentSkipPermissions",
+  setPermissionMode: "codingAgentSetPermissionMode",
+  setModelMode: "codingAgentSetModelMode",
+  setPatternMode: "codingAgentSetPatternMode",
+  finish: "finishCodingAgentSession",
+  merge: "mergeFinishedCodingAgentSession",
+  finishStop: "codingAgentFinishStop",
+  abandon: "abandonCodingAgentSession",
+  archive: "codingAgentArchiveSession",
+  refreshWorktree: "refreshCodingAgentSession",
+  worktreeBehind: "getCodingAgentWorktreeBehind",
+  worktreeAhead: "getCodingAgentWorktreeAhead",
+  markSessionViewed: "markSessionViewed",
   /**
    * Phase 1 of snapshot migration: pull the full session-state
    * snapshot. Called on mount + after any reconnect to get an
    * authoritative read of mode/model/reasoning/tokens/worktree etc.
    * without depending on having received the granular events.
    */
-  getSnapshot: 'getCodingAgentSnapshot',
+  getSnapshot: "getCodingAgentSnapshot",
   // Listen-only attach to a session's live task stream (cross-device sync).
-  chatAttach: 'codingAgentChatAttach',
-  eventType: 'codingAgent:event',
-  exitType: 'codingAgent:exit',
+  chatAttach: "codingAgentChatAttach",
+  eventType: "codingAgent:event",
+  exitType: "codingAgent:exit",
 } as const;
 
 const WINDOW_MAX = 500;
@@ -776,7 +791,7 @@ export interface PeerMessage {
 export interface PeerToolProgress {
   toolCallId: string;
   /** 'stdout' | 'stderr' | 'meta' (meta carries timing only). */
-  stream: 'stdout' | 'stderr' | 'meta';
+  stream: "stdout" | "stderr" | "meta";
   text: string;
   /** Server-side wall clock when the chunk landed; drives staleness. */
   updatedAt: number;
@@ -802,60 +817,62 @@ function agentMessageToChatMessage(
   const partData = (p: RawMessagePart): Record<string, unknown> =>
     (p.data ?? {}) as Record<string, unknown>;
   const ts =
-    typeof message.created_at === 'number' && message.created_at > 0
+    typeof message.created_at === "number" && message.created_at > 0
       ? { created_at: message.created_at }
       : {};
-  if (message.role === 'user') {
-    let text = '';
+  if (message.role === "user") {
+    let text = "";
     for (const p of parts) {
-      if (p.type === 'text')
-        text += (partData(p).text as string | undefined) ?? '';
+      if (p.type === "text")
+        text += (partData(p).text as string | undefined) ?? "";
     }
     if (!text) return null;
     return {
       id: message.id,
-      role: 'user',
+      role: "user",
       content: text,
       toolUses: [],
       isStreaming: false,
       ...ts,
     };
   }
-  if (message.role === 'assistant') {
-    let textContent = '';
-    let thinkingContent = '';
+  if (message.role === "assistant") {
+    let textContent = "";
+    let thinkingContent = "";
     const toolUses: ToolUse[] = [];
     let isFinished = false;
     for (const part of parts) {
       const d = partData(part);
       switch (part.type) {
-        case 'text':
-          textContent += (d.text as string | undefined) ?? '';
+        case "text":
+          textContent += (d.text as string | undefined) ?? "";
           break;
-        case 'reasoning':
-          thinkingContent += (d.thinking as string | undefined) ?? '';
+        case "reasoning":
+          thinkingContent += (d.thinking as string | undefined) ?? "";
           break;
-        case 'tool_call':
+        case "tool_call":
           toolUses.push({
             id:
               (d.id as string | undefined) ??
               Math.random().toString(36).slice(2),
-            name: (d.name as string | undefined) ?? 'tool',
-            input: (d.input as string | undefined) ?? '',
-            status: d.finished ? 'executing' : 'running',
+            name: (d.name as string | undefined) ?? "tool",
+            input: (d.input as string | undefined) ?? "",
+            status: d.finished ? "executing" : "running",
             // Persisted start time (see clientAgent onTurn) so a running tool's
             // duration timer survives reload instead of resetting to zero.
-            ...(typeof d.started_at === 'number' ? { startedAt: d.started_at } : {}),
+            ...(typeof d.started_at === "number"
+              ? { startedAt: d.started_at }
+              : {}),
           });
           break;
-        case 'finish':
+        case "finish":
           isFinished = true;
           break;
       }
     }
     return {
       id: message.id,
-      role: 'assistant',
+      role: "assistant",
       content: textContent,
       toolUses,
       ...(thinkingContent ? { thinking: thinkingContent } : {}),
@@ -863,16 +880,16 @@ function agentMessageToChatMessage(
       ...ts,
     };
   }
-  if (message.role === 'judge') {
-    const judgePart = parts.find((p) => p.type === 'judge_call');
+  if (message.role === "judge") {
+    const judgePart = parts.find((p) => p.type === "judge_call");
     if (!judgePart?.data) return null;
     const snap = judgePart.data as JudgeCallSnapshot;
     const summaryLine = `${snap.kind} · ${snap.model} · ${snap.output.verdict}${
-      snap.output.intervention ? `/${snap.output.intervention.kind}` : ''
+      snap.output.intervention ? `/${snap.output.intervention.kind}` : ""
     }`;
     return {
       id: message.id,
-      role: 'judge',
+      role: "judge",
       content: summaryLine,
       toolUses: [],
       isStreaming: false,
@@ -880,21 +897,21 @@ function agentMessageToChatMessage(
       ...ts,
     };
   }
-  if (message.role === 'status') {
-    const donePart = parts.find((p) => p.type === 'done_state');
+  if (message.role === "status") {
+    const donePart = parts.find((p) => p.type === "done_state");
     if (!donePart?.data) return null;
     const snap = donePart.data as DoneStateSnapshot;
     const wt = snap.worktree;
     const summary =
-      `${wt.changedCount} file${wt.changedCount === 1 ? '' : 's'} changed` +
+      `${wt.changedCount} file${wt.changedCount === 1 ? "" : "s"} changed` +
       (wt.aheadCount && wt.aheadCount > 0
         ? ` · ${wt.aheadCount} commit${
-            wt.aheadCount === 1 ? '' : 's'
+            wt.aheadCount === 1 ? "" : "s"
           } ahead of ${wt.parentBranch}`
-        : '');
+        : "");
     return {
       id: message.id,
-      role: 'status',
+      role: "status",
       content: summary,
       toolUses: [],
       isStreaming: false,
@@ -935,13 +952,13 @@ function mergeToolResultsIntoChatMessages(
     {
       result: string;
       metadata: Record<string, unknown> | null;
-      status: 'done' | 'error';
+      status: "done" | "error";
     }
   >();
   for (const m of raw) {
-    if (m.role !== 'tool') continue;
+    if (m.role !== "tool") continue;
     for (const p of m.parts ?? []) {
-      if (p.type !== 'tool_result') continue;
+      if (p.type !== "tool_result") continue;
       const d = (p.data ?? {}) as {
         tool_call_id?: string;
         content?: string;
@@ -950,32 +967,32 @@ function mergeToolResultsIntoChatMessages(
       };
       const tcid = d.tool_call_id;
       if (!tcid) continue;
-      const content = d.content ?? '';
+      const content = d.content ?? "";
       let metadata: Record<string, unknown> | null = null;
       const metaRaw = d.metadata;
-      if (typeof metaRaw === 'string' && metaRaw.length > 0) {
+      if (typeof metaRaw === "string" && metaRaw.length > 0) {
         try {
           metadata = JSON.parse(metaRaw) as Record<string, unknown>;
         } catch {
           /* ignore */
         }
-      } else if (metaRaw && typeof metaRaw === 'object') {
+      } else if (metaRaw && typeof metaRaw === "object") {
         metadata = metaRaw as Record<string, unknown>;
       }
       const display =
         content.length > TOOL_RESULT_DISPLAY_CAP
-          ? content.slice(0, TOOL_RESULT_DISPLAY_CAP) + '\n... (truncated)'
+          ? content.slice(0, TOOL_RESULT_DISPLAY_CAP) + "\n... (truncated)"
           : content;
       results.set(tcid, {
         result: display,
         metadata,
-        status: d.is_error ? 'error' : 'done',
+        status: d.is_error ? "error" : "done",
       });
     }
   }
   if (results.size === 0) return projected;
   return projected.map((cm) => {
-    if (cm.role !== 'assistant') return cm;
+    if (cm.role !== "assistant") return cm;
     if (cm.toolUses.length === 0) return cm;
     let touched = false;
     const nextTools = cm.toolUses.map((tu) => {
@@ -1021,22 +1038,17 @@ export interface SessionWorktreeBinding {
 }
 
 export type FinishStageState =
-  | 'pending'
-  | 'running'
-  | 'passed'
-  | 'failed'
-  | 'skipped'
-  | 'stopped';
+  "pending" | "running" | "passed" | "failed" | "skipped" | "stopped";
 
 export interface FinishStageInfo {
   name:
-    | 'precheck_dirty_main'
-    | 'merge_parent'
-    | 'tsc'
-    | 'lint'
-    | 'tests'
-    | 'merge_squash'
-    | 'cleanup';
+    | "precheck_dirty_main"
+    | "merge_parent"
+    | "tsc"
+    | "lint"
+    | "tests"
+    | "merge_squash"
+    | "cleanup";
   state: FinishStageState;
   command?: string;
   output: string;
@@ -1057,7 +1069,7 @@ export interface FinishPipelineState {
   ok: boolean;
   stages: FinishStageInfo[];
   conflicts?: string[];
-  conflictStage?: 'merge_parent' | 'merge_squash';
+  conflictStage?: "merge_parent" | "merge_squash";
   squashSha?: string;
   message?: string;
   /**
@@ -1214,7 +1226,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     prevIsStreamingRef.current = isStreaming;
     if (!wasStreaming || isStreaming) return;
     if (!sessionId) return;
-    if (typeof document !== 'undefined' && !document.hasFocus()) return;
+    if (typeof document !== "undefined" && !document.hasFocus()) return;
     void agentApi(BACKEND.markSessionViewed, { compositeId: sessionId }).catch(
       () => undefined,
     );
@@ -1235,7 +1247,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // truth until the user changes an axis. Model + reasoning are also confirmed by the
   // chatCreate response below; the others are client-only.
   const seededAxes = initialSessionId ? getSessionAxes(initialSessionId) : {};
-  const seededModel = initialSessionId ? getSessionModel(initialSessionId) : null;
+  const seededModel = initialSessionId
+    ? getSessionModel(initialSessionId)
+    : null;
   const [model, setModel] = useState<string>(
     () => seededModel ?? initialModel ?? DEFAULT_MODEL,
   );
@@ -1243,14 +1257,17 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // → sendMessage → startNewChat, all in one tick before re-render) read the
   // just-picked model instead of the stale closure value.
   const modelRef = useRef(model);
-  useEffect(() => { modelRef.current = model; }, [model]);
+  useEffect(() => {
+    modelRef.current = model;
+  }, [model]);
   // Default to max thinking for fresh sessions — matches the server
   // env default in `readReasoningEffortEnv()` and ensures the studio
   // requests the heaviest reasoning the provider exposes. Users opt
   // down in the UI when they need latency back. Resumed sessions
   // overwrite this from disk via the chatCreate response.
-  const [reasoningEffort, setReasoningEffortState] =
-    useState<ReasoningEffort>(() => (seededAxes.reasoningEffort as ReasoningEffort | undefined) ?? 'max');
+  const [reasoningEffort, setReasoningEffortState] = useState<ReasoningEffort>(
+    () => (seededAxes.reasoningEffort as ReasoningEffort | undefined) ?? "max",
+  );
   // Ref mirror so a same-tick hero pre-pick (handleHeroSubmit → switchReasoningEffort
   // → sendMessage → startNewChat, before any re-render) reaches chatCreate instead of
   // the stale closure default. Mirrors the `modelRef` pattern below.
@@ -1259,8 +1276,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     reasoningEffortRef.current = reasoningEffort;
   }, [reasoningEffort]);
   // Branch mode mirror (same pattern — synchronous so startNewChat reads the hero's pick).
-  const branchModeRef = useRef<'worktree' | 'main'>('worktree');
-  const setBranchMode = useCallback((next: 'worktree' | 'main') => {
+  const branchModeRef = useRef<"worktree" | "main">("worktree");
+  const setBranchMode = useCallback((next: "worktree" | "main") => {
     branchModeRef.current = next;
   }, []);
   const [pendingSkill, setPendingSkill] = useState<string | null>(null);
@@ -1300,14 +1317,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // 'lost' / 'unavailable' banner text). Consumed by the chat header.
   const [worktreeStatus, setWorktreeStatus] = useState<{
     kind:
-      | 'created'
-      | 'reattached'
-      | 'refreshed'
-      | 'refresh_conflict'
-      | 'refresh_failed'
-      | 'lost'
-      | 'unavailable'
-      | 'removed';
+      | "created"
+      | "reattached"
+      | "refreshed"
+      | "refresh_conflict"
+      | "refresh_failed"
+      | "lost"
+      | "unavailable"
+      | "removed";
     message?: string;
     conflicts?: string[];
   } | null>(null);
@@ -1316,7 +1333,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // button. Null = not yet checked (button stays enabled until first
   // probe lands so the click degrades gracefully to a noop).
   const [worktreeBehind, setWorktreeBehind] = useState<
-    'up_to_date' | 'behind' | 'in_progress_merge' | 'unknown' | null
+    "up_to_date" | "behind" | "in_progress_merge" | "unknown" | null
   >(null);
   // Latest read-only probe of how many commits the worktree is AHEAD
   // of its parent. Drives the chat panel's Done button visibility —
@@ -1335,7 +1352,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const [finishPipeline, setFinishPipeline] =
     useState<FinishPipelineState>(EMPTY_FINISH);
   const [lspStatus, setLspStatus] = useState<LspStatus>({
-    state: 'idle',
+    state: "idle",
     errors: 0,
     warnings: 0,
     lastUpdatedAt: null,
@@ -1359,23 +1376,32 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // whenever the server's IndexerWatcher / ArchitectureManager emits
   // a state change, so the chat strip is always live without polling.
   const [codebaseReadiness, setCodebaseReadiness] = useState<
-    SessionSnapshot['codebaseReadiness'] | null
+    SessionSnapshot["codebaseReadiness"] | null
   >(null);
   // Three-axis state surfaced to the chat header. The strict types come
   // from the SessionSnapshot zod schema in shared/api.ts. State setters
   // get the *State suffix because the public callbacks (setPermissionMode
   // etc., defined as useCallback below) wrap them with server RPC calls.
-  const [permissionMode, setPermissionModeState] =
-    useState<SessionSnapshot['permissionMode']>(
-      () => (seededAxes.permissionMode as SessionSnapshot['permissionMode'] | undefined) ?? 'edit',
-    );
-  const [modelMode, setModelModeState] = useState<SessionSnapshot['modelMode']>(
-    () => (seededAxes.modelMode as SessionSnapshot['modelMode'] | undefined) ?? { kind: 'auto' },
+  const [permissionMode, setPermissionModeState] = useState<
+    SessionSnapshot["permissionMode"]
+  >(
+    () =>
+      (seededAxes.permissionMode as
+        SessionSnapshot["permissionMode"] | undefined) ?? "edit",
   );
-  const [patternMode, setPatternModeState] =
-    useState<SessionSnapshot['patternMode']>(
-      () => (seededAxes.patternMode as SessionSnapshot['patternMode'] | undefined) ?? 'auto',
-    );
+  const [modelMode, setModelModeState] = useState<SessionSnapshot["modelMode"]>(
+    () =>
+      (seededAxes.modelMode as SessionSnapshot["modelMode"] | undefined) ?? {
+        kind: "auto",
+      },
+  );
+  const [patternMode, setPatternModeState] = useState<
+    SessionSnapshot["patternMode"]
+  >(
+    () =>
+      (seededAxes.patternMode as SessionSnapshot["patternMode"] | undefined) ??
+      "auto",
+  );
   // Ref mirrors of the three axes so a same-tick new-session hero pre-pick reaches
   // `chatCreate` (see reasoningEffortRef / modelRef). The setters below write these
   // synchronously; `startNewChat` reads `.current` so it never sends a stale default.
@@ -1399,16 +1425,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // Cleared after the first matching snapshot so steady-state changes never log.
   const intendedCreateAxesRef = useRef<{
     id: string;
-    permissionMode: SessionSnapshot['permissionMode'];
-    modelMode: SessionSnapshot['modelMode'];
-    patternMode: SessionSnapshot['patternMode'];
+    permissionMode: SessionSnapshot["permissionMode"];
+    modelMode: SessionSnapshot["modelMode"];
+    patternMode: SessionSnapshot["patternMode"];
     reasoningEffort: ReasoningEffort;
     branchMode: "worktree" | "main";
   } | null>(null);
   const [resolvedPattern, setResolvedPattern] =
-    useState<SessionSnapshot['resolvedPattern']>(null);
+    useState<SessionSnapshot["resolvedPattern"]>(null);
   const [currentStepId, setCurrentStepId] =
-    useState<SessionSnapshot['currentStepId']>(null);
+    useState<SessionSnapshot["currentStepId"]>(null);
   const [currentStepIter, setCurrentStepIter] = useState<number>(0);
   const [currentStepFinished, setCurrentStepFinished] =
     useState<boolean>(false);
@@ -1431,10 +1457,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
    */
   const [autoModeRouting, setAutoModeRouting] = useState<{
     source:
-      | 'manual'
-      | 'auto-classified'
-      | 'auto-default'
-      | 'expensive-parallel';
+      "manual" | "auto-classified" | "auto-default" | "expensive-parallel";
     modelId: string;
     reason?: string;
     profileSummary?: string;
@@ -1455,9 +1478,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // a "start a new chat" splash flash before their prior transcript
   // fills in. Fresh sessions (no initialSessionId) skip the backfill
   // and start with this false.
-  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(
-    !!initialSessionId,
-  );
+  const [isLoadingHistory, setIsLoadingHistory] =
+    useState<boolean>(!!initialSessionId);
   const onSessionCreatedRef = useRef(onSessionCreated);
   const onModelChangedRef = useRef(onModelChanged);
   const onResumeMissingRef = useRef(onResumeMissing);
@@ -1499,20 +1521,31 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // snapshot for a freshly-created session must echo the axes we seeded on
       // create; if it doesn't, the user's picks were silently dropped downstream.
       const intended = intendedCreateAxesRef.current;
-      if (intended && (snap.sessionId === intended.id || snap.compositeId === intended.id)) {
+      if (
+        intended &&
+        (snap.sessionId === intended.id || snap.compositeId === intended.id)
+      ) {
         intendedCreateAxesRef.current = null;
         const drift: string[] = [];
         if (snap.permissionMode !== intended.permissionMode)
-          drift.push(`permissionMode ${intended.permissionMode}→${snap.permissionMode}`);
-        if (JSON.stringify(snap.modelMode) !== JSON.stringify(intended.modelMode))
-          drift.push(`modelMode ${JSON.stringify(intended.modelMode)}→${JSON.stringify(snap.modelMode)}`);
+          drift.push(
+            `permissionMode ${intended.permissionMode}→${snap.permissionMode}`,
+          );
+        if (
+          JSON.stringify(snap.modelMode) !== JSON.stringify(intended.modelMode)
+        )
+          drift.push(
+            `modelMode ${JSON.stringify(intended.modelMode)}→${JSON.stringify(snap.modelMode)}`,
+          );
         if (snap.patternMode !== intended.patternMode)
           drift.push(`patternMode ${intended.patternMode}→${snap.patternMode}`);
         if (snap.reasoningEffort !== intended.reasoningEffort)
-          drift.push(`reasoningEffort ${intended.reasoningEffort}→${snap.reasoningEffort}`);
+          drift.push(
+            `reasoningEffort ${intended.reasoningEffort}→${snap.reasoningEffort}`,
+          );
         if (drift.length > 0) {
           console.debug(
-            '[session-origin] worker echoed axes differing from local picks — keeping local (not adopting)',
+            "[session-origin] worker echoed axes differing from local picks — keeping local (not adopting)",
             JSON.stringify({ sessionId: intended.id, drift }),
           );
         }
@@ -1545,41 +1578,67 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             }
           : null,
       );
-      setSessionInfo({
-        id: snap.sessionId,
-        title: snap.title,
-        cwd: snap.cwd,
-        cost: snap.cost,
-        ...(snap.billedCost !== undefined && { billedCost: snap.billedCost }),
-        promptTokens: snap.promptTokens,
-        completionTokens: snap.completionTokens,
-        cacheReadTokens: snap.cacheReadTokens,
-        cacheCreationTokens: snap.cacheCreationTokens,
-        perModel: snap.perModel,
-        ...(snap.peerTotals !== undefined && { peerTotals: snap.peerTotals }),
-        messageCount: snap.messageCount,
-        createdAt: snap.createdAt,
-        updatedAt: snap.updatedAt,
-        ...(snap.modelDisplayLabel
-          ? { modelDisplayLabel: snap.modelDisplayLabel }
-          : {}),
-        ...(snap.contextTokens !== undefined && {
-          contextTokens: snap.contextTokens,
-        }),
-        ...(snap.contextBudget !== undefined && {
-          contextBudget: snap.contextBudget,
-        }),
-        ...(snap.contextWindow !== undefined && {
-          contextWindow: snap.contextWindow,
-        }),
-        ...(snap.specId ? { specId: snap.specId } : {}),
-        ...(snap.parentSessionId
-          ? { parentSessionId: snap.parentSessionId }
-          : {}),
-        ...(snap.maxModeWinnerSessionId
-          ? { maxModeWinnerSessionId: snap.maxModeWinnerSessionId }
-          : {}),
-        eval: snap.eval ?? null,
+      // Preserve-max the token/cost totals within a session. The doc-driven host path
+      // (headless/remote) emits session_state snapshots whose usage fields are 0 — only
+      // persistMeta's `codingSession` doc carries them — so a full-replace here clobbered the
+      // real doc value the subscription had installed, leaving the header stuck at "↑0 ↓0 /
+      // $0.00" for the whole session while the sidebar (a different read path off the same doc)
+      // climbed. Tokens and cost are cumulative and only grow within a session, so max(snap,
+      // prev) keeps whichever source has the real number — and the Claude-CLI runner's
+      // authoritative snapshot cost (`result.total_cost_usd`) still wins because it climbs. On a
+      // session switch prev belongs to a different session, so take snap verbatim.
+      setSessionInfo((prev) => {
+        const sameSession = prev?.id === snap.sessionId;
+        const keepMax = (snapVal: number, prevVal: number | undefined) =>
+          sameSession ? Math.max(snapVal, prevVal ?? 0) : snapVal;
+        const billed =
+          snap.billedCost !== undefined
+            ? keepMax(snap.billedCost, prev?.billedCost)
+            : sameSession
+              ? prev.billedCost
+              : undefined;
+        return {
+          id: snap.sessionId,
+          title: snap.title,
+          cwd: snap.cwd,
+          cost: keepMax(snap.cost, prev?.cost),
+          ...(billed !== undefined && { billedCost: billed }),
+          promptTokens: keepMax(snap.promptTokens, prev?.promptTokens),
+          completionTokens: keepMax(
+            snap.completionTokens,
+            prev?.completionTokens,
+          ),
+          cacheReadTokens: keepMax(snap.cacheReadTokens, prev?.cacheReadTokens),
+          cacheCreationTokens: keepMax(
+            snap.cacheCreationTokens,
+            prev?.cacheCreationTokens,
+          ),
+          perModel: snap.perModel,
+          ...(snap.peerTotals !== undefined && { peerTotals: snap.peerTotals }),
+          messageCount: snap.messageCount,
+          createdAt: snap.createdAt,
+          updatedAt: snap.updatedAt,
+          ...(snap.modelDisplayLabel
+            ? { modelDisplayLabel: snap.modelDisplayLabel }
+            : {}),
+          ...(snap.contextTokens !== undefined && {
+            contextTokens: snap.contextTokens,
+          }),
+          ...(snap.contextBudget !== undefined && {
+            contextBudget: snap.contextBudget,
+          }),
+          ...(snap.contextWindow !== undefined && {
+            contextWindow: snap.contextWindow,
+          }),
+          ...(snap.specId ? { specId: snap.specId } : {}),
+          ...(snap.parentSessionId
+            ? { parentSessionId: snap.parentSessionId }
+            : {}),
+          ...(snap.maxModeWinnerSessionId
+            ? { maxModeWinnerSessionId: snap.maxModeWinnerSessionId }
+            : {}),
+          eval: snap.eval ?? null,
+        };
       });
       // Phase 2 finishPipeline: snapshot carries every stage's
       // metadata (state, exitCode, command label) plus the
@@ -1603,7 +1662,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             return {
               name: s.name,
               state: s.state,
-              output: existing?.output ?? '',
+              output: existing?.output ?? "",
               ...(s.command !== undefined && { command: s.command }),
               ...(s.exitCode !== undefined && { exitCode: s.exitCode }),
               ...(s.message !== undefined && { message: s.message }),
@@ -1680,8 +1739,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // Only when present — the mount snapshot omits it, and the indexer poll streams it in
       // separate session_state events; an unconditional set would clobber live readiness.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- schema types codebaseReadiness as required, but the mount snapshot / cast path can omit it.
-      if (snap.codebaseReadiness !== undefined) setCodebaseReadiness(snap.codebaseReadiness);
-      if (snap.title && snap.title !== 'New session') {
+      if (snap.codebaseReadiness !== undefined)
+        setCodebaseReadiness(snap.codebaseReadiness);
+      if (snap.title && snap.title !== "New session") {
         onTitleChanged?.(snap.title);
       }
     },
@@ -1719,7 +1779,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         const parsed = SessionSnapshotSchema.safeParse(res.snapshot);
         if (!parsed.success) {
           console.warn(
-            '[CodingAgentChat] mount snapshot failed validation; falling back to granular events',
+            "[CodingAgentChat] mount snapshot failed validation; falling back to granular events",
             parsed.error.issues,
           );
           return;
@@ -1727,7 +1787,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         applySnapshot(parsed.data);
       } catch (err) {
         console.warn(
-          '[CodingAgentChat] Snapshot fetch failed; falling back to granular events',
+          "[CodingAgentChat] Snapshot fetch failed; falling back to granular events",
           err,
         );
       }
@@ -1757,7 +1817,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         (initialSessionId != null && msg.sessionId === initialSessionId);
 
       if (msg.type === backend.exitType && acceptedSessionId) {
-        console.debug('[CodingAgentChat] Session exited:', msg.sessionId);
+        console.debug("[CodingAgentChat] Session exited:", msg.sessionId);
         setIsStreaming(false);
         setStreamStartedAt(null);
         // Drop the dead session id so the next sendMessage falls through
@@ -1772,9 +1832,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // Finish/Abandon buttons. Log when we drop one on the floor
         // because sessionId state hadn't landed yet (init race).
         const evType = (msg.event as { type?: string } | undefined)?.type;
-        if (msg.type === backend.eventType && evType === 'worktree_event') {
+        if (msg.type === backend.eventType && evType === "worktree_event") {
           console.warn(
-            '[CodingAgentChat] Dropped worktree_event: msgSessionId=%s localSessionId=%s',
+            "[CodingAgentChat] Dropped worktree_event: msgSessionId=%s localSessionId=%s",
             msg.sessionId,
             sessionId,
           );
@@ -1789,7 +1849,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // legitimate cross-session traffic isn't noise.
         if (
           msg.type === backend.eventType &&
-          evType === 'session_state' &&
+          evType === "session_state" &&
           sessionId == null &&
           initialSessionId == null
         ) {
@@ -1812,12 +1872,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       const eventType = event.type;
       const payload = event.payload;
 
-      console.debug('[CodingAgentChat] Event: type=%s', eventType);
+      console.debug("[CodingAgentChat] Event: type=%s", eventType);
 
       // The transcript is owned by the trackDocs({includeTransient}) subscription
       // (committed rows + live transient streaming), so the local task.listen message
       // stream is ignored. Control events (below) still flow.
-      if (eventType === 'message') return;
+      if (eventType === "message") return;
 
       // Snapshot is the single source of truth for mode, model,
       // reasoning, tokens, worktree, worktreeStatus, finishPipeline
@@ -1833,14 +1893,17 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // poll), so the header pill renders on every client via trackDocs. See the doc-driven
       // read in the context-meter effect below. The producer stopped emitting the event.
 
-      if (eventType === 'session_state') {
+      if (eventType === "session_state") {
         // VALIDATE, don't cast: this snapshot is untyped wire data primed by the host's
         // coding.js task (whose build can lag the SPA). A bare `as SessionSnapshot` is the
         // lie that let `pendingPermissions.map` crash — parse it so the type is real. safeParse
         // also fills the schema defaults, so an older host's partial snapshot still applies.
         const parsed = SessionSnapshotSchema.safeParse(payload?.payload);
         if (!parsed.success) {
-          console.warn('[CodingAgentChat] dropping malformed session_state snapshot', parsed.error.issues);
+          console.warn(
+            "[CodingAgentChat] dropping malformed session_state snapshot",
+            parsed.error.issues,
+          );
           return;
         }
         const snap = parsed.data;
@@ -1851,7 +1914,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // landing, the snapshot arrives with the server's compositeId while the
         // local sessionId is still null. Dropping it here would lose any
         // pendingAskUsers the snapshot carries — the ask_user card never renders.
-        if (snap.compositeId !== sessionId && snap.compositeId !== initialSessionId) return;
+        if (
+          snap.compositeId !== sessionId &&
+          snap.compositeId !== initialSessionId
+        )
+          return;
         applySnapshot(snap);
         return;
       }
@@ -1864,11 +1931,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // peerLspState (rolling diagnostic counts per peer). The
       // per-peer pill view doesn't use any of these — it remounts
       // onto the peer's compositeId directly.
-      if (eventType === 'peer_stuck') {
+      if (eventType === "peer_stuck") {
         const stuck = payload?.payload as
           | { peerModelId?: string; peerCompositeId?: string; stuckMs?: number }
           | undefined;
-        if (!stuck?.peerModelId || typeof stuck.stuckMs !== 'number') return;
+        if (!stuck?.peerModelId || typeof stuck.stuckMs !== "number") return;
         setPeerStuckState((prev) => ({
           ...prev,
           [stuck.peerModelId!]: {
@@ -1879,7 +1946,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         return;
       }
 
-      if (eventType === 'peer_event') {
+      if (eventType === "peer_event") {
         const wrapped = payload?.payload as
           | {
               peerModelId?: string;
@@ -1907,14 +1974,13 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         }
 
         // Peer message → append/replace in the per-peer transcript.
-        if (original.type === 'message') {
+        if (original.type === "message") {
           const subType = original.payload?.type;
           const message = original.payload?.payload as
-            | RawAgentMessage
-            | undefined;
+            RawAgentMessage | undefined;
           if (!message?.id) return;
           setPeerMessages((prev) => {
-            if (subType === 'deleted') {
+            if (subType === "deleted") {
               return prev.filter((p) => p.message.id !== message.id);
             }
             // 'created' or 'updated': replace existing same-id entry,
@@ -1933,11 +1999,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
 
         // Peer tool_progress → keep only the latest chunk per peer.
         // High-volume (every bash stdout line) so we don't accumulate.
-        if (original.type === 'tool_progress') {
+        if (original.type === "tool_progress") {
           const tp = original.payload?.payload as
             | {
                 tool_call_id?: string;
-                stream?: 'stdout' | 'stderr' | 'meta';
+                stream?: "stdout" | "stderr" | "meta";
                 text?: string;
               }
             | undefined;
@@ -1945,9 +2011,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           setPeerToolProgress((prev) => ({
             ...prev,
             [peerModelId]: {
-              toolCallId: tp.tool_call_id ?? '',
-              stream: tp.stream ?? 'stdout',
-              text: tp.text ?? '',
+              toolCallId: tp.tool_call_id ?? "",
+              stream: tp.stream ?? "stdout",
+              text: tp.text ?? "",
               updatedAt: Date.now(),
             },
           }));
@@ -1958,7 +2024,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // single chip per peer. We deliberately don't store the full
         // diagnostics list (high-volume during a refactor and the
         // per-peer pill view shows the peer's own LSP state natively).
-        if (original.type === 'lsp_event') {
+        if (original.type === "lsp_event") {
           const ls = original.payload?.payload as
             | {
                 totalErrors?: number;
@@ -1982,15 +2048,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         return;
       }
       if (
-        eventType === 'session' ||
-        eventType === 'worktree_event' ||
-        eventType === 'permission_request' ||
-        eventType === 'permission_notification' ||
-        eventType === 'ask_user_request' ||
-        eventType === 'ask_user_resolved' ||
-        eventType === 'step_review_request' ||
-        eventType === 'step_review_resolved' ||
-        eventType === 'lsp_event'
+        eventType === "session" ||
+        eventType === "worktree_event" ||
+        eventType === "permission_request" ||
+        eventType === "permission_notification" ||
+        eventType === "ask_user_request" ||
+        eventType === "ask_user_resolved" ||
+        eventType === "step_review_request" ||
+        eventType === "step_review_resolved" ||
+        eventType === "lsp_event"
       ) {
         // Supplanted by `session_state` — see comment above.
         return;
@@ -2002,16 +2068,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // Only the streaming-only `stage_output` chunks still flow
       // through here — those carry the per-stage stdout text the
       // snapshot intentionally doesn't carry.
-      if (eventType === 'finish_event') {
+      if (eventType === "finish_event") {
         const p = payload?.payload as
           | {
               kind?: string;
-              stage?: FinishStageInfo['name'];
+              stage?: FinishStageInfo["name"];
               chunk?: string;
             }
           | undefined;
-        if (p?.kind !== 'stage_output') return;
-        if (!p.stage || typeof p.chunk !== 'string') return;
+        if (p?.kind !== "stage_output") return;
+        if (!p.stage || typeof p.chunk !== "string") return;
         // Hoist the narrowed values into consts so the narrowing survives
         // into the setState callback closure below.
         const stageName = p.stage;
@@ -2036,12 +2102,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // `result` — we leave `liveOutput` untouched so a brief flicker
       // between last progress chunk and tool_result doesn't empty the
       // pane.
-      if (eventType === 'tool_progress') {
+      if (eventType === "tool_progress") {
         if (!tailFollowingRef.current) return;
         const p = payload?.payload as
           | {
               tool_call_id?: string;
-              stream?: 'stdout' | 'stderr' | 'meta';
+              stream?: "stdout" | "stderr" | "meta";
               text?: string;
               timeout_ms?: number;
               started_at?: number;
@@ -2052,10 +2118,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // `meta` events carry timeout + start-time setup; `stdout` /
         // `stderr` carry chunk text. Handle them separately so the
         // countdown info isn't discarded when text is empty.
-        if (p.stream === 'meta') {
+        if (p.stream === "meta") {
           setMessages((prev) =>
             prev.map((m) => {
-              if (m.role !== 'assistant') return m;
+              if (m.role !== "assistant") return m;
               const idx = m.toolUses.findIndex((tu) => tu.id === tcid);
               if (idx === -1) return m;
               const prevTool = m.toolUses[idx];
@@ -2064,10 +2130,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
               const next = m.toolUses.slice();
               next[idx] = {
                 ...prevTool,
-                ...(typeof p.timeout_ms === 'number'
+                ...(typeof p.timeout_ms === "number"
                   ? { timeoutMs: p.timeout_ms }
                   : {}),
-                ...(typeof p.started_at === 'number'
+                ...(typeof p.started_at === "number"
                   ? { startedAt: p.started_at }
                   : {}),
               };
@@ -2078,10 +2144,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           return;
         }
         const text = p.text;
-        if (typeof text !== 'string' || text.length === 0) return;
+        if (typeof text !== "string" || text.length === 0) return;
         setMessages((prev) =>
           prev.map((m) => {
-            if (m.role !== 'assistant') return m;
+            if (m.role !== "assistant") return m;
             const idx = m.toolUses.findIndex((tu) => tu.id === tcid);
             if (idx === -1) return m;
             const prevTool = m.toolUses[idx];
@@ -2090,7 +2156,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             const next = m.toolUses.slice();
             next[idx] = {
               ...prevTool,
-              liveOutput: (prevTool.liveOutput ?? '') + text,
+              liveOutput: (prevTool.liveOutput ?? "") + text,
             };
             return { ...m, toolUses: next };
           }),
@@ -2106,9 +2172,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // doesn't already cover the field.
 
       // Handle errors
-      if (eventType === 'error' || eventType === 'stderr') {
-        const errMsg = event.text ?? event.message ?? 'Unknown error';
-        console.debug('[CodingAgentChat] Error event: %s', errMsg);
+      if (eventType === "error" || eventType === "stderr") {
+        const errMsg = event.text ?? event.message ?? "Unknown error";
+        console.debug("[CodingAgentChat] Error event: %s", errMsg);
         setError(errMsg);
         return;
       }
@@ -2120,57 +2186,63 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // (e.g. MiniMax hitting the loop detector) produce an empty
       // final assistant message with no finish part at all — which
       // would leave the spinner hanging forever.
-      if (eventType === 'agent_event') {
-        const innerBody = payload?.payload as { type?: string; reason?: string; diag?: unknown } | undefined;
+      if (eventType === "agent_event") {
+        const innerBody = payload?.payload as
+          { type?: string; reason?: string; diag?: unknown } | undefined;
         const innerType = innerBody?.type ?? payload?.type;
         // Fold the turn-end diagnostics into the console so bug-report feedback
         // telemetry captures WHY a turn ended (reason + ranMs/tokens) — the task
         // child's own logs don't reach the browser recentLogs.
-        if (innerType === 'agent_finished') {
+        if (innerType === "agent_finished") {
           console.debug(
-            '[CodingAgentChat] Agent event: innerType=%s reason=%s diag=%s',
+            "[CodingAgentChat] Agent event: innerType=%s reason=%s diag=%s",
             innerType,
-            innerBody?.reason ?? '',
+            innerBody?.reason ?? "",
             JSON.stringify(innerBody?.diag ?? {}),
           );
         } else {
-          console.debug('[CodingAgentChat] Agent event: innerType=%s', innerType);
+          console.debug(
+            "[CodingAgentChat] Agent event: innerType=%s",
+            innerType,
+          );
         }
         // subagent_event envelopes are produced by the session for
         // every event a delegate child emits. The shape is
         //   { type: 'subagent_event', child_session_id, child_index, depth, event }
         // We fold them into the parent's `delegate` (or
         // `delegate_parallel`) tool use as a `children` tree.
-        if (innerType === 'subagent_event') {
+        if (innerType === "subagent_event") {
           if (!tailFollowingRef.current) return;
-          const inner = payload?.payload as {
-            child_session_id?: string;
-            child_index?: number;
-            depth?: number;
-            event?: ChildEvent;
-          } | undefined;
+          const inner = payload?.payload as
+            | {
+                child_session_id?: string;
+                child_index?: number;
+                depth?: number;
+                event?: ChildEvent;
+              }
+            | undefined;
           if (inner?.child_session_id != null && inner.event) {
             applySubagentEvent({
               childSessionId: inner.child_session_id,
               childIndex:
-                typeof inner.child_index === 'number' ? inner.child_index : 0,
-              depth: typeof inner.depth === 'number' ? inner.depth : 1,
+                typeof inner.child_index === "number" ? inner.child_index : 0,
+              depth: typeof inner.depth === "number" ? inner.depth : 1,
               childEvent: inner.event,
             });
           }
           return;
         }
-        if (innerType === 'auto_mode_routing') {
+        if (innerType === "auto_mode_routing") {
           // Phase 0.5 — server emits this on every turn that auto
           // routing fires (or whenever a nudge claimer / parallel
           // fan-out is in play). The chat header reads
           // `autoModeRouting.reason` to render an inline route hint.
           const routing = payload?.payload as {
             source?:
-              | 'manual'
-              | 'auto-classified'
-              | 'auto-default'
-              | 'expensive-parallel';
+              | "manual"
+              | "auto-classified"
+              | "auto-default"
+              | "expensive-parallel";
             reason?: string;
             profile?: {
               kind?: string;
@@ -2183,8 +2255,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           };
           if (routing.source) {
             const profileSummary = routing.profile
-              ? `kind=${routing.profile.kind ?? '?'} ${
-                  routing.profile.breadthNeeded ?? '?'
+              ? `kind=${routing.profile.kind ?? "?"} ${
+                  routing.profile.breadthNeeded ?? "?"
                 }`
               : undefined;
             setAutoModeRouting({
@@ -2203,16 +2275,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           }
           return;
         }
-        if (innerType === 'reinforce_verdict') {
+        if (innerType === "reinforce_verdict") {
           const verdict = payload?.payload as {
-            kind?: 'critique' | 'terminated' | 'replan_restart';
+            kind?: "critique" | "terminated" | "replan_restart";
             text?: string;
             reason?: string;
           };
           if (
-            verdict.kind === 'critique' ||
-            verdict.kind === 'terminated' ||
-            verdict.kind === 'replan_restart'
+            verdict.kind === "critique" ||
+            verdict.kind === "terminated" ||
+            verdict.kind === "replan_restart"
           ) {
             setLastJudgeVerdict({
               kind: verdict.kind,
@@ -2223,7 +2295,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           }
           return;
         }
-        if (innerType === 'agent_finished' || innerType === 'error') {
+        if (innerType === "agent_finished" || innerType === "error") {
           setIsStreaming(false);
           setStreamStartedAt(null);
           // Close out any still-streaming assistant messages so the UI
@@ -2236,7 +2308,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           // error banner picks it up. The per-event top-level `error`
           // emit from runTurn does the same, but defensively handle the
           // case where only the agent_event carries the message.
-          if (innerType === 'error') {
+          if (innerType === "error") {
             const errMsg = (payload?.payload as { errorMessage?: string })
               .errorMessage;
             if (errMsg) setError(errMsg);
@@ -2287,10 +2359,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       if (!parentToolCallId) {
         for (let i = prev.length - 1; i >= 0; i--) {
           const m = prev[i];
-          if (m.role !== 'assistant') continue;
+          if (m.role !== "assistant") continue;
           for (const tu of m.toolUses) {
             const spawnsChildren =
-              tu.name === 'delegate' || tu.name === 'delegate_parallel';
+              tu.name === "delegate" || tu.name === "delegate_parallel";
             if (!spawnsChildren) continue;
             if (tu.result !== undefined) continue;
             const taken = (tu.children ?? []).some(
@@ -2310,7 +2382,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // array, returning a fresh array. Most delegate calls have a
       // single child so this stays cheap.
       return prev.map((m) => {
-        if (m.role !== 'assistant') return m;
+        if (m.role !== "assistant") return m;
         let touched = false;
         const nextTools = m.toolUses.map((tu) => {
           if (tu.id !== parentToolCallId) return tu;
@@ -2323,7 +2395,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
               index: childIndex,
               depth,
               toolUses: [],
-              text: '',
+              text: "",
               isStreaming: true,
             };
             existing.push(child);
@@ -2332,19 +2404,19 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           // Apply the inner event onto the child's state.
           const inner = childEvent;
           const innerType = inner.type;
-          if (innerType === 'message') {
+          if (innerType === "message") {
             const sub = inner.payload?.payload;
-            if (sub?.role === 'assistant' && Array.isArray(sub.parts)) {
-              let text = '';
+            if (sub?.role === "assistant" && Array.isArray(sub.parts)) {
+              let text = "";
               const tools: ToolUse[] = [];
               for (const p of sub.parts) {
-                if (p.type === 'text') text += p.data?.text ?? '';
-                else if (p.type === 'tool_call') {
+                if (p.type === "text") text += p.data?.text ?? "";
+                else if (p.type === "tool_call") {
                   tools.push({
                     id: p.data?.id ?? crypto.randomUUID(),
-                    name: p.data?.name ?? 'tool',
-                    input: p.data?.input ?? '',
-                    status: p.data?.finished ? 'executing' : 'running',
+                    name: p.data?.name ?? "tool",
+                    input: p.data?.input ?? "",
+                    status: p.data?.finished ? "executing" : "running",
                   });
                 }
               }
@@ -2355,8 +2427,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
                 if (!old) return t;
                 const keepTerminal =
                   old.result != null ||
-                  old.status === 'done' ||
-                  old.status === 'error';
+                  old.status === "done" ||
+                  old.status === "error";
                 return {
                   ...t,
                   result: old.result,
@@ -2366,23 +2438,23 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
                 };
               });
               child = { ...child, text: text || child.text, toolUses: merged };
-            } else if (sub?.role === 'tool' && Array.isArray(sub.parts)) {
+            } else if (sub?.role === "tool" && Array.isArray(sub.parts)) {
               const newToolUses = child.toolUses.slice();
               for (const p of sub.parts) {
-                if (p.type !== 'tool_result') continue;
+                if (p.type !== "tool_result") continue;
                 const tcid = p.data?.tool_call_id;
                 if (!tcid) continue;
                 const idx = newToolUses.findIndex((tu2) => tu2.id === tcid);
                 if (idx === -1) continue;
                 let metadata: Record<string, unknown> | null = null;
                 const raw = p.data?.metadata;
-                if (typeof raw === 'string' && raw.length > 0) {
+                if (typeof raw === "string" && raw.length > 0) {
                   try {
                     metadata = JSON.parse(raw) as Record<string, unknown>;
                   } catch {
                     /* ignore */
                   }
-                } else if (raw && typeof raw === 'object') {
+                } else if (raw && typeof raw === "object") {
                   metadata = raw as Record<string, unknown>;
                 }
                 const prevTool = newToolUses[idx];
@@ -2390,16 +2462,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
                 if (!prevTool) continue;
                 newToolUses[idx] = {
                   ...prevTool,
-                  result: p.data?.content ?? '',
+                  result: p.data?.content ?? "",
                   metadata,
-                  status: p.data?.is_error ? 'error' : 'done',
+                  status: p.data?.is_error ? "error" : "done",
                 };
               }
               child = { ...child, toolUses: newToolUses };
             }
-          } else if (innerType === 'agent_event') {
+          } else if (innerType === "agent_event") {
             const at = inner.payload?.payload?.type ?? inner.payload?.type;
-            if (at === 'agent_finished' || at === 'error') {
+            if (at === "agent_finished" || at === "error") {
               child = { ...child, isStreaming: false };
             }
           }
@@ -2439,9 +2511,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       knownMessageIds.current.clear();
       return true;
     } catch (err) {
-      console.error('[useCodingAgentChat:clearMessages]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:clearMessages]",
+        JSON.stringify({
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       const errMsg = `Failed to clear chat: ${(err as Error).message}`;
-      console.debug('[CodingAgentChat] %s', errMsg);
+      console.debug("[CodingAgentChat] %s", errMsg);
       setError(errMsg);
       return false;
     }
@@ -2450,7 +2529,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const startNewChat = useCallback(async () => {
     // Stop existing session
     if (sessionId) {
-      agentApi(backend.chatStop, { sessionId }).catch(() => {/* noop */});
+      agentApi(backend.chatStop, { sessionId }).catch(() => {
+        /* noop */
+      });
     }
     setMessages([]);
     setError(null);
@@ -2462,14 +2543,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     setWorktreeStatus(null);
     setFinishPipeline(EMPTY_FINISH);
     setLspStatus({
-      state: 'idle',
+      state: "idle",
       errors: 0,
       warnings: 0,
       lastUpdatedAt: null,
     });
     knownMessageIds.current.clear();
 
-    console.debug('[CodingAgentChat] Starting new chat with model: %s', model);
+    console.debug("[CodingAgentChat] Starting new chat with model: %s", model);
 
     try {
       // Resolve EVERY create axis from its ref, not the closed-over React state.
@@ -2509,7 +2590,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         reasoningEffort: createReasoningEffort,
         branchMode: createBranchMode,
       })) as ChatCreateResponse;
-      console.debug('[CodingAgentChat] Session created: %s', newId);
+      console.debug("[CodingAgentChat] Session created: %s", newId);
       // Arm the one-shot drift sentinel: the first snapshot for `newId` must echo
       // these seeded axes; applySnapshot logs to errorLog if it doesn't.
       intendedCreateAxesRef.current = {
@@ -2529,22 +2610,44 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       agentApi(backend.skipPermissions, {
         sessionId: newId,
         skip: true,
-      }).catch(() => {/* noop */});
-      if (createReasoningEffort !== 'off') {
+      }).catch(() => {
+        /* noop */
+      });
+      if (createReasoningEffort !== "off") {
         agentApi(backend.chatSetReasoningEffort, {
           sessionId: newId,
           effort: createReasoningEffort,
-        }).catch(() => {/* noop */});
+        }).catch(() => {
+          /* noop */
+        });
       }
       return newId;
     } catch (err) {
-      console.error('[useCodingAgentChat:startNewChat]', JSON.stringify({ model: modelRef.current, permissionMode, patternMode, reasoningEffort, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:startNewChat]",
+        JSON.stringify({
+          model: modelRef.current,
+          permissionMode,
+          patternMode,
+          reasoningEffort,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       const errMsg = `Failed to start chat: ${(err as Error).message}`;
-      console.debug('[CodingAgentChat] %s', errMsg);
+      console.debug("[CodingAgentChat] %s", errMsg);
       setError(errMsg);
       return null;
     }
-  }, [sessionId, model, permissionMode, patternMode, modelMode, reasoningEffort, backend]);
+  }, [
+    sessionId,
+    model,
+    permissionMode,
+    patternMode,
+    modelMode,
+    reasoningEffort,
+    backend,
+  ]);
 
   // Splice in any USER prompts we're missing — a viewer that attached AFTER the sender
   // emitted the prompt at turn start (common right after the host task is (re)started).
@@ -2564,21 +2667,28 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         if (!Array.isArray(res?.messages)) return;
         history = res.messages;
       } catch (err) {
-        console.error('[useCodingAgentChat:backfillMissingUserMessages]', JSON.stringify({ sessionId: sid, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:backfillMissingUserMessages]",
+          JSON.stringify({
+            sessionId: sid,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         return;
       }
       const rows = history.map((m) => ({
         id: m.id,
         role: m.role,
         text: (m.parts ?? [])
-          .filter((p) => p.type === 'text')
-          .map((p) => (p.data as MessagePartData | undefined)?.text ?? '')
-          .join(''),
+          .filter((p) => p.type === "text")
+          .map((p) => (p.data as MessagePartData | undefined)?.text ?? "")
+          .join(""),
       }));
       setMessages((prev) =>
         spliceMissingUserRows(prev, rows, (id, content) => ({
           id,
-          role: 'user',
+          role: "user",
           content,
           toolUses: [],
           isStreaming: false,
@@ -2724,7 +2834,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           setSessionInfo(
             (prev) =>
               ({
-                id: newId.split(':')[1] ?? newId,
+                id: newId.split(":")[1] ?? newId,
                 cost: prev?.cost ?? 0,
                 promptTokens: prev?.promptTokens ?? 0,
                 completionTokens: prev?.completionTokens ?? 0,
@@ -2749,8 +2859,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         agentApi(backend.skipPermissions, {
           sessionId: newId,
           skip: true,
-        }).catch(() => {/* noop */});
-
+        }).catch(() => {
+          /* noop */
+        });
       } catch (err) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
         if (!cancelled) {
@@ -2764,7 +2875,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           // permanent "Failed to start chat" message.
           if (
             initialSessionId &&
-            message.includes('not found in any open project') &&
+            message.includes("not found in any open project") &&
             onResumeMissingRef.current
           ) {
             console.warn(
@@ -2772,7 +2883,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             );
             onResumeMissingRef.current(initialSessionId);
           } else {
-            console.error('[useCodingAgentChat:resumeSession]', JSON.stringify({ initialSessionId, model, error: message }), err instanceof Error ? err.stack : undefined);
+            console.error(
+              "[useCodingAgentChat:resumeSession]",
+              JSON.stringify({ initialSessionId, model, error: message }),
+              err instanceof Error ? err.stack : undefined,
+            );
             setError(`Failed to start chat: ${message}`);
           }
           // Outer catch fires before the backfill block runs, so the
@@ -2786,7 +2901,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       cancelled = true;
       if (initialSessionId) {
         console.log(
-          '[session-origin] useCodingAgentChat.unmount sessionId=%s',
+          "[session-origin] useCodingAgentChat.unmount sessionId=%s",
           initialSessionId,
         );
       }
@@ -2812,7 +2927,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     setMessages((prev) =>
       prev.some((m) => m.id === id)
         ? prev
-        : [...prev, { id, role: 'assistant', content: `⚠ ${initialLastError}`, toolUses: [], isStreaming: false }],
+        : [
+            ...prev,
+            {
+              id,
+              role: "assistant",
+              content: `⚠ ${initialLastError}`,
+              toolUses: [],
+              isStreaming: false,
+            },
+          ],
     );
   }, [isLoadingHistory, initialLastError, initialSessionId]);
 
@@ -2844,9 +2968,17 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       });
       setHasMoreOlder(Boolean(hasMore));
     } catch (err) {
-      console.error('[useCodingAgentChat:loadOlderMessages]', JSON.stringify({ sessionId, beforeId: oldest.id, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:loadOlderMessages]",
+        JSON.stringify({
+          sessionId,
+          beforeId: oldest.id,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       console.debug(
-        '[CodingAgentChat] loadOlderMessages failed: %s',
+        "[CodingAgentChat] loadOlderMessages failed: %s",
         (err as Error).message,
       );
     } finally {
@@ -2888,9 +3020,17 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       });
       setHasMoreNewer(Boolean(hasMore));
     } catch (err) {
-      console.error('[useCodingAgentChat:loadNewerMessages]', JSON.stringify({ sessionId, afterId: newest.id, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:loadNewerMessages]",
+        JSON.stringify({
+          sessionId,
+          afterId: newest.id,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       console.debug(
-        '[CodingAgentChat] loadNewerMessages failed: %s',
+        "[CodingAgentChat] loadNewerMessages failed: %s",
         (err as Error).message,
       );
     } finally {
@@ -2918,9 +3058,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       setHasMoreNewer(false);
       knownMessageIds.current = new Set(fresh.map((m) => m.id));
     } catch (err) {
-      console.error('[useCodingAgentChat:jumpToTail]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:jumpToTail]",
+        JSON.stringify({
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       console.debug(
-        '[CodingAgentChat] jumpToTail failed: %s',
+        "[CodingAgentChat] jumpToTail failed: %s",
         (err as Error).message,
       );
     }
@@ -2931,7 +3078,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
    * snapshot stream re-confirms server state shortly after.
    */
   const setPermissionMode = useCallback(
-    async (next: SessionSnapshot['permissionMode']) => {
+    async (next: SessionSnapshot["permissionMode"]) => {
       permissionModeRef.current = next; // synchronous — startNewChat reads this
       setPermissionModeState(next);
       if (!sessionId) return;
@@ -2941,7 +3088,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           permissionMode: next,
         });
       } catch (err) {
-        console.error('[useCodingAgentChat:setPermissionMode]', JSON.stringify({ sessionId, permissionMode: next, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:setPermissionMode]",
+          JSON.stringify({
+            sessionId,
+            permissionMode: next,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setError(`Failed to set permission: ${(err as Error).message}`);
       }
     },
@@ -2964,7 +3119,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   }, []);
 
   const setModelMode = useCallback(
-    async (next: SessionSnapshot['modelMode']) => {
+    async (next: SessionSnapshot["modelMode"]) => {
       // The SERVER is the authority on backend/model consistency: it knows
       // which runtime a session is on (the client `model` string can lag a
       // snapshot) and whether the session has history. So just send the
@@ -2977,7 +3132,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // displayed model and what startNewChat sends to chatCreate. (Without this
       // a new-session claude-cli pick was lost: the string stayed at the default
       // 'auto', so the session showed auto and routed to the ugly.bot agent.)
-      if (next.kind === 'single') {
+      if (next.kind === "single") {
         modelRef.current = next.model; // synchronous — startNewChat reads this
         setModel(next.model);
         onModelChangedRef.current?.(next.model);
@@ -2987,10 +3142,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         const res = (await agentApi(backend.setModelMode, {
           sessionId,
           modelMode: next,
-        })) as { needsFamilySwitchConfirm?: boolean; ok?: boolean; sessionId?: string };
-        if (res.needsFamilySwitchConfirm && next.kind === 'single') {
+        })) as {
+          needsFamilySwitchConfirm?: boolean;
+          ok?: boolean;
+          sessionId?: string;
+        };
+        if (res.needsFamilySwitchConfirm && next.kind === "single") {
           const confirmed =
-            typeof window !== 'undefined' &&
+            typeof window !== "undefined" &&
             window.confirm(
               "Switching between Claude Code and ugly.bot models resets this chat's history and telemetry. Your worktree and files are kept. Continue?",
             );
@@ -3007,19 +3166,32 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // backend (a silent empty-session family switch). Within-family
         // changes return `{ ok }` with no sessionId — never wipe history for
         // those. Mirror locally only on a real convert.
-        if (res.ok && res.sessionId && next.kind === 'single') {
+        if (res.ok && res.sessionId && next.kind === "single") {
           applyFamilyConvertLocally(next.model);
         }
       } catch (err) {
-        console.error('[useCodingAgentChat:setModelMode]', JSON.stringify({ sessionId, modelMode: next, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:setModelMode]",
+          JSON.stringify({
+            sessionId,
+            modelMode: next,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setError(`Failed to set model mode: ${(err as Error).message}`);
       }
     },
-    [sessionId, backend.setModelMode, backend.chatSetModel, applyFamilyConvertLocally],
+    [
+      sessionId,
+      backend.setModelMode,
+      backend.chatSetModel,
+      applyFamilyConvertLocally,
+    ],
   );
 
   const setPatternMode = useCallback(
-    async (next: SessionSnapshot['patternMode']) => {
+    async (next: SessionSnapshot["patternMode"]) => {
       patternModeRef.current = next; // synchronous — startNewChat reads this
       setPatternModeState(next);
       if (!sessionId) return;
@@ -3029,7 +3201,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           patternMode: next,
         });
       } catch (err) {
-        console.error('[useCodingAgentChat:setPatternMode]', JSON.stringify({ sessionId, patternMode: next, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:setPatternMode]",
+          JSON.stringify({
+            sessionId,
+            patternMode: next,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setError(`Failed to set pattern mode: ${(err as Error).message}`);
       }
     },
@@ -3040,8 +3220,8 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     async (
       text: string,
       attachments?: {
-        kind: 'image';
-        mediaType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
+        kind: "image";
+        mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
         base64: string;
         filename?: string;
       }[],
@@ -3060,7 +3240,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       // skill-only).
       const outgoing = pendingSkill
         ? `Use the \`${pendingSkill}\` skill.${
-            text.trim() ? `\n\n${text}` : ''
+            text.trim() ? `\n\n${text}` : ""
           }`
         : text;
       const displayText =
@@ -3068,14 +3248,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         (pendingSkill
           ? `/${pendingSkill}`
           : hasAttachments
-          ? `📎 ${attachments!.length} image(s)`
-          : '');
+            ? `📎 ${attachments!.length} image(s)`
+            : "");
 
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
-          role: 'user',
+          role: "user",
           content: displayText,
           toolUses: [],
           isStreaming: false,
@@ -3103,7 +3283,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       setPendingStepReviews([]);
 
       console.debug(
-        '[CodingAgentChat] Sending message: session=%s length=%d attachments=%d',
+        "[CodingAgentChat] Sending message: session=%s length=%d attachments=%d",
         sid.slice(0, 16),
         outgoing.length,
         attachments?.length ?? 0,
@@ -3116,7 +3296,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           ...(hasAttachments ? { attachments } : {}),
         });
       } catch (err) {
-        console.error('[useCodingAgentChat:sendMessage]', JSON.stringify({ sessionId: sid, hasAttachments, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:sendMessage]",
+          JSON.stringify({
+            sessionId: sid,
+            hasAttachments,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setError(`Failed to send message: ${(err as Error).message}`);
         setIsStreaming(false);
         setStreamStartedAt(null);
@@ -3128,10 +3316,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const stopGeneration = useCallback(() => {
     if (sessionId) {
       console.debug(
-        '[CodingAgentChat] Stopping generation: %s',
+        "[CodingAgentChat] Stopping generation: %s",
         sessionId.slice(0, 16),
       );
-      agentApi(backend.chatStop, { sessionId }).catch(() => {/* noop */});
+      agentApi(backend.chatStop, { sessionId }).catch(() => {
+        /* noop */
+      });
     }
     setIsStreaming(false);
     setStreamStartedAt(null);
@@ -3156,11 +3346,13 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     (toolCallId: string) => {
       if (!sessionId) return;
       console.debug(
-        '[CodingAgentChat] Stopping tool: session=%s toolCall=%s',
+        "[CodingAgentChat] Stopping tool: session=%s toolCall=%s",
         sessionId.slice(0, 16),
         toolCallId.slice(0, 16),
       );
-      agentApi(backend.toolStop, { sessionId, toolCallId }).catch(() => {/* noop */});
+      agentApi(backend.toolStop, { sessionId, toolCallId }).catch(() => {
+        /* noop */
+      });
     },
     [sessionId, backend.toolStop],
   );
@@ -3189,7 +3381,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     const sid = sessionId ?? initialSessionId;
     if (!sid || !app?.socket) return;
     const unsub = app.socket.trackDocs<CodingMsgDoc>(
-      'codingSessionMessage',
+      "codingSessionMessage",
       { keys: { sessionId: sid }, includeTransient: true },
       (docs) => {
         // Numeric seq sort (JSONB sorts seq as text) with the summary tiebreak, then
@@ -3197,13 +3389,20 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // doc-sourced transcript renders byte-identically to a live-streamed one.
         const sorted: StoredMessageRow[] = [...docs]
           .sort(compareCodingMessages)
-          .map((d) => ({ seq: d.seq, role: d.role, kind: d.kind, compacted: d.compacted, content: d.content }));
+          .map((d) => ({
+            seq: d.seq,
+            role: d.role,
+            kind: d.kind,
+            compacted: d.compacted,
+            content: d.content,
+          }));
         // Bound the projection + render to the most recent DOC_WINDOW rows. The transient
         // streaming row is always the newest, so it's always in-window; only old history is
         // dropped from the view (a "load older" affordance is a follow-up). Without this a
         // long session re-projected + re-rendered its ENTIRE history on every streamed
         // token — the heaviest cost the throttled writes now also relieve.
-        const rows = sorted.length > DOC_WINDOW ? sorted.slice(-DOC_WINDOW) : sorted;
+        const rows =
+          sorted.length > DOC_WINDOW ? sorted.slice(-DOC_WINDOW) : sorted;
         const display = rowsToDisplayMessages(sid, rows);
         const chat = projectAgentMessagesToChat(display);
         // Never let an EMPTY server snapshot (the initial one, or the window before the
@@ -3211,16 +3410,23 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // spinner — that made a fresh session's first message vanish and snap back to the
         // new-session hero. Only take the projection once the server actually has rows;
         // an empty snapshot leaves the local optimistic state intact.
-        if (chat.length === 0) { setIsLoadingHistory(false); return; }
+        if (chat.length === 0) {
+          setIsLoadingHistory(false);
+          return;
+        }
         setMessages(chat);
         // Streaming indicator derived purely from docs: a `pending` (transient) assistant
         // row projects to `isStreaming` (no `finish` part); its durable commit flips it
         // finished. So the spinner reflects the live turn without the gated event stream.
-        setIsStreaming(chat.some((m) => m.role === 'assistant' && m.isStreaming));
+        setIsStreaming(
+          chat.some((m) => m.role === "assistant" && m.isStreaming),
+        );
         setIsLoadingHistory(false);
       },
     );
-    return () => { unsub(); };
+    return () => {
+      unsub();
+    };
   }, [sessionId, initialSessionId, app]);
 
   // Doc-driven interactive control: render the ask_user card from `codingInteraction` docs
@@ -3231,31 +3437,66 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     const sid = sessionId ?? initialSessionId;
     if (!sid || !app?.socket) return;
     const unsub = app.socket.trackDocs<CodingInteractionDoc>(
-      'codingInteraction',
+      "codingInteraction",
       { keys: { sessionId: sid } },
       (docs) => {
-        const asks = docs.filter((d) => d.kind === 'ask_user' && d.status === 'pending');
-        setPendingAskUsers(asks.map((d) => {
-          let q: { question?: string; options?: AskUserOption[] } = {};
-          try { q = JSON.parse(d.question ?? '{}') as typeof q; } catch { /* keep defaults */ }
-          const toolCallId = d.toolCallId ?? d._id;
-          return { id: toolCallId, sessionId: sid, toolCallId, question: q.question ?? '', options: q.options ?? [] };
-        }));
-        const reviews = docs.filter((d) => d.kind === 'step_review' && d.status === 'pending');
-        setPendingStepReviews(reviews.map((d) => {
-          let q: { stepId?: string; stepLabel?: string; patternId?: string; specId?: string; createdAt?: number } = {};
-          try { q = JSON.parse(d.question ?? '{}') as typeof q; } catch { /* keep defaults */ }
-          // `d.stepId` holds the REVIEW id (answerStepReview target); the display step id
-          // rides the question JSON.
-          const reviewId = d.stepId ?? d._id;
-          return {
-            id: reviewId, sessionId: sid, stepId: q.stepId ?? '', stepLabel: q.stepLabel ?? '',
-            patternId: q.patternId ?? '', ...(q.specId ? { specId: q.specId } : {}), createdAt: q.createdAt ?? 0,
-          };
-        }));
+        const asks = docs.filter(
+          (d) => d.kind === "ask_user" && d.status === "pending",
+        );
+        setPendingAskUsers(
+          asks.map((d) => {
+            let q: { question?: string; options?: AskUserOption[] } = {};
+            try {
+              q = JSON.parse(d.question ?? "{}") as typeof q;
+            } catch {
+              /* keep defaults */
+            }
+            const toolCallId = d.toolCallId ?? d._id;
+            return {
+              id: toolCallId,
+              sessionId: sid,
+              toolCallId,
+              question: q.question ?? "",
+              options: q.options ?? [],
+            };
+          }),
+        );
+        const reviews = docs.filter(
+          (d) => d.kind === "step_review" && d.status === "pending",
+        );
+        setPendingStepReviews(
+          reviews.map((d) => {
+            let q: {
+              stepId?: string;
+              stepLabel?: string;
+              patternId?: string;
+              specId?: string;
+              createdAt?: number;
+            } = {};
+            try {
+              q = JSON.parse(d.question ?? "{}") as typeof q;
+            } catch {
+              /* keep defaults */
+            }
+            // `d.stepId` holds the REVIEW id (answerStepReview target); the display step id
+            // rides the question JSON.
+            const reviewId = d.stepId ?? d._id;
+            return {
+              id: reviewId,
+              sessionId: sid,
+              stepId: q.stepId ?? "",
+              stepLabel: q.stepLabel ?? "",
+              patternId: q.patternId ?? "",
+              ...(q.specId ? { specId: q.specId } : {}),
+              createdAt: q.createdAt ?? 0,
+            };
+          }),
+        );
       },
     );
-    return () => { unsub(); };
+    return () => {
+      unsub();
+    };
   }, [sessionId, initialSessionId, app]);
 
   // Doc-driven context-pressure meter: read the session's contextTokens/window/budget from
@@ -3266,7 +3507,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     const sid = sessionId ?? initialSessionId;
     if (!sid || !app?.socket || !app.userId) return;
     const unsub = app.socket.trackDocs<CodingSessionMetaDoc>(
-      'codingSession',
+      "codingSession",
       { keys: { userId: app.userId } },
       (docs) => {
         const d = docs.find((x) => x._id === sid);
@@ -3275,7 +3516,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // `codebase_readiness` event), so it renders on every client — including ones with no
         // task channel (headless/remote). Validate with the same parser the event path used.
         if (d.codebaseReadiness !== undefined) {
-          const r = parseCodebaseReadinessEvent({ payload: d.codebaseReadiness });
+          const r = parseCodebaseReadinessEvent({
+            payload: d.codebaseReadiness,
+          });
           if (r) setCodebaseReadiness(r);
         }
         // Turn status first: the early return below (context fields) would otherwise
@@ -3283,31 +3526,53 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // delta actually CARRIES a status — a readiness/token-only write leaves it
         // undefined, and treating that as 'not running' briefly flickered the Stop
         // control off mid-turn (sub-second, but real).
-        if (d.status !== undefined) setTurnRunning(d.status === 'running');
+        if (d.status !== undefined) setTurnRunning(d.status === "running");
         // The doc also carries the turn's token + cost totals (persistMeta writes them),
         // but this subscription only ever copied the CONTEXT fields — so the header read
         // info.promptTokens/cost off a value nothing updated and showed "↑0 ↓0" / "$0.00"
         // for the whole session, while the sidebar (a different read path) climbed. Copy
         // them too. The doc field is `costUsd`; info calls it `cost`.
         const hasUsage =
-          d.contextTokens !== undefined || d.contextWindow !== undefined ||
-          d.promptTokens !== undefined || d.completionTokens !== undefined ||
-          d.costUsd !== undefined || d.cacheReadTokens !== undefined;
+          d.contextTokens !== undefined ||
+          d.contextWindow !== undefined ||
+          d.promptTokens !== undefined ||
+          d.completionTokens !== undefined ||
+          d.costUsd !== undefined ||
+          d.cacheReadTokens !== undefined;
         if (!hasUsage) return;
-        setSessionInfo((prev) => ({
-          ...(prev ?? { cwd: '' }),
-          ...(d.contextTokens !== undefined ? { contextTokens: d.contextTokens } : {}),
-          ...(d.contextWindow !== undefined ? { contextWindow: d.contextWindow } : {}),
-          ...(d.contextBudget !== undefined ? { contextBudget: d.contextBudget } : {}),
-          ...(d.promptTokens !== undefined ? { promptTokens: d.promptTokens } : {}),
-          ...(d.completionTokens !== undefined ? { completionTokens: d.completionTokens } : {}),
-          ...(d.cacheReadTokens !== undefined ? { cacheReadTokens: d.cacheReadTokens } : {}),
-          ...(d.cacheCreationTokens !== undefined ? { cacheCreationTokens: d.cacheCreationTokens } : {}),
-          ...(d.costUsd !== undefined ? { cost: d.costUsd } : {}),
-        } as CodingAgentSessionInfo));
+        setSessionInfo(
+          (prev) =>
+            ({
+              ...(prev ?? { cwd: "" }),
+              ...(d.contextTokens !== undefined
+                ? { contextTokens: d.contextTokens }
+                : {}),
+              ...(d.contextWindow !== undefined
+                ? { contextWindow: d.contextWindow }
+                : {}),
+              ...(d.contextBudget !== undefined
+                ? { contextBudget: d.contextBudget }
+                : {}),
+              ...(d.promptTokens !== undefined
+                ? { promptTokens: d.promptTokens }
+                : {}),
+              ...(d.completionTokens !== undefined
+                ? { completionTokens: d.completionTokens }
+                : {}),
+              ...(d.cacheReadTokens !== undefined
+                ? { cacheReadTokens: d.cacheReadTokens }
+                : {}),
+              ...(d.cacheCreationTokens !== undefined
+                ? { cacheCreationTokens: d.cacheCreationTokens }
+                : {}),
+              ...(d.costUsd !== undefined ? { cost: d.costUsd } : {}),
+            }) as CodingAgentSessionInfo,
+        );
       },
     );
-    return () => { unsub(); };
+    return () => {
+      unsub();
+    };
   }, [sessionId, initialSessionId, app]);
 
   useEffect(() => {
@@ -3315,8 +3580,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     let cancelled = false;
     void (async () => {
       try {
-        const socket = app.socket as unknown as { request(name: string, input: unknown): Promise<unknown> };
-        const settings = (await socket.request('getUserSettings', {})) as {
+        const socket = app.socket as unknown as {
+          request(name: string, input: unknown): Promise<unknown>;
+        };
+        const settings = (await socket.request("getUserSettings", {})) as {
           codingAgent?: ServerCodingAgent;
         } | null;
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `cancelled` is flipped true in the effect cleanup; TS control-flow can't see the deferred closure write.
@@ -3325,9 +3592,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           setFeatures(serverToFeatures(settings.codingAgent));
         }
       } catch (err) {
-        console.error('[useCodingAgentChat:getUserSettings]', JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:getUserSettings]",
+          JSON.stringify({
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         console.debug(
-          '[CodingAgentChat] getUserSettings (features) failed: %s',
+          "[CodingAgentChat] getUserSettings (features) failed: %s",
           (err as Error).message,
         );
       }
@@ -3346,7 +3619,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // updates the user default so the next new session starts there. See
   // shared/sessionConfig.ts.
   const configSeededRef = useRef<string | null>(null);
-  const lastPersistedConfigRef = useRef<string>('');
+  const lastPersistedConfigRef = useRef<string>("");
   useEffect(() => {
     if (!sessionId || !app || configSeededRef.current === sessionId) return;
     configSeededRef.current = sessionId;
@@ -3367,7 +3640,13 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       });
     };
     void (async () => {
-      const fallback: AxisState = { model, modelMode: coerceModelMode(modelMode), permissionMode, reasoningEffort, patternMode };
+      const fallback: AxisState = {
+        model,
+        modelMode: coerceModelMode(modelMode),
+        permissionMode,
+        reasoningEffort,
+        patternMode,
+      };
       try {
         const stored = await readServerConfig(sessionId);
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- flipped true in the effect cleanup; TS can't see the deferred write.
@@ -3377,16 +3656,23 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           config = stored; // resume/open → the session's authoritative server value
         } else {
           // New session → seed from the user's remembered defaults, then persist.
-          const socket = app.socket as unknown as { request(n: string, i: unknown): Promise<unknown> };
+          const socket = app.socket as unknown as {
+            request(n: string, i: unknown): Promise<unknown>;
+          };
           const settings = (await socket
-            .request('getUserSettings', {})
-            .catch(() => null)) as { codingAgent?: { sessionDefaults?: SessionConfigDefaults } } | null;
+            .request("getUserSettings", {})
+            .catch(() => null)) as {
+            codingAgent?: { sessionDefaults?: SessionConfigDefaults };
+          } | null;
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- flipped true in the effect cleanup; TS can't see the deferred write.
           if (cancelled) return;
           // New session → seed the header + cache from the user's defaults. Do NOT
           // persist yet (that would create an empty session doc / sidebar spam); the
           // worker's persistMeta writes the config on the session's first turn.
-          config = completeConfig(settings?.codingAgent?.sessionDefaults, fallback);
+          config = completeConfig(
+            settings?.codingAgent?.sessionDefaults,
+            fallback,
+          );
         }
         applyConfig(config);
         lastPersistedConfigRef.current = JSON.stringify(config);
@@ -3394,7 +3680,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         /* keep the local instant-render values */
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // Seed ONCE per session — axis values are read via closure, not deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, app]);
@@ -3408,24 +3696,46 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   // which only update alongside session config writes below.
   useEffect(() => {
     if (!sessionId || configSeededRef.current !== sessionId) return;
-    const config = axesToConfig({ model, modelMode: coerceModelMode(modelMode), permissionMode, reasoningEffort, patternMode });
+    const config = axesToConfig({
+      model,
+      modelMode: coerceModelMode(modelMode),
+      permissionMode,
+      reasoningEffort,
+      patternMode,
+    });
     const json = JSON.stringify(config);
     if (json === lastPersistedConfigRef.current) return;
     lastPersistedConfigRef.current = json;
     // Always persist per-session config so reloads survive.
     void writeServerConfig(sessionId, config);
     if (app) {
-      const socket = app.socket as unknown as { request(n: string, i: unknown): Promise<unknown> };
-      void socket.request('updateUserSettings', { codingAgent: { sessionDefaults: config } }).catch(() => {/* best-effort */});
+      const socket = app.socket as unknown as {
+        request(n: string, i: unknown): Promise<unknown>;
+      };
+      void socket
+        .request("updateUserSettings", {
+          codingAgent: { sessionDefaults: config },
+        })
+        .catch(() => {
+          /* best-effort */
+        });
     }
-  }, [model, modelMode, permissionMode, reasoningEffort, patternMode, sessionId, app]);
+  }, [
+    model,
+    modelMode,
+    permissionMode,
+    reasoningEffort,
+    patternMode,
+    sessionId,
+    app,
+  ]);
 
   const switchReasoningEffort = useCallback(
     (next: ReasoningEffort) => {
       reasoningEffortRef.current = next; // synchronous — startNewChat reads this
       if (next === reasoningEffort) return;
       console.debug(
-        '[CodingAgentChat] Switching reasoning effort: %s → %s',
+        "[CodingAgentChat] Switching reasoning effort: %s → %s",
         reasoningEffort,
         next,
       );
@@ -3439,7 +3749,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           effort: next,
         }).catch((err: unknown) => {
           console.debug(
-            '[CodingAgentChat] Reasoning effort switch failed: %s',
+            "[CodingAgentChat] Reasoning effort switch failed: %s",
             (err as Error).message,
           );
         });
@@ -3451,7 +3761,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const switchModel = useCallback(
     (newModel: string) => {
       console.debug(
-        '[CodingAgentChat] Switching model: %s → %s',
+        "[CodingAgentChat] Switching model: %s → %s",
         model,
         newModel,
       );
@@ -3467,7 +3777,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         agentApi(backend.chatSetModel, { sessionId, model: newModel }).catch(
           (err: unknown) => {
             console.debug(
-              '[CodingAgentChat] Model switch failed: %s',
+              "[CodingAgentChat] Model switch failed: %s",
               (err as Error).message,
             );
           },
@@ -3480,9 +3790,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const approvePermission = useCallback(
     async (perm: PermissionRequest, allowAll?: boolean) => {
       if (!sessionId) return;
-      const action = allowAll ? 'allow_session' : 'allow';
+      const action = allowAll ? "allow_session" : "allow";
       console.debug(
-        '[CodingAgentChat] Approving permission: tool=%s action=%s',
+        "[CodingAgentChat] Approving permission: tool=%s action=%s",
         perm.toolName,
         action,
       );
@@ -3503,9 +3813,18 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         });
         setPendingPermissions((prev) => prev.filter((p) => p.id !== perm.id));
       } catch (err) {
-        console.error('[useCodingAgentChat:approvePermission]', JSON.stringify({ sessionId, toolName: perm.toolName, action, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:approvePermission]",
+          JSON.stringify({
+            sessionId,
+            toolName: perm.toolName,
+            action,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         console.debug(
-          '[CodingAgentChat] Permission grant failed: %s',
+          "[CodingAgentChat] Permission grant failed: %s",
           (err as Error).message,
         );
       }
@@ -3533,14 +3852,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       const sid = targetSessionId ?? sessionId;
       if (!sid) return false;
       console.debug(
-        '[CodingAgentChat] answerAskUser: toolCall=%s session=%s',
+        "[CodingAgentChat] answerAskUser: toolCall=%s session=%s",
         toolCallId.slice(0, 12),
         sid.slice(0, 16),
       );
       const dropEntry = (prev: PendingAskUser[]): PendingAskUser[] =>
         prev.filter((p) => p.toolCallId !== toolCallId);
       try {
-        const res = (await agentApi('codingAgentAnswerAskUser', {
+        const res = (await agentApi("codingAgentAnswerAskUser", {
           sessionId: sid,
           toolCallId,
           value,
@@ -3557,7 +3876,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             setError(`Answer failed: ${res.error}`);
           } else {
             setError(
-              'That question is no longer pending — likely the agent or session restarted. Send a new message to continue.',
+              "That question is no longer pending — likely the agent or session restarted. Send a new message to continue.",
             );
           }
           return false;
@@ -3567,7 +3886,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       } catch (err) {
         // Network or RPC failure — clear the card so the user has a
         // way out and surface the error.
-        console.error('[useCodingAgentChat:answerAskUser]', JSON.stringify({ sessionId: sid, toolCallId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:answerAskUser]",
+          JSON.stringify({
+            sessionId: sid,
+            toolCallId,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setPendingAskUsers(dropEntry);
         setError(`Answer failed: ${(err as Error).message}`);
         return false;
@@ -3595,14 +3922,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   const answerStepReview = useCallback(
     async (
       id: string,
-      action: 'continue' | 'iterate',
+      action: "continue" | "iterate",
       feedback?: string,
       targetSessionId?: string,
     ): Promise<boolean> => {
       const sid = targetSessionId ?? sessionId;
       if (!sid) return false;
       console.debug(
-        '[CodingAgentChat] answerStepReview: id=%s action=%s session=%s',
+        "[CodingAgentChat] answerStepReview: id=%s action=%s session=%s",
         id.slice(0, 12),
         action,
         sid.slice(0, 16),
@@ -3610,7 +3937,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       const dropEntry = (prev: PendingStepReview[]): PendingStepReview[] =>
         prev.filter((p) => p.id !== id);
       try {
-        const res = (await agentApi('codingAgentAnswerStepReview', {
+        const res = (await agentApi("codingAgentAnswerStepReview", {
           sessionId: sid,
           id,
           action,
@@ -3624,9 +3951,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         const outcome = res.outcome;
         // Benign duplicates / abort races: clear the card without
         // pestering the user. The agent already moved on.
-        if (outcome === 'already_answered' || outcome === 'aborted') {
+        if (outcome === "already_answered" || outcome === "aborted") {
           console.warn(
-            '[CodingAgentChat] step_review %s for id=%s — silent dismiss',
+            "[CodingAgentChat] step_review %s for id=%s — silent dismiss",
             outcome,
             id.slice(0, 12),
           );
@@ -3636,12 +3963,12 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // have to send a fresh message.
         const message =
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string error must fall through to the default message, which `??` (nullish-only) would not do.
-          (typeof res.error === 'string' && res.error) ||
-          'No pending review found — the agent sidecar may have restarted. Send a new message to continue.';
+          (typeof res.error === "string" && res.error) ||
+          "No pending review found — the agent sidecar may have restarted. Send a new message to continue.";
         setError(message);
         console.warn(
-          '[CodingAgentChat] step_review answer failed outcome=%s id=%s',
-          outcome ?? '<none>',
+          "[CodingAgentChat] step_review answer failed outcome=%s id=%s",
+          outcome ?? "<none>",
           id.slice(0, 12),
         );
         return false;
@@ -3649,7 +3976,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         setPendingStepReviews(dropEntry);
         setError(`Answer failed: ${(err as Error).message}`);
         console.error(
-          '[CodingAgentChat] step_review answer threw id=%s: %s',
+          "[CodingAgentChat] step_review answer threw id=%s: %s",
           id.slice(0, 12),
           (err as Error).message,
         );
@@ -3661,14 +3988,21 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
 
   const skipAllPermissions = useCallback(async () => {
     if (!sessionId) return;
-    console.debug('[CodingAgentChat] Skipping all permissions');
+    console.debug("[CodingAgentChat] Skipping all permissions");
     try {
       await agentApi(backend.skipPermissions, { sessionId, skip: true });
       setPendingPermissions([]);
     } catch (err) {
-      console.error('[useCodingAgentChat:skipAllPermissions]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:skipAllPermissions]",
+        JSON.stringify({
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       console.debug(
-        '[CodingAgentChat] Skip permissions failed: %s',
+        "[CodingAgentChat] Skip permissions failed: %s",
         (err as Error).message,
       );
     }
@@ -3684,9 +4018,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
    */
   const compactNow = useCallback(async () => {
     if (!sessionId || isStreaming) return;
-    console.debug('[CodingAgentChat] Force-compact requested');
+    console.debug("[CodingAgentChat] Force-compact requested");
     try {
-      const res = (await agentApi('codingAgentCompactNow', { sessionId })) as {
+      const res = (await agentApi("codingAgentCompactNow", { sessionId })) as {
         ok?: boolean;
         error?: string;
       };
@@ -3694,7 +4028,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         setError(`Compact failed: ${res.error}`);
       }
     } catch (err) {
-      console.error('[useCodingAgentChat:compactNow]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:compactNow]",
+        JSON.stringify({
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setError(`Compact failed: ${(err as Error).message}`);
     }
   }, [sessionId, isStreaming]);
@@ -3711,7 +4052,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     async (msgId: string): Promise<boolean> => {
       if (!sessionId || isStreaming) return false;
       try {
-        const res = (await agentApi('codingAgentRestoreCheckpoint', {
+        const res = (await agentApi("codingAgentRestoreCheckpoint", {
           sessionId,
           msgId,
         })) as { ok?: boolean; error?: string };
@@ -3720,7 +4061,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         }
         return !!res.ok;
       } catch (err) {
-        console.error('[useCodingAgentChat:restoreCheckpoint]', JSON.stringify({ sessionId, msgId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:restoreCheckpoint]",
+          JSON.stringify({
+            sessionId,
+            msgId,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setError(`Restore failed: ${(err as Error).message}`);
         return false;
       }
@@ -3767,7 +4116,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       sessionBranch?: string;
       worktreePath?: string;
     }> => {
-      if (!sessionId) return { ok: false, message: 'No session' };
+      if (!sessionId) return { ok: false, message: "No session" };
       setFinishPipeline({ ...EMPTY_FINISH, running: true });
       try {
         const res = (await agentApi(backend.finish, {
@@ -3793,7 +4142,17 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         };
         return res;
       } catch (err) {
-        console.error('[useCodingAgentChat:finishSession]', JSON.stringify({ sessionId, runTypecheck: opts.runTypecheck, runLint: opts.runLint, runTests: opts.runTests, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:finishSession]",
+          JSON.stringify({
+            sessionId,
+            runTypecheck: opts.runTypecheck,
+            runLint: opts.runLint,
+            runTests: opts.runTests,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         setFinishPipeline((prev) => ({
           ...prev,
           running: false,
@@ -3824,7 +4183,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       message?: string;
       conflicts?: string[];
     }> => {
-      if (!sessionId) return { ok: false, message: 'No session' };
+      if (!sessionId) return { ok: false, message: "No session" };
       try {
         const res = (await agentApi(backend.merge, {
           sessionId,
@@ -3838,7 +4197,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         };
         return res;
       } catch (err) {
-        console.error('[useCodingAgentChat:mergeFinishedSession]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:mergeFinishedSession]",
+          JSON.stringify({
+            sessionId,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         return { ok: false, message: (err as Error).message };
       }
     },
@@ -3849,7 +4215,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
    * Stop an in-flight validation gate inside the Finish pipeline.
    */
   const stopFinishStage = useCallback(
-    async (stage: 'tsc' | 'lint' | 'tests'): Promise<boolean> => {
+    async (stage: "tsc" | "lint" | "tests"): Promise<boolean> => {
       if (!sessionId) return false;
       try {
         const res = (await agentApi(backend.finishStop, {
@@ -3858,7 +4224,15 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         })) as { ok: boolean };
         return res.ok;
       } catch (err) {
-        console.error('[useCodingAgentChat:stopFinishStage]', JSON.stringify({ sessionId, stage, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+        console.error(
+          "[useCodingAgentChat:stopFinishStage]",
+          JSON.stringify({
+            sessionId,
+            stage,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          err instanceof Error ? err.stack : undefined,
+        );
         return false;
       }
     },
@@ -3879,7 +4253,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       if (!res.ok && res.error) setError(`Abandon failed: ${res.error}`);
       return res.ok;
     } catch (err) {
-      console.error('[useCodingAgentChat:abandonSession]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:abandonSession]",
+        JSON.stringify({
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setError(`Abandon failed: ${(err as Error).message}`);
       return false;
     }
@@ -3899,7 +4280,14 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       })) as { ok: boolean };
       return res.ok;
     } catch (err) {
-      console.error('[useCodingAgentChat:archiveSession]', JSON.stringify({ sessionId, error: err instanceof Error ? err.message : String(err) }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:archiveSession]",
+        JSON.stringify({
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setError(`Archive failed: ${(err as Error).message}`);
       return false;
     }
@@ -3916,16 +4304,16 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     ok: boolean;
     blocked?: boolean;
     conflicts?: string[];
-    conflictKind?: 'merge' | 'stash_apply';
+    conflictKind?: "merge" | "stash_apply";
     error?: string;
   }> => {
-    if (!sessionId) return { ok: false, error: 'No session' };
+    if (!sessionId) return { ok: false, error: "No session" };
     try {
       const res = (await agentApi(backend.refreshWorktree, { sessionId })) as {
         ok: boolean;
         blocked?: boolean;
         conflicts?: string[];
-        conflictKind?: 'merge' | 'stash_apply';
+        conflictKind?: "merge" | "stash_apply";
         error?: string;
       };
       if (!res.ok && res.error)
@@ -3933,7 +4321,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
       return res;
     } catch (err) {
       const msg = (err as Error).message;
-      console.error('[useCodingAgentChat:refreshWorktreeNow]', JSON.stringify({ sessionId, error: msg }), err instanceof Error ? err.stack : undefined);
+      console.error(
+        "[useCodingAgentChat:refreshWorktreeNow]",
+        JSON.stringify({ sessionId, error: msg }),
+        err instanceof Error ? err.stack : undefined,
+      );
       setError(`Worktree refresh failed: ${msg}`);
       return { ok: false, error: msg };
     }
@@ -3949,7 +4341,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     try {
       const res = (await agentApi(backend.worktreeBehind, { sessionId })) as {
         ok: boolean;
-        kind?: 'up_to_date' | 'behind' | 'in_progress_merge' | 'unknown';
+        kind?: "up_to_date" | "behind" | "in_progress_merge" | "unknown";
         reason?: string;
         error?: string;
       };
@@ -3974,7 +4366,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         count?: number;
         error?: string;
       };
-      if (res.ok && typeof res.count === 'number') {
+      if (res.ok && typeof res.count === "number") {
         setWorktreeAheadCount(res.count);
       }
     } catch {
