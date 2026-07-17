@@ -2704,14 +2704,17 @@ function SessionReadout({
   // the chip reflects what the run actually cost. Falls through to
   // info.* unchanged for non-max-mode sessions.
   const peerTotals = info.peerTotals;
-  const totalCost = info.cost + (peerTotals?.cost ?? 0);
-  const totalPromptTokens = info.promptTokens + (peerTotals?.promptTokens ?? 0);
+  // Usage totals are doc-owned and optional (absent until the codingSession delta lands) —
+  // default to 0. `costUsd` is the doc's field name; the readout reuses it directly.
+  const totalCost = (info.costUsd ?? 0) + (peerTotals?.cost ?? 0);
+  const totalPromptTokens =
+    (info.promptTokens ?? 0) + (peerTotals?.promptTokens ?? 0);
   const totalCompletionTokens =
-    info.completionTokens + (peerTotals?.completionTokens ?? 0);
+    (info.completionTokens ?? 0) + (peerTotals?.completionTokens ?? 0);
   const totalCacheReadTokens =
-    info.cacheReadTokens + (peerTotals?.cacheReadTokens ?? 0);
+    (info.cacheReadTokens ?? 0) + (peerTotals?.cacheReadTokens ?? 0);
   const totalCacheCreationTokens =
-    info.cacheCreationTokens + (peerTotals?.cacheCreationTokens ?? 0);
+    (info.cacheCreationTokens ?? 0) + (peerTotals?.cacheCreationTokens ?? 0);
   // Merged per-model array — the parent's own rows plus every peer's,
   // collapsed by model id (cross-peer dupes get summed). Used by the
   // multi-model branch below.
@@ -2777,21 +2780,6 @@ function SessionReadout({
   const subscriptionCaveat = isSubscriptionProvider(resolvedSingleModel)
     ? "\n\nYou pay this provider via subscription, not per-token — this is what your usage would cost at the upstream's standard pay-as-you-go rates."
     : '';
-  // Claude Code recomputes cost from rate cards (so the chip is
-  // apples-to-apples with other models) and ALSO carries the CLI's
-  // own `total_cost_usd` as `info.billedCost`. Surface the gap in
-  // the tooltip so users can see what Anthropic actually charged
-  // them vs. the rate-card estimate.
-  const billedCaveat =
-    model === 'claude-code'
-      ? `\n\nAnthropic actually billed: ${
-          info.billedCost === undefined
-            ? '(not yet reported)'
-            : info.billedCost === 0
-            ? '$0 (Pro/Team subscription)'
-            : formatCurrency(info.billedCost)
-        }`
-      : '';
   // Caveat appended to every tooltip when the session is a max-mode
   // parent: makes clear the displayed total is summed across the
   // peer fanout (otherwise users see "$X" without context for why
@@ -2804,7 +2792,7 @@ function SessionReadout({
   const costTitle = showActual
     ? `Actual upstream cost so far: ${formatCurrency(
         totalCost,
-      )}${peerCaveat}${billedCaveat}`
+      )}${peerCaveat}`
     : showEstimate
     ? [
         `Estimated cost at standard rates: ${formatCurrency(estimate.total)}`,
@@ -2829,8 +2817,7 @@ function SessionReadout({
         .filter((line) => line !== null)
         .join('\n') +
       subscriptionCaveat +
-      peerCaveat +
-      billedCaveat
+      peerCaveat
     : '';
   // Cost line folded into the token tooltip so hovering the token chip also
   // shows what the session cost (actual upstream cost when reported, else a

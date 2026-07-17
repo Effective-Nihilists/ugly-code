@@ -506,17 +506,6 @@ export const SessionSnapshotSchema = z.object({
 
   // Token / cost rollup
   cost: z.number(),
-  /**
-   * What the upstream billing system actually charged across all
-   * turns so far. Populated by the Claude Code runner from each
-   * turn's `result.total_cost_usd` (which reflects Pro/Team
-   * subscription or BYO API key billing). `cost` above stays as the
-   * apples-to-apples rate-card estimate so the chip matches every
-   * other model's chip; `billedCost` is surfaced as a tooltip line
-   * so users can see the gap. Absent for in-process coding-agent
-   * sessions (whose `cost` already IS the bill).
-   */
-  billedCost: z.number().optional(),
   promptTokens: z.number(),
   completionTokens: z.number(),
   cacheReadTokens: z.number(),

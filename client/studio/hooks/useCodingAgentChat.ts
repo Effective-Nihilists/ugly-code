@@ -38,7 +38,10 @@ import type {
   StoredRole,
   StoredKind,
 } from "../agent/serverSessionApi";
-import { compareCodingMessages } from "../../../shared/codingCollections";
+import {
+  compareCodingMessages,
+  type CodingSession,
+} from "../../../shared/codingCollections";
 
 /** A `codingSessionMessage` doc as delivered by trackDocs (for the projection).
  *  Extends the DBObject system fields (`version`/`created`/`updated`) so it satisfies
@@ -55,27 +58,12 @@ interface CodingMsgDoc {
   content: string;
 }
 
-/** The subset of a `codingSession` doc the in-chat context meter reads (doc-driven). */
-interface CodingSessionMetaDoc {
-  _id: string;
-  version: number;
-  created: Date;
-  updated: Date;
-  /** Turn lifecycle: 'running' between send and the terminal event. The TURN's state —
-   *  not a message's — which is what the Stop control must follow. */
-  status?: string;
-  contextTokens?: number;
-  contextWindow?: number;
-  contextBudget?: number;
-  // Per-turn usage totals persistMeta writes to this same doc — the header reads these.
-  promptTokens?: number;
-  completionTokens?: number;
-  cacheReadTokens?: number;
-  cacheCreationTokens?: number;
-  costUsd?: number;
-  // Doc-driven codebase-index readiness (written by the task's poll via codingSessionSetReadiness).
-  codebaseReadiness?: { indexer?: unknown; diagnostics?: unknown };
-}
+/** A `codingSession` doc as trackDocs delivers it: a PARTIAL delta (only the fields that
+ *  changed this write), so every schema field is optional; the DBObject system fields
+ *  (`_id`/`version`/`created`/`updated`) are always present. DERIVED from the canonical
+ *  `CodingSession` so a new column can't silently drift out of this reader's view. */
+type CodingSessionDelta = Partial<CodingSession> &
+  Pick<CodingSession, "_id" | "version" | "created" | "updated">;
 
 /** A `codingInteraction` doc (doc-driven ask_user/step_review cards). */
 interface CodingInteractionDoc {
@@ -253,7 +241,29 @@ function serverToFeatures(ca: ServerCodingAgent): CodingAgentFeatures {
   };
 }
 
-export interface CodingAgentSessionInfo {
+/**
+ * Persisted per-session usage — REUSES the `codingSession` doc's own field names + types so the
+ * header can't drift from what persistMeta stores. All optional: they reach the UI from ONE
+ * writer — the codingSession doc subscription (persistMeta is their sole producer) — and are
+ * simply absent until that delta arrives. The `session_state` snapshot no longer carries them (a
+ * zeroed boot snapshot used to full-replace them to 0 and clobber the header → "↑0 ↓0 / $0.00").
+ * The doc names cost `costUsd`; the readout reads `info.costUsd ?? 0`.
+ */
+type SessionUsage = Partial<
+  Pick<
+    CodingSession,
+    | "promptTokens"
+    | "completionTokens"
+    | "cacheReadTokens"
+    | "cacheCreationTokens"
+    | "contextTokens"
+    | "contextWindow"
+    | "contextBudget"
+    | "costUsd"
+  >
+>;
+
+export interface CodingAgentSessionInfo extends SessionUsage {
   id: string;
   title?: string;
   /**
@@ -263,21 +273,6 @@ export interface CodingAgentSessionInfo {
    * (the chat panel's model dropdown) render this verbatim.
    */
   modelDisplayLabel?: string;
-  cost: number;
-  /**
-   * What the upstream billing system actually charged so far, when
-   * different from our rate-card `cost`. Set by the Claude Code
-   * runner from each turn's `result.total_cost_usd`. Surfaced as a
-   * tooltip line on the cost chip so users see the gap between the
-   * apples-to-apples estimate and what Anthropic actually billed.
-   */
-  billedCost?: number;
-  promptTokens: number;
-  completionTokens: number;
-  /** Cache-hit input tokens (for the cost-estimate chip). 0 when the upstream doesn't break out cache usage. */
-  cacheReadTokens: number;
-  /** Cache-creation input tokens (for the cost-estimate chip). 0 when none. */
-  cacheCreationTokens: number;
   /**
    * Per-model token + cost breakdown across the session, folded from
    * on-disk turn telemetry on the server. Populated for auto-mode
@@ -331,12 +326,6 @@ export interface CodingAgentSessionInfo {
    * Empty string when the snapshot hasn't reached the client yet.
    */
   cwd: string;
-  /** Estimated tokens in the live history, as it would be sent on the next turn. */
-  contextTokens?: number;
-  /** Tokens we're willing to send before compacting (= contextWindow * BUDGET_FRACTION). */
-  contextBudget?: number;
-  /** Raw model context window, shown in the meter tooltip. */
-  contextWindow?: number;
   /**
    * Spec id this session is bound to, once `spec_write` has run.
    * Undefined for fresh sessions that haven't authored a spec yet.
@@ -1578,68 +1567,36 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             }
           : null,
       );
-      // Preserve-max the token/cost totals within a session. The doc-driven host path
-      // (headless/remote) emits session_state snapshots whose usage fields are 0 — only
-      // persistMeta's `codingSession` doc carries them — so a full-replace here clobbered the
-      // real doc value the subscription had installed, leaving the header stuck at "↑0 ↓0 /
-      // $0.00" for the whole session while the sidebar (a different read path off the same doc)
-      // climbed. Tokens and cost are cumulative and only grow within a session, so max(snap,
-      // prev) keeps whichever source has the real number — and the Claude-CLI runner's
-      // authoritative snapshot cost (`result.total_cost_usd`) still wins because it climbs. On a
-      // session switch prev belongs to a different session, so take snap verbatim.
-      setSessionInfo((prev) => {
-        const sameSession = prev?.id === snap.sessionId;
-        const keepMax = (snapVal: number, prevVal: number | undefined) =>
-          sameSession ? Math.max(snapVal, prevVal ?? 0) : snapVal;
-        const billed =
-          snap.billedCost !== undefined
-            ? keepMax(snap.billedCost, prev?.billedCost)
-            : sameSession
-              ? prev.billedCost
-              : undefined;
-        return {
-          id: snap.sessionId,
-          title: snap.title,
-          cwd: snap.cwd,
-          cost: keepMax(snap.cost, prev?.cost),
-          ...(billed !== undefined && { billedCost: billed }),
-          promptTokens: keepMax(snap.promptTokens, prev?.promptTokens),
-          completionTokens: keepMax(
-            snap.completionTokens,
-            prev?.completionTokens,
-          ),
-          cacheReadTokens: keepMax(snap.cacheReadTokens, prev?.cacheReadTokens),
-          cacheCreationTokens: keepMax(
-            snap.cacheCreationTokens,
-            prev?.cacheCreationTokens,
-          ),
-          perModel: snap.perModel,
-          ...(snap.peerTotals !== undefined && { peerTotals: snap.peerTotals }),
-          messageCount: snap.messageCount,
-          createdAt: snap.createdAt,
-          updatedAt: snap.updatedAt,
-          ...(snap.modelDisplayLabel
-            ? { modelDisplayLabel: snap.modelDisplayLabel }
-            : {}),
-          ...(snap.contextTokens !== undefined && {
-            contextTokens: snap.contextTokens,
-          }),
-          ...(snap.contextBudget !== undefined && {
-            contextBudget: snap.contextBudget,
-          }),
-          ...(snap.contextWindow !== undefined && {
-            contextWindow: snap.contextWindow,
-          }),
-          ...(snap.specId ? { specId: snap.specId } : {}),
-          ...(snap.parentSessionId
-            ? { parentSessionId: snap.parentSessionId }
-            : {}),
-          ...(snap.maxModeWinnerSessionId
-            ? { maxModeWinnerSessionId: snap.maxModeWinnerSessionId }
-            : {}),
-          eval: snap.eval ?? null,
-        };
-      });
+      // The session_state snapshot carries only RUNTIME state (cwd, per-model rollup, axes,
+      // pending-review flags …). Per-session token/cost/context totals are owned SOLELY by the
+      // codingSession doc subscription below — persistMeta is their single producer — so we MERGE
+      // onto prev here instead of full-replacing, preserving whatever usage the doc has installed.
+      // (A zeroed boot snapshot used to full-replace those to 0 and clobber the header → "↑0 ↓0 /
+      // $0.00"; keeping usage off the snapshot entirely removes the whole race.) The carry-forward
+      // is identity-scoped: on a switch to a DIFFERENT session, drop prev so the previous session's
+      // usage can't bleed into the new header before its own doc delta lands.
+      setSessionInfo((prev) => ({
+        ...(prev?.id === snap.sessionId ? prev : {}),
+        id: snap.sessionId,
+        title: snap.title,
+        cwd: snap.cwd,
+        perModel: snap.perModel,
+        ...(snap.peerTotals !== undefined && { peerTotals: snap.peerTotals }),
+        messageCount: snap.messageCount,
+        createdAt: snap.createdAt,
+        updatedAt: snap.updatedAt,
+        ...(snap.modelDisplayLabel
+          ? { modelDisplayLabel: snap.modelDisplayLabel }
+          : {}),
+        ...(snap.specId ? { specId: snap.specId } : {}),
+        ...(snap.parentSessionId
+          ? { parentSessionId: snap.parentSessionId }
+          : {}),
+        ...(snap.maxModeWinnerSessionId
+          ? { maxModeWinnerSessionId: snap.maxModeWinnerSessionId }
+          : {}),
+        eval: snap.eval ?? null,
+      }));
       // Phase 2 finishPipeline: snapshot carries every stage's
       // metadata (state, exitCode, command label) plus the
       // pipeline-level flags (running/done/ok, conflicts,
@@ -2835,13 +2792,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
             (prev) =>
               ({
                 id: newId.split(":")[1] ?? newId,
-                cost: prev?.cost ?? 0,
-                promptTokens: prev?.promptTokens ?? 0,
-                completionTokens: prev?.completionTokens ?? 0,
-                cacheReadTokens: prev?.cacheReadTokens ?? 0,
-                cacheCreationTokens: prev?.cacheCreationTokens ?? 0,
                 perModel: prev?.perModel ?? [],
                 messageCount: prev?.messageCount ?? 0,
+                // Usage (tokens/cost/context) is doc-owned and optional — omitted here; the
+                // codingSession subscription fills it in.
                 ...(prev ?? {}),
                 specId: resolvedSpecId,
               }) as CodingAgentSessionInfo,
@@ -3506,7 +3460,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
   useEffect(() => {
     const sid = sessionId ?? initialSessionId;
     if (!sid || !app?.socket || !app.userId) return;
-    const unsub = app.socket.trackDocs<CodingSessionMetaDoc>(
+    const unsub = app.socket.trackDocs<CodingSessionDelta>(
       "codingSession",
       { keys: { userId: app.userId } },
       (docs) => {
@@ -3527,11 +3481,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // undefined, and treating that as 'not running' briefly flickered the Stop
         // control off mid-turn (sub-second, but real).
         if (d.status !== undefined) setTurnRunning(d.status === "running");
-        // The doc also carries the turn's token + cost totals (persistMeta writes them),
-        // but this subscription only ever copied the CONTEXT fields — so the header read
-        // info.promptTokens/cost off a value nothing updated and showed "↑0 ↓0" / "$0.00"
-        // for the whole session, while the sidebar (a different read path) climbed. Copy
-        // them too. The doc field is `costUsd`; info calls it `cost`.
+        // This subscription is the SOLE writer of the session's usage totals into sessionInfo:
+        // context fields, the per-turn token counts, AND cost — all straight off the doc
+        // persistMeta writes (the session_state snapshot no longer carries them). The UI reuses
+        // the doc's own field names (`costUsd`, `promptTokens`, …) so there's nothing to rename.
         const hasUsage =
           d.contextTokens !== undefined ||
           d.contextWindow !== undefined ||
@@ -3565,7 +3518,7 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
               ...(d.cacheCreationTokens !== undefined
                 ? { cacheCreationTokens: d.cacheCreationTokens }
                 : {}),
-              ...(d.costUsd !== undefined ? { cost: d.costUsd } : {}),
+              ...(d.costUsd !== undefined ? { costUsd: d.costUsd } : {}),
             }) as CodingAgentSessionInfo,
         );
       },
