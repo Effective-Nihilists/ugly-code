@@ -372,7 +372,8 @@ export function StudioSettingsModal({
   const personaIds = Object.keys(PERSONAS) as PersonaId[];
 
   return (
-    <Modal open={open} onClose={onClose} size="md" ariaLabel="Studio settings">
+    <>
+      <Modal open={open} onClose={onClose} size="md" ariaLabel="Studio settings">
       <Modal.Header>Settings</Modal.Header>
       <Modal.Body>
         {/* ── GLM Coding Plan key ── */}
@@ -708,12 +709,16 @@ export function StudioSettingsModal({
           Done
         </button>
       </Modal.Footer>
+      </Modal>
+      {/* Rendered as a SIBLING of the settings modal (not a child) so it mounts
+          in its own portal on top — nesting it inside the settings Modal trapped
+          it in that portal's subtree and the settings card painted over it. */}
       <ModesExplainerModal
         open={explainerOpen}
         onClose={() => {
           setExplainerOpen(false);
         }}
       />
-    </Modal>
+    </>
   );
 }

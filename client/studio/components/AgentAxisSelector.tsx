@@ -103,7 +103,7 @@ export interface DropdownOption<T extends string> {
 }
 
 export const PERMISSION_OPTIONS: DropdownOption<PermissionAxisValue>[] = [
-  { value: 'edit', label: 'Edit', hint: 'r/w within the worktree' },
+  { value: 'edit', label: 'Edit', hint: 'r/w within the project' },
   {
     value: 'yolo',
     label: 'Yolo',
