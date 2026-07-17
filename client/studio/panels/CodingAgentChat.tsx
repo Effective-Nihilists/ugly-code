@@ -70,6 +70,7 @@ import {
   searchBadge,
 } from './toolCardSummary';
 import { findTurnVerifyFailed, turnStartIndex } from './turnVerify';
+import { elementScroll } from '@tanstack/virtual-core';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
 import { formatCurrency } from '../shared/Currency';
 import { estimateCost, isSubscriptionProvider } from '../shared/model-rates';
@@ -7514,12 +7515,36 @@ CodingAgentChatProps = {}) {
     }
     return null;
   }, [displayMessages]);
+  // virtual-core performs its OWN programmatic scrollTop writes during
+  // remeasure: when an item ABOVE the current scroll offset is measured for
+  // the first time (estimate 120 -> actual), `resizeItem` calls
+  // `applyScrollAdjustment` -> `scrollToFn` to keep the anchored row visually
+  // stable. On load, tool cards mount tiny then grow (ChatMarkdown gates on a
+  // measured width; CodeMirror lays out a frame late), so these adjustments
+  // fire in a burst. They are NOT user scrolls, but they reach `handleScroll`
+  // like any scroll event, and mid-cascade `distFromBottom` briefly exceeds
+  // the 200px unfollow threshold — flipping `userScrolledRef` to true and
+  // freezing auto-follow above the real bottom. Route virtual-core's writes
+  // through the same `suppressScrollRef` that `pinToBottom` uses so the
+  // handler ignores them; genuine user scrolls never go through `scrollToFn`,
+  // so they still detach normally.
+  const suppressedScrollToFn = useCallback<typeof elementScroll>(
+    (offset, options, instance) => {
+      suppressScrollRef.current = true;
+      elementScroll(offset, options, instance);
+      requestAnimationFrame(() => {
+        suppressScrollRef.current = false;
+      });
+    },
+    [],
+  );
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: displayMessages.length,
     getScrollElement: () => listRef.current,
     estimateSize: () => 120,
     overscan: 8,
     getItemKey,
+    scrollToFn: suppressedScrollToFn,
   });
 
   const pinToBottom = useCallback(() => {
