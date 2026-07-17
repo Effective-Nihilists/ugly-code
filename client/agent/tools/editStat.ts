@@ -9,7 +9,11 @@
 // The tool, unlike the card, holds the old body AND the new body — so it can just count.
 // This is the same line-LCS the transcript's diff view uses, so the badge and the diff can
 // never disagree.
-import { buildDiffRows, diffStats } from '../../studio/panels/tokenDiff';
+import {
+  buildDiffRows,
+  diffStats,
+  type DiffRow,
+} from '../../studio/panels/tokenDiff';
 
 export interface EditStat {
   added: number;
@@ -19,6 +23,16 @@ export interface EditStat {
 /** Line-level +N −M between two file bodies. */
 export function editStat(oldBody: string, newBody: string): EditStat {
   return diffStats(buildDiffRows(oldBody, newBody));
+}
+
+/**
+ * The unified diff rows between two bodies — the SAME rows the transcript's diff view
+ * renders. An anchor edit carries no old_string, so the card can't recompute the removed
+ * line; the tool holds both bodies, so it ships the rows out-of-band as tool_result metadata
+ * and the card renders a real `−` line instead of badging every write as a pure addition.
+ */
+export function editDiffRows(oldBody: string, newBody: string): DiffRow[] {
+  return buildDiffRows(oldBody, newBody);
 }
 
 /** " (+1 −1)" — the suffix a tool result carries so the card can badge the truth. */

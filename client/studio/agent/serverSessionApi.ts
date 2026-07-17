@@ -68,9 +68,7 @@ export async function createRunRequest(input: {
 }
 
 /** Read a run-request's status (client watchdog: still `pending` → no host claimed it). */
-export async function getRunRequestStatus(
-  id: string,
-): Promise<{
+export async function getRunRequestStatus(id: string): Promise<{
   status: 'pending' | 'claimed' | 'done' | 'error';
   host?: string;
   error?: string;
@@ -150,6 +148,12 @@ export interface ToolResultPayload {
   tool_use_id: string;
   content: string;
   is_error: boolean;
+  /**
+   * Out-of-band, UI-only payload a tool attached (e.g. an edit's diff rows). Persisted on the
+   * row + projected into the display part's `data.metadata`, but NEVER folded into the
+   * model-facing message (the `role:'tool'` → `role:'user'` mapper below reads only `content`).
+   */
+  metadata?: unknown;
 }
 export interface ToolRowPayload {
   results: ToolResultPayload[];

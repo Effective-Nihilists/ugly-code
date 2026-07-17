@@ -497,7 +497,10 @@ const fetchSocket: RunAgentSocket = {
 function makeToolHandlers(
   sessionId: string,
   state: SessionAgentState,
-): Record<string, (input: unknown) => Promise<string>> {
+): Record<
+  string,
+  (input: unknown) => Promise<string | { content: string; metadata?: unknown }>
+> {
   // Core tools (legacy inline switch) + every registered tool — both dispatch
   // through dispatchTool, which routes the registry first.  EXCEPT ask_user:
   // that tool pauses the turn and awaits a user answer via the broker card.
@@ -1612,10 +1615,19 @@ function getOrCreate(
           // "(grep failed …)" string got success chrome and told the user a dead search
           // found nothing. If you add a tool, throw on failure; don't return prose.
           const isError = content.startsWith('Error:');
+          // Out-of-band UI-only metadata a tool attached (e.g. an edit's diff rows) — never
+          // sent to the model; carried into the live message + the persisted row so the card
+          // can render it (the read-side reads `part.data.metadata`).
+          const metadata = r.metadata;
           emitMessage(emitRef.current, sessionId, 'tool', [
             {
               type: 'tool_result',
-              data: { tool_call_id: r.tool_use_id, content, is_error: isError },
+              data: {
+                tool_call_id: r.tool_use_id,
+                content,
+                is_error: isError,
+                ...(metadata !== undefined && { metadata }),
+              },
             },
           ]);
           state.messageCount += 1;
@@ -1630,6 +1642,7 @@ function getOrCreate(
             tool_use_id: r.tool_use_id,
             content,
             is_error: isError,
+            ...(metadata !== undefined && { metadata }),
           });
         }
         if (bundle.length > 0) {

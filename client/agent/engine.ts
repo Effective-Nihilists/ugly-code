@@ -7,7 +7,7 @@
 // conversation even if the loop is aborted mid-flight.
 
 import type { AgentContentPart, AgentMessage } from '../../shared/agent';
-import type { ToolDispatch } from './tools';
+import { toolResultText, type ToolDispatch } from './tools';
 
 export type StepFn = (input: {
   messages: AgentMessage[];
@@ -77,7 +77,7 @@ export async function runAgent(opts: RunAgentOpts): Promise<AgentMessage[]> {
     for (const tu of toolUses) {
       emit({ type: 'tool_call', id: tu.id, name: tu.name, input: tu.input });
       try {
-        const result = await dispatch(tu.name, tu.input);
+        const result = toolResultText(await dispatch(tu.name, tu.input));
         emit({
           type: 'tool_result',
           id: tu.id,

@@ -121,6 +121,7 @@ export function rowsToDisplayMessages(
                 tool_call_id: x.tool_use_id,
                 content: x.content,
                 is_error: x.is_error,
+                ...(x.metadata !== undefined && { metadata: x.metadata }),
               },
             },
           ],

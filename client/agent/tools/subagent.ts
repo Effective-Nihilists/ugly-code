@@ -3,7 +3,7 @@
 // and a hard recursion guard (a subagent can't spawn further subagents).
 
 import { runAgent, type StepFn } from '../engine';
-import { dispatchTool, type ToolContext } from '../tools';
+import { dispatchTool, toolResultText, type ToolContext } from '../tools';
 import type { AgentMessage } from '../../../shared/agent';
 
 const NO_RECURSE = new Set(['delegate', 'delegate_parallel', 'agent']);
@@ -45,7 +45,7 @@ export async function runSubAgent(
       return Promise.resolve(`(nested delegation is disabled)`);
     if (allow && !allow.has(name))
       return Promise.resolve(`(tool ${name} not available to this subagent)`);
-    return dispatchTool(name, input, opts.ctx);
+    return dispatchTool(name, input, opts.ctx).then(toolResultText);
   };
   const out = await runAgent({
     history,

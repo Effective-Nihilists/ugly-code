@@ -57,7 +57,7 @@ import {
   sessionBranchName,
   sessionWorktreeDir,
 } from '../agent/sessionWorkspace';
-import { buildDiffRows, diffStats, type Part } from './tokenDiff';
+import { buildDiffRows, diffStats, type Part, type DiffRow } from './tokenDiff';
 import {
   badgeLabel,
   grepBadgeNoun,
@@ -1298,6 +1298,12 @@ interface ToolMetadata {
   start_time?: number | string;
   end_time?: number | string;
   truncated?: boolean;
+  /**
+   * Out-of-band diff rows an edit tool shipped (anchor edits carry no old_string, so the
+   * card can't recompute the removed line). When present, the diff view renders these
+   * directly instead of diffing old vs new bodies it doesn't have.
+   */
+  edit?: { rows: DiffRow[] };
 }
 
 /** One child summary from a `delegate_parallel` tool result. */
@@ -1590,7 +1596,11 @@ function EditCard({ tool }: { tool: ToolUse }) {
                 {targetDescription}
               </div>
             ) : null}
-            <EditBeforeAfter oldStr={oldContent} newStr={newContent} />
+            <EditBeforeAfter
+              oldStr={oldContent}
+              newStr={newContent}
+              precomputedRows={meta.edit?.rows}
+            />
           </>
         ) : (
           <div style={{ color: 'var(--text-muted)' }}>
@@ -1745,16 +1755,20 @@ function DiffParts({ parts, mark }: { parts: Part[]; mark: string }) {
 function EditBeforeAfter({
   oldStr,
   newStr,
+  precomputedRows,
 }: {
   oldStr?: string;
   newStr?: string;
+  /** Diff rows shipped out-of-band by the tool (anchor edits, whose old body the card lacks).
+   *  Preferred over diffing oldStr/newStr — it's the only source of the removed (−) line. */
+  precomputedRows?: DiffRow[];
 }) {
   const rows = useMemo(
-    () => buildDiffRows(oldStr ?? '', newStr ?? ''),
-    [oldStr, newStr],
+    () => precomputedRows ?? buildDiffRows(oldStr ?? '', newStr ?? ''),
+    [precomputedRows, oldStr, newStr],
   );
   const stats = useMemo(() => diffStats(rows), [rows]);
-  if (!oldStr && !newStr) return null;
+  if (!precomputedRows && !oldStr && !newStr) return null;
   if (rows.length === 0) return null;
   return (
     <div>

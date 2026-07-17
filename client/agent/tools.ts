@@ -10,7 +10,7 @@ import { DB_SCRIPT } from '../studio/db/dbScript';
 import { runRegisteredTool } from './tools/registry';
 import { formatHashlineRead } from './tools/hashline';
 import { applyEdit, type EditOp } from './tools/applyEdit';
-import { editStatSuffix } from './tools/editStat';
+import { editStatSuffix, editDiffRows } from './tools/editStat';
 import { markDirty } from './tools/codebaseDirty';
 
 /** Project + mode context so tool subprocesses can be OS-user sandboxed by the
@@ -158,11 +158,22 @@ export function relativizePath(
     : absPath;
 }
 
+/**
+ * A tool result: the plain string IS the model-visible content. The `{ content, metadata }`
+ * form additionally attaches an OUT-OF-BAND, UI-only payload (see ugly-app runAgent) — e.g.
+ * an edit's diff rows, which an anchor edit can't recover from `content` alone.
+ */
+export type ToolResult = string | { content: string; metadata?: unknown };
+
+/** The model-visible content string of a tool result (drops any UI-only metadata). */
+export const toolResultText = (r: ToolResult): string =>
+  typeof r === 'string' ? r : r.content;
+
 export type ToolDispatch = (
   name: string,
   input: unknown,
   ctx?: ToolContext,
-) => Promise<string>;
+) => Promise<ToolResult>;
 
 export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
   const p = (input ?? {}) as Record<string, unknown>;
@@ -213,8 +224,12 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       if (ctx?.sessionId) markDirty(ctx.sessionId, path);
       // Report the REAL line delta. Anchor edits carry no old_string, so the transcript
       // card can't derive this and badged every replacement as "+1 −0"; the tool has both
-      // bodies, so it just counts.
-      return `Edited ${relativizePath(ctx, path)}${editStatSuffix(cur, r.body!)}`;
+      // bodies, so it just counts — AND ships the diff rows out-of-band so the card can
+      // render the actual removed (−) line, not only the badge.
+      return {
+        content: `Edited ${relativizePath(ctx, path)}${editStatSuffix(cur, r.body!)}`,
+        metadata: { edit: { rows: editDiffRows(cur, r.body!) } },
+      };
     }
     case 'bash': {
       const command = str(p.command ?? '');

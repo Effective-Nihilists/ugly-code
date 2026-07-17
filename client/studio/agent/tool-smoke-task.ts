@@ -3,7 +3,12 @@
 // binaries work. Built by `ugly-app build:tasks` (declared in .uglyapp) and driven by the
 // ugly-studio task-tools e2e (which spawns it through the real forkTaskChild + bundled env).
 import { defineTask, taskContext, createNodeUglyNative } from 'ugly-app/native';
-import { dispatchTool, type ToolContext } from '../../agent/tools';
+import {
+  dispatchTool,
+  toolResultText,
+  type ToolContext,
+  type ToolResult as DispatchToolResult,
+} from '../../agent/tools';
 
 // Node-backed window.UglyNative so the agent's tools resolve native.fs/process to node:fs /
 // child_process. ugly-app's permissions read platform lazily, so this body-level install
@@ -34,20 +39,20 @@ defineTask({
       const results: Record<string, ToolResult> = {};
       const run = async (
         label: string,
-        fn: () => Promise<string>,
+        fn: () => Promise<DispatchToolResult>,
       ): Promise<void> => {
         try {
           // Per-tool timeout so a db tool waiting on an absent dev postgres can't hang the
           // whole run (a timeout still implies node spawned — the env/binary point).
-          const out = await Promise.race<string>([
+          const out = await Promise.race<DispatchToolResult>([
             fn(),
-            new Promise<string>((_, rej) =>
+            new Promise<DispatchToolResult>((_, rej) =>
               setTimeout(() => {
                 rej(new Error('TIMEOUT'));
               }, 8000),
             ),
           ]);
-          results[label] = { ok: true, out: out.slice(0, 300) };
+          results[label] = { ok: true, out: toolResultText(out).slice(0, 300) };
         } catch (e) {
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a thrown value can be null/undefined despite the `as Error` cast
           results[label] = {

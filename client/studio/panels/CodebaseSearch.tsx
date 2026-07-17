@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, ChevronDown, ChevronRight } from 'lucide-react';
 import { getActiveProjectPath, codebaseCall } from '../hooks/useSocket';
-import { dispatchTool } from '../../agent/tools';
+import { dispatchTool, toolResultText } from '../../agent/tools';
 import {
   provenance,
   type SearchHit,
@@ -40,15 +40,17 @@ export function CodebaseSearch({
     setState({ kind: 'loading' });
     try {
       if (mode === 'grep') {
-        const text = await dispatchTool(
-          'grep',
-          {
-            pattern: q,
-            mode: 'exact',
-            output_mode: 'content',
-            head_limit: limit,
-          },
-          { projectDir: projectPath },
+        const text = toolResultText(
+          await dispatchTool(
+            'grep',
+            {
+              pattern: q,
+              mode: 'exact',
+              output_mode: 'content',
+              head_limit: limit,
+            },
+            { projectDir: projectPath },
+          ),
         );
         setState({ kind: 'grep', hits: parseGrepHits(text) });
       } else {
