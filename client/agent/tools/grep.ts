@@ -127,9 +127,16 @@ async function runExact(args: GrepArgs, ctx: ToolContext | undefined): Promise<s
     // Agent can override via timeout_ms arg; default 30s for ripgrep
     timeoutMs: typeof args.timeout_ms === 'number' ? args.timeout_ms : 30_000,
   });
+  // code === null means the spawn never ran (e.g. ripgrep not on PATH) or we killed it
+  // on timeout — NOT "no matches". This used to fall through to the `|| (no matches)`
+  // below, so a missing binary looked exactly like a clean empty search and the agent
+  // concluded the codebase was empty. Report the failure instead.
+  if (code === null) {
+    return `(grep failed — the search did not run: ${stderr.trim() || 'could not start ripgrep (rg)'})`;
+  }
   // ripgrep: 0 = matches, 1 = no matches, 2 = error.
   if (code === 1) return `(no matches for ${JSON.stringify(args.pattern)})`;
-  if (code !== 0 && code !== null) {
+  if (code !== 0) {
     return `(grep error, exit ${code})\n${(stderr || stdout).trim()}`;
   }
   return stdout.trimEnd() || `(no matches for ${JSON.stringify(args.pattern)})`;
