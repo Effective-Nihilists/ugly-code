@@ -54,10 +54,9 @@ export function FilePicker({
     } catch (e) {
       // console.error is captured to the project's server error_log (ugly-app Logger),
       // so proxied readdir failures are diagnosable without the webview console.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a thrown value can be null/undefined despite the `as Error` cast
       console.error('[FilePicker] readdir failed', {
         dir,
-        message: (e as Error)?.message,
+        message: e instanceof Error ? e.message : String(e),
       });
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a thrown value can be null/undefined despite the `as Error` cast
       setError((e as Error)?.message || 'Could not open this folder');

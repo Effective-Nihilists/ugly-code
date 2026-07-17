@@ -57,7 +57,7 @@ defineTask({
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a thrown value can be null/undefined despite the `as Error` cast
           results[label] = {
             ok: false,
-            out: (e as Error)?.message ?? String(e),
+            out: e instanceof Error ? e.message : String(e),
           };
         }
       };

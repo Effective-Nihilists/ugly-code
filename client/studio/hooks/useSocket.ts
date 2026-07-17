@@ -646,7 +646,7 @@ function runCli(
               _id: string;
               created: number;
               data: Record<string, unknown>;
-            } => !!d && !!d.data,
+            } => !!d,
           );
         resolve(docs);
       });
@@ -1584,12 +1584,12 @@ const handlers: Record<string, Handler> = {
       /^~(?=$|\/)/,
       '$HOME',
     );
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty trailing segment must also fall back to 'repo', not just undefined
     const name =
       url
         .replace(/\/+$/, '')
         .replace(/\.git$/, '')
         .split(/[/:]/)
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty trailing segment must also fall back to 'repo', not just undefined
         .pop() || 'repo';
     const q = (s: string): string => s.replace(/"/g, '\\"');
     const cmd =
