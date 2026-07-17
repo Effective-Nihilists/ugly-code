@@ -1271,6 +1271,12 @@ function getOrCreate(sessionId: string, emit: Emit, selection?: AgentSelection, 
         for (const r of e.results) {
           if (r.type !== 'tool_result') continue;
           const content = r.content;
+          // The framework's tool contract: a tool that THROWS comes back as
+          // `Error: <message>` (runAgent.ts runTool catch); a tool that returns normally
+          // is a success, whatever it says. So the prefix is the protocol, not a guess —
+          // but it means a tool must THROW to be rendered as failed. Returning a polite
+          // "(grep failed …)" string got success chrome and told the user a dead search
+          // found nothing. If you add a tool, throw on failure; don't return prose.
           const isError = content.startsWith('Error:');
           emitMessage(emitRef.current, sessionId, 'tool', [
             { type: 'tool_result', data: { tool_call_id: r.tool_use_id, content, is_error: isError } },

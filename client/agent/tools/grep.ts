@@ -113,7 +113,12 @@ export function buildRgArgs(args: GrepArgs): string[] {
   if (args.head_limit) a.push('-m', String(args.head_limit));
   if (args.literal_text) a.push('-F');
   a.push('-e', args.pattern);
-  if (args.path) a.push(args.path);
+  // ALWAYS pass a search path. With none, ripgrep searches stdin — which is a pipe when
+  // we spawn it from node, so rg blocks forever waiting for input and the tool times out
+  // after 30s having searched nothing. From a terminal you never see this (stdin is a
+  // tty, so rg defaults to ./), which is exactly why it survived so long: every grep the
+  // model issued without an explicit `path` returned "no matches" 30s later.
+  a.push(args.path ?? '.');
   return a;
 }
 
@@ -127,17 +132,19 @@ async function runExact(args: GrepArgs, ctx: ToolContext | undefined): Promise<s
     // Agent can override via timeout_ms arg; default 30s for ripgrep
     timeoutMs: typeof args.timeout_ms === 'number' ? args.timeout_ms : 30_000,
   });
-  // code === null means the spawn never ran (e.g. ripgrep not on PATH) or we killed it
-  // on timeout — NOT "no matches". This used to fall through to the `|| (no matches)`
-  // below, so a missing binary looked exactly like a clean empty search and the agent
-  // concluded the codebase was empty. Report the failure instead.
+  // code === null means the spawn never ran (rg not on PATH) or we killed it on timeout —
+  // NOT "no matches". THROW, don't return a string: the framework turns a thrown tool
+  // error into `Error: …` content with is_error=true (runAgent.ts), which is what paints
+  // the card as a failure and tells the model the search didn't happen. Returning a
+  // polite string here made a dead search render as a green "0 matches" — an affirmative
+  // claim about the codebase that nothing had checked.
   if (code === null) {
-    return `(grep failed — the search did not run: ${stderr.trim() || 'could not start ripgrep (rg)'})`;
+    throw new Error(`grep failed — the search did not run: ${stderr.trim() || 'could not start ripgrep (rg)'}`);
   }
   // ripgrep: 0 = matches, 1 = no matches, 2 = error.
   if (code === 1) return `(no matches for ${JSON.stringify(args.pattern)})`;
   if (code !== 0) {
-    return `(grep error, exit ${code})\n${(stderr || stdout).trim()}`;
+    throw new Error(`grep error (rg exit ${code}): ${(stderr || stdout).trim()}`);
   }
   return stdout.trimEnd() || `(no matches for ${JSON.stringify(args.pattern)})`;
 }

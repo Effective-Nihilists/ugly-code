@@ -54,6 +54,7 @@ import { registerFeedbackContextProvider } from 'ugly-app/client';
 import { MdastViewer } from 'ugly-app/markdown/client';
 import { isNativeAvailable } from 'ugly-app/native';
 import { buildDiffRows, diffStats, type Part } from './tokenDiff';
+import { badgeLabel, parseGlobFiles, parseGrepOutput, searchBadge } from './toolCardSummary';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
 import { formatCurrency } from '../shared/Currency';
 import { estimateCost, isSubscriptionProvider } from '../shared/model-rates';
@@ -2097,40 +2098,6 @@ interface GrepHit {
  *   path/to/other.go:
  *     Line 5: package main
  */
-function parseGrepOutput(
-  text: string,
-): { hits: GrepHit[]; summary: string } | null {
-  if (!text) return null;
-  const lines = text.split('\n');
-  const hits: GrepHit[] = [];
-  let currentFile = '';
-  let summary = '';
-  for (const line of lines) {
-    if (/^Found \d+ match/.test(line)) {
-      summary = line.trim();
-      continue;
-    }
-    if (!line.trim()) continue;
-    // "path/to/file.ts:" — file header
-    const fileMatch = /^(\S.*):$/.exec(line);
-    if (fileMatch) {
-      currentFile = fileMatch[1];
-      continue;
-    }
-    // "  Line N[, Char M]: text"
-    const hitMatch = /^\s+Line (\d+)(?:, Char \d+)?:\s?(.*)$/.exec(line);
-    if (hitMatch && currentFile) {
-      hits.push({
-        file: currentFile,
-        line: parseInt(hitMatch[1], 10),
-        text: hitMatch[2],
-      });
-    }
-  }
-  if (hits.length === 0) return null;
-  return { hits, summary };
-}
-
 function DevServerCard({
   tool,
   onStop,
@@ -2277,19 +2244,13 @@ function GlobCard({ tool }: { tool: ToolUse }) {
   const pattern: string = input.pattern ?? '';
   const scopePath: string = relativizePath(input.path ?? '', cwd);
   const result = tool.result ?? '';
-  // Server returns paths one-per-line, or the literal string
-  // 'No matches found' on empty. Use metadata.count when present,
-  // otherwise derive from the result body.
-  const isEmpty = result === '' || result === 'No matches found';
+  // Badge from a real parse of the tool's own sentinels — NOT from "how many lines of
+  // text came back". `(no files match "x")` is one line of prose, and counting it badged
+  // an empty search as "1 file", asserting files exist when none do.
   const metaCount = typeof meta.count === 'number' ? meta.count : null;
   const truncated = meta.truncated === true;
-  const lines = isEmpty
-    ? []
-    : result
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
-  const total = metaCount ?? lines.length;
+  const lines = parseGlobFiles(result);
+  const badge = searchBadge(tool.status, result, metaCount, truncated, (t) => parseGlobFiles(t).length);
   return (
     <ToolCardShell
       icon={<Search size={13} />}
@@ -2314,11 +2275,11 @@ function GlobCard({ tool }: { tool: ToolUse }) {
         <span
           style={{
             fontSize: 10,
-            color: 'var(--text-muted)',
+            color: badge.kind === 'failed' ? 'var(--error)' : 'var(--text-muted)',
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          {total} file{total === 1 ? '' : 's'}
+          {badgeLabel(badge, 'file')}
           {truncated && ' (truncated)'}
         </span>
       }
@@ -2369,10 +2330,12 @@ function GrepCard({ tool }: { tool: ToolUse }) {
   const path: string = relativizePath(input.path ?? '.', cwd);
   const include: string = input.include ?? '';
   const parsed = parseGrepOutput(tool.result ?? '');
-  const totalMatches = Number(
-    meta.number_of_matches ?? parsed?.hits.length ?? 0,
-  );
   const truncated = !!meta.truncated;
+  const metaMatches = typeof meta.number_of_matches === 'number' ? meta.number_of_matches : null;
+  // An errored grep (rg never ran) must not be summarized as "0 matches" — that's an
+  // affirmative claim about a codebase nothing searched.
+  const badge = searchBadge(tool.status, tool.result, metaMatches, truncated,
+    (t) => parseGrepOutput(t)?.hits.length ?? 0);
 
   // Group hits by file for compact display.
   const byFile = new Map<string, GrepHit[]>();
@@ -2420,11 +2383,11 @@ function GrepCard({ tool }: { tool: ToolUse }) {
         <span
           style={{
             fontSize: 10,
-            color: 'var(--text-muted)',
+            color: badge.kind === 'failed' ? 'var(--error)' : 'var(--text-muted)',
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          {totalMatches} match{totalMatches === 1 ? '' : 'es'}
+          {badgeLabel(badge, 'match')}
           {truncated && ' (truncated)'}
         </span>
       }

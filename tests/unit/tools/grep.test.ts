@@ -150,3 +150,22 @@ describe('grep auto-supplement', () => {
     expect(out).not.toMatch(/LSP DEFINITIONS/);
   });
 });
+
+describe('grep buildRgArgs — search path (the 30s stdin hang)', () => {
+  // Regression: with no path argument, ripgrep searches STDIN. Spawned from node, stdin
+  // is a pipe, so rg blocked until the 30s timeout and reported "no matches" having
+  // searched nothing. Every grep the model issued without an explicit `path` was dead.
+  it('always passes a search path, defaulting to "."', () => {
+    const a = buildRgArgs({ pattern: 'foo' });
+    expect(a[a.length - 1]).toBe('.');
+  });
+  it('honors an explicit path', () => {
+    const a = buildRgArgs({ pattern: 'foo', path: 'src/' });
+    expect(a[a.length - 1]).toBe('src/');
+  });
+  it('the path comes after the -e pattern, never consumed as the pattern', () => {
+    const a = buildRgArgs({ pattern: 'foo' });
+    expect(a[a.indexOf('-e') + 1]).toBe('foo');
+    expect(a.indexOf('-e')).toBeLessThan(a.length - 1);
+  });
+});

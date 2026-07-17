@@ -76,19 +76,20 @@ export const globTool: ToolModule = {
     const { stdout, stderr, code } = await spawnCollect('rg', buildGlobArgs(args, extraExcludes), {
       ...(root ? { cwd: root } : {}),
     });
-    // code === null means the spawn never ran (e.g. ripgrep not on PATH) or we killed
-    // it on timeout — NOT an empty result set. This used to fall through to the final
-    // `return stdout` (""), rendering a green, successful "no files match" card: a
-    // missing binary was indistinguishable from an empty project, and the agent would
-    // conclude the codebase had no files and give up. Say what actually happened.
+    // code === null means the spawn never ran (rg not on PATH) or we killed it on
+    // timeout — NOT an empty result set. THROW, don't return a string: the framework
+    // turns a thrown tool error into `Error: …` with is_error=true (runAgent.ts), which
+    // paints the card as a failure and tells the model the search didn't happen. A
+    // returned string got success chrome, so a missing binary was indistinguishable from
+    // an empty project and the agent concluded the codebase had no files.
     if (code === null) {
-      return `(glob failed — the search did not run: ${stderr.trim() || 'could not start ripgrep (rg)'})`;
+      throw new Error(`glob failed — the search did not run: ${stderr.trim() || 'could not start ripgrep (rg)'}`);
     }
     if (code === 1 || (code === 0 && !stdout.trim())) {
       return `(no files match ${JSON.stringify(args.pattern)})`;
     }
     if (code !== 0) {
-      return `(glob error, exit ${code})\n${(stderr || stdout).trim()}`;
+      throw new Error(`glob error (rg exit ${code}): ${(stderr || stdout).trim()}`);
     }
     return stdout.trimEnd();
   },
