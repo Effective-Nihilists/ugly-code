@@ -47,6 +47,12 @@ interface CodingSessionMetaDoc {
   contextTokens?: number;
   contextWindow?: number;
   contextBudget?: number;
+  // Per-turn usage totals persistMeta writes to this same doc — the header reads these.
+  promptTokens?: number;
+  completionTokens?: number;
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
+  costUsd?: number;
   // Doc-driven codebase-index readiness (written by the task's poll via codingSessionSetReadiness).
   codebaseReadiness?: { indexer?: unknown; diagnostics?: unknown };
 }
@@ -3278,12 +3284,26 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
         // undefined, and treating that as 'not running' briefly flickered the Stop
         // control off mid-turn (sub-second, but real).
         if (d.status !== undefined) setTurnRunning(d.status === 'running');
-        if (d.contextTokens === undefined && d.contextWindow === undefined) return;
+        // The doc also carries the turn's token + cost totals (persistMeta writes them),
+        // but this subscription only ever copied the CONTEXT fields — so the header read
+        // info.promptTokens/cost off a value nothing updated and showed "↑0 ↓0" / "$0.00"
+        // for the whole session, while the sidebar (a different read path) climbed. Copy
+        // them too. The doc field is `costUsd`; info calls it `cost`.
+        const hasUsage =
+          d.contextTokens !== undefined || d.contextWindow !== undefined ||
+          d.promptTokens !== undefined || d.completionTokens !== undefined ||
+          d.costUsd !== undefined || d.cacheReadTokens !== undefined;
+        if (!hasUsage) return;
         setSessionInfo((prev) => ({
           ...(prev ?? { cwd: '' }),
           ...(d.contextTokens !== undefined ? { contextTokens: d.contextTokens } : {}),
           ...(d.contextWindow !== undefined ? { contextWindow: d.contextWindow } : {}),
           ...(d.contextBudget !== undefined ? { contextBudget: d.contextBudget } : {}),
+          ...(d.promptTokens !== undefined ? { promptTokens: d.promptTokens } : {}),
+          ...(d.completionTokens !== undefined ? { completionTokens: d.completionTokens } : {}),
+          ...(d.cacheReadTokens !== undefined ? { cacheReadTokens: d.cacheReadTokens } : {}),
+          ...(d.cacheCreationTokens !== undefined ? { cacheCreationTokens: d.cacheCreationTokens } : {}),
+          ...(d.costUsd !== undefined ? { cost: d.costUsd } : {}),
         } as CodingAgentSessionInfo));
       },
     );
