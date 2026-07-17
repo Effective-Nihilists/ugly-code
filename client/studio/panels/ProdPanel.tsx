@@ -155,7 +155,7 @@ export function ProdPanel(): React.ReactElement {
               )}
             </>
           ) : (
-            <span style={S.sub}>Not deployed yet — deploy to provision Neon + Cloudflare Workers and go live.</span>
+            <span style={S.sub}>Not deployed yet — deploy to provision your database + Cloudflare Workers and go live.</span>
           )}
         </div>
         <span style={{ flex: 1 }} />
@@ -170,7 +170,7 @@ export function ProdPanel(): React.ReactElement {
         )}
       </div>
       <div ref={scrollRef} data-id="prod-output" style={S.console}>
-        <ConsoleText text={output || (running ? 'Starting deploy…' : 'Press Deploy to run the ugly-app deploy pipeline (Neon + Cloudflare provisioning + Workers deploy).')} TextComponent={LinkifiedText} />
+        <ConsoleText text={output || (running ? 'Starting deploy…' : 'Press Deploy to run the ugly-app deploy pipeline (database + Cloudflare Workers + storage provisioning).')} TextComponent={LinkifiedText} />
       </div>
       {running && (
         <div style={S.inputRow}>

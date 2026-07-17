@@ -27,6 +27,22 @@ import { GitRepoSelector, useActiveRepoPath } from './GitRepoSelector';
 type DbMode = 'dev' | 'prod';
 type Tab = 'browse' | 'sql' | 'schema';
 
+// A prod-D1 failure is thrown as a raw Cloudflare envelope
+// ("D1 query failed (400): {\"errors\":[{\"code\":7500,\"message\":\"…\"}]}"). Surface the
+// inner human message instead of dumping the whole JSON payload at the user.
+function humanizeDbError(raw: string | null): string {
+  if (!raw) return '';
+  const at = raw.indexOf('{');
+  if (at >= 0) {
+    try {
+      const env = JSON.parse(raw.slice(at)) as { errors?: { message?: string }[] };
+      const msg = (env.errors ?? []).map((e) => e.message).filter(Boolean).join('; ');
+      if (msg) return `${raw.slice(0, at).replace(/[:\s]+$/, '')} — ${msg}`;
+    } catch { /* not a JSON envelope — show the raw message */ }
+  }
+  return raw;
+}
+
 const FILTER_OPS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'exists'] as const;
 type FilterOp = (typeof FILTER_OPS)[number];
 const OP_LABEL: Record<FilterOp, string> = {
@@ -319,7 +335,7 @@ function BrowseView({ mode, writes }: { mode: DbMode; writes: boolean }) {
     </button>
   );
   if (loading && collections.length === 0) return <Centered>Loading…</Centered>;
-  if (error) return <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{refreshBtn}<div style={errorBoxStyle}>{error}</div></div>;
+  if (error) return <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{refreshBtn}<div style={errorBoxStyle}>{humanizeDbError(error)}</div></div>;
   if (collections.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', paddingTop: 24 }}>
@@ -485,7 +501,7 @@ function CollectionDetail({
         </div>
       </div>
 
-      {error && <div style={errorBoxStyle}>{error}</div>}
+      {error && <div style={errorBoxStyle}>{humanizeDbError(error)}</div>}
 
       {result && (
         <>
@@ -605,7 +621,7 @@ function DocEditorModal({
   return (
     <Modal title={title} onClose={onClose} width={680}>
       <CodeEditor value={text} onChange={setText} language="json" minHeight={300} maxHeight={460} dataId="doc-editor" onSubmit={() => void save()} />
-      {error && <div style={errorBoxStyle}>{error}</div>}
+      {error && <div style={errorBoxStyle}>{humanizeDbError(error)}</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         <button data-id="doc-cancel" onClick={onClose} style={btnStyle('default')}>Cancel</button>
         <button data-id="doc-save" onClick={() => void save()} disabled={saving} style={btnStyle('primary', saving)}>{saving ? 'Saving…' : `Save  ${shortcut('Enter')}`}</button>
@@ -701,7 +717,7 @@ function SqlConsole({ mode, writes, onWantWrites }: { mode: DbMode; writes: bool
         )}
       </div>
 
-      {error && <div style={errorBoxStyle}>{error}</div>}
+      {error && <div style={errorBoxStyle}>{humanizeDbError(error)}</div>}
       {result?.kind === 'read' && (
         <>
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{result.rowCount} row{result.rowCount === 1 ? '' : 's'} · {result.durationMs}ms</span>
@@ -753,7 +769,7 @@ function SchemaView({ mode }: { mode: DbMode }) {
       <select data-id="schema-collection-select" value={selected} onChange={(e) => { setSelected(e.target.value); }} style={{ ...inputStyle, maxWidth: 240 }}>
         {collections.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
       </select>
-      {error && <div style={errorBoxStyle}>{error}</div>}
+      {error && <div style={errorBoxStyle}>{humanizeDbError(error)}</div>}
       {schema && (
         <>
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{schema.count.toLocaleString()} rows</span>

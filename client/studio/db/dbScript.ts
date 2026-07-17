@@ -132,13 +132,22 @@ export const DB_SCRIPT = [
   // shape (matches the Postgres flatten()).
   "function d1Flatten(rows){ return rows.map((row) => { let d = {}; if (row.data){ try { d = JSON.parse(row.data); } catch {} } return Object.assign({ _id: row._id }, (d && typeof d === 'object') ? d : {}, { _created: row.created, _updated: row.updated }); }); }",
   "async function d1TableExists(name){ const r = await d1All(\"SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name = ? LIMIT 1\", [ident(name)]); return r.length > 0; }",
-  // estimatedCount: SQLite has no cheap reltuples, so count each table in ONE
-  // round-trip via a UNION ALL of scalar subqueries.
+  // estimatedCount: SQLite has no cheap reltuples, so count each table via a UNION ALL of
+  // scalar subqueries. CHUNKED — one UNION ALL over EVERY table blows past D1/SQLite's
+  // compound-SELECT term cap once an app has enough tables (framework builtins + collections
+  // + telemetry), failing the whole Browse list with `too many terms in compound SELECT`.
+  // Batch keeps each compound query small; a handful of round-trips is fine for a table list.
   "async function d1CountNames(tables){",
   "  if (!tables.length) return [];",
-  "  const unionSql = tables.map((t) => \"SELECT '\" + String(t).replace(/'/g, \"''\") + \"' AS name, (SELECT count(*) FROM `\" + ident(t) + \"`) AS n\").join(' UNION ALL ');",
-  "  const rows = await d1All(unionSql, []);",
-  "  return rows.map((x) => ({ name: String(x.name), estimatedCount: Math.max(0, Number(x.n) || 0) }));",
+  "  const CHUNK = 20;",
+  "  const out = [];",
+  "  for (let i = 0; i < tables.length; i += CHUNK) {",
+  "    const batch = tables.slice(i, i + CHUNK);",
+  "    const unionSql = batch.map((t) => \"SELECT '\" + String(t).replace(/'/g, \"''\") + \"' AS name, (SELECT count(*) FROM `\" + ident(t) + \"`) AS n\").join(' UNION ALL ');",
+  "    const rows = await d1All(unionSql, []);",
+  "    for (const x of rows) out.push({ name: String(x.name), estimatedCount: Math.max(0, Number(x.n) || 0) });",
+  "  }",
+  "  return out;",
   "}",
   "async function d1ListAll(){ const tables = (await d1All(\"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT LIKE 'd1_%' ORDER BY name\", [])).map((r) => String(r.name)); return d1CountNames(tables); }",
   "async function d1ListNamed(names){ const present = []; for (const n of names){ if (await d1TableExists(n)) present.push(n); } return d1CountNames(present); }",

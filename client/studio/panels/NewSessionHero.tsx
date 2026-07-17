@@ -494,7 +494,11 @@ export function NewSessionHero({
                   cursor: 'pointer',
                 }}
               >
-                Start →
+                Start
+                <span style={{ margin: '0 8px', fontSize: 10, opacity: 0.8, textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
+                  {shortcut('Enter')}
+                </span>
+                →
               </button>
             </div>
           </form>
@@ -591,8 +595,8 @@ function BranchDropdown({
     <button
       data-id="branch-mode-trigger"
       type="button"
-      aria-label="Branch: {label}"
-      data-us-tooltip="Branch: {label}"
+      aria-label={`Where the agent works — ${label}`}
+      data-us-tooltip={`Where the agent works: ${value === 'worktree' ? 'Worktree — an isolated branch you review before merging' : 'Main branch — edits the project directly'}`}
       data-us-tooltip-placement="top"
       style={{
         background: 'var(--bg-secondary, #1a1a2e)',

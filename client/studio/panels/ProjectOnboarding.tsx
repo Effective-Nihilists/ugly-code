@@ -178,7 +178,10 @@ export function ProjectOnboarding({
   // Per-row "⋯" menu + delete confirmation (Open in Finder / Remove / Delete).
   const [menuFor, setMenuFor] = useState<{ project: RecentProject; x: number; y: number } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<RecentProject | null>(null);
-  const [activeAction, setActiveAction] = useState<ActionTab>('new');
+  // Start with all three collapsed so New / Open / Clone are visible at equal weight — a
+  // newcomer sees every entry path at a glance. (Auto-expanding New pushed Open + Git-clone
+  // below the fold, so opening an existing folder looked impossible without scrolling.)
+  const [activeAction, setActiveAction] = useState<ActionTab | null>(null);
   const [newName, setNewName] = useState('');
   const [newParentDir, setNewParentDir] = useState(DEFAULT_PARENT_DIR);
   // Optional ugly-app features to scaffold (empty = minimal template). Passed to
