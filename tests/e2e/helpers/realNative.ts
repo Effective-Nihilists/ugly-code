@@ -31,13 +31,11 @@ export async function installRealNative(
     return true;
   });
   await page.exposeFunction('__nfsReaddir', (p: string) =>
-    fs
-      .readdirSync(rp(p), { withFileTypes: true })
-      .map((d) => ({
-        name: d.name,
-        isDirectory: d.isDirectory(),
-        isFile: d.isFile(),
-      })),
+    fs.readdirSync(rp(p), { withFileTypes: true }).map((d) => ({
+      name: d.name,
+      isDirectory: d.isDirectory(),
+      isFile: d.isFile(),
+    })),
   );
   await page.exposeFunction('__nfsMkdir', (p: string) => {
     fs.mkdirSync(rp(p), { recursive: true });

@@ -51,9 +51,7 @@ interface CliJson {
 }
 
 /** Spawn the CLI as a subprocess with `--json` and parse the structured result. */
-async function runCli(
-  extraArgs: string[],
-): Promise<{
+async function runCli(extraArgs: string[]): Promise<{
   code: number;
   json: CliJson | null;
   stdout: string;

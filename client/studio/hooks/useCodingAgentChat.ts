@@ -1265,7 +1265,9 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     reasoningEffortRef.current = reasoningEffort;
   }, [reasoningEffort]);
   // Branch mode mirror (same pattern — synchronous so startNewChat reads the hero's pick).
-  const branchModeRef = useRef<'worktree' | 'main'>('worktree');
+  // Default is 'main' (edits land on the current branch): worktree isolation is an advanced
+  // mode gated behind a settings opt-in, so the simple default doesn't quarantine edits.
+  const branchModeRef = useRef<'worktree' | 'main'>('main');
   const setBranchMode = useCallback((next: 'worktree' | 'main') => {
     branchModeRef.current = next;
   }, []);
@@ -1388,8 +1390,10 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
     SessionSnapshot['patternMode']
   >(
     () =>
+      // Default 'none' (flat iteration loop): the plan/pattern engine is an advanced mode gated
+      // behind a settings opt-in, so the simple default runs a single straightforward loop.
       (seededAxes.patternMode as SessionSnapshot['patternMode'] | undefined) ??
-      'auto',
+      'none',
   );
   // Ref mirrors of the three axes so a same-tick new-session hero pre-pick reaches
   // `chatCreate` (see reasoningEffortRef / modelRef). The setters below write these

@@ -415,9 +415,7 @@ const PW_LIST_RE =
  * cwd-relative file and let the caller resolve it against known TestCases by
  * suffix. The trailing `(4ms)` is present only for non-skipped tests.
  */
-export function parsePlaywrightListLine(
-  line: string,
-): {
+export function parsePlaywrightListLine(line: string): {
   file: string;
   line: number;
   title: string;

@@ -63,6 +63,10 @@ export const MODEL_MODE_SETTING_KEY = 'codingAgentModelMode';
 export const PATTERN_SETTING_KEY = 'codingAgentPatternMode';
 export const REASONING_SETTING_KEY = 'codingAgentReasoningEffort';
 export const BRANCH_MODE_SETTING_KEY = 'codingAgentBranchMode';
+// Advanced modes (git worktree isolation, the plan/pattern engine, and group/max multi-model)
+// are hidden from the new-session + in-session UI until the user opts in here. Keeps the
+// default interface simple: edits on the current branch, a flat iteration loop, one model.
+export const SHOW_ADVANCED_MODES_SETTING_KEY = 'codingAgentShowAdvancedModes';
 
 /**
  * Max pixel height the prompt textarea will auto-grow to before it
@@ -140,7 +144,12 @@ export function NewSessionHero({
     useStudioUserSetting<ReasoningEffort>(REASONING_SETTING_KEY, 'high');
   const [branchMode, setBranchMode] = useStudioUserSetting<'worktree' | 'main'>(
     BRANCH_MODE_SETTING_KEY,
-    'worktree',
+    'main',
+  );
+  // Advanced modes off by default — hides the branch/worktree, pattern, and group/max controls.
+  const [showAdvancedModes] = useStudioUserSetting<boolean>(
+    SHOW_ADVANCED_MODES_SETTING_KEY,
+    false,
   );
 
   // When the user pins a single model via the Model axis, also write
@@ -230,10 +239,18 @@ export function NewSessionHero({
         ...(pendingEvalTask ? { exposeMcp: false } : {}),
         pendingEvalTask,
         permissionMode,
-        modelMode,
-        patternMode,
+        // When advanced modes are hidden the branch/worktree, pattern, and
+        // group/max controls are gone — so a stale persisted advanced value
+        // must not silently drive the session. Pin each to its simple default
+        // until the user re-enables advanced modes in settings.
+        modelMode:
+          showAdvancedModes ||
+          (modelMode.kind !== 'max' && modelMode.kind !== 'group')
+            ? modelMode
+            : { kind: 'single', model: 'deepseek_v4_pro' },
+        patternMode: showAdvancedModes ? patternMode : 'none',
         reasoningEffort,
-        branchMode,
+        branchMode: showAdvancedModes ? branchMode : 'main',
       };
       // Hand off and reset local state — the hero unmounts almost
       // immediately as SessionLayout swaps the center pane to
@@ -249,6 +266,7 @@ export function NewSessionHero({
       patternMode,
       reasoningEffort,
       branchMode,
+      showAdvancedModes,
       onStartCreation,
       pendingEvalTask,
     ],
@@ -578,11 +596,14 @@ export function NewSessionHero({
               >
                 Run options
               </span>
-              <BranchDropdown value={branchMode} onChange={setBranchMode} />
+              {showAdvancedModes && (
+                <BranchDropdown value={branchMode} onChange={setBranchMode} />
+              )}
               <AgentAxisSelector
                 permission={permissionMode}
                 model={modelMode}
                 pattern={patternMode}
+                hidePattern={!showAdvancedModes}
                 agent={
                   modelMode.kind === 'single' &&
                   (modelMode.model === 'claude-code' ||

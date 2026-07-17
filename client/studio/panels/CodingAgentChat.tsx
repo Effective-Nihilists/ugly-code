@@ -119,7 +119,12 @@ import { timeAgoShort } from '../utils/timeAgo';
 import { EvalScorecard } from './EvalScorecard';
 import { type FinishFailureInfo } from './FinishFailurePopup';
 import { type SubscriptionProvider } from './ModelSelector';
-import { NewSessionHero, type NewSessionStartParams } from './NewSessionHero';
+import {
+  NewSessionHero,
+  SHOW_ADVANCED_MODES_SETTING_KEY,
+  type NewSessionStartParams,
+} from './NewSessionHero';
+import { useStudioUserSetting } from '../hooks/useStudioUserSetting';
 import { PatternStrip } from './PatternStrip';
 import {
   ReasoningSelector,
@@ -1543,46 +1548,55 @@ function EditCard({ tool }: { tool: ToolUse }) {
             </pre>
           </>
         ) : multiEdits.length > 0 ? (
-          <>
-            {multiEdits.map((e, i: number) => {
-              const target = describeEditTarget(e);
-              const newStr = e.new_string ?? e.new_content;
-              return (
-                <div
-                  key={i}
-                  style={{ marginBottom: i < multiEdits.length - 1 ? 12 : 0 }}
-                >
+          meta.edit?.rows ? (
+            // Anchor multiedits carry no per-edit old_string, so the per-edit blocks below can
+            // only show the added line (+N −0). The tool ships the whole-file diff rows as
+            // metadata — render that unified diff so the real REMOVED (−) lines show and the
+            // body ± matches the header (eval R8: the multiedit card hid removed lines).
+            <EditBeforeAfter precomputedRows={meta.edit.rows} />
+          ) : (
+            <>
+              {multiEdits.map((e, i: number) => {
+                const target = describeEditTarget(e);
+                const newStr = e.new_string ?? e.new_content;
+                return (
                   <div
-                    style={{
-                      fontSize: 10,
-                      color: 'var(--text-muted)',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      marginBottom: 4,
-                      fontFamily: 'Inter, sans-serif',
-                    }}
+                    key={i}
+                    style={{ marginBottom: i < multiEdits.length - 1 ? 12 : 0 }}
                   >
-                    Edit {i + 1} / {multiEdits.length}
-                    {e.replace_all ? ' · replace all' : ''}
-                    {target ? (
-                      <span
-                        style={{
-                          marginLeft: 6,
-                          color: 'var(--text-muted)',
-                          fontWeight: 400,
-                          textTransform: 'none',
-                          fontFamily: 'SF Mono, Fira Code, Consolas, monospace',
-                        }}
-                      >
-                        {target}
-                      </span>
-                    ) : null}
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: 'var(--text-muted)',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        marginBottom: 4,
+                        fontFamily: 'Inter, sans-serif',
+                      }}
+                    >
+                      Edit {i + 1} / {multiEdits.length}
+                      {e.replace_all ? ' · replace all' : ''}
+                      {target ? (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            color: 'var(--text-muted)',
+                            fontWeight: 400,
+                            textTransform: 'none',
+                            fontFamily:
+                              'SF Mono, Fira Code, Consolas, monospace',
+                          }}
+                        >
+                          {target}
+                        </span>
+                      ) : null}
+                    </div>
+                    <EditBeforeAfter oldStr={e.old_string} newStr={newStr} />
                   </div>
-                  <EditBeforeAfter oldStr={e.old_string} newStr={newStr} />
-                </div>
-              );
-            })}
-          </>
+                );
+              })}
+            </>
+          )
         ) : oldContent || newContent ? (
           <>
             {targetDescription ? (
@@ -6390,6 +6404,13 @@ CodingAgentChatProps = {}) {
     onTitleChanged,
     ...(onResumeMissing ? { onResumeMissing } : {}),
   });
+  // Advanced modes (worktree isolation, the plan/pattern engine, group/max) are hidden until
+  // opted into in settings — so the default in-session UI shows no Pattern pill and no worktree
+  // banner / Apply-to-project action (edits are on the current branch already).
+  const [showAdvancedModes] = useStudioUserSetting<boolean>(
+    SHOW_ADVANCED_MODES_SETTING_KEY,
+    false,
+  );
   // Surface this session's live run state to the host so the sidebar row's
   // "thinking" indicator flips the instant the model starts/stops — the
   // server-status poll alone lags (poll interval + D1 read-replica latency),
@@ -7813,6 +7834,7 @@ CodingAgentChatProps = {}) {
           disabled={interactionDisabled}
           resolvedPattern={resolvedPattern}
           modelDisplayLabel={modelDisplayLabel}
+          hidePattern={!showAdvancedModes}
         />
         <ReasoningSelector
           value={reasoningEffort}

@@ -87,13 +87,11 @@ export async function installGatedNative(
           return {};
         case 'readdir':
           return {
-            entries: fs
-              .readdirSync(abs, { withFileTypes: true })
-              .map((d) => ({
-                name: d.name,
-                isDirectory: d.isDirectory(),
-                isFile: d.isFile(),
-              })),
+            entries: fs.readdirSync(abs, { withFileTypes: true }).map((d) => ({
+              name: d.name,
+              isDirectory: d.isDirectory(),
+              isFile: d.isFile(),
+            })),
           };
         case 'mkdir':
           fs.mkdirSync(abs, { recursive: true });

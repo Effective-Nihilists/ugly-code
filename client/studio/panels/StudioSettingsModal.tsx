@@ -24,7 +24,9 @@ import {
   PERMISSION_SETTING_KEY,
   REASONING_SETTING_KEY,
   BRANCH_MODE_SETTING_KEY,
+  SHOW_ADVANCED_MODES_SETTING_KEY,
 } from './NewSessionHero';
+import { ModesExplainerModal } from './ModesExplainerModal';
 import type { ReasoningEffort } from './ReasoningSelector';
 
 /**
@@ -251,8 +253,15 @@ export function StudioSettingsModal({
     useStudioUserSetting<ReasoningEffort>(REASONING_SETTING_KEY, 'high');
   const [branchMode, setBranchMode] = useStudioUserSetting<'worktree' | 'main'>(
     BRANCH_MODE_SETTING_KEY,
-    'worktree',
+    'main',
   );
+  // Advanced modes (worktree isolation, the plan/pattern engine, group/max
+  // multi-model) are hidden from the new-session + in-session UI until the user
+  // opts in here. Off by default keeps first-run simple: one model, current
+  // branch, no step engine.
+  const [showAdvancedModes, setShowAdvancedModes] =
+    useStudioUserSetting<boolean>(SHOW_ADVANCED_MODES_SETTING_KEY, false);
+  const [explainerOpen, setExplainerOpen] = React.useState(false);
 
   // Catalog lookup — the multi-select works in `CodingAgentModel`
   // objects but the persisted group value stores string ids.
@@ -369,26 +378,117 @@ export function StudioSettingsModal({
         {/* ── GLM Coding Plan key ── */}
         <GlmCodingKeySection />
 
-        {/* ── Pattern default ── */}
-        <Section
-          title="Pattern default"
-          hint="The step engine every new session starts with. Auto lets a classifier pick per turn."
-        >
-          <select
-            data-id="settings-pattern-select"
-            value={patternMode}
-            onChange={(e) => {
-              setPatternMode(e.target.value as PatternAxisValue);
+        {/* ── Advanced modes gate ── */}
+        <Section title="Advanced modes">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 14,
             }}
-            style={selectCss}
           >
-            {PATTERN_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label} — {o.hint}
-              </option>
-            ))}
-          </select>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                Show worktree isolation, the plan engine, and multi-model modes
+              </div>
+              <div style={hintCss}>
+                Off by default, new sessions run one model on your current
+                branch with no step engine — the simple path. Turn this on to
+                expose three power features in the new-session and in-session
+                controls:
+                <br />
+                <strong>Branch isolation</strong> — run edits in a throwaway git
+                worktree and Apply them only when you&rsquo;re happy.
+                <br />
+                <strong>Plan patterns</strong> — a spec → build → verify (or
+                investigate → fix) step engine with review gates.
+                <br />
+                <strong>Group / Max</strong> — run several models per turn, in
+                parallel (Max, keep the winner) or as a collaborating pool
+                (Group).
+              </div>
+              <button
+                type="button"
+                data-id="settings-modes-explainer-link"
+                onClick={() => {
+                  setExplainerOpen(true);
+                }}
+                style={{
+                  marginTop: 8,
+                  padding: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--accent)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
+                Learn how these modes work →
+              </button>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showAdvancedModes}
+              data-id="settings-advanced-modes-toggle"
+              onClick={() => {
+                setShowAdvancedModes(!showAdvancedModes);
+              }}
+              style={{
+                flexShrink: 0,
+                width: 44,
+                height: 24,
+                borderRadius: 999,
+                border: '1px solid var(--border)',
+                background: showAdvancedModes
+                  ? 'var(--accent)'
+                  : 'var(--bg-secondary, #1a1a2e)',
+                position: 'relative',
+                cursor: 'pointer',
+                transition: 'background 120ms',
+              }}
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  left: showAdvancedModes ? 22 : 2,
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  transition: 'left 120ms',
+                }}
+              />
+            </button>
+          </div>
         </Section>
+
+        {/* ── Pattern default (advanced) ── */}
+        {showAdvancedModes && (
+          <Section
+            title="Pattern default"
+            hint="The step engine every new session starts with. Auto lets a classifier pick per turn."
+          >
+            <select
+              data-id="settings-pattern-select"
+              value={patternMode}
+              onChange={(e) => {
+                setPatternMode(e.target.value as PatternAxisValue);
+              }}
+              style={selectCss}
+            >
+              {PATTERN_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label} — {o.hint}
+                </option>
+              ))}
+            </select>
+          </Section>
+        )}
 
         {/* ── Permission default ── */}
         <Section
@@ -424,7 +524,10 @@ export function StudioSettingsModal({
               marginBottom: 12,
             }}
           >
-            {MODEL_MODE_CHOICES.map((c) => {
+            {MODEL_MODE_CHOICES.filter(
+              (c) =>
+                showAdvancedModes || (c.kind !== 'max' && c.kind !== 'group'),
+            ).map((c) => {
               const active = c.kind === currentKind;
               return (
                 <button
@@ -471,7 +574,7 @@ export function StudioSettingsModal({
             />
           )}
 
-          {currentKind === 'group' && (
+          {showAdvancedModes && currentKind === 'group' && (
             <div>
               <ModelPicker
                 mode="multi"
@@ -535,7 +638,7 @@ export function StudioSettingsModal({
             </div>
           )}
 
-          {currentKind === 'max' && (
+          {showAdvancedModes && currentKind === 'max' && (
             <div style={hintCss}>
               Max mode runs the default peer pool (
               {DEFAULT_POOL_PINNED_IDS.length} models) in parallel each turn and
@@ -564,23 +667,25 @@ export function StudioSettingsModal({
           </select>
         </Section>
 
-        {/* ── Branch isolation default ── */}
-        <Section
-          title="Branch isolation"
-          hint="Every new session creates a git worktree by default (isolated from other sessions). Switch to main branch to work directly on the project directory."
-        >
-          <select
-            data-id="settings-branch-mode-select"
-            value={branchMode}
-            onChange={(e) => {
-              setBranchMode(e.target.value as 'worktree' | 'main');
-            }}
-            style={selectCss}
+        {/* ── Branch isolation default (advanced) ── */}
+        {showAdvancedModes && (
+          <Section
+            title="Branch isolation"
+            hint="New sessions edit your current branch directly by default. Switch to worktree to quarantine each session's edits on a throwaway git worktree that you Apply to the project only when ready."
           >
-            <option value="worktree">Worktree (isolated branch)</option>
-            <option value="main">Main branch (no isolation)</option>
-          </select>
-        </Section>
+            <select
+              data-id="settings-branch-mode-select"
+              value={branchMode}
+              onChange={(e) => {
+                setBranchMode(e.target.value as 'worktree' | 'main');
+              }}
+              style={selectCss}
+            >
+              <option value="main">Current branch (no isolation)</option>
+              <option value="worktree">Worktree (isolated branch)</option>
+            </select>
+          </Section>
+        )}
       </Modal.Body>
       <Modal.Footer>
         <button
@@ -603,6 +708,12 @@ export function StudioSettingsModal({
           Done
         </button>
       </Modal.Footer>
+      <ModesExplainerModal
+        open={explainerOpen}
+        onClose={() => {
+          setExplainerOpen(false);
+        }}
+      />
     </Modal>
   );
 }

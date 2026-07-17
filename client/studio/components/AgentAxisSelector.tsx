@@ -91,6 +91,9 @@ export interface AgentAxisSelectorProps {
    * the in-process loop.
    */
   agent?: 'claude-code' | 'coding-agent';
+  /** Hide the Pattern (plan-engine) pill — the pattern engine is an advanced mode gated behind
+   *  a settings opt-in, so the default UI never shows it. */
+  hidePattern?: boolean;
 }
 
 export interface DropdownOption<T extends string> {
@@ -359,6 +362,7 @@ export const AgentAxisSelector: FC<AgentAxisSelectorProps> = ({
   resolvedPattern,
   modelDisplayLabel,
   agent,
+  hidePattern,
 }) => {
   // 'claude-plan' is a claude-cli-only value — the CLI's
   // `--permission-mode plan` argv branch. For any other agent, drop
@@ -421,7 +425,7 @@ export const AgentAxisSelector: FC<AgentAxisSelectorProps> = ({
           its own agent loop and ignores the studio pattern engine
           entirely, so the dropdown would be a no-op there. Hide it
           for claude-cli sessions to remove the dead control. */}
-      {agent !== 'claude-code' && (
+      {agent !== 'claude-code' && !hidePattern && (
         <AxisDropdown
           value={pattern}
           options={PATTERN_OPTIONS}
