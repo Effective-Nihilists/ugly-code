@@ -55,7 +55,7 @@ import { MdastViewer } from 'ugly-app/markdown/client';
 import { isNativeAvailable } from 'ugly-app/native';
 import { sessionBranchName, sessionWorktreeDir } from '../agent/sessionWorkspace';
 import { buildDiffRows, diffStats, type Part } from './tokenDiff';
-import { badgeLabel, parseGlobFiles, parseGrepOutput, searchBadge } from './toolCardSummary';
+import { badgeLabel, grepBadgeNoun, grepResultCount, parseEditStat, parseGlobFiles, parseGrepOutput, searchBadge } from './toolCardSummary';
 import { useVirtualizer } from '../common/hooks/useVirtualizer';
 import { formatCurrency } from '../shared/Currency';
 import { estimateCost, isSubscriptionProvider } from '../shared/model-rates';
@@ -1314,6 +1314,8 @@ interface ToolInput {
   new_string?: string;
   new_content?: string;
   content?: string;
+  /** grep's result shape — the badge must count what the mode actually returns. */
+  output_mode?: 'content' | 'files_with_matches' | 'count';
   edits?: ToolInputEdit[];
   thought?: string;
   filter?: string;
@@ -1380,6 +1382,11 @@ function EditCard({ tool }: { tool: ToolUse }) {
   // counts from the same diff the expanded view renders, so the default (collapsed) view
   // answers "what did it do to my repo?" with zero clicks.
   const derived = useMemo(() => {
+    // The tool now reports the REAL delta (it diffed both file bodies). Trust it over any
+    // guess here: anchor edits carry no old_string, so guessing counts every replacement
+    // as a pure addition — git said +1 −1 while the card said +1 −0.
+    const reported = parseEditStat(tool.result);
+    if (reported) return reported;
     if (additions > 0 || removals > 0) return { added: additions, removed: removals };
     const tally = (o: string | undefined, n: string | undefined): { added: number; removed: number } =>
       diffStats(buildDiffRows(o ?? '', n ?? ''));
@@ -1394,7 +1401,7 @@ function EditCard({ tool }: { tool: ToolUse }) {
     }
     if (oldContent !== undefined || newContent !== undefined) return tally(oldContent, newContent);
     return { added: 0, removed: 0 };
-  }, [additions, removals, multiEdits, oldContent, newContent]);
+  }, [tool.result, additions, removals, multiEdits, oldContent, newContent]);
 
   return (
     <ToolCardShell
@@ -2357,8 +2364,12 @@ function GrepCard({ tool }: { tool: ToolUse }) {
   const metaMatches = typeof meta.number_of_matches === 'number' ? meta.number_of_matches : null;
   // An errored grep (rg never ran) must not be summarized as "0 matches" — that's an
   // affirmative claim about a codebase nothing searched.
+  // Count what the MODE actually returns: files_with_matches gives bare paths and count
+  // gives "file:N" — neither parses as a hit, so the search that found every file the
+  // agent edited badged "0 matches" while listing them in its own body.
+  const outputMode: string | undefined = typeof input.output_mode === 'string' ? input.output_mode : undefined;
   const badge = searchBadge(tool.status, tool.result, metaMatches, truncated,
-    (t) => parseGrepOutput(t)?.hits.length ?? 0);
+    (t) => grepResultCount(t, outputMode));
 
   // Group hits by file for compact display.
   const byFile = new Map<string, GrepHit[]>();
@@ -2410,7 +2421,7 @@ function GrepCard({ tool }: { tool: ToolUse }) {
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          {badgeLabel(badge, 'match')}
+          {badgeLabel(badge, grepBadgeNoun(outputMode))}
           {truncated && ' (truncated)'}
         </span>
       }

@@ -52,11 +52,19 @@ describe('write', () => {
 });
 
 describe('edit', () => {
-  it('replaces a unique substring', async () => {
+  it('replaces a unique substring and reports the real line delta', async () => {
     resetMock({ files: { 'x.ts': 'const x = 1;\n' } });
     const out = await dispatchTool('edit', { path: 'x.ts', old: '1', new: '2' });
-    expect(out).toBe('Edited x.ts');
+    // The delta is part of the contract: the transcript card can't derive it (anchor
+    // edits carry no old_string) and used to badge every replacement as "+1 −0".
+    expect(out).toBe('Edited x.ts (+1 −1)');
     expect(mockFiles().get('x.ts')).toBe('const x = 2;\n');
+  });
+
+  it('reports a pure insertion as +1 −0', async () => {
+    resetMock({ files: { 'x.ts': 'a\n' } });
+    const out = await dispatchTool('edit', { path: 'x.ts', old: 'a\n', new: 'a\nb\n' });
+    expect(out).toBe('Edited x.ts (+1 −0)');
   });
 
   it('reports when the old text is not found', async () => {

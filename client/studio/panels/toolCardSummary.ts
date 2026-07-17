@@ -75,6 +75,34 @@ export function parseGrepOutput(
   return { hits, summary };
 }
 
+/**
+ * Grep's result count for a given output_mode. `content` yields `file:line:text`, but
+ * `files_with_matches` (rg -l) yields BARE PATHS and `count` yields `file:N` — neither
+ * parses as a hit, so a grep that matched 3 files badged "0 matches" while its own body
+ * listed them. Count what the mode actually returns.
+ */
+export function grepResultCount(text: string, mode: string | undefined): number {
+  if (isNoResultSentinel(text)) return 0;
+  if (mode === 'files_with_matches') {
+    // rg -l: one path per line.
+    return text.split('\n').map((l) => l.trim()).filter(Boolean).length;
+  }
+  if (mode === 'count') {
+    // rg -c: "path:N" per line — the badge means total matches, so sum them.
+    return text
+      .split('\n')
+      .map((l) => /:(\d+)\s*$/.exec(l.trim())?.[1])
+      .filter((n): n is string => n !== undefined)
+      .reduce((sum, n) => sum + parseInt(n, 10), 0);
+  }
+  return parseGrepOutput(text)?.hits.length ?? 0;
+}
+
+/** The noun a grep badge counts for a mode — files for -l, matches otherwise. */
+export function grepBadgeNoun(mode: string | undefined): 'match' | 'file' {
+  return mode === 'files_with_matches' ? 'file' : 'match';
+}
+
 /** Files listed by a glob result (one path per line), or [] for the no-match sentinel. */
 export function parseGlobFiles(text: string): string[] {
   if (isNoResultSentinel(text)) return [];
@@ -114,4 +142,14 @@ export function badgeLabel(badge: CardBadge, noun: 'match' | 'file'): string {
   const n = badge.count;
   const plural = n === 1 ? noun : `${noun}${noun === 'match' ? 'es' : 's'}`;
   return `${n}${badge.truncated ? '+' : ''} ${plural}`;
+}
+
+/**
+ * The `(+N −M)` the edit/multiedit tools now append to their result. Authoritative: the
+ * tool diffed the real file bodies, whereas the card can only guess (anchor edits carry
+ * no old_string, so a guess reports every replacement as a pure addition).
+ */
+export function parseEditStat(result: string | undefined): { added: number; removed: number } | null {
+  const m = /\(\+(\d+)\s*[−-](\d+)\)\s*$/.exec((result ?? '').trim());
+  return m ? { added: parseInt(m[1], 10), removed: parseInt(m[2], 10) } : null;
 }

@@ -8,6 +8,7 @@ import { native } from 'ugly-app/native';
 import type { TextGenTool } from 'ugly-app/shared';
 import type { ToolModule } from './registry';
 import { resolvePath } from '../tools';
+import { editStatSuffix } from './editStat';
 import { markDirty } from './codebaseDirty';
 import { applyEdit, type EditOp } from './applyEdit';
 
@@ -70,6 +71,7 @@ export const multieditTool: ToolModule = {
       console.error('[multieditTool:readFile]', JSON.stringify({ path: rawPath, error: e instanceof Error ? e.message : String(e) }), e instanceof Error ? e.stack : undefined);
       return `multiedit: could not read ${rawPath}: ${(e as Error).message}`;
     }
+    const original = content;
     // Apply in memory; reject the whole set on the first failure (atomic).
     for (let i = 0; i < args.edits.length; i++) {
       const r = applyEdit(content, args.edits[i]);
@@ -80,6 +82,8 @@ export const multieditTool: ToolModule = {
     }
     await native.fs.writeFile(abs, content);
     if (ctx?.sessionId) markDirty(ctx.sessionId, abs);
-    return `Applied ${args.edits.length} edit(s) to ${rawPath}`;
+    // Real line delta across the whole set — the card can't derive it (anchor edits carry
+    // no old_string) and badged every replacement as "+N −0".
+    return `Applied ${args.edits.length} edit(s) to ${rawPath}${editStatSuffix(original, content)}`;
   },
 };

@@ -2,8 +2,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   badgeLabel,
+  grepBadgeNoun,
+  grepResultCount,
   isNoResultSentinel,
   parseGlobFiles,
+  parseEditStat,
   parseGrepOutput,
   searchBadge,
 } from '../../client/studio/panels/toolCardSummary';
@@ -104,5 +107,48 @@ describe('searchBadge — a failure is never a count', () => {
   it('singular/plural', () => {
     expect(badgeLabel(searchBadge('done', 'a', null, false, parse), 'file')).toBe('1 file');
     expect(badgeLabel(searchBadge('done', 'a', null, false, parse), 'match')).toBe('1 match');
+  });
+});
+
+describe('grepResultCount — modes the parser used to badge as 0', () => {
+  it('files_with_matches: bare paths are FILES, not zero', () => {
+    // The exact case: the search that found every file the agent edited badged "0 matches".
+    expect(grepResultCount('./report.ts\n./format.ts\n./store.ts', 'files_with_matches')).toBe(3);
+    expect(grepBadgeNoun('files_with_matches')).toBe('file');
+  });
+  it('count mode sums per-file counts', () => {
+    expect(grepResultCount('format.ts:2\nreport.ts:3', 'count')).toBe(5);
+  });
+  it('content mode still counts hits', () => {
+    expect(grepResultCount('format.ts:3:export function f() {}', 'content')).toBe(1);
+    expect(grepBadgeNoun('content')).toBe('match');
+  });
+  it('sentinels are zero in every mode', () => {
+    expect(grepResultCount('(no matches for "x")', 'files_with_matches')).toBe(0);
+    expect(grepResultCount('(no matches for "x")', 'count')).toBe(0);
+    expect(grepResultCount('(no matches for "x")', undefined)).toBe(0);
+  });
+  it('undefined mode defaults to content parsing', () => {
+    expect(grepResultCount('a.ts:1:x', undefined)).toBe(1);
+  });
+});
+
+describe('parseEditStat — the tool reports, the card stops guessing', () => {
+  it('reads the real counts the edit tool appended', () => {
+    // git said +1 −1; the card guessed "+1 −0" because anchor edits carry no old line.
+    expect(parseEditStat('Edited format.ts (+1 −1)')).toEqual({ added: 1, removed: 1 });
+  });
+  it('reads multiedit results', () => {
+    expect(parseEditStat('Applied 3 edit(s) to store.ts (+4 −2)')).toEqual({ added: 4, removed: 2 });
+  });
+  it('accepts an ASCII hyphen as well as the minus sign', () => {
+    expect(parseEditStat('Edited a.ts (+2 -3)')).toEqual({ added: 2, removed: 3 });
+  });
+  it('null when absent (old transcripts) so the card falls back', () => {
+    expect(parseEditStat('Edited format.ts')).toBeNull();
+    expect(parseEditStat(undefined)).toBeNull();
+  });
+  it('does not match a stat mid-sentence', () => {
+    expect(parseEditStat('(+1 −1) trailing words')).toBeNull();
   });
 });

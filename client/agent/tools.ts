@@ -10,6 +10,7 @@ import { DB_SCRIPT } from '../studio/db/dbScript';
 import { runRegisteredTool } from './tools/registry';
 import { formatHashlineRead } from './tools/hashline';
 import { applyEdit, type EditOp } from './tools/applyEdit';
+import { editStatSuffix } from './tools/editStat';
 import { markDirty } from './tools/codebaseDirty';
 
 /** Project + mode context so tool subprocesses can be OS-user sandboxed by the
@@ -191,7 +192,10 @@ export const dispatchTool: ToolDispatch = async (name, input, ctx) => {
       if (!r.ok) return `edit failed in ${relativizePath(ctx, path)}: ${r.error}`;
       await native.fs.writeFile(path, r.body!);
       if (ctx?.sessionId) markDirty(ctx.sessionId, path);
-      return `Edited ${relativizePath(ctx, path)}`;
+      // Report the REAL line delta. Anchor edits carry no old_string, so the transcript
+      // card can't derive this and badged every replacement as "+1 −0"; the tool has both
+      // bodies, so it just counts.
+      return `Edited ${relativizePath(ctx, path)}${editStatSuffix(cur, r.body!)}`;
     }
     case 'bash': {
       const command = str(p.command ?? '');
