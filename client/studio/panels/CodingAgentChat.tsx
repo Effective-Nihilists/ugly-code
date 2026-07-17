@@ -781,8 +781,11 @@ function ToolOutputView({ tool }: { tool: ToolUse }) {
         <pre
           style={{
             margin: 0,
-            whiteSpace: 'pre',
-            overflowX: 'auto',
+            // Wrap rather than scroll: a long signature used to run off the right
+            // edge of the card, and since the card has no visible scrollbar the
+            // text simply looked truncated with no way to read the rest.
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
             color: 'var(--text-secondary)',
             fontFamily: 'SF Mono, Fira Code, Consolas, monospace',
             fontSize: 11,
