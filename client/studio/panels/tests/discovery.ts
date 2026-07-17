@@ -149,7 +149,11 @@ async function collectVitest(
           avail: 'not-installed',
           note: 'vitest is not installed — run your package manager’s install.',
         }
-      : { cases: [], avail: 'present', note: firstLine(r.stderr) };
+      : {
+          cases: [],
+          avail: 'present',
+          note: humanizeCollectFailure('vitest', r.stderr || r.stdout),
+        };
   }
   return { cases: parseVitestList(r.stdout, cwd), avail: 'present' };
 }
@@ -171,7 +175,11 @@ async function collectPytest(
           avail: 'not-installed',
           note: 'pytest is not installed — `pip install pytest` (or add uv).',
         }
-      : { cases: [], avail: 'present', note: firstLine(r.stderr || r.stdout) };
+      : {
+          cases: [],
+          avail: 'present',
+          note: humanizeCollectFailure('pytest', r.stderr || r.stdout),
+        };
   }
   return { cases: parsePytestCollect(r.stdout), avail: 'present' };
 }
@@ -191,7 +199,11 @@ async function collectPlaywright(
           avail: 'not-installed',
           note: '@playwright/test is not installed.',
         }
-      : { cases: [], avail: 'present', note: firstLine(r.stderr) };
+      : {
+          cases: [],
+          avail: 'present',
+          note: humanizeCollectFailure('playwright', r.stderr || r.stdout),
+        };
   }
   const rootDirRel = playwrightRootDirRel(r.stdout, cwd);
   return { cases: parsePlaywrightList(r.stdout, rootDirRel), avail: 'present' };
@@ -200,6 +212,28 @@ async function collectPlaywright(
 function firstLine(s: string): string {
   const l = s.trim().split('\n')[0] ?? '';
   return l.length > 200 ? l.slice(0, 200) + '…' : l;
+}
+
+/**
+ * A collect that failed for a reason OTHER than "not installed" often prints only
+ * a bare stack frame or bundler vendor path — e.g. `vitest list --json` throwing
+ * from `…/vitest/dist/vendor/cac.<hash>.js:403` on a version that doesn't accept
+ * the flag, even though `vitest run` works fine. Dumping that path at the user (in
+ * red, next to "0 tests") reads as "the panel is broken". Detect that noise and
+ * fall back to plain language; surface the raw first line only when it's a real,
+ * human-readable message.
+ */
+function humanizeCollectFailure(runner: TestRunner, raw: string): string {
+  const line = firstLine(raw);
+  const looksLikeNoise =
+    line === '' ||
+    /\.(m?[jt]s|cjs):\d+$/.test(line) || // ends in some/file.ext:lineNo
+    /[/\\](?:vendor|dist|node_modules)[/\\]/.test(line) || // bundler internals
+    line.startsWith('file://') ||
+    /^\s*at\s/.test(line); // a stack frame
+  return looksLikeNoise
+    ? `${runner} couldn’t list tests here — press Run to execute them directly.`
+    : line;
 }
 
 /** Detect, then collect each declared runner concurrently. */

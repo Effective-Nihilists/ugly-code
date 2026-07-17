@@ -121,7 +121,7 @@ export const PERMISSION_OPTIONS: DropdownOption<PermissionAxisValue>[] = [
 
 export const PATTERN_OPTIONS: DropdownOption<PatternAxisValue>[] = [
   { value: 'auto', label: 'Auto', hint: 'classifier picks per turn' },
-  { value: 'none', label: 'None', hint: 'no step engine — flat loop' },
+  { value: 'none', label: 'No plan', hint: 'no step engine — flat loop' },
   {
     value: 'spec-build-verify',
     label: 'Spec → Build → Verify',

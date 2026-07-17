@@ -573,7 +573,9 @@ export function NewSessionHero({
               >
                 {shortcut('Enter')}
               </span>
-              to start · spec first
+              {/* "spec first" hints at the spec→build→verify pattern, which is an
+                  advanced-only feature — don't surface it on the simple default path. */}
+              to start{showAdvancedModes ? ' · spec first' : ''}
             </div>
             <div
               style={{

@@ -666,7 +666,7 @@ export function TestsPanel(): React.ReactElement {
               )}
               {avail === 'present' && s.notes[runner] && (
                 <p
-                  style={{ fontSize: 12, color: '#e53935', margin: '0 0 6px' }}
+                  style={{ fontSize: 12, color: '#f0a000', margin: '0 0 6px' }}
                 >
                   {s.notes[runner]}
                 </p>

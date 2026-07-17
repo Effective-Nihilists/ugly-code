@@ -50,6 +50,15 @@ function humanizeDbError(raw: string | null): string {
   return raw;
 }
 
+// A dev-DB query against a directory that isn't an ugly-app app (no `ugly-app`
+// dependency, hence no meta.db / migrations) fails deep in module resolution with
+// "Cannot find package 'ugly-app'". That's not an error worth a red box — it just
+// means this project has no database. Detect it and show a calm empty state.
+function isNoUglyAppDb(raw: string | null): boolean {
+  if (!raw) return false;
+  return /Cannot find (?:package|module) '?ugly-app'?/i.test(raw);
+}
+
 const FILTER_OPS = [
   'eq',
   'ne',
@@ -532,6 +541,37 @@ function BrowseView({ mode, writes }: { mode: DbMode; writes: boolean }) {
     </button>
   );
   if (loading && collections.length === 0) return <Centered>Loading…</Centered>;
+  // A project with no ugly-app database isn't an error — degrade to a calm note.
+  if (error && isNoUglyAppDb(error)) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          alignItems: 'center',
+          paddingTop: 24,
+        }}
+      >
+        <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+          No database in this project
+        </span>
+        <span
+          style={{
+            color: 'var(--text-secondary)',
+            fontSize: 11,
+            textAlign: 'center',
+            maxWidth: 300,
+          }}
+        >
+          The dev database is only available for ugly-app projects — it&rsquo;s
+          created when the app runs its migrations. Plain repos have nothing to
+          browse here.
+        </span>
+        {refreshBtn}
+      </div>
+    );
+  }
   if (error)
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

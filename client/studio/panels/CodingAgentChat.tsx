@@ -272,6 +272,7 @@ function ToolCardShell({
   children,
   headerExtras,
   persistKey,
+  defaultExpanded,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -282,14 +283,18 @@ function ToolCardShell({
   /** Tool-call id. The hand-picked expand state is remembered under this key so it
    *  survives a reload. Omit for cards with no stable identity (never persisted). */
   persistKey?: string;
+  /** Open by default even when not running (a user click still overrides). Used so a
+   *  SMALL edit diff shows its red−/green+ lines without a click — a newcomer shouldn't
+   *  have to expand a two-line change to see what happened. */
+  defaultExpanded?: boolean;
 }) {
-  // `null` = untouched → follow the default (open only while running). Once the user clicks,
-  // their choice wins and is written through to localStorage.
+  // `null` = untouched → follow the default (open while running, or when the card asked
+  // to default-open). Once the user clicks, their choice wins and persists to localStorage.
   const [userChoice, setUserChoice] = useState<boolean | null>(() =>
     persistKey ? (readToolCardExpanded()[persistKey] ?? null) : null,
   );
   const isRunning = status === 'running' || status === 'executing';
-  const expanded = userChoice ?? isRunning;
+  const expanded = userChoice ?? (isRunning || defaultExpanded === true);
   const setExpanded = (next: boolean): void => {
     setUserChoice(next);
     if (persistKey) writeToolCardExpanded(persistKey, next);
@@ -1480,6 +1485,11 @@ function EditCard({ tool }: { tool: ToolUse }) {
       }
       status={tool.status}
       persistKey={tool.id}
+      // Edits open by default so the red−/green+ lines are visible with no click
+      // (both a newcomer and a power-user flagged the collapsed-by-default diff).
+      // The diff body is height-capped with its own inner scroll, so even a large
+      // rewrite stays contained rather than flooding the transcript.
+      defaultExpanded
     >
       <div
         style={{

@@ -5,7 +5,29 @@
     <link rel="icon" type="image/png" href="/icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>App</title>
-    <style>html, body, #root { height: 100%; margin: 0; }</style>
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      /* Paint a base background + a spinner BEFORE React hydrates, so a cold load
+         shows a calm loading state instead of a flash of blank white. Respect the
+         OS light/dark preference so dark-mode users don't get a white flash (the
+         common case). The spinner is drawn on #root while it's still empty and
+         disappears the instant React renders its first node into it. */
+      body { background: #ffffff; color: #9aa0a6; }
+      @media (prefers-color-scheme: dark) { body { background: #0e0e12; } }
+      #root:empty::after {
+        content: "";
+        position: fixed;
+        top: 50%; left: 50%;
+        width: 26px; height: 26px;
+        margin: -13px 0 0 -13px;
+        border: 3px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        opacity: 0.4;
+        animation: app-boot-spin 0.8s linear infinite;
+      }
+      @keyframes app-boot-spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
     <div id="root"></div>

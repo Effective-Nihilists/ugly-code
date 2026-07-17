@@ -373,342 +373,352 @@ export function StudioSettingsModal({
 
   return (
     <>
-      <Modal open={open} onClose={onClose} size="md" ariaLabel="Studio settings">
-      <Modal.Header>Settings</Modal.Header>
-      <Modal.Body>
-        {/* ── GLM Coding Plan key ── */}
-        <GlmCodingKeySection />
+      <Modal
+        open={open}
+        onClose={onClose}
+        size="md"
+        ariaLabel="Studio settings"
+      >
+        <Modal.Header>Settings</Modal.Header>
+        <Modal.Body>
+          {/* ── GLM Coding Plan key ── */}
+          <GlmCodingKeySection />
 
-        {/* ── Advanced modes gate ── */}
-        <Section title="Advanced modes">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: 14,
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
-                Show worktree isolation, the plan engine, and multi-model modes
-              </div>
-              <div style={hintCss}>
-                Off by default, new sessions run one model on your current
-                branch with no step engine — the simple path. Turn this on to
-                expose three power features in the new-session and in-session
-                controls:
-                <br />
-                <strong>Branch isolation</strong> — run edits in a throwaway git
-                worktree and Apply them only when you&rsquo;re happy.
-                <br />
-                <strong>Plan patterns</strong> — a spec → build → verify (or
-                investigate → fix) step engine with review gates.
-                <br />
-                <strong>Group / Max</strong> — run several models per turn, in
-                parallel (Max, keep the winner) or as a collaborating pool
-                (Group).
+          {/* ── Advanced modes gate ── */}
+          <Section title="Advanced modes">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 14,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                  Show worktree isolation, the plan engine, and multi-model
+                  modes
+                </div>
+                <div style={hintCss}>
+                  Off by default, new sessions run one model on your current
+                  branch with no step engine — the simple path. Turn this on to
+                  expose three power features in the new-session and in-session
+                  controls:
+                  <br />
+                  <strong>Branch isolation</strong> — run edits in a throwaway
+                  git worktree and Apply them only when you&rsquo;re happy.
+                  <br />
+                  <strong>Plan patterns</strong> — a spec → build → verify (or
+                  investigate → fix) step engine with review gates.
+                  <br />
+                  <strong>Group / Max</strong> — run several models per turn, in
+                  parallel (Max, keep the winner) or as a collaborating pool
+                  (Group).
+                </div>
+                <button
+                  type="button"
+                  data-id="settings-modes-explainer-link"
+                  onClick={() => {
+                    setExplainerOpen(true);
+                  }}
+                  style={{
+                    marginTop: 8,
+                    padding: 0,
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--accent)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Learn how these modes work →
+                </button>
               </div>
               <button
                 type="button"
-                data-id="settings-modes-explainer-link"
+                role="switch"
+                aria-checked={showAdvancedModes}
+                data-id="settings-advanced-modes-toggle"
                 onClick={() => {
-                  setExplainerOpen(true);
+                  setShowAdvancedModes(!showAdvancedModes);
                 }}
                 style={{
-                  marginTop: 8,
-                  padding: 0,
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--accent)',
-                  fontSize: 12,
-                  fontWeight: 600,
+                  flexShrink: 0,
+                  width: 44,
+                  height: 24,
+                  borderRadius: 999,
+                  border: '1px solid var(--border)',
+                  background: showAdvancedModes
+                    ? 'var(--accent)'
+                    : 'var(--bg-secondary, #1a1a2e)',
+                  position: 'relative',
                   cursor: 'pointer',
-                  textDecoration: 'underline',
+                  transition: 'background 120ms',
                 }}
               >
-                Learn how these modes work →
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 2,
+                    left: showAdvancedModes ? 22 : 2,
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    transition: 'left 120ms',
+                  }}
+                />
               </button>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={showAdvancedModes}
-              data-id="settings-advanced-modes-toggle"
-              onClick={() => {
-                setShowAdvancedModes(!showAdvancedModes);
-              }}
-              style={{
-                flexShrink: 0,
-                width: 44,
-                height: 24,
-                borderRadius: 999,
-                border: '1px solid var(--border)',
-                background: showAdvancedModes
-                  ? 'var(--accent)'
-                  : 'var(--bg-secondary, #1a1a2e)',
-                position: 'relative',
-                cursor: 'pointer',
-                transition: 'background 120ms',
-              }}
-            >
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 2,
-                  left: showAdvancedModes ? 22 : 2,
-                  width: 18,
-                  height: 18,
-                  borderRadius: '50%',
-                  background: '#fff',
-                  transition: 'left 120ms',
-                }}
-              />
-            </button>
-          </div>
-        </Section>
+          </Section>
 
-        {/* ── Pattern default (advanced) ── */}
-        {showAdvancedModes && (
+          {/* ── Pattern default (advanced) ── */}
+          {showAdvancedModes && (
+            <Section
+              title="Pattern default"
+              hint="The step engine every new session starts with. Auto lets a classifier pick per turn."
+            >
+              <select
+                data-id="settings-pattern-select"
+                value={patternMode}
+                onChange={(e) => {
+                  setPatternMode(e.target.value as PatternAxisValue);
+                }}
+                style={selectCss}
+              >
+                {PATTERN_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label} — {o.hint}
+                  </option>
+                ))}
+              </select>
+            </Section>
+          )}
+
+          {/* ── Permission default ── */}
           <Section
-            title="Pattern default"
-            hint="The step engine every new session starts with. Auto lets a classifier pick per turn."
+            title="Permission default"
+            hint="How much filesystem reach a new session's agent gets."
           >
             <select
-              data-id="settings-pattern-select"
-              value={patternMode}
+              data-id="settings-permission-select"
+              value={permissionMode}
               onChange={(e) => {
-                setPatternMode(e.target.value as PatternAxisValue);
+                setPermissionMode(e.target.value as PermissionAxisValue);
               }}
               style={selectCss}
             >
-              {PATTERN_OPTIONS.map((o) => (
+              {PERMISSION_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label} — {o.hint}
                 </option>
               ))}
             </select>
           </Section>
-        )}
 
-        {/* ── Permission default ── */}
-        <Section
-          title="Permission default"
-          hint="How much filesystem reach a new session's agent gets."
-        >
-          <select
-            data-id="settings-permission-select"
-            value={permissionMode}
-            onChange={(e) => {
-              setPermissionMode(e.target.value as PermissionAxisValue);
-            }}
-            style={selectCss}
-          >
-            {PERMISSION_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label} — {o.hint}
-              </option>
-            ))}
-          </select>
-        </Section>
-
-        {/* ── Model mode default ── */}
-        <Section
-          title="Model mode default"
-          hint={MODEL_MODE_CHOICES.find((c) => c.kind === currentKind)?.hint}
-        >
-          <div
-            style={{
-              display: 'flex',
-              gap: 6,
-              flexWrap: 'wrap',
-              marginBottom: 12,
-            }}
-          >
-            {MODEL_MODE_CHOICES.filter(
-              (c) =>
-                showAdvancedModes || (c.kind !== 'max' && c.kind !== 'group'),
-            ).map((c) => {
-              const active = c.kind === currentKind;
-              return (
-                <button
-                  key={c.kind}
-                  type="button"
-                  data-id={`settings-model-mode-${c.kind}`}
-                  onClick={() => {
-                    handleKindChange(c.kind);
-                  }}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 6,
-                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border, #2a2a3e)'}`,
-                    background: active
-                      ? 'color-mix(in srgb, var(--accent, #ff5500) 18%, transparent)'
-                      : 'var(--bg-secondary, #1a1a2e)',
-                    color: 'var(--text-primary, #e0e0e0)',
-                    fontSize: 12.5,
-                    fontWeight: active ? 700 : 500,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {currentKind === 'single' && (
-            <ModelPicker
-              mode="single"
-              value={singleValue}
-              onChange={(choice) => {
-                if (typeof choice === 'object') {
-                  applyModelMode({ kind: 'single', model: choice.id });
-                } else {
-                  // Auto sentinel picked from within the single picker.
-                  applyModelMode({ kind: 'auto' });
-                }
-              }}
-              triggerStyle="row"
-              rowLabel="Pinned model"
-              rowHint="Used for every turn of a new session."
-            />
-          )}
-
-          {showAdvancedModes && currentKind === 'group' && (
-            <div>
-              <ModelPicker
-                mode="multi"
-                values={groupValues}
-                onChangeMany={handleGroupModels}
-                triggerStyle="row"
-                rowLabel="Peer pool"
-                rowHint="Models that run concurrently each turn."
-              />
-              {groupValues.length === 0 ? (
-                <div style={hintCss}>
-                  No peers selected — the runtime default pool is used.
-                </div>
-              ) : (
-                <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
-                  {groupValues.map((m) => (
-                    <div
-                      key={m.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                      }}
-                    >
-                      <span
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          fontSize: 12.5,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {m.name}
-                      </span>
-                      <select
-                        data-id={`settings-group-persona-${m.id}`}
-                        value={groupPersonas[m.id] ?? ''}
-                        onChange={(e) => {
-                          handleGroupPersona(
-                            m.id,
-                            e.target.value as PersonaId | '',
-                          );
-                        }}
-                        style={{ ...selectCss, width: 260, cursor: 'pointer' }}
-                      >
-                        <option value="">No persona</option>
-                        {personaIds
-                          .filter((id) => id !== 'default')
-                          .map((id) => (
-                            <option key={id} value={id}>
-                              {id} — {PERSONAS[id].description}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {showAdvancedModes && currentKind === 'max' && (
-            <div style={hintCss}>
-              Max mode runs the default peer pool (
-              {DEFAULT_POOL_PINNED_IDS.length} models) in parallel each turn and
-              a picker LLM keeps the winning diff. No extra configuration
-              needed.
-            </div>
-          )}
-        </Section>
-
-        {/* ── Reasoning default ── */}
-        <Section
-          title="Reasoning default"
-          hint="Controls how much the model thinks before answering each turn. High = deeper reasoning, low = faster."
-        >
-          <select
-            data-id="settings-reasoning-select"
-            value={reasoningEffort}
-            onChange={(e) => {
-              setReasoningEffort(e.target.value as ReasoningEffort);
-            }}
-            style={selectCss}
-          >
-            <option value="high">High — thorough reasoning</option>
-            <option value="medium">Medium — balanced</option>
-            <option value="low">Low — fast</option>
-          </select>
-        </Section>
-
-        {/* ── Branch isolation default (advanced) ── */}
-        {showAdvancedModes && (
+          {/* ── Model mode default ── */}
           <Section
-            title="Branch isolation"
-            hint="New sessions edit your current branch directly by default. Switch to worktree to quarantine each session's edits on a throwaway git worktree that you Apply to the project only when ready."
+            title="Model mode default"
+            hint={MODEL_MODE_CHOICES.find((c) => c.kind === currentKind)?.hint}
+          >
+            <div
+              style={{
+                display: 'flex',
+                gap: 6,
+                flexWrap: 'wrap',
+                marginBottom: 12,
+              }}
+            >
+              {MODEL_MODE_CHOICES.filter(
+                (c) =>
+                  showAdvancedModes || (c.kind !== 'max' && c.kind !== 'group'),
+              ).map((c) => {
+                const active = c.kind === currentKind;
+                return (
+                  <button
+                    key={c.kind}
+                    type="button"
+                    data-id={`settings-model-mode-${c.kind}`}
+                    onClick={() => {
+                      handleKindChange(c.kind);
+                    }}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 6,
+                      border: `1px solid ${active ? 'var(--accent)' : 'var(--border, #2a2a3e)'}`,
+                      background: active
+                        ? 'color-mix(in srgb, var(--accent, #ff5500) 18%, transparent)'
+                        : 'var(--bg-secondary, #1a1a2e)',
+                      color: 'var(--text-primary, #e0e0e0)',
+                      fontSize: 12.5,
+                      fontWeight: active ? 700 : 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {currentKind === 'single' && (
+              <ModelPicker
+                mode="single"
+                value={singleValue}
+                onChange={(choice) => {
+                  if (typeof choice === 'object') {
+                    applyModelMode({ kind: 'single', model: choice.id });
+                  } else {
+                    // Auto sentinel picked from within the single picker.
+                    applyModelMode({ kind: 'auto' });
+                  }
+                }}
+                triggerStyle="row"
+                rowLabel="Pinned model"
+                rowHint="Used for every turn of a new session."
+              />
+            )}
+
+            {showAdvancedModes && currentKind === 'group' && (
+              <div>
+                <ModelPicker
+                  mode="multi"
+                  values={groupValues}
+                  onChangeMany={handleGroupModels}
+                  triggerStyle="row"
+                  rowLabel="Peer pool"
+                  rowHint="Models that run concurrently each turn."
+                />
+                {groupValues.length === 0 ? (
+                  <div style={hintCss}>
+                    No peers selected — the runtime default pool is used.
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+                    {groupValues.map((m) => (
+                      <div
+                        key={m.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                        }}
+                      >
+                        <span
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: 12.5,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {m.name}
+                        </span>
+                        <select
+                          data-id={`settings-group-persona-${m.id}`}
+                          value={groupPersonas[m.id] ?? ''}
+                          onChange={(e) => {
+                            handleGroupPersona(
+                              m.id,
+                              e.target.value as PersonaId | '',
+                            );
+                          }}
+                          style={{
+                            ...selectCss,
+                            width: 260,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <option value="">No persona</option>
+                          {personaIds
+                            .filter((id) => id !== 'default')
+                            .map((id) => (
+                              <option key={id} value={id}>
+                                {id} — {PERSONAS[id].description}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {showAdvancedModes && currentKind === 'max' && (
+              <div style={hintCss}>
+                Max mode runs the default peer pool (
+                {DEFAULT_POOL_PINNED_IDS.length} models) in parallel each turn
+                and a picker LLM keeps the winning diff. No extra configuration
+                needed.
+              </div>
+            )}
+          </Section>
+
+          {/* ── Reasoning default ── */}
+          <Section
+            title="Reasoning default"
+            hint="Controls how much the model thinks before answering each turn. High = deeper reasoning, low = faster."
           >
             <select
-              data-id="settings-branch-mode-select"
-              value={branchMode}
+              data-id="settings-reasoning-select"
+              value={reasoningEffort}
               onChange={(e) => {
-                setBranchMode(e.target.value as 'worktree' | 'main');
+                setReasoningEffort(e.target.value as ReasoningEffort);
               }}
               style={selectCss}
             >
-              <option value="main">Current branch (no isolation)</option>
-              <option value="worktree">Worktree (isolated branch)</option>
+              <option value="high">High — thorough reasoning</option>
+              <option value="medium">Medium — balanced</option>
+              <option value="low">Low — fast</option>
             </select>
           </Section>
-        )}
-      </Modal.Body>
-      <Modal.Footer>
-        <button
-          type="button"
-          data-id="settings-done"
-          onClick={onClose}
-          style={{
-            fontFamily: 'var(--font-label)',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--text-primary)',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            padding: '8px 18px',
-            cursor: 'pointer',
-          }}
-        >
-          Done
-        </button>
-      </Modal.Footer>
+
+          {/* ── Branch isolation default (advanced) ── */}
+          {showAdvancedModes && (
+            <Section
+              title="Branch isolation"
+              hint="New sessions edit your current branch directly by default. Switch to worktree to quarantine each session's edits on a throwaway git worktree that you Apply to the project only when ready."
+            >
+              <select
+                data-id="settings-branch-mode-select"
+                value={branchMode}
+                onChange={(e) => {
+                  setBranchMode(e.target.value as 'worktree' | 'main');
+                }}
+                style={selectCss}
+              >
+                <option value="main">Current branch (no isolation)</option>
+                <option value="worktree">Worktree (isolated branch)</option>
+              </select>
+            </Section>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <button
+            type="button"
+            data-id="settings-done"
+            onClick={onClose}
+            style={{
+              fontFamily: 'var(--font-label)',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'var(--text-primary)',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              padding: '8px 18px',
+              cursor: 'pointer',
+            }}
+          >
+            Done
+          </button>
+        </Modal.Footer>
       </Modal>
       {/* Rendered as a SIBLING of the settings modal (not a child) so it mounts
           in its own portal on top — nesting it inside the settings Modal trapped
