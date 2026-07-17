@@ -3273,8 +3273,11 @@ export function useCodingAgentChat(opts: UseCodingAgentChatOptions = {}) {
           if (r) setCodebaseReadiness(r);
         }
         // Turn status first: the early return below (context fields) would otherwise
-        // skip it entirely on docs that carry no context numbers.
-        setTurnRunning(d.status === 'running');
+        // skip it entirely on docs that carry no context numbers. Only act when the
+        // delta actually CARRIES a status — a readiness/token-only write leaves it
+        // undefined, and treating that as 'not running' briefly flickered the Stop
+        // control off mid-turn (sub-second, but real).
+        if (d.status !== undefined) setTurnRunning(d.status === 'running');
         if (d.contextTokens === undefined && d.contextWindow === undefined) return;
         setSessionInfo((prev) => ({
           ...(prev ?? { cwd: '' }),
