@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-16T21:00:51.746Z",
+  "generatedAt": "2026-07-19T20:51:18.077Z",
   "source": "shared/collections.ts",
   "collections": {
     "authMagicLink": {
@@ -106,6 +106,47 @@
           {
             "fields": {
               "userId": 1
+            }
+          }
+        ]
+      },
+      "meta": {
+        "cache": false,
+        "trackable": false,
+        "public": false,
+        "cascadeFrom": null,
+        "db": {
+          "kind": "d1"
+        }
+      }
+    },
+    "emailSuppression": {
+      "name": "emailSuppression",
+      "schema": {
+        "fields": {
+          "category": {
+            "type": "string",
+            "required": true,
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "required": true
+          },
+          "reason": {
+            "type": "enum",
+            "values": [
+              "unsubscribed",
+              "bounced",
+              "complained"
+            ],
+            "required": true
+          }
+        },
+        "indexes": [
+          {
+            "fields": {
+              "email": 1
             }
           }
         ]

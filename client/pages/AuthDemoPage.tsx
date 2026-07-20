@@ -1,6 +1,13 @@
 import { nanoid } from 'nanoid';
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Card, PageLayout, Text, useApp } from 'ugly-app/client';
+import {
+  Button,
+  Card,
+  PageLayout,
+  Text,
+  startUglyBotLogin,
+  useApp,
+} from 'ugly-app/client';
 
 // ─── Session helpers (used for the experiment / analytics demo below) ─────────
 
@@ -30,32 +37,6 @@ async function rpc<T>(name: string, input: unknown): Promise<T> {
 function getCtaLabel(branches: Record<string, string>): string {
   if (branches['cta-test'] === 'treatment') return 'Try it free';
   return 'Get started';
-}
-
-function openLogin(): void {
-  window.open(
-    `https://ugly.bot/oauth?origin=${encodeURIComponent(
-      window.location.origin,
-    )}`,
-    'ugly-bot-login',
-    `width=480,height=640,left=${Math.round(
-      window.screenX + (window.outerWidth - 480) / 2,
-    )},top=${Math.round(window.screenY + (window.outerHeight - 640) / 2)}`,
-  );
-  function onMessage(event: MessageEvent): void {
-    if (event.origin !== 'https://ugly.bot') return;
-    const data = event.data as { type?: string; code?: string } | null;
-    if (!data?.type || data.type !== 'ugly-bot-oauth' || !data.code) return;
-    window.removeEventListener('message', onMessage);
-    void fetch('/auth/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: data.code }),
-    }).then((res) => {
-      if (res.ok) window.location.reload();
-    });
-  }
-  window.addEventListener('message', onMessage);
 }
 
 function AuthDemoAuthenticated(): React.ReactElement {
@@ -131,7 +112,7 @@ function AuthDemoUnauthenticated(): React.ReactElement {
       properties: { page: 'auth-demo' },
     }).catch((_e: unknown) => undefined);
 
-    openLogin();
+    startUglyBotLogin();
   }
 
   const ctaLabel = getCtaLabel(branches);

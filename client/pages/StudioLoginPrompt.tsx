@@ -2,28 +2,7 @@
 // present. Reuses the same ugly.bot OAuth popup flow as AuthDemoPage; a
 // successful login reloads the page (→ HomeGate re-evaluates → StudioShell).
 import React from 'react';
-
-function openLogin(): void {
-  window.open(
-    `https://ugly.bot/oauth?origin=${encodeURIComponent(window.location.origin)}`,
-    'ugly-bot-login',
-    'width=480,height=640',
-  );
-  function onMessage(event: MessageEvent): void {
-    if (event.origin !== 'https://ugly.bot') return;
-    const data = event.data as { type?: string; code?: string } | null;
-    if (!data?.type || data.type !== 'ugly-bot-oauth' || !data.code) return;
-    window.removeEventListener('message', onMessage);
-    void fetch('/auth/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: data.code }),
-    }).then((res) => {
-      if (res.ok) window.location.reload();
-    });
-  }
-  window.addEventListener('message', onMessage);
-}
+import { startUglyBotLogin } from 'ugly-app/client';
 
 export default function StudioLoginPrompt(): React.ReactElement {
   return (
@@ -50,7 +29,9 @@ export default function StudioLoginPrompt(): React.ReactElement {
         </p>
         <button
           data-id="studio-login-btn"
-          onClick={openLogin}
+          onClick={() => {
+            startUglyBotLogin();
+          }}
           style={{ padding: '10px 18px' }}
         >
           Sign in →

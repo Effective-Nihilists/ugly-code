@@ -21,12 +21,13 @@
       "push": "",
       "search": ""
     },
-    "lastDeployedAt": "2026-07-18T06:48:40.394Z"
+    "lastDeployedAt": "2026-07-20T20:07:35.935Z"
   },
   "domain": "code.ugly.bot",
   "tasks": {
     "coding": "client/studio/agent/coding-task.ts",
     "tool-smoke": "client/studio/agent/tool-smoke-task.ts"
   },
-  "neon": false
+  "neon": false,
+  "crossOriginIsolation": false
 }

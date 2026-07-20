@@ -11,6 +11,7 @@ export default [
       '**/*.mjs',
       'dist/**',
       'node_modules/**',
+      '.ugly-studio/**', // bundled local Postgres/MinIO data — lint crashes recursing in
       'vite.config.ts',
       'vitest.config.ts',
       'playwright.config.ts',

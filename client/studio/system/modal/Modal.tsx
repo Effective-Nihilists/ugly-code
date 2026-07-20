@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method -- @floating-ui/react setters (setFloating/setReference) and getFloatingProps/getReferenceProps are referentially-stable bound fns; passing them as refs is the documented API */
 import {
   FloatingFocusManager,
   FloatingOverlay,
