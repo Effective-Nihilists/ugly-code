@@ -72,8 +72,8 @@ importers:
         specifier: ^0.183.2
         version: 0.183.2
       ugly-app:
-        specifier: ^0.1.879
-        version: 0.1.879(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.2)(typescript@5.9.3)(vega-lite@6.4.3(vega@6.2.0))(vega@6.2.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+        specifier: ^0.1.891
+        version: 0.1.891(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.2)(typescript@5.9.3)(vega-lite@6.4.3(vega@6.2.0))(vega@6.2.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
       yjs:
         specifier: ^13.6.30
         version: 13.6.31
@@ -2528,8 +2528,8 @@ packages:
     resolution: {integrity: sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w==}
     engines: {node: '>=12.0.0'}
 
-  hono@4.12.30:
-    resolution: {integrity: sha512-emn+JoJjrN9YTpRDS5it/UI2SO9BAE37T6I3d963RxcZ81G9A4pr2SZTEiiaiKbzx+NKRg5BZ89fCL7gCJCUog==}
+  hono@4.12.31:
+    resolution: {integrity: sha512-zJIHFrl6bq3RDd2YusFNCDlM8qUprxKswyi/OPzPyzKDdyBXDqWx8bZlZ7R+saTdSTatUmb3O7K4SspGPaEOQg==}
     engines: {node: '>=16.9.0'}
 
   html-escaper@2.0.2:
@@ -3974,8 +3974,8 @@ packages:
     engines: {node: '>=0.8.0'}
     hasBin: true
 
-  ugly-app@0.1.879:
-    resolution: {integrity: sha512-SA58+z6vLf99wOhL5vC7vTQu6e8t0t/4Sg04urwZQXC7EOCWUC2mEIXvgmN8Fg23hFiOnRuIO8piH95bEpFerg==}
+  ugly-app@0.1.891:
+    resolution: {integrity: sha512-vFKTgFbWmVBrUWX4qwQIwEA/XobjO6ZoIjLRcKOf8H9dUL1qJ/ZLqYu3Ovml/z8+CuPB8xe5ridDtBSjhWL3/Q==}
     hasBin: true
     peerDependencies:
       '@types/react': '>=18.0.0'
@@ -7211,7 +7211,7 @@ snapshots:
 
   highlight.js@11.11.1: {}
 
-  hono@4.12.30: {}
+  hono@4.12.31: {}
 
   html-escaper@2.0.2: {}
 
@@ -8958,7 +8958,7 @@ snapshots:
   uglify-js@3.19.3:
     optional: true
 
-  ugly-app@0.1.879(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.2)(typescript@5.9.3)(vega-lite@6.4.3(vega@6.2.0))(vega@6.2.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31):
+  ugly-app@0.1.891(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.2)(typescript@5.9.3)(vega-lite@6.4.3(vega@6.2.0))(vega@6.2.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31):
     dependencies:
       '@aws-sdk/client-s3': 3.1090.0
       '@aws-sdk/s3-request-presigner': 3.1090.0
@@ -8992,7 +8992,7 @@ snapshots:
       handlebars: 4.7.9
       hast-util-to-html: 9.0.5
       highlight.js: 11.11.1
-      hono: 4.12.30
+      hono: 4.12.31
       html2canvas: 1.4.1
       jose: 6.2.3
       jsonwebtoken: 9.0.3
