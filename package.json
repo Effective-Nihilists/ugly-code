@@ -1,5 +1,6 @@
 {
   "name": "ugly-code",
+  "packageManager": "pnpm@10.34.5",
   "version": "0.1.135",
   "type": "module",
   "bin": {
