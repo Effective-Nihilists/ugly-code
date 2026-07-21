@@ -26,6 +26,7 @@ import { collections } from '../shared/collections';
 import { makeCodingSessionHandlers } from './codingSessionHandlers';
 import {
   DEFAULT_USER_SETTINGS,
+  byoKeyField,
   mergeUserSettings,
   parseStoredUserSettings,
   type UserSettings,
@@ -85,11 +86,13 @@ const app = createApp(
     // would otherwise cycle back through `app`'s own initializer (TS7022/7023).
     agentStep: async (userId, input): Promise<{ message: AgentMessage }> =>
       agentStepHandler(userId, input, {
-        // Only invoked for BYO-subscription models (glm_coding_plan); an
-        // ordinary metered turn never reads the settings doc.
-        loadByoKey: async (uid): Promise<string | undefined> => {
+        // Only invoked for BYO-subscription models (glm_coding_plan,
+        // kimi_coding_plan); an ordinary metered turn never reads the doc.
+        loadByoKey: async (uid, model): Promise<string | undefined> => {
+          const field = byoKeyField(model);
+          if (!field) return undefined;
           const doc = await app.db.getDoc(collections.userSettings, uid);
-          return parseStoredUserSettings(doc?.data).codingAgent.glmCodingKey;
+          return parseStoredUserSettings(doc?.data).codingAgent[field];
         },
       }),
 

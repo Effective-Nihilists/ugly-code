@@ -44,16 +44,18 @@ export const codingAgentSettingsSchema = z.object({
   superSynthesisModel: z.string().optional(),
   superInjectionStyle: z.enum(['advisory', 'imperative']).optional(),
   /**
-   * Z.ai GLM Coding Plan API key. The ONLY provider credential stored here.
-   *
-   * It is forwarded to ugly.bot on each `agentStep` (never stored there) and
-   * bills against the user's own flat-rate subscription rather than ugly.bot's
-   * metered account. Without it the `glm_coding_plan` model is hidden in the
-   * picker and rejected by ugly.bot.
+   * BYO provider credentials. Each is forwarded to ugly.bot on each `agentStep`
+   * (never stored there) and bills against the user's own flat-rate subscription
+   * rather than ugly.bot's metered account. Without the matching key its model is
+   * hidden in the picker and rejected by ugly.bot. `byoKeyField()` maps a BYO
+   * model id to its field here.
    *
    * Stored in plaintext in the Neon settings blob, like every other field here.
    */
+  // Z.ai GLM Coding Plan key (model `glm_coding_plan`).
   glmCodingKey: z.string().optional(),
+  // Moonshot Kimi Code plan key (model `kimi_coding_plan`).
+  kimiCodingKey: z.string().optional(),
   // The user's LAST-picked session config (model + run modes), remembered so a NEW
   // coding session defaults to it. Per-session picks live on the session itself
   // (CodingSession.config); this is only the seed for freshly-created sessions.
@@ -102,6 +104,7 @@ export const userSettingsPatchSchema = z.object({
         .optional(),
       // `null` clears the stored key (see mergeUserSettings).
       glmCodingKey: z.string().nullable().optional(),
+      kimiCodingKey: z.string().nullable().optional(),
       // Remembered defaults for new sessions (see CodingSession.config).
       sessionDefaults: sessionConfigDefaultsSchema.optional(),
     })
@@ -215,6 +218,9 @@ function mergeOptional(
   if (p.glmCodingKey === null) out.glmCodingKey = undefined;
   else if (p.glmCodingKey !== undefined) out.glmCodingKey = p.glmCodingKey;
   else if (ca.glmCodingKey !== undefined) out.glmCodingKey = ca.glmCodingKey;
+  if (p.kimiCodingKey === null) out.kimiCodingKey = undefined;
+  else if (p.kimiCodingKey !== undefined) out.kimiCodingKey = p.kimiCodingKey;
+  else if (ca.kimiCodingKey !== undefined) out.kimiCodingKey = ca.kimiCodingKey;
   const pollinator = strN(p.pollinator, ca.pollinator);
   if (pollinator !== undefined) out.pollinator = pollinator;
   if (p.pollinatorEnabled !== undefined)
@@ -274,19 +280,43 @@ export function parseStoredUserSettings(
   const lenient = userSettingsPatchSchema.safeParse(parsed);
   if (lenient.success)
     return mergeUserSettings(DEFAULT_USER_SETTINGS, lenient.data);
-  const key = extractGlmCodingKey(parsed);
-  return key === undefined
+  // Salvage EVERY BYO credential before falling back to defaults, so a bad
+  // unrelated field can't erase any of them on the next write.
+  const creds = extractByoCredentials(parsed);
+  return Object.keys(creds).length === 0
     ? DEFAULT_USER_SETTINGS
-    : mergeUserSettings(DEFAULT_USER_SETTINGS, {
-        codingAgent: { glmCodingKey: key },
-      });
+    : mergeUserSettings(DEFAULT_USER_SETTINGS, { codingAgent: creds });
 }
 
-/** Pull a well-typed, non-empty glmCodingKey straight out of a raw parsed blob. */
-function extractGlmCodingKey(parsed: unknown): string | undefined {
-  if (parsed === null || typeof parsed !== 'object') return undefined;
+/** Pull well-typed, non-empty BYO credential fields straight out of a raw blob. */
+function extractByoCredentials(
+  parsed: unknown,
+): Pick<CodingAgentSettings, 'glmCodingKey' | 'kimiCodingKey'> {
+  const out: Pick<CodingAgentSettings, 'glmCodingKey' | 'kimiCodingKey'> = {};
+  if (parsed === null || typeof parsed !== 'object') return out;
   const ca = (parsed as { codingAgent?: unknown }).codingAgent;
-  if (ca === null || typeof ca !== 'object') return undefined;
-  const key = (ca as { glmCodingKey?: unknown }).glmCodingKey;
-  return typeof key === 'string' && key.length > 0 ? key : undefined;
+  if (ca === null || typeof ca !== 'object') return out;
+  for (const field of ['glmCodingKey', 'kimiCodingKey'] as const) {
+    const key = (ca as Record<string, unknown>)[field];
+    if (typeof key === 'string' && key.length > 0) out[field] = key;
+  }
+  return out;
+}
+
+/**
+ * Map a BYO text-gen model id to the settings field holding its key.
+ * The single source of truth for "which credential does this model need."
+ * Returns undefined for metered models (which never read a stored key).
+ */
+export function byoKeyField(
+  model: string,
+): 'glmCodingKey' | 'kimiCodingKey' | undefined {
+  switch (model) {
+    case 'glm_coding_plan':
+      return 'glmCodingKey';
+    case 'kimi_coding_plan':
+      return 'kimiCodingKey';
+    default:
+      return undefined;
+  }
 }

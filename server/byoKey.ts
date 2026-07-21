@@ -1,5 +1,6 @@
 // Server-side resolution of the user's own provider key for BYO-subscription
-// models (currently only `glm_coding_plan`, backed by a Z.ai GLM Coding Plan).
+// models (`glm_coding_plan` → Z.ai, `kimi_coding_plan` → Moonshot Kimi Code).
+// `byoKeyField(model)` maps each model to the settings field holding its key.
 //
 // Shared by BOTH server entries — the Node one (server/index.ts) and the
 // Cloudflare Worker (server/workers.ts, which is what code.ugly.bot actually
@@ -10,7 +11,7 @@
 // server, per turn, and only for a model that needs it.
 import { isByoKeyTextGenModel } from 'ugly-app/shared';
 import { collections } from '../shared/collections';
-import { parseStoredUserSettings } from '../shared/userSettings';
+import { byoKeyField, parseStoredUserSettings } from '../shared/userSettings';
 
 /** The narrow slice of TypedDB this needs; satisfied by Node and Workers alike. */
 export interface SettingsDocReader {
@@ -48,19 +49,22 @@ export function makeResolveApiKey(
 ): (userId: string, model: string) => Promise<string | undefined> {
   return async (userId, model) => {
     if (!isByoKeyTextGenModel(model)) return undefined;
+    const field = byoKeyField(model);
+    // A BYO model with no mapped field is a programming error, not a "no key".
+    if (!field) return undefined;
     let lastErr: unknown;
     for (let attempt = 0; attempt < READ_ATTEMPTS; attempt++) {
       try {
         const doc = await db().getDoc(collections.userSettings, userId);
         // A successful read with no key is a genuine "add your key" — undefined.
-        return parseStoredUserSettings(doc?.data).codingAgent.glmCodingKey;
+        return parseStoredUserSettings(doc?.data).codingAgent[field];
       } catch (e) {
         lastErr = e;
       }
     }
     const detail = lastErr instanceof Error ? lastErr.message : String(lastErr);
     throw new Error(
-      `Couldn't load your saved Z.ai GLM Coding Plan key (transient settings-read failure — please retry). [${detail}]`,
+      `Couldn't load your saved coding-plan key (transient settings-read failure — please retry). [${detail}]`,
     );
   };
 }

@@ -16,6 +16,7 @@ import {
 } from '../shared/model-rankings';
 import { Popover } from '../system';
 import { useGlmCodingKey } from '../hooks/useGlmCodingKey';
+import { useKimiCodingKey } from '../hooks/useKimiCodingKey';
 
 /**
  * Unified model picker. One component for every model-selection surface
@@ -316,8 +317,10 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
 
   // Detect the local Claude CLI; when present, surface the claude-cli rows.
   const [claudeCliAvailable, setClaudeCliAvailable] = useState(false);
-  // Gates the BYO `glm_coding_plan` row (see the groups memo below).
+  // Gates the BYO rows (see the groups memo below) — each BYO model is shown
+  // only when ITS own key is configured.
   const { key: glmKey } = useGlmCodingKey();
+  const { key: kimiKey } = useKimiCodingKey();
   useEffect(() => {
     let cancelled = false;
     void import('../agent/claudeCliDetect').then(({ detectClaudeCli }) =>
@@ -341,11 +344,13 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
   // sources — BYO subscription models were removed (everything routes through
   // the metered ugly.bot proxy).
   const groups = useMemo(() => {
+    // A BYO model runs on the USER's own subscription key; without it the server
+    // rejects the turn. Hide the row rather than offer a dead option — same "no
+    // locked stubs" rule. Each BYO model is gated on ITS own key.
+    const byoKeyPresent = (id: string): boolean =>
+      id === 'kimi_coding_plan' ? !!kimiKey : !!glmKey;
     const all: CodingAgentModel[] = [
-      // `glm_coding_plan` runs on the USER's own Z.ai subscription key; without
-      // one the server rejects the turn. Hide the row rather than offer a dead
-      // option — same "no locked stubs" rule as the removed BYO subscriptions.
-      ...BASE_MODELS.filter((m) => !isByoKeyTextGenModel(m.id) || !!glmKey),
+      ...BASE_MODELS.filter((m) => !isByoKeyTextGenModel(m.id) || byoKeyPresent(m.id)),
       ...(claudeCliAvailable ? CLAUDE_CLI_MODELS : []),
     ];
     const bySub = new Map<SubscriptionKey, CodingAgentModel[]>();
@@ -359,7 +364,7 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
     // Sort within each group by SWE-bench desc, then weighted price asc.
     for (const arr of bySub.values()) arr.sort(sortBySweAndCost);
     return bySub;
-  }, [family, claudeCliAvailable, glmKey]);
+  }, [family, claudeCliAvailable, glmKey, kimiKey]);
 
   // ── Trigger label resolution
   const triggerText = useMemo(() => {

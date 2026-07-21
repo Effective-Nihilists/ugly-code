@@ -10,6 +10,7 @@ import {
 import { ModelPicker } from '../components/ModelPicker';
 import { useSocket } from '../hooks/useSocket';
 import { useGlmCodingKey } from '../hooks/useGlmCodingKey';
+import { useKimiCodingKey } from '../hooks/useKimiCodingKey';
 import {
   setStudioUserSetting,
   useStudioUserSetting,
@@ -121,15 +122,32 @@ function Section({
 }
 
 /**
- * The Z.ai GLM Coding Plan key. The only provider credential the studio stores.
- *
- * Lives in the Neon per-user settings doc (not the host-disk studio settings)
- * because the SERVER reads it to forward on each agentStep. Until one is saved,
- * the `GLM Coding Plan` model is hidden from the picker and the server refuses
- * the turn — ugly.bot never falls back to a shared Z.ai account.
+ * A BYO coding-plan key section. Each key lives in the Neon per-user settings
+ * doc (not the host-disk studio settings) because the SERVER reads it to forward
+ * on each agentStep. Until one is saved, the matching model is hidden from the
+ * picker and the server refuses the turn — ugly.bot never falls back to a shared
+ * account. Generic over the provider so GLM and Kimi share one implementation.
  */
-function GlmCodingKeySection(): React.ReactElement {
-  const { key, hydrated, save } = useGlmCodingKey();
+interface CodingKeyApi {
+  key: string | undefined;
+  hydrated: boolean;
+  save: (next: string | null) => Promise<void>;
+}
+function CodingKeySection({
+  api,
+  title,
+  hint,
+  placeholder,
+  idPrefix,
+}: {
+  api: CodingKeyApi;
+  title: string;
+  hint: string;
+  placeholder: string;
+  /** data-id prefix, e.g. 'glm' → settings-glm-key-input. */
+  idPrefix: string;
+}): React.ReactElement {
+  const { key, hydrated, save } = api;
   const [draft, setDraft] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -149,10 +167,7 @@ function GlmCodingKeySection(): React.ReactElement {
   };
 
   return (
-    <Section
-      title="GLM Coding Plan key"
-      hint="Your Z.ai Coding Plan key. Turns run on your own flat-rate subscription — ugly.bot relays the request and bills nothing. Without a key the model is hidden."
-    >
+    <Section title={title} hint={hint}>
       {configured ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 12, color: '#4caf50' }}>
@@ -160,7 +175,7 @@ function GlmCodingKeySection(): React.ReactElement {
             Key configured
           </span>
           <button
-            data-id="settings-glm-key-remove"
+            data-id={`settings-${idPrefix}-key-remove`}
             type="button"
             disabled={busy}
             onClick={() => void commit(null)}
@@ -183,13 +198,11 @@ function GlmCodingKeySection(): React.ReactElement {
       ) : (
         <div style={{ display: 'flex', gap: 8 }}>
           <input
-            data-id="settings-glm-key-input"
+            data-id={`settings-${idPrefix}-key-input`}
             type="password"
             autoComplete="off"
             spellCheck={false}
-            placeholder={
-              hydrated ? 'Paste your Z.ai Coding Plan key' : 'Loading…'
-            }
+            placeholder={hydrated ? placeholder : 'Loading…'}
             value={draft}
             disabled={!hydrated || busy}
             onChange={(e) => {
@@ -198,7 +211,7 @@ function GlmCodingKeySection(): React.ReactElement {
             style={{ ...selectCss, flex: 1 }}
           />
           <button
-            data-id="settings-glm-key-save"
+            data-id={`settings-${idPrefix}-key-save`}
             type="button"
             disabled={!hydrated || busy || draft.trim() === ''}
             onClick={() => void commit(draft)}
@@ -226,6 +239,32 @@ function GlmCodingKeySection(): React.ReactElement {
         </div>
       )}
     </Section>
+  );
+}
+
+/** Z.ai GLM Coding Plan key. */
+function GlmCodingKeySection(): React.ReactElement {
+  return (
+    <CodingKeySection
+      api={useGlmCodingKey()}
+      idPrefix="glm"
+      title="GLM Coding Plan key"
+      hint="Your Z.ai Coding Plan key. Turns run on your own flat-rate subscription — ugly.bot relays the request and bills nothing. Without a key the model is hidden."
+      placeholder="Paste your Z.ai Coding Plan key"
+    />
+  );
+}
+
+/** Moonshot Kimi Code plan key. */
+function KimiCodingKeySection(): React.ReactElement {
+  return (
+    <CodingKeySection
+      api={useKimiCodingKey()}
+      idPrefix="kimi"
+      title="Kimi Coding Plan key"
+      hint="Your Moonshot Kimi Code plan key. Turns run on your own flat-rate subscription — ugly.bot relays the request and bills nothing. Without a key the model is hidden."
+      placeholder="Paste your Kimi Code plan key"
+    />
   );
 }
 
@@ -381,8 +420,9 @@ export function StudioSettingsModal({
       >
         <Modal.Header>Settings</Modal.Header>
         <Modal.Body>
-          {/* ── GLM Coding Plan key ── */}
+          {/* ── BYO coding-plan keys ── */}
           <GlmCodingKeySection />
+          <KimiCodingKeySection />
 
           {/* ── Advanced modes gate ── */}
           <Section title="Advanced modes">

@@ -26,15 +26,17 @@ import { STANDARD_MODEL_RATES } from './model-rates.js';
 
 export type SubscriptionKey =
   | 'z-ai' // BYO Z.ai GLM Coding Plan — billed to the user's own subscription key
+  | 'kimi' // BYO Moonshot Kimi Code plan — billed to the user's own subscription key
   | 'claude-cli' // Claude Pro / Max plan, invoked via the local `claude` CLI
   | 'ugly.bot' // Anthropic / OpenAI / Google / open-weight / DeepSeek — billed via ugly.bot prepaid credits
   | 'anthropic'; // Generic Anthropic endpoint (ANTHROPIC_BASE_URL / settings)
 
-// Order = top-to-bottom in the picker. The BYO Z.ai and Claude CLI sections
-// lead so the user's own subscriptions stay above the fold, ahead of the big
-// collapsible ugly.bot catalog.
+// Order = top-to-bottom in the picker. The BYO Z.ai / Kimi and Claude CLI
+// sections lead so the user's own subscriptions stay above the fold, ahead of
+// the big collapsible ugly.bot catalog.
 export const SUBSCRIPTION_ORDER: readonly SubscriptionKey[] = [
   'z-ai',
+  'kimi',
   'claude-cli',
   'ugly.bot',
   'anthropic',
@@ -42,6 +44,7 @@ export const SUBSCRIPTION_ORDER: readonly SubscriptionKey[] = [
 
 const SUBSCRIPTION_LABEL: Record<SubscriptionKey, string> = {
   'z-ai': 'Z.ai',
+  'kimi': 'Moonshot',
   'claude-cli': 'Claude CLI',
   'ugly.bot': 'ugly.bot',
   'anthropic': 'Anthropic',
@@ -59,8 +62,10 @@ export function subscriptionLabel(key: SubscriptionKey): string {
  * CLI rows (provider === 'claude-cli') get their own keys.
  */
 export function subscriptionOf(model: CodingAgentModel): SubscriptionKey {
-  // BYO subscriptions (currently only the Z.ai GLM Coding Plan) bill against
-  // the user's own provider key, never ugly.bot credits — their own section.
+  // BYO subscriptions bill against the user's own provider key, never ugly.bot
+  // credits — each gets its own section (keyed by the specific model id, not
+  // just the BYO predicate, so GLM and Kimi don't collapse together).
+  if (model.id === 'kimi_coding_plan') return 'kimi';
   if (isByoKeyTextGenModel(model.id)) return 'z-ai';
   if (model.provider === 'claude-cli') return 'claude-cli';
   if (model.id.startsWith('anthropic:')) return 'anthropic';
@@ -107,6 +112,7 @@ export function isUglyBotModelId(id: string): boolean {
  * default seats — explicit picks still work via the picker.
  */
 export const DEFAULT_POOL_PINNED_IDS: readonly string[] = [
+  'kimi_k3',
   'deepseek_v4_pro',
   'deepseek_v4_flash',
   'minimax_m2_7',

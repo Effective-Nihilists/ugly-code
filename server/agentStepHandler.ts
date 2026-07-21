@@ -38,11 +38,13 @@ export interface AgentStepInput {
 export interface AgentStepDeps {
   /**
    * Read the caller's own provider key for BYO-subscription models
-   * (`glm_coding_plan`). Injected because the two server entries reach the
-   * settings doc through different DB handles. Only called when the selected
-   * model actually needs a key — an ordinary metered turn never touches Neon.
+   * (`glm_coding_plan`, `kimi_coding_plan`). Injected because the two server
+   * entries reach the settings doc through different DB handles. The model is
+   * passed so the closure reads the right credential field (see `byoKeyField`).
+   * Only called when the selected model actually needs a key — an ordinary
+   * metered turn never touches Neon.
    */
-  loadByoKey?: (userId: string) => Promise<string | undefined>;
+  loadByoKey?: (userId: string, model: string) => Promise<string | undefined>;
 }
 
 export async function agentStepHandler(
@@ -57,10 +59,16 @@ export async function agentStepHandler(
   // fail here with a message that says what to do rather than surfacing a 401.
   let apiKey: string | undefined;
   if (isByoKeyTextGenModel(resolvedModel)) {
-    apiKey = await deps.loadByoKey?.(userId);
+    apiKey = await deps.loadByoKey?.(userId, resolvedModel);
     if (!apiKey) {
+      // Compare as string: the ugly-app model union may lag the new BYO ids
+      // until the package is republished, and this stays correct either way.
+      const planName =
+        (resolvedModel as string) === 'kimi_coding_plan'
+          ? 'Kimi Code plan'
+          : 'Z.ai GLM Coding Plan';
       throw new Error(
-        `${resolvedModel} needs your own provider key. Add your Z.ai GLM Coding Plan key in Settings.`,
+        `${resolvedModel} needs your own provider key. Add your ${planName} key in Settings.`,
       );
     }
   }
@@ -75,7 +83,7 @@ export async function agentStepHandler(
       maxTokens: maxTokens ?? 8192,
       ...(reasoning ? { reasoningEffort: reasoning } : {}),
     },
-    // Forwarded per request; ugly.bot relays it to Z.ai and never persists it.
+    // Forwarded per request; ugly.bot relays it to the provider and never persists it.
     ...(apiKey ? { apiKey } : {}),
   });
   if (!data?.message)

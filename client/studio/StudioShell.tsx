@@ -12,6 +12,7 @@ import BinariesInstallOverlay from './panels/BinariesInstallOverlay';
 import { StudioSettingsModal } from './panels/StudioSettingsModal';
 import { recordRecentProject } from './state/recentProjects';
 import { useGlmCodingKey } from './hooks/useGlmCodingKey';
+import { useKimiCodingKey } from './hooks/useKimiCodingKey';
 
 // The Studio IDE on window.UglyNative, backed by the native transport shim
 // (./hooks/useSocket) instead of the sidecar /rpc socket.
@@ -81,12 +82,13 @@ export default function StudioShell(): React.ReactElement {
   // The ugly-app socket (cross-device sync). Optional: a logged-out shell still
   // renders the picker; it just won't record/sync recents until sign-in.
   const app = useAppOptional();
-  // Warm the BYO GLM Coding Plan key at boot so the model picker's Z.ai row is
-  // present the first time the dropdown opens. The key hydrates via a
+  // Warm the BYO coding-plan keys at boot so the model picker's Z.ai / Moonshot
+  // rows are present the first time the dropdown opens. Each key hydrates via a
   // getUserSettings RPC; without this it only starts loading when the picker
-  // itself mounts, so the Z.ai row popped in a beat late on first open. The hook
-  // is module-cached, so this single early read serves every picker instance.
+  // itself mounts, so the BYO row popped in a beat late on first open. The hooks
+  // are module-cached, so this single early read serves every picker instance.
   useGlmCodingKey();
+  useKimiCodingKey();
 
   const openProject = React.useCallback(
     (name: string, path?: string) => {
