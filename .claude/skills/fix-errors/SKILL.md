@@ -4,7 +4,7 @@ description: Fetch prod errors and fix them
 user-invocable: true
 ---
 
-Fetch errors from the project's **production** Neon DB and fix them.
+Fetch errors from the project's **production** Cloudflare D1 and fix them.
 
 Error logs are written only by the deployed Worker, so this is prod-only:
 
@@ -12,7 +12,7 @@ Error logs are written only by the deployed Worker, so this is prod-only:
 npx ugly-app errors            # add --limit <n> / --level error as needed
 ```
 
-If it reports "No prod Neon DB found", the app hasn't been deployed yet — run
+If it reports "No prod Cloudflare D1 found", the app hasn't been deployed yet — run
 `npm run deploy` first.
 
 For each error:
