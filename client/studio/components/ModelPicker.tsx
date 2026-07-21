@@ -350,7 +350,9 @@ export function ModelPicker(props: ModelPickerProps): React.ReactElement {
     const byoKeyPresent = (id: string): boolean =>
       id === 'kimi_coding_plan' ? !!kimiKey : !!glmKey;
     const all: CodingAgentModel[] = [
-      ...BASE_MODELS.filter((m) => !isByoKeyTextGenModel(m.id) || byoKeyPresent(m.id)),
+      ...BASE_MODELS.filter(
+        (m) => !isByoKeyTextGenModel(m.id) || byoKeyPresent(m.id),
+      ),
       ...(claudeCliAvailable ? CLAUDE_CLI_MODELS : []),
     ];
     const bySub = new Map<SubscriptionKey, CodingAgentModel[]>();
