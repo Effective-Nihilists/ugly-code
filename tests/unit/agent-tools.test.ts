@@ -7,7 +7,11 @@
 // (read/write/edit/bash), not the earlier read_file/run_command port.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { dispatchTool, killSessionBashProcs } from '../../client/agent/tools';
+import {
+  dispatchTool,
+  killSessionBashProcs,
+  toolResultText,
+} from '../../client/agent/tools';
 import { annotateLines } from '../../client/agent/tools/hashline';
 import { runAgent, type StepFn } from '../../client/agent/engine';
 import type { AgentMessage } from '../../shared/agent';
@@ -70,7 +74,11 @@ describe('edit', () => {
     });
     // The delta is part of the contract: the transcript card can't derive it (anchor
     // edits carry no old_string) and used to badge every replacement as "+1 −0".
-    expect(out).toBe('Edited x.ts (+1 −1)');
+    //
+    // `edit` now returns the ToolResult union ({ content, metadata }) rather than
+    // a bare string, so read it through the helper instead of asserting on the
+    // envelope.
+    expect(toolResultText(out)).toBe('Edited x.ts (+1 −1)');
     expect(mockFiles().get('x.ts')).toBe('const x = 2;\n');
   });
 
@@ -81,7 +89,7 @@ describe('edit', () => {
       old: 'a\n',
       new: 'a\nb\n',
     });
-    expect(out).toBe('Edited x.ts (+1 −0)');
+    expect(toolResultText(out)).toBe('Edited x.ts (+1 −0)');
   });
 
   it('reports when the old text is not found', async () => {
@@ -118,7 +126,7 @@ describe('edit', () => {
       anchor: '2',
       new_content: 'L2',
     });
-    expect(out).toMatch(/Edited/);
+    expect(toolResultText(out)).toMatch(/Edited/);
     expect(mockFiles().get('a.ts')).toBe('l1\nL2\nl3\n');
   });
 

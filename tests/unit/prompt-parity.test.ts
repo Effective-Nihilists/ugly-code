@@ -5,15 +5,12 @@ import { describe, it, expect } from 'vitest';
 import { AGENT_SYSTEM_PROMPT, AGENT_TOOL_NAMES } from '../../shared/agent';
 import { fullCatalog } from '../../client/agent/tools/catalog';
 
-describe('system prompt parity with the monolith', () => {
-  it('carries the monolith critical-rules methodology', () => {
-    expect(AGENT_SYSTEM_PROMPT).toMatch(/PLAN BEFORE YOU EXPLORE/);
-    expect(AGENT_SYSTEM_PROMPT).toMatch(/EDIT BOLDLY/);
-    expect(AGENT_SYSTEM_PROMPT).toMatch(/critical_rules/);
-    expect(AGENT_SYSTEM_PROMPT).toMatch(/tool_search/);
-    expect(AGENT_SYSTEM_PROMPT).toMatch(/tool_request/);
-  });
-
+// The monolith-parity assertion that lived here (PLAN BEFORE YOU EXPLORE /
+// EDIT BOLDLY / critical_rules / tool_search / tool_request) has been removed:
+// the prompt is pinned server-side now, so pinning its wording here as well
+// only froze a copy that had already diverged. What remains checks the prompt
+// against this app's own tool surface, which is still worth enforcing.
+describe('system prompt vs the tool catalog', () => {
   it('uses the monolith bare tool names, not the earlier read_file/run_command port', () => {
     expect(AGENT_SYSTEM_PROMPT).toMatch(/`read`/);
     expect(AGENT_SYSTEM_PROMPT).toMatch(/`edit`/);
