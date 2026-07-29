@@ -29,5 +29,8 @@
     "tool-smoke": "client/studio/agent/tool-smoke-task.ts"
   },
   "neon": false,
-  "crossOriginIsolation": false
+  "crossOriginIsolation": false,
+  "staticAssets": {
+    "hostBundle": true
+  }
 }
