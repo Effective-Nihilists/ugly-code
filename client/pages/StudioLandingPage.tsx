@@ -215,8 +215,8 @@ export default function StudioLandingPage(): React.ReactElement {
         background: BG,
         // viewport-fit=cover lets content slide under a notch in landscape;
         // env() insets are 0 on normal devices, so this is a no-op elsewhere.
-        paddingLeft: 'env(safe-area-inset-left)',
-        paddingRight: 'env(safe-area-inset-right)',
+        paddingLeft: 'var(--safe-area-inset-left, 0px)',
+        paddingRight: 'var(--safe-area-inset-right, 0px)',
       }}
     >
       <ScrollView showScrollArrow>
