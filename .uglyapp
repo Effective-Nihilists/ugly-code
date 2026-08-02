@@ -2,7 +2,7 @@
   "projectId": "nelbipxwfm",
   "title": "Ugly Code",
   "description": "The Ugly Studio coding agent + IDE, as a web app — runs on the Ugly Studio desktop browser via window.ugly (fs/process), AI via ugly.bot.",
-  "icon": "icon.png",
+  "icon": "https://code.ugly.bot/icon.png",
   "deployTarget": {
     "provider": "cloudflare-workers",
     "workerName": "ugly-code",
@@ -21,7 +21,7 @@
       "push": "",
       "search": ""
     },
-    "lastDeployedAt": "2026-07-31T02:15:25.167Z"
+    "lastDeployedAt": "2026-08-02T02:33:31.459Z"
   },
   "domain": "code.ugly.bot",
   "tasks": {
@@ -33,5 +33,6 @@
   "staticAssets": {
     "hostBundle": true,
     "baseUrl": "https://code-static.ugly.bot"
-  }
+  },
+  "image": "https://code.ugly.bot/icon.png"
 }
