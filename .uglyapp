@@ -34,5 +34,7 @@
     "hostBundle": true,
     "baseUrl": "https://code-static.ugly.bot"
   },
-  "image": "https://code.ugly.bot/icon.png"
+  "image": "https://code.ugly.bot/icon.png",
+  "backgroundColor": "#ffffff",
+  "backgroundColorDark": "#0f1115"
 }
