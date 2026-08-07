@@ -2,6 +2,7 @@ import React from 'react';
 import { hasSessionCookie } from 'ugly-app/client';
 import { isNativeAvailable } from 'ugly-app/native';
 import { chooseHomeView } from '../lib/homeView';
+import { lazyChunk } from '../lib/lazyChunk';
 
 // The home route.
 //  • Outside the Ugly Studio browser → the landing page (what it is + install).
@@ -12,9 +13,12 @@ import { chooseHomeView } from '../lib/homeView';
 // so a mount-time check is sufficient. Each side is lazy-loaded so a visit only
 // pulls the bundle it needs (the landing page is large; the IDE pulls the
 // native/agent code).
-const StudioLandingPage = React.lazy(() => import('./StudioLandingPage'));
-const StudioShell = React.lazy(() => import('../studio/StudioShell'));
-const StudioLoginPrompt = React.lazy(() => import('./StudioLoginPrompt'));
+//
+// `lazyChunk`, not `React.lazy`: this is the home route, so a stale chunk after
+// a redeploy wedges the app at the front door with nothing rendered.
+const StudioLandingPage = lazyChunk(() => import('./StudioLandingPage'));
+const StudioShell = lazyChunk(() => import('../studio/StudioShell'));
+const StudioLoginPrompt = lazyChunk(() => import('./StudioLoginPrompt'));
 
 export default function HomeGate(): React.ReactElement {
   const [view] = React.useState(() =>
