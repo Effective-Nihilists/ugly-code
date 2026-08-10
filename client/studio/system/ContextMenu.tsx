@@ -60,7 +60,8 @@ export function ContextMenu({
       const id = n === 0 ? base : `${base}-${n}`;
       map.set(id, item.onClick);
       // Divider before the first danger item that follows a non-danger one.
-      if (item.danger && i > 0 && !visible[i - 1].danger) out.push({ separator: true });
+      if (item.danger && i > 0 && !visible[i - 1].danger)
+        out.push({ separator: true });
       out.push({
         id,
         label: item.label,
