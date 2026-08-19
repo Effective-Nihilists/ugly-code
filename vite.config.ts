@@ -1,9 +1,18 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
-import { dataSourcePlugin } from 'ugly-app/vite';
+import {
+  audioWorkletsPlugin,
+  dataSourcePlugin,
+  staticAssetsPlugin,
+} from 'ugly-app/vite';
 
 export default defineConfig({
-  plugins: [dataSourcePlugin(), react()],
+  plugins: [
+    dataSourcePlugin(),
+    staticAssetsPlugin(),
+    audioWorkletsPlugin(),
+    react(),
+  ],
   root: 'client',
   base: process.env.VITE_CDN_BASE || '/',
   build: {

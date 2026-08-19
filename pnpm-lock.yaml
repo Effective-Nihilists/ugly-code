@@ -72,8 +72,8 @@ importers:
         specifier: ^0.183.2
         version: 0.183.2
       ugly-app:
-        specifier: ^0.1.991
-        version: 0.1.991(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.2)(typescript@5.9.3)(vega-lite@6.4.3(vega@6.2.0))(vega@6.2.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+        specifier: ^0.1.1020
+        version: 0.1.1020(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.2)(typescript@5.9.3)(vega-lite@6.4.3(vega@6.2.0))(vega@6.2.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
       yjs:
         specifier: ^13.6.30
         version: 13.6.31
@@ -3988,8 +3988,8 @@ packages:
     engines: {node: '>=0.8.0'}
     hasBin: true
 
-  ugly-app@0.1.991:
-    resolution: {integrity: sha512-WsOcNTRwr6DWOuUQwl+x47hEAHjMXBnc0zUseLUFiJlo56kSEl6wGjE/BnEdKimsB8gQBSSmINeVH+7AtUVwPg==}
+  ugly-app@0.1.1020:
+    resolution: {integrity: sha512-RC6bTwwEa0XEGPwpV8C0es6GoNfTpCjNH7YrmtDO69yrjWM1UTe8eTDJKhhgycHNWl5cvCkm1q4PsioJP3bRRA==}
     hasBin: true
     peerDependencies:
       '@types/react': '>=18.0.0'
@@ -4011,8 +4011,8 @@ packages:
       yjs:
         optional: true
 
-  ugly-game@0.15.4:
-    resolution: {integrity: sha512-K46noVV+7bhoSiQtIWVEzTib/+XW+SKyCMnOftTBqXlf+Hbnfnc3IBTOrAm1xDB8YUOmRUN8/35YgsqcFHkNdA==}
+  ugly-game@0.15.45:
+    resolution: {integrity: sha512-rjMC9RMmy/tlfkd/RP8mTFpWzUwfAVzbJya1v8BUPnTreqRLXPleCNPqC4Ie1CaD21Qf/oEuePx28Q4n36Dkbg==}
     peerDependencies:
       react: '>=18'
 
@@ -8997,7 +8997,7 @@ snapshots:
   uglify-js@3.19.3:
     optional: true
 
-  ugly-app@0.1.991(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.2)(typescript@5.9.3)(vega-lite@6.4.3(vega@6.2.0))(vega@6.2.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31):
+  ugly-app@0.1.1020(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.2)(typescript@5.9.3)(vega-lite@6.4.3(vega@6.2.0))(vega@6.2.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31):
     dependencies:
       '@aws-sdk/client-s3': 3.1096.0
       '@aws-sdk/s3-request-presigner': 3.1096.0
@@ -9070,7 +9070,7 @@ snapshots:
       sprintf-js: 1.1.3
       turndown: 7.2.4
       typescript-eslint: 8.65.0(eslint@8.57.1)(typescript@5.9.3)
-      ugly-game: 0.15.4(react@18.3.1)
+      ugly-game: 0.15.45(react@18.3.1)
       url-parse: 1.5.10
       vega-embed: 7.1.0(vega-lite@6.4.3(vega@6.2.0))(vega@6.2.0)
       ws: 8.21.1
@@ -9091,8 +9091,9 @@ snapshots:
       - vega-lite
       - y-protocols
 
-  ugly-game@0.15.4(react@18.3.1):
+  ugly-game@0.15.45(react@18.3.1):
     dependencies:
+      '@webgpu/types': 0.1.70
       meshoptimizer: 1.2.0
       react: 18.3.1
 

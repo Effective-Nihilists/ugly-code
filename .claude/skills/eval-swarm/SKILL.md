@@ -35,6 +35,14 @@ the real feature, on real data, and *see* the result with its own eyes produces
 imagination — dead weight that pollutes the signal. Every guardrail below exists to keep
 each finding anchored to something the persona actually did and saw.
 
+**Corollary — grade the OUTCOME, never the UI's self-report.** A green check, a "done"
+status, and a completed turn are claims by the thing under test; they are not evidence.
+Assert ground truth outside the app: read the file on disk, query the row, diff the repo.
+An app that politely tells you it did nothing still renders as success — that exact hole
+let five ugly-code rounds score a coding agent that could not search (see Step 0.6). When
+a persona's goal implies a durable change, the verdict must be checked against that
+change, not against the transcript describing it.
+
 ---
 
 ## Billing
@@ -87,6 +95,21 @@ fake findings, which is worse than no findings.
    with any cost-control env var prepended (see Billing), NOT `--watch` (the swarm reads a
    stable build). Then poll `$(npx ugly-app url)` until it answers.
 
+6. **Does the app's machinery actually WORK, or just not crash?** A broken environment
+   usually announces itself; a **silently degraded** one does not, and that is the
+   dangerous case — the run completes, every check is green, and the rating is fiction.
+   Before dispatching, prove each capability the personas will exercise is *live*, not
+   merely present: run the smallest real operation and look at its output.
+   - **Real precedent:** ugly-code evals ran five rounds and earned ★★★★★ while the coding
+     agent's `glob`/`grep` were **dead** — `rg` was missing from the task child's PATH, the
+     failed spawn rendered as a green "no matches" card, and the agent concluded each
+     project was empty. Nothing errored. The harness now refuses to start when a required
+     binary is unresolvable (`assertAgentToolchain`) — **prefer a preflight that makes the
+     harness refuse over one that warns.**
+   - Generalize it: if the app shells out to a binary, resolve it; if it depends on an
+     index/model/migration, query it for a known-present row. "It returned successfully"
+     is not evidence — "it returned the thing I planted" is.
+
 Store `BASE_URL="$(npx ugly-app url)"` for the run. Everything the swarm reads and writes
 lives on **this local server** — the framework read CLIs (`ugly-app feedback`, `errors`,
 `logs`) query **prod**, not local, so don't use them to inspect the run.
@@ -130,9 +153,33 @@ Do not use a stock roster. Open the app and design personas around what it actua
    - **consume-persona** — it needs *existing* data to work on (a reader needs a
      manuscript; a coach-user needs a draft). Requires seed — see Step 2.
 
+4. **Always include a first-run newcomer.** One persona must arrive COLD — has never used
+   the app — and judge the ONBOARDING itself: landing → creating / opening the first project
+   → writing the **first prompt** → seeing the first result. This cold-start is the
+   make-or-break moment for adoption (a powerful tool that's confusing to *start* loses users
+   at the door) and it's the single thing builders are most blind to. Have them narrate every
+   hesitation out loud — "what do I click?", "what do I type here?", "wait, did that even
+   work?" — and screenshot each dead-end.
+
+Vary **UX tolerance** as a real axis, not just goals: an impatient newcomer who bails at the
+first confusion surfaces different problems than a patient power user who pushes through
+friction. The gap between their verdicts IS your ease-of-use signal — design at least two
+personas whose *patience* differs, not just their task.
+
+5. **Pick each persona's `device`: `desktop` | `ios` | `android`.** These apps ship to
+   phones, where a whole class of bugs lives that a desktop viewport never shows — content
+   bleeding under the notch/status bar, a docked composer or CTA hidden under the
+   home-indicator, an input covered by the on-screen keyboard. A desktop-only swarm is
+   **blind** to all of it. So give **at least two personas a mobile device** — the cold-start
+   newcomer especially (first-run pain is worst on a phone), plus one persona whose goal leans
+   on a text input / composer (the keyboard-overlap case). Mobile costs the same AI spend as
+   desktop; it only changes the viewport and screenshots. A mobile persona runs the **Mobile
+   safe-area + keyboard pass** in its contract (Step 3).
+
 Write each persona as a short brief you will hand to its subagent: who they are, their
 goal for this session, the exact features they should exercise, and what would make them
-say "this tool works" vs. "this is broken."
+say "this tool works" vs. "this is broken" — AND what would make them say "this felt
+effortless" vs. "I nearly gave up."
 
 *(Optional repeatability: an app may ship `bots/eval-swarm.json` — `{ personas, seed,
 model }`. If present, use it instead of inventing. See Config.)*
@@ -171,12 +218,22 @@ calls). Never batch-author findings for several personas in one pass — that is
 shortcut that produces imagination instead of usage. Give each subagent this contract:
 
 > You are **<Persona Name>**: <one-line brief>. Your goal this session: <goal>.
-> Base URL: `<BASE_URL>`. Your account token: `<token>`.
+> Base URL: `<BASE_URL>`. Your account token: `<token>`. Your device: `<desktop|ios|android>`.
 >
 > **Authenticate**, then actually use the product to pursue your goal:
-> 1. In headless Chromium (`pnpm exec playwright` / the Playwright MCP if available), set
->    cookie `auth_token=<token>` for `<BASE_URL>`, then `goto` the app and wait for the
->    hydration selector `<WAIT_SEL>` (see Screenshot recipe), never `networkidle`.
+> 1. In headless Chromium (`pnpm exec playwright` / the Playwright MCP if available):
+>    - **`desktop`** → set cookie `auth_token=<token>` for `<BASE_URL>`, then `goto` the app.
+>    - **`ios` / `android`** → drive a real phone frame. In a `.mjs` script inside the app dir
+>      (`import { createMobileBotPage, raiseKeyboard, dismissKeyboard, waitForApp, expectClean }
+>      from 'ugly-app/playwright'`), do
+>      `const page = await createMobileBotPage(browser, '<token>', '<ios|android>')` — it sets a
+>      phone viewport (390×844 iOS / 360×780 Android), touch emulation, and injects the top +
+>      bottom device safe-area so the layout pads for real. `goto` **`<BASE_URL>/?debugSafeArea=true`**
+>      so the red top / blue bottom / green keyboard bands render for your vision pass.
+>    - Either way, wait for the hydration selector `<WAIT_SEL>` (see Screenshot recipe), never
+>      `networkidle`. (If `ugly-app/playwright` lacks `createMobileBotPage`, the app is on an old
+>      `ugly-app` — tell the orchestrator to bump it; do NOT fall back to a desktop viewport and
+>      call it a mobile run.)
 > 2. Drive the real features toward your goal. **Trigger the real AI** — generate, coach,
 >    extract, chat, whatever this app does — and **wait for real responses**. This spends
 >    real (owner-billed) tokens; that is expected. Budget ~10–20 AI interactions.
@@ -185,22 +242,79 @@ shortcut that produces imagination instead of usage. Give each subagent this con
 >    without a logged look at the thing you are critiquing is invalid — discard it.
 > 4. Judge as your persona: did the feature do what you came for? Was the AI output good,
 >    wrong, empty, slow, truncated, off-tone? Was anything broken, confusing, or missing?
+> 5. **Judge the EXPERIENCE, not just the output.** Beyond "did it work": at each step, was it
+>    obvious what to do next? Where did you hesitate, backtrack, misread a control, hunt for a
+>    button, or feel lost? What did the app assume you already knew? What (if anything)
+>    delighted you? Ease-of-use is a first-class finding — a feature that *works* but is
+>    confusing to reach is still a real problem worth ranking (`type: 'design'`). Narrate this
+>    in the user's own voice. **If you are the newcomer, walk the FULL cold start** — first
+>    screen → create/open a project → write the first prompt → first result — and log every
+>    friction point with a screenshot; that onboarding narrative is your most valuable output.
+> 6. **Mobile safe-area + keyboard pass (only if your `device` is `ios`/`android`).** A phone
+>    clips content the desktop layout never does. At each key screen you visit, judge these
+>    states — screenshot and LOOK at each against the debug bands:
+>    - **Top (notch / status bar):** is the header, back button, or top nav clear of the red
+>      top band, or does it hide under it?
+>    - **Bottom (home-indicator):** is a docked composer, send button, tab bar, or primary CTA
+>      clear of the blue bottom band, or clipped by it?
+>    - **Reachability:** for anything clickable that DOES sit in the top/bottom band — can you
+>      scroll it clear to tap it, or is it stuck there (a fixed/sticky control jammed under the
+>      notch/home-indicator is a real bug: permanently untappable)?
+>    - **Seamless background:** does the strip under the notch/home-indicator show the SAME
+>      background as the content, or an ugly bare white/black box at the very top/bottom edge?
+>    - **Keyboard open:** focus the main text input, then `await raiseKeyboard(page, '<ios|android>')`.
+>      Is the **focused** input — and its Send/submit button — still visible above the green
+>      keyboard band, or hidden behind it? (`await dismissKeyboard(page)` when done.)
+>    Then get the **hard signal**: `await expectClean(page, { allowSafeAreaViolations: false,
+>    allowSafeAreaSeams: false, allowKeyboardCoverage: false, allowFocusedInputCovered: false })`.
+>    It throws listing any interactive element crossing a safe-area edge (`safeAreaViolations`,
+>    flagged `UNREACHABLE` when it can't be scrolled clear), a background seam (`safeAreaSeams`),
+>    an input under the keyboard (`keyboard.coveredInputs`), or — worst — the focused element
+>    hidden behind the keyboard (`focused input hidden behind keyboard`). Quote those selectors as
+>    evidence. File each as `--type design`; a clipped/unreachable/covered control or a seam on a
+>    **core** flow is high-severity (it caps the rating — see rubric), not a nit.
+>
+>    **Shortcut — the runtime auditor already logs these.** On a mobile device the framework
+>    auto-detects all of the above and emits `console.error('[ugly.ux] …')` (→ the app's error
+>    telemetry). So after driving a screen, also read the browser console for `[ugly.ux]` lines —
+>    they name the exact selector and defect with zero extra work. (`ugly-app errors` surfaces the
+>    same lines from real users' sessions.)
 >
 > **File each real finding** with
 > `npx ugly-app feedback:submit --type <bug|design|feature> --message "<what you did →
 > what you saw → why it's wrong>" --token <token> --url <page>`. Every message must name
-> the concrete thing you did and saw.
+> the concrete thing you did and saw. UX-friction findings are `--type design`.
 >
-> **Return to me** a JSON array of your findings (`{type, severity, feature, message,
-> evidence}`) plus a one-line verdict: does this tool work for you? Return the findings as
-> your final message — they are data for aggregation, not a human report.
+> **Return to me** a JSON object as your final message (data for aggregation, not a human
+> report):
+> `{ findings: [{type, severity, feature, message, evidence}], ease: <1–5, how effortless was
+> it to get what you came for>, firstRun: "<one-paragraph narrative of the onboarding + first-
+> prompt experience, every hesitation named>", friction: ["<a moment you felt lost/confused/
+> slowed>", …], delight: ["<anything that felt genuinely good>", …], verdict: "<does this tool
+> work for you — AND did it feel good to use?>" }`. Findings must include design/UX friction
+> (`type:'design'`), not only functional bugs. If your device is mobile, add
+> `mobile: { device, safeAreaViolations: [...], unreachable: [...], seams: [...],
+> keyboardCoveredInputs: [...], focusedCovered: "<selector or null>", uglyUxErrors: ["<any
+> [ugly.ux] console.error lines>"], verdict: "<did the phone layout hold up?>" }` from your
+> Mobile pass.
 
 **Guardrails to state in every dispatch:**
+- **A mobile persona that never checked safe-area or the keyboard did not do its job.** A phone
+  run whose findings are all desktop-shaped (no notch / home-indicator / keyboard-overlap check)
+  wasted the slot — run the Mobile pass and report `expectClean`'s result, even if it's clean.
 - Real AI only. If you find yourself imagining a response instead of waiting for one, stop
   and actually run the feature.
 - Vision before verdict. No finding about a screen you did not look at.
 - Ground every message in "I did X, I saw Y." Vague wishes ("would be nice if…") that
   could have been written without opening the app are noise — cut them.
+- **Green is a claim, not a result.** When your goal implies a durable change (a file
+  edited, a row written, a doc saved), verify it OUTSIDE the app — read the file, query
+  the row — before crediting it. If the app reports success and the change isn't there,
+  that is a **blocker**, and it's the single most valuable finding you can file.
+- **"There's nothing here" is a red flag, not a finding.** If the app claims the data you
+  planted doesn't exist, suspect your environment before believing it (Step 0.6): a
+  silently dead dependency looks exactly like an empty app. Report it as a possible
+  harness failure so the orchestrator can check — don't grade the app on it.
 
 Timeout ~20 min per persona. A persona that fails or times out does not block the others;
 record which succeeded.
@@ -222,10 +336,16 @@ rows. Don't hand off by telling a fixer to "go read the feedback" — it can't.)
    output, then UX friction, then wishes.
 4. Present one ranked list: for each item — feature, severity, how many personas hit it,
    the sharpest one-line evidence, and the persona verdicts (did the tool work?).
-5. **Rate the product 1–5 stars** (see rubric) with a one-line justification. Lead the
+5. **Synthesize the EXPERIENCE, separately from the bug list.** Report the average `ease`
+   score and its spread (a wide gap between the impatient and the patient persona is itself a
+   finding — it means the app only works if you already know it). Give a short **first-run
+   digest**: the friction points every newcomer hit walking new-project → first-prompt →
+   first-result, plus anything that delighted. Onboarding friction rarely files as a "bug" but
+   is the #1 reason a new user leaves — surface it as prominently as the top functional finding.
+6. **Rate the product 1–5 stars** (see rubric) with a one-line justification. Lead the
    presentation with the rating — it is the headline the user wants; the ranked list is the
    evidence behind it.
-6. Hand off the ranked list **as content** for fixing — either fix the items directly in
+7. Hand off the ranked list **as content** for fixing — either fix the items directly in
    this session, or paste the list into a `/fix-feedback`-style pass (using its ambition
    policy), since the fixer cannot pull these local rows itself.
 
@@ -262,8 +382,10 @@ moved. That's how a product climbs from ★★★ to ★★★★★.
 ### Rating rubric (1–5 stars)
 
 Rate the product as a whole, computed from the **worst core-feature outcome**, **how many
-personas completed their primary goal**, and the **persona verdicts**. A broken feature
-caps the score — polish can't buy back a blocker.
+personas completed their primary goal**, the **persona verdicts**, and the **ease-of-use /
+first-run experience** (the `ease` scores + onboarding friction). A broken feature caps the
+score — polish can't buy back a blocker; and a feature that works but that a newcomer can't
+figure out how to *reach* is a real defect, not a nit.
 
 | Stars | Meaning | Gate |
 |-------|---------|------|
@@ -273,9 +395,32 @@ caps the score — polish can't buy back a blocker.
 | ★★★★☆ **4 — Solid** | All core jobs work; findings are UX polish, edge cases, or wishes. | All personas completed their goal; no blocker/high on a core path. |
 | ★★★★★ **5 — Excellent** | Every persona completed their goal; outputs accurate and trustworthy; only cosmetic nits. | Every verdict "works"; no finding above `low`. |
 
+**Validity gate — publish no rating you can't vouch for the environment of.** Stars are a
+claim about the product; they're only true if the product was the thing being measured.
+Before you report a number, confirm Step 0.6 passed and that at least one persona's durable
+change was verified outside the app. If a capability was silently dead, the round measured
+your harness — say so and re-run; do NOT publish the score with a caveat. A wrong ★★★★★ is
+more damaging than no rating, because it ends the investigation.
+
 Caps are hard: one blocker on a primary feature means **≤2 stars no matter how good the
 rest is**; a broken secondary feature caps at **3**. Half-stars are fine (e.g. ★★★½).
 State the single finding that set the ceiling.
+
+**Ease-of-use caps too.** If the first-run newcomer couldn't figure out how to start —
+create/open a project, or write and send their first prompt — without trial-and-error, cap at
+**3** however well the features work (a tool you can't figure out isn't "solid"). **5 requires
+the cold start to feel effortless**, not merely for the features to be correct: average
+`ease ≥ 4.5`, no newcomer left confused at a step, and no "I nearly gave up" verdict.
+
+**Mobile safe-area / keyboard caps too.** If a mobile persona found, on a **core** flow, any of:
+an interactive control clipped under the notch/home-indicator, a control **unreachable** there
+(stuck, can't scroll to tap), the **focused** element hidden behind the keyboard, or a background
+**seam** (bare white/black box under the notch/home-indicator) — cap at **3** however well the
+desktop layout works. A real phone user literally cannot use what they can't reach or see, and a
+bare box reads as broken. Name the offending control/edge as the ceiling finding. **5 requires a
+clean mobile pass**: no core-flow safe-area violation, unreachable control, seam, or
+keyboard-coverage (`expectClean` passes, and no `[ugly.ux]` console.error) on any device a persona
+ran. (Cosmetic edge clipping of a non-interactive decoration is a `low` nit, not a cap.)
 
 ---
 
@@ -309,6 +454,18 @@ writes a `.mjs` script instead. Two gotchas that will `ERR_MODULE_NOT_FOUND` you
   resolves bare imports from the script's own folder upward, so a script in a scratchpad
   can't find the app's `node_modules`. Delete it when done.
 
+**Mobile personas — phone frame + safe-area.** Don't screenshot a mobile persona in a desktop
+viewport. Use `createMobileBotPage(browser, token, 'ios'|'android')` from `ugly-app/playwright`
+(phone viewport + touch + injected top/bottom safe-area), and load with `?debugSafeArea=true` so
+the red top / blue bottom / green keyboard bands are visible in the PNG for your vision pass.
+`raiseKeyboard(page, platform)` / `dismissKeyboard(page)` toggle the keyboard; `expectClean(page,
+{ allowSafeAreaViolations: false, allowSafeAreaSeams: false, allowKeyboardCoverage: false,
+allowFocusedInputCovered: false })` is the hard gate that lists clipped/unreachable/covered
+interactive elements, background seams, and a focused input hidden behind the keyboard. The
+framework also auto-logs all of these as `[ugly.ux]` `console.error` lines on a mobile device —
+read the console too. (Requires a recent `ugly-app`; see TESTING.md → "Mobile safe-area +
+keyboard".)
+
 ---
 
 ## Config (optional, per-app)
@@ -318,7 +475,8 @@ An app can ship `bots/eval-swarm.json` for repeatable runs:
 ```json
 {
   "personas": [
-    { "slug": "plotter", "name": "The Plotter", "brief": "...", "goal": "...", "needs": "consume" }
+    { "slug": "plotter", "name": "The Plotter", "brief": "...", "goal": "...", "needs": "consume", "device": "desktop" },
+    { "slug": "newcomer", "name": "The Newcomer", "brief": "...", "goal": "...", "needs": "create", "device": "ios" }
   ],
   "seed": "bots/seed-story.mjs",
   "model": "deepseek_v4_flash"
@@ -329,6 +487,8 @@ An app can ship `bots/eval-swarm.json` for repeatable runs:
   data is absent after it; the skill does not auto-run seeders unless the app documents it).
 - `model` — a cheap-model override env the app honors for eval runs (e.g. ugly-ink's
   `INK_FORCE_MODEL`). Cost control only; default is the app's real production model.
+- `device` — per-persona `desktop` | `ios` | `android` (default `desktop`). Mobile personas
+  run the Mobile safe-area + keyboard pass (Step 3). Give at least two personas a phone.
 
 If no config exists, invent personas per Step 1 — that is the normal path.
 
@@ -392,6 +552,8 @@ native/mobile work, or cross-app infra), say so — that's a real-cost item, not
 | "I can skip the screenshot, I know what it says" | No finding about a screen you didn't look at. Vision before verdict. |
 | "`login` failed, let me retry it headless" | It deadlocks on browser auth. Stop and tell the user. |
 | "Stubs would be cheaper" | Stubbed AI produces fake critiques. This skill is real-AI by design; use `verify:e2e` for hermetic checks. |
+| "I'll test this mobile-first app on desktop only" | A desktop viewport is blind to notch / home-indicator / keyboard clipping. Give ≥2 personas a phone `device` and run the Mobile pass. |
+| "The mobile screenshot looks fine, skip `expectClean`" | Eyeballing misses sub-pixel overlaps. `expectClean` names the exact clipped/covered element — run it for the hard signal. |
 
 ## Completion
 
