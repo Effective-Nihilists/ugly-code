@@ -147,7 +147,6 @@ export class IndexerClient {
     // since our last cached lookup. invalidateDaemonCache() forces a
     // re-discover (which will re-spawn under lock if needed).
     const deadline = Date.now() + 5_000;
-    let lastErr: unknown;
     let attempted = 0;
     for (;;) {
       try {
@@ -169,7 +168,6 @@ export class IndexerClient {
         }
         return data;
       } catch (err) {
-        lastErr = err;
         // node:http surfaces the refusal as `err.code`, not a wrapped cause.
         const transient =
           err instanceof Error &&
@@ -185,8 +183,6 @@ export class IndexerClient {
         await new Promise((r) => setTimeout(r, 50));
       }
     }
-    // unreachable
-    void lastErr;
   }
 
   /** Full index of a project directory. Blocks until complete. */

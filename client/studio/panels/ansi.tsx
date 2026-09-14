@@ -44,14 +44,11 @@ function applyCode(style: Style, code: number): Style {
   if (code === 1) return { ...style, fontWeight: 700 };
   if (code === 2) return { ...style, opacity: 0.7 };
   if (code === 22) {
-    const { fontWeight, opacity, ...rest } = style;
-    void fontWeight;
-    void opacity;
+    const { fontWeight: _fontWeight, opacity: _opacity, ...rest } = style;
     return rest;
   }
   if (code === 39) {
-    const { color, ...rest } = style;
-    void color;
+    const { color: _color, ...rest } = style;
     return rest;
   }
   if (FG[code]) return { ...style, color: FG[code] };

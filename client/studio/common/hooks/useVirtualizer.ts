@@ -68,7 +68,6 @@ export function useVirtualizer<
     scrollToFn: elementScroll,
     ...options,
     onChange: (instance, sync) => {
-      void sync;
       rerender();
       options.onChange?.(instance, sync);
     },

@@ -46,15 +46,35 @@ export interface ModelRates {
  */
 function ratesFromTextGen(id: TextGenModel): ModelRates {
   const d = textGenModelData[id];
+  const currentRates = () =>
+    (
+      d as typeof d & {
+        pricingAt?: (
+          at?: Date,
+        ) => Pick<
+          typeof d,
+          | 'inputTokenNanoDollar'
+          | 'outputTokenNanoDollar'
+          | 'cacheReadTokenNanoDollar'
+          | 'cacheWriteTokenNanoDollar'
+        >;
+      }
+    ).pricingAt?.() ?? d;
   return {
-    inputPerM: d.inputTokenNanoDollar / 1000,
-    outputPerM: d.outputTokenNanoDollar / 1000,
-    ...(d.cacheReadTokenNanoDollar !== undefined
-      ? { cacheReadPerM: d.cacheReadTokenNanoDollar / 1000 }
-      : {}),
-    ...(d.cacheWriteTokenNanoDollar !== undefined
-      ? { cacheWritePerM: d.cacheWriteTokenNanoDollar / 1000 }
-      : {}),
+    get inputPerM() {
+      return currentRates().inputTokenNanoDollar / 1000;
+    },
+    get outputPerM() {
+      return currentRates().outputTokenNanoDollar / 1000;
+    },
+    get cacheReadPerM() {
+      const rate = currentRates().cacheReadTokenNanoDollar;
+      return rate === undefined ? undefined : rate / 1000;
+    },
+    get cacheWritePerM() {
+      const rate = currentRates().cacheWriteTokenNanoDollar;
+      return rate === undefined ? undefined : rate / 1000;
+    },
   };
 }
 
