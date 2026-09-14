@@ -12,9 +12,7 @@ export interface StaticAssetRecord {
 // `satisfies` (not `as const`) — it keeps the keys literal, which is what
 // StaticAssetPath needs, while leaving the values mutable so the lookups below
 // don't need a readonly-stripping cast.
-export const staticAssets = {
-
-} satisfies Record<string, StaticAssetRecord>;
+export const staticAssets = {} satisfies Record<string, StaticAssetRecord>;
 
 /** Every path present in `static/` at build time. */
 export type StaticAssetPath = never;
