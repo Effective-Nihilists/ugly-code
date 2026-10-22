@@ -1256,6 +1256,7 @@ export const requests = defineRequests({
    * @deprecated Use `grep` with `mode='exact'` instead. Kept as a thin
    * shim around the merged engine for backward compat.
    */
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- the declaration itself, flagged since typescript-eslint 8.72
   searchFiles: req({
     input: z.object({
       projectPath: z.string().optional(),
@@ -1289,6 +1290,7 @@ export const requests = defineRequests({
    * @deprecated Use `grep` with `mode='semantic'` instead. Kept as a
    * thin shim around the merged engine for backward compat.
    */
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- the declaration itself, flagged since typescript-eslint 8.72
   semanticSearch: req({
     input: z.object({
       projectPath: z.string().optional(),
